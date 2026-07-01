@@ -1,0 +1,16 @@
+[package]
+name = "netpulse-capture"
+description = "Capture pipeline: interface enumeration, ring feeding, timestamping, staged shedding (docs/05)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-platform = { path = "../netpulse-platform" }
+
+[lints]
+workspace = true

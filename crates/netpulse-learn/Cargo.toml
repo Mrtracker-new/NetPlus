@@ -1,0 +1,16 @@
+[package]
+name = "netpulse-learn"
+description = "Learning engine: lessons/exercises generated from the user's own captures (docs/13)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-storage = { path = "../netpulse-storage" }
+
+[lints]
+workspace = true

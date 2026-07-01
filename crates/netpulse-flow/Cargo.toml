@@ -1,0 +1,16 @@
+[package]
+name = "netpulse-flow"
+description = "Flow + session reconstruction: sharded state machines, direction pairing, metrics (docs/06)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-decode = { path = "../netpulse-decode" }
+
+[lints]
+workspace = true

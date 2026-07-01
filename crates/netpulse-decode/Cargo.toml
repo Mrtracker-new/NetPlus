@@ -1,0 +1,16 @@
+[package]
+name = "netpulse-decode"
+description = "Protocol dissection — the security-critical parser. Fuzzed in isolation (docs/07, docs/04 §3.4)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# Deliberately dependency-light (core only) so it can be fuzzed in isolation.
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+
+[lints]
+workspace = true

@@ -1,0 +1,15 @@
+[package]
+name = "netpulse-storage"
+description = "Ring buffer, time-series metrics, capture store — private, bounded, crash-safe (docs/08)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+
+[lints]
+workspace = true

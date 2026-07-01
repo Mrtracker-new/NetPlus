@@ -1,0 +1,17 @@
+[package]
+name = "netpulse-intel"
+description = "Security + anomaly detection core: Detectors emitting confidence-scored Findings (docs/17, 18, 20)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-flow = { path = "../netpulse-flow" }
+netpulse-storage = { path = "../netpulse-storage" }
+
+[lints]
+workspace = true

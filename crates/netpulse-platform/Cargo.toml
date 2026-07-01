@@ -1,0 +1,15 @@
+[package]
+name = "netpulse-platform"
+description = "OS shims: all non-portable code lives behind narrow traits here (docs/03 §13, docs/04 §3.2)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+
+[lints]
+workspace = true

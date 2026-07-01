@@ -1,0 +1,19 @@
+[package]
+name = "netpulse-ai"
+description = "AI Explanation Service — THE ONLY crate permitted outbound network egress (docs/02 §10, docs/19)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+# NOTE: this is the single egress boundary. A CI check (docs/04 §7) asserts no
+# OTHER crate pulls an outbound-network dependency. Networking deps belong here
+# and nowhere else.
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-storage = { path = "../netpulse-storage" }
+
+[lints]
+workspace = true

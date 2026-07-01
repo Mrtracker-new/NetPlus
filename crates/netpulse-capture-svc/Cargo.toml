@@ -1,0 +1,23 @@
+[package]
+name = "netpulse-capture-svc"
+description = "The small, privileged capture process. Minimal deps, small TCB, independently auditable (docs/02 §5.1)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "netpulse-capture-svc"
+path = "src/main.rs"
+
+# Deliberately TINY dependency set (capture + platform only). This process
+# holds capture capability and nothing else; its deps are reviewed on every
+# change to keep the trusted computing base small (docs/02 §5.1, docs/04 §3.12).
+[dependencies]
+netpulse-capture = { path = "../netpulse-capture" }
+netpulse-platform = { path = "../netpulse-platform" }
+
+[lints]
+workspace = true

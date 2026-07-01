@@ -1,0 +1,31 @@
+[package]
+name = "netpulse-engine"
+description = "The analysis process: wires decode → flow → narrative → storage → intel → ai/learn and serves the API."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "netpulse-engine"
+path = "src/main.rs"
+
+# The engine sits at the top of the graph and may depend on every lower layer
+# (docs/04 §3.12). It runs at USER privilege — it holds no raw-capture
+# capability (docs/02 §10.2).
+[dependencies]
+netpulse-core = { path = "../netpulse-core" }
+netpulse-api = { path = "../netpulse-api" }
+netpulse-storage = { path = "../netpulse-storage" }
+netpulse-decode = { path = "../netpulse-decode" }
+netpulse-flow = { path = "../netpulse-flow" }
+netpulse-narrative = { path = "../netpulse-narrative" }
+netpulse-intel = { path = "../netpulse-intel" }
+netpulse-ai = { path = "../netpulse-ai" }
+netpulse-learn = { path = "../netpulse-learn" }
+netpulse-capture = { path = "../netpulse-capture" }
+
+[lints]
+workspace = true

@@ -1,0 +1,11 @@
+{
+  "name": "@netpulse/components",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Disclosure-aware React components over the shared data model.",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@netpulse/contract": "workspace:*",
+    "@netpulse/design-system": "workspace:*"
+  }
+}

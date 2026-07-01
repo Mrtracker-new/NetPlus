@@ -1,0 +1,11 @@
+{
+  "name": "netpulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NetPulse UI workspace root (pnpm). Phase 2 wires the build; foundation stage is stubs only.",
+  "license": "MIT OR Apache-2.0",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

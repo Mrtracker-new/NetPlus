@@ -1,0 +1,13 @@
+{
+  "name": "@netpulse/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Tauri-hosted NetPulse UI application: routes, screens, mode switching. Phase 2.",
+  "license": "MIT OR Apache-2.0",
+  "dependencies": {
+    "@netpulse/contract": "workspace:*",
+    "@netpulse/components": "workspace:*",
+    "@netpulse/viz": "workspace:*",
+    "@netpulse/design-system": "workspace:*"
+  }
+}

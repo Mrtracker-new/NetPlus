@@ -1,0 +1,6 @@
+# pnpm workspace (docs/0-foundation/04_Project_Structure.md §4).
+# Dependencies are NOT installed in the foundation phase — this file declares
+# the package topology so Phase 2 can `pnpm install` and wire Vite + Tauri.
+packages:
+  - "ui/app"
+  - "ui/packages/*"

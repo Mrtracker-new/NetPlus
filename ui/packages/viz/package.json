@@ -1,0 +1,7 @@
+{
+  "name": "@netpulse/viz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WebGL/Canvas visualization primitives: graphs, timelines, packet-flow animations. Framework-light.",
+  "license": "MIT OR Apache-2.0"
+}

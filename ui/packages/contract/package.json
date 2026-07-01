@@ -1,0 +1,7 @@
+{
+  "name": "@netpulse/contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GENERATED TypeScript types from netpulse-api. Do not hand-edit.",
+  "license": "MIT OR Apache-2.0"
+}

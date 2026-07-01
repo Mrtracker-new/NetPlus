@@ -12,6 +12,10 @@ authors.workspace = true
 name = "netpulse-engine"
 path = "src/main.rs"
 
+[lib]
+name = "netpulse_engine"
+path = "src/lib.rs"
+
 # The engine sits at the top of the graph and may depend on every lower layer
 # (docs/04 §3.12). It runs at USER privilege — it holds no raw-capture
 # capability (docs/02 §10.2).

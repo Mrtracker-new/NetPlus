@@ -11,6 +11,7 @@ authors.workspace = true
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
 netpulse-platform = { path = "../netpulse-platform" }
+netpulse-decode = { path = "../netpulse-decode" }
 
 [lints]
 workspace = true

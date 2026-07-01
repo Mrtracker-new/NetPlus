@@ -23,6 +23,7 @@ name = "netpulse-capture"
 version = "0.1.0"
 dependencies = [
  "netpulse-core",
+ "netpulse-decode",
  "netpulse-platform",
 ]
 

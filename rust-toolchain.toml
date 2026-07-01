@@ -1,0 +1,10 @@
+# Pinned toolchain for reproducible builds across the 3-OS CI matrix.
+# See docs/0-foundation/03_Technology_Stack.md §12.
+[toolchain]
+channel = "1.96.0"
+components = ["rustfmt", "clippy"]
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+    "aarch64-apple-darwin",
+]

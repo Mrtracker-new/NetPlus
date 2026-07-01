@@ -1,0 +1,36 @@
+# NetPulse — Rust workspace manifest.
+#
+# The dependency graph across these crates *is* the layer diagram from
+# docs/0-foundation/02_System_Architecture.md §4. Arrows point strictly
+# downward; Cargo forbids cycles, so a layer violation fails to compile.
+# See docs/0-foundation/04_Project_Structure.md for the full mapping.
+
+[workspace]
+resolver = "2"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/netpulse/netpulse"
+authors = ["The NetPulse contributors"]
+
+# Shared external dependencies, pinned once and referenced with
+# `<crate>.workspace = true`. Kept deliberately small: for a security tool,
+# dependencies are attack surface (docs/03 §14).
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+# Workspace-wide lints. Memory safety on hostile input is the defining
+# requirement of this codebase (docs/03 §3), so unsafe is denied by default.
+# Crates that genuinely need it (e.g. netpulse-platform FFI) re-allow locally
+# with a documented justification and review.
+[workspace.lints.rust]
+unsafe_code = "deny"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = "warn"

@@ -5,7 +5,9 @@ docs/
 target/
 **/*.rs.bk
 *.pdb
-Cargo.lock            # keep for binaries; remove this line if this is a bin crate you want pinned
+# Cargo.lock is intentionally committed: this workspace ships binaries
+# (netpulse-engine, netpulse-capture-svc), so the lockfile is pinned for
+# reproducible builds (docs/03 §12). Do not ignore it.
 
 # ── Tauri ─────────────────────────────────────────────────────────
 src-tauri/target/

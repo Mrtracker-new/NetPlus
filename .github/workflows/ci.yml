@@ -1,0 +1,67 @@
+# NetPulse CI — foundation stage.
+#
+# Runs the Rust workspace gates across the 3-OS matrix (docs/03 §12, docs/04 §7).
+# Commented placeholders below mark the enforcement checks the design promises
+# but that need later wiring (fuzz gate, audit, egress-boundary assertion,
+# contract-drift, cfg-leakage lint).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins the channel + components; this action honors it.
+      - name: Install pinned toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --workspace
+
+      - name: Test
+        run: cargo test --workspace
+
+  # ── Deferred enforcement gates (docs/04 §7) — enable as phases land ──────────
+  #
+  # fuzz:
+  #   Continuous fuzzing of netpulse-decode dissectors (docs/03 §3, docs/07).
+  #   Runs cargo-fuzz targets on a nightly toolchain once dissectors exist.
+  #
+  # audit:
+  #   cargo audit + pnpm audit — dependency vulnerability scan (docs/03 §14).
+  #
+  # egress-boundary:
+  #   Assert only netpulse-ai links an outbound-network dependency (docs/02 §10,
+  #   docs/04 §7). Inspect `cargo tree` for networking crates outside netpulse-ai.
+  #
+  # cfg-leakage:
+  #   Assert no `#[cfg(target_os)]` outside netpulse-platform (docs/04 §7).
+  #
+  # contract-drift:
+  #   Regenerate ui/packages/contract from netpulse-api and fail if it differs
+  #   from the committed output (docs/03 §7, docs/04 §4).

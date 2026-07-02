@@ -25,15 +25,17 @@ pub mod codegen;
 pub mod dto;
 
 pub use dto::{
-    AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto,
-    DiagnosisDto, DimensionDto, EvidenceRefDto, MonitorSnapshotDto, NarrativeCardDto,
-    ProjectionDepth, SeverityDto,
+    AnimationKindDto, AnimationModelDto, AttributionConfidenceDto, AttributionDto, BreakdownDto,
+    BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
+    ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto, GroundedExerciseDto, JourneyStageDto,
+    LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth,
+    SeverityDto, StageKindDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
-/// and engine can negotiate compatibility (docs/02 §7.2). Phase 2 firms up the
-/// payloads, so the version advances from its foundation-stage `0`.
-pub const API_VERSION: u32 = 1;
+/// and engine can negotiate compatibility (docs/02 §7.2). Phase 3 adds the
+/// education queries/DTOs (docs/13–16), advancing the version from Phase 2's `1`.
+pub const API_VERSION: u32 = 2;
 
 /// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
@@ -76,6 +78,22 @@ pub enum Query {
     AttributionOfFlow { flow_id: u64 },
     /// Fetch packets belonging to a flow — the deepest drill-down (docs/09 §8).
     PacketsOfFlow { flow_id: u64 },
+    /// Grounded lesson offers for a session's teachable moments (docs/13 §4).
+    LessonOffers {
+        session_id: u64,
+        depth: ProjectionDepth,
+    },
+    /// The staged website journey for a session (docs/14).
+    JourneyStagesOfSession {
+        session_id: u64,
+        depth: ProjectionDepth,
+    },
+    /// Browse the whole protocol reference (docs/15 §4).
+    ExplorerBrowse,
+    /// Search the protocol reference by term/symptom (docs/15 §8).
+    ExplorerSearch { term: String },
+    /// The data-driven handshake animation model for a flow (docs/16 §4.2).
+    HandshakeAnimationForFlow { flow_id: u64 },
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -89,6 +107,14 @@ pub enum QueryResponse {
     Attribution(AttributionDto),
     /// Honest empty answer when payloads were not stored (docs/09 §8).
     PayloadsUnavailable,
+    /// Grounded lesson offers (docs/13 §4).
+    LessonOffers(Vec<LessonOfferDto>),
+    /// The staged website journey (docs/14).
+    PageJourney(PageJourneyDto),
+    /// Protocol reference entries (browse or search, docs/15).
+    ExplorerEntries(Vec<ExplorerEntryDto>),
+    /// A data-driven animation model (docs/16).
+    Animation(AnimationModelDto),
 }
 
 /// A user-initiated control write — the only write path UI→engine (docs/02 §7.1).
@@ -117,8 +143,20 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_advanced_for_phase2() {
-        assert_eq!(API_VERSION, 1);
+    fn version_advanced_for_phase3() {
+        // Phase 3 adds the education queries/DTOs (docs/13–16).
+        assert_eq!(API_VERSION, 2);
+    }
+
+    #[test]
+    fn education_query_round_trips() {
+        let q = Query::LessonOffers {
+            session_id: 7,
+            depth: ProjectionDepth::Beginner,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let back: Query = serde_json::from_str(&json).unwrap();
+        assert_eq!(q, back);
     }
 
     #[test]

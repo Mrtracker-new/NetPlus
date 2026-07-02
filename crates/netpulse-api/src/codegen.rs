@@ -103,6 +103,117 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
+    // --- Phase 3 education enums (docs/13–16) ---
+    s.push_str(&union(
+        "ExerciseKind",
+        &["identify", "explain_back", "predict", "diagnose"],
+    ));
+    s.push_str(&union(
+        "StageKind",
+        &[
+            "navigation",
+            "dns_resolution",
+            "connection",
+            "encryption",
+            "request",
+            "fan_out",
+            "completion",
+        ],
+    ));
+    s.push_str(&union(
+        "Direction",
+        &["client_to_server", "server_to_client"],
+    ));
+    s.push_str(&union(
+        "AnimationKind",
+        &[
+            "packet_flow",
+            "handshake",
+            "multiplexing",
+            "fan_out",
+            "degradation",
+        ],
+    ));
+
+    // --- Phase 3 education interfaces (docs/13–16) ---
+    s.push_str(&iface(
+        "GroundedExercise",
+        &[
+            ("kind", "ExerciseKind"),
+            ("prompt", "string"),
+            ("answer", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "LessonOffer",
+        &[
+            ("lesson_id", "string"),
+            ("title", "string"),
+            ("level", "ProjectionDepth"),
+            ("grounded", "boolean"),
+            ("grounding", "string[]"),
+            ("exercise", "GroundedExercise | null"),
+            ("evidence", "EvidenceRef[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ExplorerEntry",
+        &[
+            ("key", "string"),
+            ("title", "string"),
+            ("beginner", "string"),
+            ("intermediate", "string"),
+            ("expert", "string"),
+            ("related", "string[]"),
+            ("examples_available", "boolean"),
+        ],
+    ));
+    s.push_str(&iface(
+        "JourneyStage",
+        &[
+            ("kind", "StageKind"),
+            ("title", "string"),
+            ("narration", "string"),
+            ("detail", "string | null"),
+            ("evidence", "EvidenceRef[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "FanoutNode",
+        &[
+            ("label", "string"),
+            ("flows", "number"),
+            ("bytes", "number"),
+            ("evidence", "EvidenceRef[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "PageJourney",
+        &[
+            ("session_id", "number"),
+            ("stages", "JourneyStage[]"),
+            ("fanout", "FanoutNode[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "VisualEvent",
+        &[
+            ("at_nanos", "number"),
+            ("direction", "Direction"),
+            ("label", "string"),
+            ("key", "string | null"),
+        ],
+    ));
+    s.push_str(&iface(
+        "AnimationModel",
+        &[
+            ("kind", "AnimationKind"),
+            ("events", "VisualEvent[]"),
+            ("total_nanos", "number"),
+            ("reduced_motion", "string[]"),
+        ],
+    ));
+
     s
 }
 
@@ -155,6 +266,18 @@ mod tests {
             "Diagnosis",
             "MonitorSnapshot",
             "Attribution",
+            "ExerciseKind",
+            "StageKind",
+            "Direction",
+            "AnimationKind",
+            "GroundedExercise",
+            "LessonOffer",
+            "ExplorerEntry",
+            "JourneyStage",
+            "FanoutNode",
+            "PageJourney",
+            "VisualEvent",
+            "AnimationModel",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

@@ -2,7 +2,7 @@
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
-export const API_VERSION = 1 as const;
+export const API_VERSION = 2 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
@@ -59,4 +59,73 @@ export interface Attribution {
   pid: number | null;
   confidence: AttributionConfidence;
   process_name: string | null;
+}
+
+export type ExerciseKind = "identify" | "explain_back" | "predict" | "diagnose";
+
+export type StageKind = "navigation" | "dns_resolution" | "connection" | "encryption" | "request" | "fan_out" | "completion";
+
+export type Direction = "client_to_server" | "server_to_client";
+
+export type AnimationKind = "packet_flow" | "handshake" | "multiplexing" | "fan_out" | "degradation";
+
+export interface GroundedExercise {
+  kind: ExerciseKind;
+  prompt: string;
+  answer: string;
+}
+
+export interface LessonOffer {
+  lesson_id: string;
+  title: string;
+  level: ProjectionDepth;
+  grounded: boolean;
+  grounding: string[];
+  exercise: GroundedExercise | null;
+  evidence: EvidenceRef[];
+}
+
+export interface ExplorerEntry {
+  key: string;
+  title: string;
+  beginner: string;
+  intermediate: string;
+  expert: string;
+  related: string[];
+  examples_available: boolean;
+}
+
+export interface JourneyStage {
+  kind: StageKind;
+  title: string;
+  narration: string;
+  detail: string | null;
+  evidence: EvidenceRef[];
+}
+
+export interface FanoutNode {
+  label: string;
+  flows: number;
+  bytes: number;
+  evidence: EvidenceRef[];
+}
+
+export interface PageJourney {
+  session_id: number;
+  stages: JourneyStage[];
+  fanout: FanoutNode[];
+}
+
+export interface VisualEvent {
+  at_nanos: number;
+  direction: Direction;
+  label: string;
+  key: string | null;
+}
+
+export interface AnimationModel {
+  kind: AnimationKind;
+  events: VisualEvent[];
+  total_nanos: number;
+  reduced_motion: string[];
 }

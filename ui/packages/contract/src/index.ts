@@ -14,6 +14,10 @@ import type {
   NarrativeCard,
   Attribution,
   ProjectionDepth,
+  LessonOffer,
+  ExplorerEntry,
+  PageJourney,
+  AnimationModel,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -31,7 +35,13 @@ export type Query =
   | { kind: "journeyOfSession"; session_id: number; depth: ProjectionDepth }
   | { kind: "monitorSnapshot"; from_mono_nanos: number; to_mono_nanos: number }
   | { kind: "attributionOfFlow"; flow_id: number }
-  | { kind: "packetsOfFlow"; flow_id: number };
+  | { kind: "packetsOfFlow"; flow_id: number }
+  // Phase 3 education queries (docs/13–16).
+  | { kind: "lessonOffers"; session_id: number; depth: ProjectionDepth }
+  | { kind: "journeyStagesOfSession"; session_id: number; depth: ProjectionDepth }
+  | { kind: "explorerBrowse" }
+  | { kind: "explorerSearch"; term: string }
+  | { kind: "handshakeAnimationForFlow"; flow_id: number };
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
@@ -39,7 +49,12 @@ export type QueryResponse =
   | { kind: "journey"; sentences: string[] }
   | { kind: "monitorSnapshot"; snapshot: MonitorSnapshot }
   | { kind: "attribution"; attribution: Attribution }
-  | { kind: "payloadsUnavailable" };
+  | { kind: "payloadsUnavailable" }
+  // Phase 3 education answers (docs/13–16).
+  | { kind: "lessonOffers"; offers: LessonOffer[] }
+  | { kind: "pageJourney"; journey: PageJourney }
+  | { kind: "explorerEntries"; entries: ExplorerEntry[] }
+  | { kind: "animation"; animation: AnimationModel };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic (docs/02 §10). */

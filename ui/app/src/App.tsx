@@ -9,14 +9,20 @@ import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";
 import { Apps } from "./screens/Apps";
+import { Journey } from "./screens/Journey";
+import { Learn } from "./screens/Learn";
+import { Explorer } from "./screens/Explorer";
 
-type Screen = "dashboard" | "timeline" | "monitoring" | "apps";
+type Screen = "dashboard" | "journey" | "timeline" | "monitoring" | "apps" | "learn" | "explorer";
 
 const NAV: Array<{ id: Screen; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "journey", label: "Journey" },
   { id: "timeline", label: "Timeline" },
   { id: "monitoring", label: "Monitor" },
   { id: "apps", label: "Apps" },
+  { id: "learn", label: "Learn" },
+  { id: "explorer", label: "Explorer" },
 ];
 
 function ModeSwitch() {
@@ -60,9 +66,12 @@ function Shell() {
         </header>
         <main>
           {screen === "dashboard" && <Dashboard />}
+          {screen === "journey" && <Journey />}
           {screen === "timeline" && <Timeline />}
           {screen === "monitoring" && <Monitoring />}
           {screen === "apps" && <Apps />}
+          {screen === "learn" && <Learn />}
+          {screen === "explorer" && <Explorer />}
         </main>
       </div>
     </div>

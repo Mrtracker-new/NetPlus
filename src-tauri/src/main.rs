@@ -21,6 +21,9 @@ use netpulse_api::{Command, ProjectionDepth, Query, QueryResponse};
 use netpulse_capture::CaptureStats;
 use netpulse_core::Depth;
 use netpulse_engine::attribution::Attribution;
+use netpulse_engine::education::{
+    explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
+};
 use netpulse_engine::pipeline::present;
 use netpulse_engine::project;
 use netpulse_storage::{CaptureStore, PayloadPolicy};
@@ -99,6 +102,46 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
         Query::PacketsOfFlow { .. } => {
             // Metadata-only store: raw bytes were never retained (docs/09 §8).
             Ok(QueryResponse::PayloadsUnavailable)
+        }
+        // ---- Phase 3 education queries (docs/13–16) ----
+        Query::LessonOffers { session_id, depth } => {
+            // Grounded offers for this session's teachable moments (docs/13 §4):
+            // filter the education view to offers that cite this session.
+            let view = present_education(&store, to_depth(depth));
+            let offers = view
+                .offers
+                .into_iter()
+                .filter(|o| {
+                    o.evidence.iter().any(|e| {
+                        matches!(e, netpulse_api::EvidenceRefDto::Session(id) if *id == session_id)
+                    })
+                })
+                .collect();
+            Ok(QueryResponse::LessonOffers(offers))
+        }
+        Query::JourneyStagesOfSession { session_id, depth } => {
+            let view = present_education(&store, to_depth(depth));
+            let journey = view
+                .journeys
+                .into_iter()
+                .find(|j| j.session_id == session_id)
+                .unwrap_or(netpulse_api::PageJourneyDto {
+                    session_id,
+                    stages: Vec::new(),
+                    fanout: Vec::new(),
+                });
+            Ok(QueryResponse::PageJourney(journey))
+        }
+        Query::ExplorerBrowse => Ok(QueryResponse::ExplorerEntries(explorer_browse(&store))),
+        Query::ExplorerSearch { term } => {
+            Ok(QueryResponse::ExplorerEntries(explorer_search(&store, &term)))
+        }
+        Query::HandshakeAnimationForFlow { flow_id } => {
+            match handshake_animation_for_flow(&store, flow_id) {
+                Some(anim) => Ok(QueryResponse::Animation(anim)),
+                // No observable RTT: we never fabricate a timing (docs/16 §11).
+                None => Ok(QueryResponse::PayloadsUnavailable),
+            }
         }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }

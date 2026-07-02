@@ -12,6 +12,11 @@ authors.workspace = true
 netpulse-core = { path = "../netpulse-core" }
 netpulse-platform = { path = "../netpulse-platform" }
 netpulse-decode = { path = "../netpulse-decode" }
+# Recording manifests (version pins, privacy manifest, checkpoints) serialize to
+# a JSON sidecar (docs/22 §3.1). serde/serde_json are already workspace deps —
+# no new external crate enters the tree (docs/03 §14).
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

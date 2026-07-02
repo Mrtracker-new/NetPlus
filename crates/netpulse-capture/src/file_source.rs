@@ -100,6 +100,18 @@ impl CaptureSource for FileCapture {
     }
 }
 
+impl crate::replay::FrameFeed for FileCapture {
+    fn link_type(&self) -> LinkType {
+        self.link_type
+    }
+    fn wall_nanos_at(&self, i: usize) -> Option<u64> {
+        self.wall_nanos.get(i).copied()
+    }
+    fn next_frames(&mut self) -> Result<Vec<RawFrame>> {
+        self.next_batch()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

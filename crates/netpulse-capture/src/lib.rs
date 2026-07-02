@@ -13,13 +13,29 @@
 //!
 //! **Phase 1 slice:** the file/import path (docs/05 §13) is fully implemented;
 //! live per-OS backends remain in [`netpulse_platform`] as documented stubs.
+//!
+//! **Phase 5 (docs/21–23):** the capture layer also owns the lifecycle formats —
+//! the [`pcapng`] codec (interop gold standard), [`recording`] (durable,
+//! replayable, privacy-manifested artifacts), and [`replay`] (a deterministic
+//! [`recording::Recording`]-backed [`netpulse_core::traits::CaptureSource`] plus
+//! interactive time control). Replay reuses the exact live pipeline — only the
+//! frame source changes (docs/21 §4).
 #![forbid(unsafe_code)]
 
 pub mod file_source;
 pub mod pcap;
+pub mod pcapng;
+pub mod recording;
+pub mod replay;
 
 pub use file_source::FileCapture;
 pub use pcap::{PcapFile, PcapRecord};
+pub use pcapng::PcapngFile;
+pub use recording::{
+    record_last_n, Checkpoint, PrivacyManifest, Recorder, Recording, RecordingManifest,
+    RecordingPayloadLevel, RecordingScope, VersionPins,
+};
+pub use replay::{FrameFeed, ReplayController, ReplaySource, ReplayState};
 
 /// The staged shedding order (docs/02 §8.2, docs/05 §9), preferring to lose
 /// *detail* before *truth*. Encoded as a first-class, testable type: a missing

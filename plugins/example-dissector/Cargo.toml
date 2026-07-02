@@ -1,0 +1,16 @@
+[package]
+name = "example-dissector"
+description = "First-party reference dissector plugin — the flagship seam (docs/24 §4.1)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../../crates/netpulse-core" }
+netpulse-plugin = { path = "../../crates/netpulse-plugin" }
+
+[lints]
+workspace = true

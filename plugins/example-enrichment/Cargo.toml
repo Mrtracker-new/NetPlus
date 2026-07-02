@@ -1,0 +1,16 @@
+[package]
+name = "example-enrichment"
+description = "First-party reference enrichment plugin — local/offline metadata only, never the network (docs/24 §4.3)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+netpulse-core = { path = "../../crates/netpulse-core" }
+netpulse-plugin = { path = "../../crates/netpulse-plugin" }
+
+[lints]
+workspace = true

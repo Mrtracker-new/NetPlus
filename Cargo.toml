@@ -7,7 +7,10 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+# `crates/*` are the product layers; `plugins/*` are the first-party reference
+# plugins (docs/24 §6) — in-tree so CI builds and conformance-tests them as living
+# examples of each extension seam (docs/24 §10).
+members = ["crates/*", "plugins/*"]
 # The Tauri desktop shell is its own build: it depends on the platform webview
 # system libraries and the Tauri CLI, which the pure-Rust workspace CI job does
 # not provision. Excluding it keeps `cargo build/test --workspace` fast and

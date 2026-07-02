@@ -22,6 +22,7 @@ netpulse-api = { path = "../crates/netpulse-api" }
 netpulse-engine = { path = "../crates/netpulse-engine" }
 netpulse-storage = { path = "../crates/netpulse-storage" }
 netpulse-capture = { path = "../crates/netpulse-capture" }
+netpulse-plugin = { path = "../crates/netpulse-plugin" }
 
 [features]
 # Tauri's default custom-protocol feature for production builds.

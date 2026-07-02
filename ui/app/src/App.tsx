@@ -12,8 +12,19 @@ import { Apps } from "./screens/Apps";
 import { Journey } from "./screens/Journey";
 import { Learn } from "./screens/Learn";
 import { Explorer } from "./screens/Explorer";
+import { Security } from "./screens/Security";
+import { Assistant } from "./screens/Assistant";
 
-type Screen = "dashboard" | "journey" | "timeline" | "monitoring" | "apps" | "learn" | "explorer";
+type Screen =
+  | "dashboard"
+  | "journey"
+  | "timeline"
+  | "monitoring"
+  | "apps"
+  | "security"
+  | "assistant"
+  | "learn"
+  | "explorer";
 
 const NAV: Array<{ id: Screen; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -21,6 +32,8 @@ const NAV: Array<{ id: Screen; label: string }> = [
   { id: "timeline", label: "Timeline" },
   { id: "monitoring", label: "Monitor" },
   { id: "apps", label: "Apps" },
+  { id: "security", label: "Security" },
+  { id: "assistant", label: "Assistant" },
   { id: "learn", label: "Learn" },
   { id: "explorer", label: "Explorer" },
 ];
@@ -70,6 +83,8 @@ function Shell() {
           {screen === "timeline" && <Timeline />}
           {screen === "monitoring" && <Monitoring />}
           {screen === "apps" && <Apps />}
+          {screen === "security" && <Security />}
+          {screen === "assistant" && <Assistant />}
           {screen === "learn" && <Learn />}
           {screen === "explorer" && <Explorer />}
         </main>

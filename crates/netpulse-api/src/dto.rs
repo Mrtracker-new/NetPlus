@@ -286,6 +286,83 @@ pub struct AnimationModelDto {
     pub reduced_motion: Vec<String>,
 }
 
+// ===== Phase 4 — Intelligence (docs/17–20) =================================
+//
+// The wire projections of the Security Engine and AI Assistant. Like every DTO
+// above, these are distinct from the rich domain types in `netpulse-intel` /
+// `netpulse-ai`; the engine maps down into these stable shapes. Honesty is on
+// the wire, not just in the backend: a finding carries its confidence, its
+// qualitative word, its *benign* explanations, and its evidence — so the UI
+// physically cannot render an unexplained, evidence-free, or over-certain alert
+// (docs/17 §3–5). The assistant answer carries its citations and privacy posture
+// (docs/19 §4, §6).
+
+/// The broad category a [`SecurityFindingDto`] rolls up to (docs/17 §4). Mirrors
+/// `netpulse_core::FindingCategory`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum FindingCategoryDto {
+    /// Statistical/ML deviation from this machine's learned normal (docs/20).
+    Anomaly,
+    /// A rule/heuristic-matched suspicious behavior (docs/18).
+    Suspicious,
+    /// Informational observation worth surfacing without alarm (docs/17 §4).
+    Informational,
+}
+
+/// The specific behavior a finding describes (docs/17 §4, docs/18 catalog) — the
+/// named, bounded set, never a vague "threat". Mirrors `netpulse_intel::FindingKind`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum FindingKindDto {
+    UnexpectedEgress,
+    Beaconing,
+    PortScan,
+    DnsAnomaly,
+    ConnectionStorm,
+    BandwidthAnomaly,
+}
+
+/// A security/anomaly finding, ready to render as a calm, confidence-labeled card
+/// (docs/17 §7.1). Every field encodes an honesty guarantee: `confidence_percent`
+/// is calibrated and never 100 for an inference (docs/17 §5); `qualitative` is the
+/// plain word a beginner reads instead of a percentage; `benign_explanations` names
+/// why the behavior might be innocent (docs/18 §3); `suggested_action` is always
+/// non-destructive (docs/17 §7.3); `evidence` makes every claim auditable
+/// (docs/02 §6.3); `corroboration` lists the other signals that combined into this
+/// one (docs/18 §5). `technical` is disclosed only at Intermediate+ (docs/09 §6.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SecurityFindingDto {
+    pub kind: FindingKindDto,
+    pub category: FindingCategoryDto,
+    pub title: String,
+    pub confidence_percent: u8,
+    pub qualitative: String,
+    pub explanation: String,
+    pub technical: Option<String>,
+    pub benign_explanations: Vec<String>,
+    pub suggested_action: String,
+    pub evidence: Vec<EvidenceRefDto>,
+    pub corroboration: Vec<FindingKindDto>,
+}
+
+/// A grounded AI answer (docs/19 §6). `citations` are validated to exist before
+/// send (docs/19 §12); `grounded` is false for an honest "can't answer from your
+/// data" (docs/19 §3). `is_remote`/`backend_id` keep the privacy posture visible
+/// (docs/19 §4), and `disclosure` is exactly what a remote backend *would* be sent
+/// — shown before any opt-in so there are no silent uploads (docs/19 §4.3).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AssistantAnswerDto {
+    pub text: String,
+    pub citations: Vec<EvidenceRefDto>,
+    pub grounded: bool,
+    pub backend_id: String,
+    pub is_remote: bool,
+    pub disclosure: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -404,6 +481,49 @@ mod tests {
             total_nanos: 30_000_000,
             reduced_motion: vec!["0.0 ms · SYN (you → server)".into()],
         });
+    }
+
+    #[test]
+    fn intelligence_dtos_round_trip() {
+        roundtrip(&SecurityFindingDto {
+            kind: FindingKindDto::Beaconing,
+            category: FindingCategoryDto::Suspicious,
+            title: "An app is contacting one server on a regular schedule".into(),
+            confidence_percent: 61,
+            qualitative: "notably unusual".into(),
+            explanation: "Connected every ~60s; often telemetry, sometimes beaconing.".into(),
+            technical: Some("interval mean 60.0s, cv 0.02".into()),
+            benign_explanations: vec!["Software update checks or telemetry".into()],
+            suggested_action: "You can mark this as expected if you recognize it.".into(),
+            evidence: vec![EvidenceRefDto::Flow(10), EvidenceRefDto::Flow(11)],
+            corroboration: vec![FindingKindDto::UnexpectedEgress],
+        });
+        roundtrip(&AssistantAnswerDto {
+            text: "203.0.113.9 moved 5.7 MB".into(),
+            citations: vec![EvidenceRefDto::Flow(1)],
+            grounded: true,
+            backend_id: "local-template".into(),
+            is_remote: false,
+            disclosure: "No packet payloads are ever sent.".into(),
+        });
+    }
+
+    #[test]
+    fn intelligence_enums_use_expected_reprs() {
+        // The TS emitter mirrors these exact wire strings; a mismatch fails the
+        // drift gate (docs/04 §7).
+        assert_eq!(
+            serde_json::to_string(&FindingKindDto::PortScan).unwrap(),
+            r#""port_scan""#
+        );
+        assert_eq!(
+            serde_json::to_string(&FindingKindDto::BandwidthAnomaly).unwrap(),
+            r#""bandwidth_anomaly""#
+        );
+        assert_eq!(
+            serde_json::to_string(&FindingCategoryDto::Suspicious).unwrap(),
+            r#""suspicious""#
+        );
     }
 
     #[test]

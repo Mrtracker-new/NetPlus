@@ -2,7 +2,7 @@
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
-export const API_VERSION = 2 as const;
+export const API_VERSION = 3 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
@@ -128,4 +128,31 @@ export interface AnimationModel {
   events: VisualEvent[];
   total_nanos: number;
   reduced_motion: string[];
+}
+
+export type FindingCategory = "anomaly" | "suspicious" | "informational";
+
+export type FindingKind = "unexpected_egress" | "beaconing" | "port_scan" | "dns_anomaly" | "connection_storm" | "bandwidth_anomaly";
+
+export interface SecurityFinding {
+  kind: FindingKind;
+  category: FindingCategory;
+  title: string;
+  confidence_percent: number;
+  qualitative: string;
+  explanation: string;
+  technical: string | null;
+  benign_explanations: string[];
+  suggested_action: string;
+  evidence: EvidenceRef[];
+  corroboration: FindingKind[];
+}
+
+export interface AssistantAnswer {
+  text: string;
+  citations: EvidenceRef[];
+  grounded: boolean;
+  backend_id: string;
+  is_remote: boolean;
+  disclosure: string;
 }

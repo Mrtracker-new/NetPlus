@@ -25,17 +25,19 @@ pub mod codegen;
 pub mod dto;
 
 pub use dto::{
-    AnimationKindDto, AnimationModelDto, AttributionConfidenceDto, AttributionDto, BreakdownDto,
-    BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
-    ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto, GroundedExerciseDto, JourneyStageDto,
-    LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth,
+    AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
+    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
+    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto,
+    FindingCategoryDto, FindingKindDto, GroundedExerciseDto, JourneyStageDto, LessonOfferDto,
+    MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth, SecurityFindingDto,
     SeverityDto, StageKindDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
-/// and engine can negotiate compatibility (docs/02 §7.2). Phase 3 adds the
-/// education queries/DTOs (docs/13–16), advancing the version from Phase 2's `1`.
-pub const API_VERSION: u32 = 2;
+/// and engine can negotiate compatibility (docs/02 §7.2). Phase 4 adds the
+/// intelligence queries/DTOs (docs/17–20: security findings + AI assistant),
+/// advancing the version from Phase 3's `2`.
+pub const API_VERSION: u32 = 3;
 
 /// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
@@ -94,6 +96,14 @@ pub enum Query {
     ExplorerSearch { term: String },
     /// The data-driven handshake animation model for a flow (docs/16 §4.2).
     HandshakeAnimationForFlow { flow_id: u64 },
+    /// Security/anomaly findings over a window (docs/17 §6), most-confident first.
+    SecurityFindings {
+        from_mono_nanos: u64,
+        to_mono_nanos: u64,
+    },
+    /// Ask the grounded AI assistant a natural-language question (docs/19). The
+    /// answer is grounded in the committed capture and cites its evidence.
+    AskAssistant { question: String },
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -115,6 +125,10 @@ pub enum QueryResponse {
     ExplorerEntries(Vec<ExplorerEntryDto>),
     /// A data-driven animation model (docs/16).
     Animation(AnimationModelDto),
+    /// Security/anomaly findings (docs/17–20), corroborated and ranked.
+    Findings(Vec<SecurityFindingDto>),
+    /// A grounded, cited AI answer (docs/19).
+    AssistantAnswer(AssistantAnswerDto),
 }
 
 /// A user-initiated control write — the only write path UI→engine (docs/02 §7.1).
@@ -143,9 +157,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_advanced_for_phase3() {
-        // Phase 3 adds the education queries/DTOs (docs/13–16).
-        assert_eq!(API_VERSION, 2);
+    fn version_advanced_for_phase4() {
+        // Phase 4 adds the intelligence queries/DTOs (docs/17–20).
+        assert_eq!(API_VERSION, 3);
+    }
+
+    #[test]
+    fn intelligence_query_round_trips() {
+        let q = Query::AskAssistant {
+            question: "why was it slow?".into(),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let back: Query = serde_json::from_str(&json).unwrap();
+        assert_eq!(q, back);
     }
 
     #[test]

@@ -214,6 +214,52 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
+    // --- Phase 4 intelligence enums (docs/17–20) ---
+    s.push_str(&union(
+        "FindingCategory",
+        &["anomaly", "suspicious", "informational"],
+    ));
+    s.push_str(&union(
+        "FindingKind",
+        &[
+            "unexpected_egress",
+            "beaconing",
+            "port_scan",
+            "dns_anomaly",
+            "connection_storm",
+            "bandwidth_anomaly",
+        ],
+    ));
+
+    // --- Phase 4 intelligence interfaces (docs/17–20) ---
+    s.push_str(&iface(
+        "SecurityFinding",
+        &[
+            ("kind", "FindingKind"),
+            ("category", "FindingCategory"),
+            ("title", "string"),
+            ("confidence_percent", "number"),
+            ("qualitative", "string"),
+            ("explanation", "string"),
+            ("technical", "string | null"),
+            ("benign_explanations", "string[]"),
+            ("suggested_action", "string"),
+            ("evidence", "EvidenceRef[]"),
+            ("corroboration", "FindingKind[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "AssistantAnswer",
+        &[
+            ("text", "string"),
+            ("citations", "EvidenceRef[]"),
+            ("grounded", "boolean"),
+            ("backend_id", "string"),
+            ("is_remote", "boolean"),
+            ("disclosure", "string"),
+        ],
+    ));
+
     s
 }
 
@@ -278,6 +324,10 @@ mod tests {
             "PageJourney",
             "VisualEvent",
             "AnimationModel",
+            "FindingCategory",
+            "FindingKind",
+            "SecurityFinding",
+            "AssistantAnswer",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

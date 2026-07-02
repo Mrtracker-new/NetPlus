@@ -1,0 +1,28 @@
+# The NetPulse desktop shell (docs/03 §8, docs/04 §3). Tauri hosts the webview
+# and bridges IPC to the engine. This crate is deliberately OUTSIDE the Rust
+# workspace (see the root Cargo.toml `exclude`): it needs the platform webview
+# libraries and the Tauri CLI, provisioned by the UI job, not the pure-Rust CI.
+[package]
+name = "netpulse-shell"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+license = "MIT OR Apache-2.0"
+description = "The Tauri desktop shell: hosts the webview and bridges the enumerated Query/Command surface to the engine."
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+netpulse-core = { path = "../crates/netpulse-core" }
+netpulse-api = { path = "../crates/netpulse-api" }
+netpulse-engine = { path = "../crates/netpulse-engine" }
+netpulse-storage = { path = "../crates/netpulse-storage" }
+netpulse-capture = { path = "../crates/netpulse-capture" }
+
+[features]
+# Tauri's default custom-protocol feature for production builds.
+custom-protocol = ["tauri/custom-protocol"]

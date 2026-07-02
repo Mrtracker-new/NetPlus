@@ -46,6 +46,45 @@ jobs:
       - name: Test
         run: cargo test --workspace
 
+      # contract-drift (docs/03 §7, docs/04 §7) is now LIVE: the committed
+      # ui/packages/contract/src/generated.ts is emitted from netpulse-api, and
+      # `committed_contract_is_in_sync` (run above by `cargo test`) fails the
+      # build if the two diverge. This double-checks it stayed in sync after the
+      # test run — e.g. if a regen was forgotten.
+      - name: Contract drift
+        shell: bash
+        run: |
+          cargo test -p netpulse-api -- --ignored write_contract
+          git diff --exit-code ui/packages/contract/src/generated.ts
+
+  ui:
+    name: UI (typecheck + contract)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      # No committed pnpm-lock.yaml yet (the scaffold predates a real install);
+      # switch to `--frozen-lockfile` once a lockfile is checked in.
+      - name: Install deps
+        run: pnpm install
+
+      - name: Typecheck contract
+        run: pnpm --filter @netpulse/contract typecheck
+
+      - name: Typecheck app
+        run: pnpm --filter @netpulse/app typecheck
+
   # ── Deferred enforcement gates (docs/04 §7) — enable as phases land ──────────
   #
   # fuzz:
@@ -61,7 +100,3 @@ jobs:
   #
   # cfg-leakage:
   #   Assert no `#[cfg(target_os)]` outside netpulse-platform (docs/04 §7).
-  #
-  # contract-drift:
-  #   Regenerate ui/packages/contract from netpulse-api and fail if it differs
-  #   from the committed output (docs/03 §7, docs/04 §4).

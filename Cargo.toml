@@ -8,6 +8,12 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+# The Tauri desktop shell is its own build: it depends on the platform webview
+# system libraries and the Tauri CLI, which the pure-Rust workspace CI job does
+# not provision. Excluding it keeps `cargo build/test --workspace` fast and
+# webview-free; the shell is built by the UI job under the Tauri toolchain
+# (docs/03 §8, docs/04 §7).
+exclude = ["src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

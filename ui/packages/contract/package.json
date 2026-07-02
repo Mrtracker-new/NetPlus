@@ -2,6 +2,18 @@
   "name": "@netpulse/contract",
   "version": "0.1.0",
   "private": true,
-  "description": "GENERATED TypeScript types from netpulse-api. Do not hand-edit.",
-  "license": "MIT OR Apache-2.0"
+  "description": "TypeScript view of the netpulse-api message schema. generated.ts is emitted from Rust — do not hand-edit it.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
 }

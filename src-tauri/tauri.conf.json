@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "NetPulse",
+  "version": "0.1.0",
+  "identifier": "app.netpulse.desktop",
+  "build": {
+    "frontendDist": "../ui/app/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "pnpm --filter @netpulse/app dev",
+    "beforeBuildCommand": "pnpm --filter @netpulse/app build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NetPulse",
+        "width": 1200,
+        "height": 800,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
+  }
+}

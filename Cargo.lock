@@ -101,7 +101,10 @@ name = "netpulse-learn"
 version = "0.1.0"
 dependencies = [
  "netpulse-core",
+ "netpulse-decode",
  "netpulse-storage",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

@@ -1,14 +1,42 @@
-//! # netpulse-learn — learning engine
+//! # netpulse-learn — the education engine (Phase 3)
 //!
-//! Lesson/exercise generation from real captures (docs/13), progress tracking,
-//! and the module content model. Grounded lessons reference *the user's own
-//! traffic* wherever possible, not synthetic examples (docs/01 E2).
+//! Turns NetPulse from a tool you *use* into a tool you *learn from*, using the
+//! learner's own captured traffic as the curriculum (docs/13 §1, docs/01 E2).
+//! This crate is the backend substrate for three of Phase 3's four surfaces:
 //!
-//! **Status: foundation stub.** See Phase 3, docs/13.
+//! - **Learning Engine** (docs/13): [`content`] authors lessons as data;
+//!   [`engine`] detects teachable moments in real traffic and offers grounded
+//!   lessons citing real evidence; [`progress`] tracks mastery locally and
+//!   adapts the next offer, calmly and without nagging.
+//! - **Protocol Explorer** (docs/15): [`explorer`] presents the `netpulse-decode`
+//!   explanation-key content as a browsable, searchable reference wired to the
+//!   learner's own observations both ways.
+//! - **Animations** (docs/16): [`anim`] builds the data-driven, timed animation
+//!   *model* (with its mandatory reduced-motion equivalent) from real events.
+//!
+//! The fourth surface — the Website Journey (docs/14) — is a narrative
+//! projection and lives in `netpulse-narrative`, whose journey this crate's
+//! flagship page-load lesson uses as its substrate (docs/13 §7 B2, docs/14 §13).
+//!
+//! Everything here is a **pure projection** over already-committed data: it
+//! captures nothing, parses nothing, and (beyond local progress) stores nothing.
+//! One explanation-key vocabulary (docs/07 §7) unifies lessons, explorer entries,
+//! and animations, so a field, anywhere, can offer its lesson (docs/13 §8).
 #![forbid(unsafe_code)]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_links() {}
-}
+pub mod anim;
+pub mod content;
+pub mod engine;
+pub mod explorer;
+pub mod progress;
+
+pub use anim::{fan_out, tcp_handshake, AnimationKind, AnimationModel, Direction, VisualEvent};
+pub use content::{
+    lesson, lesson_for_trigger, AnimationRef, Exercise, ExerciseKind, Lesson, Level, Module, Step,
+    Trigger, CURRICULUM,
+};
+pub use engine::{detect_offers, GroundedExercise, LessonOffer, TrafficView};
+pub use explorer::{
+    annotate, browse, content_at, entry, examples_for, search, AnnotatedField, ExplorerEntry,
+};
+pub use progress::{LessonStatus, Progress, ProgressStore, MASTERY_THRESHOLD};

@@ -3,6 +3,38 @@
 version = 4
 
 [[package]]
+name = "example-detector"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "netpulse-plugin",
+]
+
+[[package]]
+name = "example-dissector"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "netpulse-plugin",
+]
+
+[[package]]
+name = "example-enrichment"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "netpulse-plugin",
+]
+
+[[package]]
+name = "example-export"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "netpulse-plugin",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -38,6 +70,8 @@ dependencies = [
  "netpulse-core",
  "netpulse-decode",
  "netpulse-platform",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -76,7 +110,9 @@ dependencies = [
  "netpulse-intel",
  "netpulse-learn",
  "netpulse-narrative",
+ "netpulse-plugin",
  "netpulse-storage",
+ "serde_json",
 ]
 
 [[package]]
@@ -121,6 +157,14 @@ name = "netpulse-platform"
 version = "0.1.0"
 dependencies = [
  "netpulse-core",
+]
+
+[[package]]
+name = "netpulse-plugin"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "serde",
 ]
 
 [[package]]

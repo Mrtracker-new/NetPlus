@@ -20,6 +20,7 @@
 
 pub mod attribution;
 pub mod education;
+pub mod export;
 pub mod monitor;
 pub mod pipeline;
 pub mod project;
@@ -29,5 +30,11 @@ pub use education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
     EducationView,
 };
-pub use pipeline::{analyze_pcap, run_offline, OfflineReport, PresentationView};
+pub use export::{
+    export_csv, export_json, export_pcapng, export_report, import_capture,
+    preview as export_preview, ExportFormat, ExportPreview, Sanitizer, Selection,
+};
+pub use pipeline::{
+    analyze_file, analyze_pcap, run_offline, run_replay, OfflineReport, PresentationView,
+};
 pub use security::{ask_assistant, present_security};

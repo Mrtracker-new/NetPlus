@@ -11,12 +11,20 @@ use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
     AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
-    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto,
-    FindingCategoryDto, FindingKindDto, GroundedExerciseDto, JourneyStageDto, LessonOfferDto,
-    MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth, SecurityFindingDto,
-    SeverityDto, StageKindDto, VisualEventDto,
+    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
+    JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto,
+    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
+    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
+    SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
+use netpulse_capture::{Recording, RecordingPayloadLevel, ReplayState};
 use netpulse_core::{AttributionConfidence, Depth, EvidenceRef, FindingCategory};
+use netpulse_plugin::{
+    Capability, ContractVersion, DisabledReason, PluginType, RegisteredPlugin, TrustStatus,
+};
+
+use crate::export::{ExportFormat, ExportPreview};
 use netpulse_intel::{FindingKind, SecurityFinding};
 use netpulse_learn::anim::{AnimationKind, AnimationModel, Direction, VisualEvent};
 use netpulse_learn::content::{ExerciseKind, Level};
@@ -359,6 +367,155 @@ pub fn assistant_answer_dto(a: &GroundedAnswer) -> AssistantAnswerDto {
         backend_id: a.backend_id.to_string(),
         is_remote: a.is_remote,
         disclosure: a.disclosure.clone(),
+    }
+}
+
+// ===== Phase 5 — lifecycle projections (docs/21–24) ========================
+
+fn payload_level_dto(level: RecordingPayloadLevel) -> PayloadLevelDto {
+    match level {
+        RecordingPayloadLevel::MetadataOnly => PayloadLevelDto::MetadataOnly,
+        RecordingPayloadLevel::Headers => PayloadLevelDto::Headers,
+        RecordingPayloadLevel::FullPayload => PayloadLevelDto::FullPayload,
+        // A future level surfaces as metadata-only (the safest, least-revealing
+        // reading) rather than over-claiming what a recording contains (docs/22 §5).
+        _ => PayloadLevelDto::MetadataOnly,
+    }
+}
+
+/// Project a sealed recording to its summary DTO (docs/22 §3). `incomplete` marks
+/// a truncated/recovered recording so review knows the reconstruction is partial
+/// (docs/21 §8, docs/22 §8).
+pub fn recording_summary_dto(
+    id: u64,
+    recording: &Recording,
+    incomplete: bool,
+) -> RecordingSummaryDto {
+    let m = &recording.manifest;
+    RecordingSummaryDto {
+        id,
+        from_mono_nanos: m.from_mono_nanos,
+        to_mono_nanos: m.to_mono_nanos,
+        frame_count: m.frame_count,
+        api_version: m.api_version,
+        version_pins: VersionPinsDto {
+            engine: m.version_pins.engine.clone(),
+            decode: m.version_pins.decode.clone(),
+            intel: m.version_pins.intel.clone(),
+            ai: m.version_pins.ai.clone(),
+            content: m.version_pins.content.clone(),
+        },
+        privacy: PrivacyManifestDto {
+            level: payload_level_dto(m.privacy.level),
+            contains_payloads: m.privacy.contains_payloads,
+            redactions: m.privacy.redactions.clone(),
+        },
+        incomplete,
+    }
+}
+
+/// Project a replay controller's state to its wire DTO (docs/21 §5).
+pub fn replay_state_dto(state: &ReplayState) -> ReplayStateDto {
+    ReplayStateDto {
+        position_nanos: state.position_nanos,
+        total_nanos: state.total_nanos,
+        speed_percent: state.speed_percent,
+        playing: state.playing,
+        frame_index: state.frame_index,
+        incomplete: state.incomplete,
+    }
+}
+
+fn export_format_dto(f: ExportFormat) -> ExportFormatDto {
+    match f {
+        ExportFormat::Pcapng => ExportFormatDto::Pcapng,
+        ExportFormat::Json => ExportFormatDto::Json,
+        ExportFormat::Csv => ExportFormatDto::Csv,
+        ExportFormat::Report => ExportFormatDto::Report,
+    }
+}
+
+/// Project an export preview to its wire DTO (docs/23 §6). The preview the user
+/// approves is exactly what the export functions produce (docs/23 §12).
+pub fn export_preview_dto(p: &ExportPreview) -> ExportPreviewDto {
+    ExportPreviewDto {
+        format: export_format_dto(p.format),
+        level: payload_level_dto(p.level),
+        flows: p.flows,
+        sessions: p.sessions,
+        hosts: p.hosts,
+        contains_payloads: p.contains_payloads,
+        sanitized: p.sanitized.clone(),
+        provenance: p.provenance.clone(),
+    }
+}
+
+fn plugin_type_dto(t: PluginType) -> PluginTypeDto {
+    match t {
+        PluginType::Dissector => PluginTypeDto::Dissector,
+        PluginType::Enrichment => PluginTypeDto::Enrichment,
+        PluginType::Detector => PluginTypeDto::Detector,
+        PluginType::View => PluginTypeDto::View,
+        PluginType::Export => PluginTypeDto::Export,
+        _ => PluginTypeDto::View,
+    }
+}
+
+fn capability_dto(c: Capability) -> PluginCapabilityDto {
+    match c {
+        Capability::ParseBytes => PluginCapabilityDto::ParseBytes,
+        Capability::ReadModel => PluginCapabilityDto::ReadModel,
+        Capability::EmitFindings => PluginCapabilityDto::EmitFindings,
+        Capability::ReadLocalData => PluginCapabilityDto::ReadLocalData,
+        Capability::ApiRead => PluginCapabilityDto::ApiRead,
+        Capability::WriteOutput => PluginCapabilityDto::WriteOutput,
+        // No egress capability exists to map; a future local variant reads as the
+        // most-restrictive existing one rather than silently widening access.
+        _ => PluginCapabilityDto::ReadModel,
+    }
+}
+
+fn trust_dto(t: TrustStatus) -> PluginTrustDto {
+    match t {
+        TrustStatus::Unreviewed => PluginTrustDto::Unreviewed,
+        TrustStatus::Reviewed => PluginTrustDto::Reviewed,
+        TrustStatus::FirstParty => PluginTrustDto::FirstParty,
+        _ => PluginTrustDto::Unreviewed,
+    }
+}
+
+fn disabled_reason_label(r: &DisabledReason) -> String {
+    match r {
+        DisabledReason::IncompatibleContract => {
+            "targets an incompatible contract version".to_string()
+        }
+        DisabledReason::IncompleteDissector => {
+            "dissector missing its fuzz target and/or explanation content".to_string()
+        }
+        DisabledReason::NotEnabled => "not enabled".to_string(),
+        _ => "unavailable".to_string(),
+    }
+}
+
+/// Project a registered plugin to its descriptor DTO (docs/24 §6). Capabilities,
+/// trust, contract compatibility, and any disable reason all travel so enabling a
+/// plugin is an informed, explicit choice (docs/24 §5).
+pub fn plugin_descriptor_dto(p: &RegisteredPlugin, host_contract: u32) -> PluginDescriptorDto {
+    let m = &p.manifest;
+    PluginDescriptorDto {
+        name: m.name.clone(),
+        plugin_type: plugin_type_dto(m.plugin_type),
+        capabilities: m
+            .capabilities()
+            .iter()
+            .map(|c| capability_dto(*c))
+            .collect(),
+        trust: trust_dto(m.trust.status),
+        source: m.trust.source.clone(),
+        target_contract: m.target_contract.0,
+        compatible: m.is_compatible(ContractVersion(host_contract)),
+        enabled: p.enabled,
+        disabled_reason: p.disabled_reason.as_ref().map(disabled_reason_label),
     }
 }
 

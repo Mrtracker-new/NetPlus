@@ -25,6 +25,7 @@ use netpulse_engine::education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
 };
 use netpulse_engine::pipeline::present;
+use netpulse_engine::security::{ask_assistant, present_security};
 use netpulse_engine::project;
 use netpulse_storage::{CaptureStore, PayloadPolicy};
 
@@ -142,6 +143,23 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                 // No observable RTT: we never fabricate a timing (docs/16 §11).
                 None => Ok(QueryResponse::PayloadsUnavailable),
             }
+        }
+        // ---- Phase 4 intelligence queries (docs/17–20) ----
+        Query::SecurityFindings {
+            from_mono_nanos,
+            to_mono_nanos,
+        } => {
+            let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
+            Ok(QueryResponse::Findings(present_security(
+                &store,
+                from_mono_nanos,
+                to_mono_nanos,
+                depth,
+            )))
+        }
+        Query::AskAssistant { question } => {
+            // Grounded in the committed store, local-default backend (docs/19 §4.1).
+            Ok(QueryResponse::AssistantAnswer(ask_assistant(&store, &question)))
         }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }

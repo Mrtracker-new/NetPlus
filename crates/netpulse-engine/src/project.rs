@@ -7,14 +7,17 @@
 //! domain→wire, at a requested [`netpulse_core::Depth`], so a beginner query
 //! never serializes expert detail (docs/09 §6.3).
 
+use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
-    AnimationKindDto, AnimationModelDto, AttributionConfidenceDto, AttributionDto, BreakdownDto,
-    BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
-    ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto, GroundedExerciseDto, JourneyStageDto,
-    LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth,
+    AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
+    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
+    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto,
+    FindingCategoryDto, FindingKindDto, GroundedExerciseDto, JourneyStageDto, LessonOfferDto,
+    MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth, SecurityFindingDto,
     SeverityDto, StageKindDto, VisualEventDto,
 };
-use netpulse_core::{AttributionConfidence, Depth, EvidenceRef};
+use netpulse_core::{AttributionConfidence, Depth, EvidenceRef, FindingCategory};
+use netpulse_intel::{FindingKind, SecurityFinding};
 use netpulse_learn::anim::{AnimationKind, AnimationModel, Direction, VisualEvent};
 use netpulse_learn::content::{ExerciseKind, Level};
 use netpulse_learn::{ExplorerEntry, GroundedExercise, LessonOffer};
@@ -284,6 +287,81 @@ pub fn animation_model_dto(model: &AnimationModel) -> AnimationModelDto {
     }
 }
 
+// ===== Phase 4 — intelligence projections (docs/17–20) =====================
+
+fn finding_category_dto(c: FindingCategory) -> FindingCategoryDto {
+    match c {
+        FindingCategory::Anomaly => FindingCategoryDto::Anomaly,
+        FindingCategory::Suspicious => FindingCategoryDto::Suspicious,
+        FindingCategory::Informational => FindingCategoryDto::Informational,
+        // `FindingCategory` is #[non_exhaustive]; a future category surfaces as
+        // Suspicious rather than being silently calmed to Informational.
+        _ => FindingCategoryDto::Suspicious,
+    }
+}
+
+fn finding_kind_dto(k: FindingKind) -> FindingKindDto {
+    match k {
+        FindingKind::UnexpectedEgress => FindingKindDto::UnexpectedEgress,
+        FindingKind::Beaconing => FindingKindDto::Beaconing,
+        FindingKind::PortScan => FindingKindDto::PortScan,
+        FindingKind::DnsAnomaly => FindingKindDto::DnsAnomaly,
+        FindingKind::ConnectionStorm => FindingKindDto::ConnectionStorm,
+        FindingKind::BandwidthAnomaly => FindingKindDto::BandwidthAnomaly,
+        // A future kind maps to the closest honest bucket rather than dropping.
+        _ => FindingKindDto::UnexpectedEgress,
+    }
+}
+
+/// Project a security finding to its wire DTO at `depth` (docs/17 §7). The
+/// beginner card carries the calm explanation, confidence word, benign
+/// alternatives and evidence; the `technical` detail line is disclosed only at
+/// Intermediate+ (docs/09 §6.3), exactly like a journey stage's detail.
+pub fn security_finding_dto(f: &SecurityFinding, depth: Depth) -> SecurityFindingDto {
+    SecurityFindingDto {
+        kind: finding_kind_dto(f.kind),
+        category: finding_category_dto(f.kind.category()),
+        title: f.kind.title().to_string(),
+        // Confidence is 0.0..=1.0; present it as a rounded 0–100 for display
+        // (docs/17 §5). Never 100 for an inference — the domain type caps it.
+        confidence_percent: (f.confidence.value() * 100.0).round() as u8,
+        qualitative: f.qualitative().to_string(),
+        explanation: f.explanation.clone(),
+        technical: if depth.shows(Depth::Intermediate) {
+            f.technical.clone()
+        } else {
+            None
+        },
+        benign_explanations: f
+            .kind
+            .benign_explanations()
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        suggested_action: f.kind.suggested_action().to_string(),
+        evidence: f.evidence.iter().map(evidence_dto).collect(),
+        corroboration: f
+            .contributing
+            .iter()
+            .map(|k| finding_kind_dto(*k))
+            .collect(),
+    }
+}
+
+/// Project a grounded assistant answer to its wire DTO (docs/19 §6). Citations,
+/// the privacy posture, and the remote-disclosure preview all travel so the UI
+/// can render them honestly (docs/19 §4, §12).
+pub fn assistant_answer_dto(a: &GroundedAnswer) -> AssistantAnswerDto {
+    AssistantAnswerDto {
+        text: a.text.clone(),
+        citations: a.citations.iter().map(evidence_dto).collect(),
+        grounded: a.grounded,
+        backend_id: a.backend_id.to_string(),
+        is_remote: a.is_remote,
+        disclosure: a.disclosure.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,6 +379,29 @@ mod tests {
         assert_eq!(expert.lines.len(), 2);
         // Evidence always travels in full, regardless of depth (docs/09 §8).
         assert_eq!(beginner.evidence, vec![EvidenceRefDto::Session(1)]);
+    }
+
+    #[test]
+    fn finding_dto_hides_technical_for_beginner() {
+        let f = SecurityFinding::observe(
+            FindingKind::Beaconing,
+            0.6,
+            "regular check-ins to a host",
+            vec![EvidenceRef::Flow(10)],
+        )
+        .unwrap()
+        .with_technical("interval mean 60.0s, cv 0.02");
+        let beginner = security_finding_dto(&f, Depth::Beginner);
+        let expert = security_finding_dto(&f, Depth::Expert);
+        // The technical line is deferred for a beginner, present for an expert
+        // (docs/09 §6.3) — the calm card stays calm.
+        assert!(beginner.technical.is_none());
+        assert!(expert.technical.is_some());
+        // Confidence is shown and never 100 for an inference (docs/17 §5).
+        assert!(beginner.confidence_percent < 100);
+        // The benign case and evidence always travel (docs/18 §3, docs/02 §6.3).
+        assert!(!beginner.benign_explanations.is_empty());
+        assert_eq!(beginner.evidence, vec![EvidenceRefDto::Flow(10)]);
     }
 
     #[test]

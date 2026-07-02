@@ -14,6 +14,10 @@ import { Learn } from "./screens/Learn";
 import { Explorer } from "./screens/Explorer";
 import { Security } from "./screens/Security";
 import { Assistant } from "./screens/Assistant";
+import { Recordings } from "./screens/Recordings";
+import { Replay } from "./screens/Replay";
+import { Export } from "./screens/Export";
+import { Plugins } from "./screens/Plugins";
 
 type Screen =
   | "dashboard"
@@ -24,7 +28,11 @@ type Screen =
   | "security"
   | "assistant"
   | "learn"
-  | "explorer";
+  | "explorer"
+  | "recordings"
+  | "replay"
+  | "export"
+  | "plugins";
 
 const NAV: Array<{ id: Screen; label: string }> = [
   { id: "dashboard", label: "Dashboard" },
@@ -36,6 +44,11 @@ const NAV: Array<{ id: Screen; label: string }> = [
   { id: "assistant", label: "Assistant" },
   { id: "learn", label: "Learn" },
   { id: "explorer", label: "Explorer" },
+  // Phase 5 lifecycle surfaces (docs/21–24).
+  { id: "recordings", label: "Recordings" },
+  { id: "replay", label: "Replay" },
+  { id: "export", label: "Export" },
+  { id: "plugins", label: "Plugins" },
 ];
 
 function ModeSwitch() {
@@ -87,6 +100,10 @@ function Shell() {
           {screen === "assistant" && <Assistant />}
           {screen === "learn" && <Learn />}
           {screen === "explorer" && <Explorer />}
+          {screen === "recordings" && <Recordings />}
+          {screen === "replay" && <Replay />}
+          {screen === "export" && <Export />}
+          {screen === "plugins" && <Plugins />}
         </main>
       </div>
     </div>

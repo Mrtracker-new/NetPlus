@@ -20,6 +20,13 @@ import type {
   AnimationModel,
   SecurityFinding,
   AssistantAnswer,
+  RecordingSummary,
+  ReplayState,
+  ExportPreview,
+  ExportSelection,
+  ExportFormat,
+  PayloadLevel,
+  PluginDescriptor,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -46,7 +53,12 @@ export type Query =
   | { kind: "handshakeAnimationForFlow"; flow_id: number }
   // Phase 4 intelligence queries (docs/17–20).
   | { kind: "securityFindings"; from_mono_nanos: number; to_mono_nanos: number }
-  | { kind: "askAssistant"; question: string };
+  | { kind: "askAssistant"; question: string }
+  // Phase 5 lifecycle queries (docs/21–24).
+  | { kind: "listRecordings" }
+  | { kind: "replayState" }
+  | { kind: "exportPreview"; selection: ExportSelection; format: ExportFormat }
+  | { kind: "listPlugins" };
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
@@ -62,7 +74,12 @@ export type QueryResponse =
   | { kind: "animation"; animation: AnimationModel }
   // Phase 4 intelligence answers (docs/17–20).
   | { kind: "findings"; findings: SecurityFinding[] }
-  | { kind: "assistantAnswer"; answer: AssistantAnswer };
+  | { kind: "assistantAnswer"; answer: AssistantAnswer }
+  // Phase 5 lifecycle answers (docs/21–24).
+  | { kind: "recordings"; recordings: RecordingSummary[] }
+  | { kind: "replayState"; state: ReplayState }
+  | { kind: "exportPreview"; preview: ExportPreview }
+  | { kind: "plugins"; plugins: PluginDescriptor[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic (docs/02 §10). */
@@ -71,4 +88,15 @@ export type Command =
   | { kind: "stopCapture"; iface_id: number }
   | { kind: "startRecording" }
   | { kind: "stopRecording" }
-  | { kind: "setDepth"; depth: ProjectionDepth };
+  | { kind: "setDepth"; depth: ProjectionDepth }
+  // Phase 5 lifecycle commands (docs/21–24). Replay transport (docs/21 §5),
+  // explicit local export (docs/23 §6, never auto-transmitted), and plugin
+  // enable/disable as an explicit user choice (docs/24 §5).
+  | { kind: "replayPlay" }
+  | { kind: "replayPause" }
+  | { kind: "replayStep" }
+  | { kind: "replaySeek"; mono_nanos: number }
+  | { kind: "replaySetSpeed"; percent: number }
+  | { kind: "startExport"; selection: ExportSelection; format: ExportFormat; level: PayloadLevel }
+  | { kind: "enablePlugin"; name: string }
+  | { kind: "disablePlugin"; name: string };

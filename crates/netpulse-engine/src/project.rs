@@ -8,11 +8,19 @@
 //! never serializes expert detail (docs/09 §6.3).
 
 use netpulse_api::dto::{
-    AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto,
-    DiagnosisDto, DimensionDto, EvidenceRefDto, MonitorSnapshotDto, NarrativeCardDto, SeverityDto,
+    AnimationKindDto, AnimationModelDto, AttributionConfidenceDto, AttributionDto, BreakdownDto,
+    BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
+    ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto, GroundedExerciseDto, JourneyStageDto,
+    LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth,
+    SeverityDto, StageKindDto, VisualEventDto,
 };
 use netpulse_core::{AttributionConfidence, Depth, EvidenceRef};
-use netpulse_narrative::{NarrativeCard, Severity};
+use netpulse_learn::anim::{AnimationKind, AnimationModel, Direction, VisualEvent};
+use netpulse_learn::content::{ExerciseKind, Level};
+use netpulse_learn::{ExplorerEntry, GroundedExercise, LessonOffer};
+use netpulse_narrative::{
+    FanoutNode, JourneyStage, NarrativeCard, PageJourney, Severity, StageKind,
+};
 
 use crate::attribution::Attribution;
 use crate::monitor::{Breakdown, Cause, Diagnosis, Dimension, MonitorSnapshot};
@@ -125,6 +133,154 @@ pub fn attribution_dto(a: &Attribution, process_name: Option<String>) -> Attribu
         },
         // A name is only meaningful when we actually attributed a PID.
         process_name: a.pid.and(process_name),
+    }
+}
+
+// ===== Phase 3 — education projections (docs/13–16) ========================
+
+/// Map a learner `Level` to the wire projection depth — they share one ladder
+/// (docs/13 §3.1, docs/09 §6).
+fn level_dto(level: Level) -> ProjectionDepth {
+    match level {
+        Level::Beginner => ProjectionDepth::Beginner,
+        Level::Intermediate => ProjectionDepth::Intermediate,
+        Level::Expert => ProjectionDepth::Expert,
+        _ => ProjectionDepth::Expert,
+    }
+}
+
+fn exercise_kind_dto(kind: ExerciseKind) -> ExerciseKindDto {
+    match kind {
+        ExerciseKind::Identify => ExerciseKindDto::Identify,
+        ExerciseKind::ExplainBack => ExerciseKindDto::ExplainBack,
+        ExerciseKind::Predict => ExerciseKindDto::Predict,
+        ExerciseKind::Diagnose => ExerciseKindDto::Diagnose,
+        _ => ExerciseKindDto::Identify,
+    }
+}
+
+fn grounded_exercise_dto(ex: &GroundedExercise) -> GroundedExerciseDto {
+    GroundedExerciseDto {
+        kind: exercise_kind_dto(ex.kind),
+        prompt: ex.prompt.clone(),
+        answer: ex.answer.clone(),
+    }
+}
+
+/// Project a grounded lesson offer to its wire DTO (docs/13 §4). Evidence travels
+/// in full so the offer stays auditable (docs/02 §6.3).
+pub fn lesson_offer_dto(offer: &LessonOffer) -> LessonOfferDto {
+    LessonOfferDto {
+        lesson_id: offer.lesson_id.to_string(),
+        title: offer.title.to_string(),
+        level: level_dto(offer.level),
+        grounded: offer.grounded,
+        grounding: offer.grounding.clone(),
+        exercise: offer.exercise.as_ref().map(grounded_exercise_dto),
+        evidence: offer.evidence.iter().map(evidence_dto).collect(),
+    }
+}
+
+/// Project a protocol-explorer entry to its wire DTO (docs/15 §4, §6).
+pub fn explorer_entry_dto(entry: &ExplorerEntry) -> ExplorerEntryDto {
+    ExplorerEntryDto {
+        key: entry.key.to_string(),
+        title: entry.title.clone(),
+        beginner: entry.beginner.to_string(),
+        intermediate: entry.intermediate.to_string(),
+        expert: entry.expert.to_string(),
+        related: entry.related.iter().map(|k| k.to_string()).collect(),
+        examples_available: entry.examples_available,
+    }
+}
+
+fn stage_kind_dto(kind: StageKind) -> StageKindDto {
+    match kind {
+        StageKind::Navigation => StageKindDto::Navigation,
+        StageKind::DnsResolution => StageKindDto::DnsResolution,
+        StageKind::Connection => StageKindDto::Connection,
+        StageKind::Encryption => StageKindDto::Encryption,
+        StageKind::Request => StageKindDto::Request,
+        StageKind::FanOut => StageKindDto::FanOut,
+        StageKind::Completion => StageKindDto::Completion,
+        _ => StageKindDto::Completion,
+    }
+}
+
+fn journey_stage_dto(stage: &JourneyStage, depth: Depth) -> JourneyStageDto {
+    JourneyStageDto {
+        kind: stage_kind_dto(stage.kind),
+        title: stage.title.clone(),
+        narration: stage.narration.clone(),
+        // The technical detail line is disclosed at Intermediate+ (docs/14 §7);
+        // a beginner sees the story, not the timings.
+        detail: if depth.shows(Depth::Intermediate) {
+            stage.detail.clone()
+        } else {
+            None
+        },
+        evidence: stage.evidence.iter().map(evidence_dto).collect(),
+    }
+}
+
+fn fanout_node_dto(node: &FanoutNode) -> FanoutNodeDto {
+    FanoutNodeDto {
+        label: node.label.clone(),
+        flows: node.flows as u32,
+        bytes: node.bytes,
+        evidence: node.evidence.iter().map(evidence_dto).collect(),
+    }
+}
+
+/// Project a website journey to its wire DTO at `depth` (docs/14 §6, §7).
+pub fn page_journey_dto(journey: &PageJourney, depth: Depth) -> PageJourneyDto {
+    PageJourneyDto {
+        session_id: journey.session_id,
+        stages: journey
+            .stages
+            .iter()
+            .map(|s| journey_stage_dto(s, depth))
+            .collect(),
+        fanout: journey.fanout.iter().map(fanout_node_dto).collect(),
+    }
+}
+
+fn direction_dto(d: Direction) -> DirectionDto {
+    match d {
+        Direction::ClientToServer => DirectionDto::ClientToServer,
+        Direction::ServerToClient => DirectionDto::ServerToClient,
+        _ => DirectionDto::ClientToServer,
+    }
+}
+
+fn animation_kind_dto(k: AnimationKind) -> AnimationKindDto {
+    match k {
+        AnimationKind::PacketFlow => AnimationKindDto::PacketFlow,
+        AnimationKind::Handshake => AnimationKindDto::Handshake,
+        AnimationKind::Multiplexing => AnimationKindDto::Multiplexing,
+        AnimationKind::FanOut => AnimationKindDto::FanOut,
+        AnimationKind::Degradation => AnimationKindDto::Degradation,
+        _ => AnimationKindDto::PacketFlow,
+    }
+}
+
+fn visual_event_dto(e: &VisualEvent) -> VisualEventDto {
+    VisualEventDto {
+        at_nanos: e.at_nanos,
+        direction: direction_dto(e.direction),
+        label: e.label.clone(),
+        key: e.key.map(|k| k.as_str().to_string()),
+    }
+}
+
+/// Project an animation model to its wire DTO (docs/16 §5). The mandatory
+/// reduced-motion equivalent (docs/16 §8) is computed here so it always ships.
+pub fn animation_model_dto(model: &AnimationModel) -> AnimationModelDto {
+    AnimationModelDto {
+        kind: animation_kind_dto(model.kind),
+        events: model.events.iter().map(visual_event_dto).collect(),
+        total_nanos: model.total_nanos,
+        reduced_motion: model.reduced_motion_steps(),
     }
 }
 

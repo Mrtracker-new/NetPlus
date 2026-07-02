@@ -16,8 +16,13 @@
 #![forbid(unsafe_code)]
 
 pub mod attribution;
+pub mod education;
 pub mod monitor;
 pub mod pipeline;
 pub mod project;
 
+pub use education::{
+    explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
+    EducationView,
+};
 pub use pipeline::{analyze_pcap, run_offline, OfflineReport, PresentationView};

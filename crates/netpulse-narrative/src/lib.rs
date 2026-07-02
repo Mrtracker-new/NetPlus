@@ -28,8 +28,13 @@
 
 mod card;
 mod coalesce;
+mod journey;
 mod render;
 
 pub use card::{NarrativeCard, Severity};
 pub use coalesce::coalesce;
+pub use journey::{
+    build_page_journey, build_page_journey_with_hosts, FanoutNode, JourneyStage, PageJourney,
+    StageKind,
+};
 pub use render::{build_card, build_cards, build_journey, SessionView};

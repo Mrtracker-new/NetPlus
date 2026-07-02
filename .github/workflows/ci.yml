@@ -69,14 +69,14 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v4
 
+      # No `cache: pnpm` yet — it needs a committed pnpm-lock.yaml for its cache
+      # key, which the scaffold does not have. Add `cache: pnpm` here and switch
+      # the install to `--frozen-lockfile` once a lockfile is checked in.
       - name: Install Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
-      # No committed pnpm-lock.yaml yet (the scaffold predates a real install);
-      # switch to `--frozen-lockfile` once a lockfile is checked in.
       - name: Install deps
         run: pnpm install
 

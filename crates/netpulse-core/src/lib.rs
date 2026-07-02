@@ -13,17 +13,19 @@
 //! *shapes* and *contracts*.
 #![forbid(unsafe_code)]
 
+pub mod disclosure;
 pub mod error;
 pub mod model;
 pub mod net;
 pub mod time;
 pub mod traits;
 
+pub use disclosure::Depth;
 pub use error::{NpError, Result};
 pub use model::{
-    Confidence, EvidenceRef, Finding, FindingCategory, Flow, FlowMetrics, FlowState, Host, Journey,
-    Packet, Process, ProtoEvent, ProtoEventKind, Session,
+    AttributionConfidence, Confidence, EvidenceRef, Finding, FindingCategory, Flow, FlowMetrics,
+    FlowState, Host, Journey, Packet, Process, ProtoEvent, ProtoEventKind, Session, SocketOwner,
 };
 pub use net::{FiveTuple, L4Proto, L7Proto};
 pub use time::Timestamp;
-pub use traits::{AttributionSource, CaptureSource, Detector, Dissector};
+pub use traits::{AttributionSource, CaptureSource, Detector, Dissector, SocketTableSource};

@@ -148,6 +148,24 @@ impl CaptureStore {
         v
     }
 
+    /// A session by id (docs/08 §8, index on session_id).
+    pub fn session(&self, id: u64) -> Option<&Session> {
+        self.sessions.get(&id)
+    }
+
+    /// All retained session ids, ascending for deterministic iteration
+    /// (docs/08 §8). The narrative feed and journey queries page over these.
+    pub fn session_ids(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self.sessions.keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// A flow by id (docs/08 §8), for drill-down and projection.
+    pub fn flow(&self, id: u64) -> Option<&Flow> {
+        self.flows.get(&id)
+    }
+
     /// A finding by id, including its retention annotation.
     pub fn finding(&self, id: u64) -> Option<&StoredFinding> {
         self.findings.get(&id)

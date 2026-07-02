@@ -1,18 +1,35 @@
 //! # netpulse-narrative — storytelling
 //!
-//! Transforms sessions into [`netpulse_core::Journey`] narratives: the
-//! template/rule system that turns `ProtoEvent`s into human-language stories
-//! (docs/09, docs/14). Purely a projection over the reconstruction model — it
-//! holds no capture logic.
+//! Transforms the reconstruction model (sessions, flows, protocol events) into
+//! **human-language narratives**: the signature surface of the Dashboard
+//! (docs/09 §5) and the per-application "why" (docs/12 §7). Where Wireshark
+//! opens to a packet grid, NetPulse opens to a feed of sentences a beginner can
+//! read — each still backed by the structured model, so readability never costs
+//! truth (docs/09 §5.3).
 //!
-//! Every narrative sentence will reference the ProtoEvents it summarizes,
-//! upholding the evidence-reference invariant (docs/02 §6.3).
+//! This crate is a **pure projection** over the model from `netpulse-flow` /
+//! `netpulse-core`. It captures nothing, parses nothing, stores nothing. Two
+//! rules from the design govern every line it emits:
 //!
-//! **Status: foundation stub.** See Phase 2/3, docs/09 and docs/14.
+//! - **The evidence-reference invariant** (docs/02 §6.3): every card points back
+//!   at the exact flows/sessions/events it summarizes. A narrative that asserts
+//!   more than its evidence supports is a bug — [`NarrativeCard`] cannot be
+//!   constructed without at least one [`netpulse_core::EvidenceRef`], and a test
+//!   enforces it.
+//! - **Generated, never free-written** (docs/09 §15): sentences are produced
+//!   from the model by the rules here, not authored by hand, so they cannot
+//!   drift from what actually happened — the same discipline that lets the AI
+//!   assistant stay grounded (docs/19).
+//!
+//! Progressive disclosure (docs/09 §6) is honored by rendering the *same* card
+//! at a requested [`netpulse_core::Depth`]: density, not vocabulary, is the
+//! lever, and nothing is withheld that cannot be reached one step deeper.
 #![forbid(unsafe_code)]
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn crate_links() {}
-}
+mod card;
+mod coalesce;
+mod render;
+
+pub use card::{NarrativeCard, Severity};
+pub use coalesce::coalesce;
+pub use render::{build_card, build_cards, build_journey, SessionView};

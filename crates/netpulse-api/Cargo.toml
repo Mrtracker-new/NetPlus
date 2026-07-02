@@ -12,5 +12,9 @@ authors.workspace = true
 netpulse-core = { path = "../netpulse-core" }
 serde.workspace = true
 
+[dev-dependencies]
+# Contract round-trip + drift tests exercise the JSON wire encoding.
+serde_json.workspace = true
+
 [lints]
 workspace = true

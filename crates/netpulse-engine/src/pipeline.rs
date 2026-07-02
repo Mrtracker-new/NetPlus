@@ -17,12 +17,17 @@
 //! This is the concrete realization of "capture from wire and capture from file
 //! converge immediately after this layer" (docs/05 §13).
 
-use netpulse_capture::FileCapture;
+use netpulse_api::dto::{MonitorSnapshotDto, NarrativeCardDto};
+use netpulse_capture::{CaptureStats, FileCapture};
 use netpulse_core::traits::CaptureSource;
-use netpulse_core::{Session, Timestamp};
+use netpulse_core::{Depth, Session, Timestamp};
 use netpulse_decode::decode_frame;
 use netpulse_flow::{FlowEngine, PacketView};
+use netpulse_narrative::{build_cards, SessionView};
 use netpulse_storage::{CaptureStore, PayloadPolicy};
+
+use crate::monitor::{self, LossAccounting};
+use crate::project;
 
 /// A summary of one offline run, for reporting and tests (docs/05 §12 golden
 /// reconstructions).
@@ -118,4 +123,72 @@ pub fn analyze_pcap(
     let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
     let report = run_offline(pcap_bytes, shards, &mut store)?;
     Ok((store, report))
+}
+
+/// The Phase 2 presentation projection of a completed run (docs/09, docs/11):
+/// the narrative feed and the monitoring snapshot, already in the `netpulse-api`
+/// wire shapes at a chosen [`Depth`]. This is the bundle a UI receives; it is a
+/// pure read-only *view* over the store (docs/11 §14), computed after the
+/// pipeline has committed its reconstruction.
+#[derive(Debug, Clone)]
+pub struct PresentationView {
+    pub narratives: Vec<NarrativeCardDto>,
+    pub monitor: MonitorSnapshotDto,
+}
+
+/// Build the presentation view from a committed store at the given disclosure
+/// depth (docs/09 §6.3). `capture_stats` carries the honest capture-drop count
+/// so the monitor snapshot can keep capture loss distinct from network loss
+/// (docs/11 §6.4); pass [`CaptureStats::default`] for a lossless offline run.
+pub fn present(
+    store: &CaptureStore,
+    depth: Depth,
+    capture_stats: CaptureStats,
+) -> PresentationView {
+    // --- Narrative feed: one card per session, over the store query surface ---
+    // Own the flow/event clones so the borrowed SessionViews can reference them
+    // for the duration of card building (docs/04 §3.6: narrative is a projection
+    // fed by the caller, which gathers from storage per docs/08 §8).
+    let session_ids = store.session_ids();
+    let mut owned: Vec<(
+        Session,
+        Vec<netpulse_core::Flow>,
+        Vec<netpulse_core::ProtoEvent>,
+    )> = Vec::with_capacity(session_ids.len());
+    for sid in session_ids {
+        let Some(session) = store.session(sid) else {
+            continue;
+        };
+        let flows: Vec<netpulse_core::Flow> =
+            store.flows_for_session(sid).into_iter().cloned().collect();
+        let mut events: Vec<netpulse_core::ProtoEvent> = Vec::new();
+        for f in &flows {
+            events.extend(store.events_for_flow(f.id).iter().cloned());
+        }
+        owned.push((session.clone(), flows, events));
+    }
+    let views: Vec<SessionView> = owned
+        .iter()
+        .map(|(s, flows, events)| {
+            SessionView::new(s, flows.iter().collect(), events.iter().collect())
+        })
+        .collect();
+    let narratives = build_cards(&views)
+        .iter()
+        .map(|c| project::card_dto(c, depth))
+        .collect();
+
+    // --- Monitoring snapshot over the full window (docs/11 §5) ---
+    let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(0, u64::MAX);
+    let network_loss: u32 = all_flows.iter().map(|f| f.stats.loss_indicators).sum();
+    let loss = LossAccounting {
+        network_loss_indicators: network_loss,
+        capture_drops: capture_stats.dropped,
+    };
+    let snap = monitor::snapshot(&all_flows, loss, None);
+
+    PresentationView {
+        narratives,
+        monitor: project::monitor_dto(&snap),
+    }
 }

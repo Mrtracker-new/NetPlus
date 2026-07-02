@@ -9,7 +9,7 @@
 //!   carry their evidence references; it cannot produce a free-floating verdict.
 
 use crate::error::Result;
-use crate::model::{Finding, Process, ProtoEvent};
+use crate::model::{Finding, Process, ProtoEvent, SocketOwner};
 use crate::net::FiveTuple;
 
 /// A read-only source of raw frames from one interface (docs/05).
@@ -39,6 +39,26 @@ pub struct RawFrame {
 pub trait AttributionSource {
     /// Resolve the process owning `tuple`, if the OS socket tables know it.
     fn attribute(&self, tuple: &FiveTuple) -> Result<Option<Process>>;
+}
+
+/// A source of periodic OS socket-table snapshots for time-correlated
+/// attribution (docs/12 §4). Unlike [`AttributionSource`]'s point lookup, this
+/// is the enumeration the correlator polls and caches so it can resolve a flow's
+/// owner *as of the flow's start time* — the core of docs/12 §5.
+///
+/// Per-OS implementations (netlink/`sock_diag`, `GetExtendedTcpTable`,
+/// `libproc`) live in `netpulse-platform` behind this trait (docs/12 §4); the
+/// correlator itself is platform-neutral and testable against a synthetic
+/// source.
+pub trait SocketTableSource {
+    /// Enumerate the current socket→owner mappings (docs/12 §4). Called on the
+    /// adaptive poll cadence of docs/12 §5.1.
+    fn snapshot(&self) -> Result<Vec<SocketOwner>>;
+
+    /// Resolve richer identity for a PID (name, exe, signer) (docs/12 §6). Split
+    /// from [`Self::snapshot`] because it is looked up lazily, only for PIDs that
+    /// actually own observed flows.
+    fn process_info(&self, pid: u64) -> Result<Option<Process>>;
 }
 
 /// Parses one protocol layer from a byte slice into structured events (docs/07).

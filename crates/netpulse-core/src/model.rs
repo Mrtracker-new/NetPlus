@@ -122,6 +122,40 @@ pub struct Process {
     pub exe_path: String,
     /// Code-signing identity where the OS exposes it.
     pub signer: Option<String>,
+    /// Process start time (monotonic ns), used to distinguish a reused PID from
+    /// the original process (docs/12 §5.3). `0` when the OS did not expose it.
+    #[serde(default)]
+    pub start_mono_nanos: u64,
+}
+
+/// A snapshot row mapping one socket (its 5-tuple) to its owning process, as read
+/// from the OS socket tables (docs/12 §4). Attribution correlates these snapshots
+/// against the packet/flow stream over time — it is not a per-packet lookup
+/// (docs/12 §3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SocketOwner {
+    /// The socket's 5-tuple as the OS reports it.
+    pub tuple: FiveTuple,
+    /// The owning process's PID.
+    pub pid: u64,
+    /// The process's start time (monotonic ns) for PID-reuse safety
+    /// (docs/12 §5.3).
+    pub start_mono_nanos: u64,
+}
+
+/// How confident an attribution is (docs/12 §5.4). Attribution is a
+/// time-sensitive correlation, so its certainty is graded, and "unknown" is a
+/// first-class, correct answer — a wrong PID is worse than an admitted unknown
+/// (docs/12 §8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum AttributionConfidence {
+    /// A direct snapshot match whose validity window contained the flow start.
+    High,
+    /// A retro-matched or inferred match near a window edge (docs/12 §5.2).
+    Low,
+    /// The OS gave no clear owner; surfaced honestly (docs/12 §5.2, §8).
+    Unknown,
 }
 
 /// A remote endpoint, enriched from *local* databases only — NetPulse never

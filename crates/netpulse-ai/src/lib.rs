@@ -1,45 +1,44 @@
-//! # netpulse-ai — the egress boundary
+//! # netpulse-ai — the egress boundary (Phase 4)
 //!
-//! The AI Explanation Service (docs/19): context distillation, grounding /
-//! citation enforcement, and the pluggable backend trait (local runtime and
-//! optional remote endpoint).
+//! The AI Explanation Service (docs/19): a *grounded* natural-language layer that
+//! **explains** the user's captured data and never replaces or invents it
+//! (docs/01 AI section, docs/19 §3). The pipeline is retrieval-first: gather the
+//! user's real evidence ([`assistant`]), distill it into a compact structured
+//! [`context::DistilledContext`], ask a pluggable [`backend::AiBackend`] to
+//! explain *that*, and validate every citation against the store before returning
+//! (docs/19 §12). Grounding is *checked, not trusted*.
 //!
 //! **This is the only crate permitted outbound network access** (docs/02 §10).
-//! Confining egress to one crate makes the privacy guarantee auditable:
-//! verifying "no capture data leaves by default" reduces to inspecting this
-//! boundary. The default backend is local (zero egress); a remote endpoint is
-//! opt-in and sends only a minimized, distilled context, disclosed per request
-//! (docs/01 §8.2, docs/19).
-//!
-//! Whichever backend, the service is *grounded*: fed structured evidence from
-//! storage and constrained to cite it. It explains data; it never invents it
-//! (docs/01 §7.5, docs/02 §6.3).
-//!
-//! **Status: foundation stub.** See Phase 4, docs/19.
+//! Confining egress here makes the privacy guarantee auditable: the sole thing
+//! that could ever leave the device is a distilled context, and exactly what it
+//! discloses is inspectable via
+//! [`DistilledContext::disclosure_preview`](context::DistilledContext::disclosure_preview)
+//! before any send (docs/19 §4.3). The default backend
+//! ([`backend::LocalTemplateBackend`]) does **zero** egress, so NetPulse is fully
+//! explanatory offline; a remote endpoint is an explicit, disclosed opt-in
+//! (docs/19 §4.1–4.2).
 #![forbid(unsafe_code)]
 
-use netpulse_core::Result;
+pub mod assistant;
+pub mod backend;
+pub mod context;
 
-/// A pluggable explanation backend (docs/19). Local by default; remote is an
-/// explicit, disclosed opt-in.
-pub trait AiBackend {
-    /// Stable backend identifier (e.g. "local-onnx", "remote-openai"),
-    /// surfaced to the user so the active posture is always visible.
-    fn id(&self) -> &'static str;
-
-    /// True if using this backend causes any network egress. The UI uses this
-    /// to disclose the privacy posture before a query runs.
-    fn is_remote(&self) -> bool;
-
-    /// Produce a grounded explanation for the distilled `context`. The backend
-    /// must cite the provided evidence and add no facts of its own.
-    ///
-    /// TODO(phase4, docs/19): define the distilled-context and citation types.
-    fn explain(&self, context: &str) -> Result<String>;
-}
+pub use assistant::{Assistant, GroundedAnswer};
+pub use backend::{AiBackend, LocalTemplateBackend};
+pub use context::{DistilledContext, Fact, Intent};
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use netpulse_storage::{CaptureStore, PayloadPolicy};
+
+    /// The whole crate links: a local assistant answers over an empty store with
+    /// an honest decline and zero egress (docs/19 §3, §4.1).
     #[test]
-    fn crate_links() {}
+    fn crate_links() {
+        let store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let a = Assistant::local().answer(&store, "what happened?");
+        assert!(!a.is_remote);
+        assert!(!a.grounded); // nothing captured → honest decline
+    }
 }

@@ -260,6 +260,112 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
+    // --- Phase 5 lifecycle enums (docs/21–24) ---
+    s.push_str(&union(
+        "PayloadLevel",
+        &["metadata_only", "headers", "full_payload"],
+    ));
+    s.push_str(&union("ExportFormat", &["pcapng", "json", "csv", "report"]));
+    s.push_str(&union(
+        "PluginType",
+        &["dissector", "enrichment", "detector", "view", "export"],
+    ));
+    s.push_str(&union(
+        "PluginCapability",
+        &[
+            "parse_bytes",
+            "read_model",
+            "emit_findings",
+            "read_local_data",
+            "api_read",
+            "write_output",
+        ],
+    ));
+    s.push_str(&union(
+        "PluginTrust",
+        &["unreviewed", "reviewed", "first_party"],
+    ));
+
+    // --- ExportSelection: internally-tagged union (matches #[serde(tag)]) ---
+    s.push_str(
+        "\nexport type ExportSelection =\n  \
+         | { kind: \"window\"; from_mono_nanos: number; to_mono_nanos: number }\n  \
+         | { kind: \"session\"; id: number }\n  \
+         | { kind: \"finding\"; id: number }\n  \
+         | { kind: \"all\" };\n",
+    );
+
+    // --- Phase 5 lifecycle interfaces (docs/21–24) ---
+    s.push_str(&iface(
+        "VersionPins",
+        &[
+            ("engine", "string"),
+            ("decode", "string"),
+            ("intel", "string"),
+            ("ai", "string"),
+            ("content", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "PrivacyManifest",
+        &[
+            ("level", "PayloadLevel"),
+            ("contains_payloads", "boolean"),
+            ("redactions", "string[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "RecordingSummary",
+        &[
+            ("id", "number"),
+            ("from_mono_nanos", "number"),
+            ("to_mono_nanos", "number"),
+            ("frame_count", "number"),
+            ("api_version", "number"),
+            ("version_pins", "VersionPins"),
+            ("privacy", "PrivacyManifest"),
+            ("incomplete", "boolean"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ReplayState",
+        &[
+            ("position_nanos", "number"),
+            ("total_nanos", "number"),
+            ("speed_percent", "number"),
+            ("playing", "boolean"),
+            ("frame_index", "number"),
+            ("incomplete", "boolean"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ExportPreview",
+        &[
+            ("format", "ExportFormat"),
+            ("level", "PayloadLevel"),
+            ("flows", "number"),
+            ("sessions", "number"),
+            ("hosts", "number"),
+            ("contains_payloads", "boolean"),
+            ("sanitized", "string[]"),
+            ("provenance", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "PluginDescriptor",
+        &[
+            ("name", "string"),
+            ("plugin_type", "PluginType"),
+            ("capabilities", "PluginCapability[]"),
+            ("trust", "PluginTrust"),
+            ("source", "string"),
+            ("target_contract", "number"),
+            ("compatible", "boolean"),
+            ("enabled", "boolean"),
+            ("disabled_reason", "string | null"),
+        ],
+    ));
+
     s
 }
 
@@ -328,6 +434,18 @@ mod tests {
             "FindingKind",
             "SecurityFinding",
             "AssistantAnswer",
+            "PayloadLevel",
+            "ExportFormat",
+            "PluginType",
+            "PluginCapability",
+            "PluginTrust",
+            "ExportSelection",
+            "VersionPins",
+            "PrivacyManifest",
+            "RecordingSummary",
+            "ReplayState",
+            "ExportPreview",
+            "PluginDescriptor",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

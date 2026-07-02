@@ -2,7 +2,7 @@
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
-export const API_VERSION = 3 as const;
+export const API_VERSION = 4 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
@@ -155,4 +155,77 @@ export interface AssistantAnswer {
   backend_id: string;
   is_remote: boolean;
   disclosure: string;
+}
+
+export type PayloadLevel = "metadata_only" | "headers" | "full_payload";
+
+export type ExportFormat = "pcapng" | "json" | "csv" | "report";
+
+export type PluginType = "dissector" | "enrichment" | "detector" | "view" | "export";
+
+export type PluginCapability = "parse_bytes" | "read_model" | "emit_findings" | "read_local_data" | "api_read" | "write_output";
+
+export type PluginTrust = "unreviewed" | "reviewed" | "first_party";
+
+export type ExportSelection =
+  | { kind: "window"; from_mono_nanos: number; to_mono_nanos: number }
+  | { kind: "session"; id: number }
+  | { kind: "finding"; id: number }
+  | { kind: "all" };
+
+export interface VersionPins {
+  engine: string;
+  decode: string;
+  intel: string;
+  ai: string;
+  content: string;
+}
+
+export interface PrivacyManifest {
+  level: PayloadLevel;
+  contains_payloads: boolean;
+  redactions: string[];
+}
+
+export interface RecordingSummary {
+  id: number;
+  from_mono_nanos: number;
+  to_mono_nanos: number;
+  frame_count: number;
+  api_version: number;
+  version_pins: VersionPins;
+  privacy: PrivacyManifest;
+  incomplete: boolean;
+}
+
+export interface ReplayState {
+  position_nanos: number;
+  total_nanos: number;
+  speed_percent: number;
+  playing: boolean;
+  frame_index: number;
+  incomplete: boolean;
+}
+
+export interface ExportPreview {
+  format: ExportFormat;
+  level: PayloadLevel;
+  flows: number;
+  sessions: number;
+  hosts: number;
+  contains_payloads: boolean;
+  sanitized: string[];
+  provenance: string;
+}
+
+export interface PluginDescriptor {
+  name: string;
+  plugin_type: PluginType;
+  capabilities: PluginCapability[];
+  trust: PluginTrust;
+  source: string;
+  target_contract: number;
+  compatible: boolean;
+  enabled: boolean;
+  disabled_reason: string | null;
 }

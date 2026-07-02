@@ -363,6 +363,182 @@ pub struct AssistantAnswerDto {
     pub disclosure: String,
 }
 
+// ===== Phase 5 — Lifecycle & Extensibility (docs/21–24) ====================
+//
+// The wire projections of Recording, Replay, Export, and Plugins. As with every
+// DTO above, these are distinct from the rich domain types in `netpulse-capture`
+// / `netpulse-engine` / `netpulse-plugin`; the engine maps down into these stable
+// shapes. Honesty travels on the wire: a recording states its exact payload level
+// and version pins (docs/22 §5–6); a replay reports incompleteness (docs/21 §8);
+// an export preview names exactly what it contains before any bytes are written
+// (docs/23 §6); a plugin descriptor exposes its capabilities and trust so enabling
+// one is an informed act (docs/24 §5).
+
+/// The payload level a recording/export carries (docs/22 §5, docs/23 §7). Mirrors
+/// `netpulse_capture::RecordingPayloadLevel`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PayloadLevelDto {
+    #[default]
+    MetadataOnly,
+    Headers,
+    FullPayload,
+}
+
+/// The engine/model/content versions pinned into a recording (docs/22 §6), so
+/// replay can reproduce the same processing or honestly disclose drift (docs/21 §8).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct VersionPinsDto {
+    pub engine: String,
+    pub decode: String,
+    pub intel: String,
+    pub ai: String,
+    pub content: String,
+}
+
+/// What a recording actually holds, made explicit (docs/22 §5). `contains_payloads`
+/// is a tested invariant for metadata-only recordings.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrivacyManifestDto {
+    pub level: PayloadLevelDto,
+    pub contains_payloads: bool,
+    pub redactions: Vec<String>,
+}
+
+/// A recording listed for the user (docs/22 §3). Everything needed to understand
+/// and choose a recording without opening it: its window, size, privacy level, and
+/// determinism metadata.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecordingSummaryDto {
+    pub id: u64,
+    pub from_mono_nanos: u64,
+    pub to_mono_nanos: u64,
+    pub frame_count: u64,
+    pub api_version: u32,
+    pub version_pins: VersionPinsDto,
+    pub privacy: PrivacyManifestDto,
+    /// True when the recording was truncated/recovered (docs/22 §8) — surfaced so
+    /// review knows the reconstruction is incomplete (docs/21 §8).
+    pub incomplete: bool,
+}
+
+/// The playback state of a replay (docs/21 §5). `speed_percent` is 100 for 1×, 10
+/// for slow-motion teaching, 1000 for 10× review — an integer so it stays exact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReplayStateDto {
+    pub position_nanos: u64,
+    pub total_nanos: u64,
+    pub speed_percent: u32,
+    pub playing: bool,
+    pub frame_index: u64,
+    pub incomplete: bool,
+}
+
+/// An open export format (docs/23 §4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ExportFormatDto {
+    /// Raw frames for Wireshark/tcpdump (the interop gold standard, docs/03 §5).
+    Pcapng,
+    /// The structured model — flows/sessions/events/findings with evidence refs.
+    Json,
+    /// Tabular flows/metrics for spreadsheets.
+    Csv,
+    /// A narrated, human-readable journey/incident (HTML).
+    Report,
+}
+
+/// What to export — a selection, not just "everything" (docs/23 §8). Tagged union:
+/// `{ "kind": "session", "id": 7 }`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ExportSelectionDto {
+    /// A time window (from Timeline range-select, docs/10 §5).
+    Window {
+        from_mono_nanos: u64,
+        to_mono_nanos: u64,
+    },
+    /// A single session/journey (docs/14).
+    Session { id: u64 },
+    /// A finding + its evidence (docs/17).
+    Finding { id: u64 },
+    /// The entire committed capture.
+    All,
+}
+
+/// A preview of exactly what an export will contain, shown before it is written or
+/// shared (docs/23 §6). Default least-revealing; the user sees payload level,
+/// counts, the sanitizations applied, and provenance before any bytes exist.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExportPreviewDto {
+    pub format: ExportFormatDto,
+    pub level: PayloadLevelDto,
+    pub flows: u32,
+    pub sessions: u32,
+    pub hosts: u32,
+    pub contains_payloads: bool,
+    /// The sanitizations applied to this export (docs/23 §7), each named.
+    pub sanitized: Vec<String>,
+    /// Provenance line: producing version + payload level (docs/23 §6).
+    pub provenance: String,
+}
+
+/// A plugin extension seam (docs/24 §3). Mirrors `netpulse_plugin::PluginType`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PluginTypeDto {
+    Dissector,
+    Enrichment,
+    Detector,
+    View,
+    Export,
+}
+
+/// A capability granted to a plugin (docs/24 §5). Note there is **no** network or
+/// system variant — no plugin can acquire egress (docs/02 §10.1).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PluginCapabilityDto {
+    ParseBytes,
+    ReadModel,
+    EmitFindings,
+    ReadLocalData,
+    ApiRead,
+    WriteOutput,
+}
+
+/// A plugin's trust/review status (docs/24 §5, §6).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum PluginTrustDto {
+    Unreviewed,
+    Reviewed,
+    FirstParty,
+}
+
+/// A plugin as listed for the user (docs/24 §6). Its type, granted capabilities,
+/// trust, contract compatibility, and activation state — everything needed to make
+/// enabling it an informed, explicit choice (docs/24 §5).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginDescriptorDto {
+    pub name: String,
+    pub plugin_type: PluginTypeDto,
+    pub capabilities: Vec<PluginCapabilityDto>,
+    pub trust: PluginTrustDto,
+    pub source: String,
+    pub target_contract: u32,
+    pub compatible: bool,
+    pub enabled: bool,
+    /// Present when inactive, explaining why (docs/24 §8) — never a silent disable.
+    pub disabled_reason: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -523,6 +699,91 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&FindingCategoryDto::Suspicious).unwrap(),
             r#""suspicious""#
+        );
+    }
+
+    #[test]
+    fn lifecycle_dtos_round_trip() {
+        roundtrip(&RecordingSummaryDto {
+            id: 1,
+            from_mono_nanos: 0,
+            to_mono_nanos: 5_000_000_000,
+            frame_count: 128,
+            api_version: 4,
+            version_pins: VersionPinsDto {
+                engine: "0.1.0".into(),
+                decode: "0.1.0".into(),
+                intel: "0.1.0".into(),
+                ai: "0.1.0".into(),
+                content: "0.1.0".into(),
+            },
+            privacy: PrivacyManifestDto {
+                level: PayloadLevelDto::MetadataOnly,
+                contains_payloads: false,
+                redactions: vec![],
+            },
+            incomplete: false,
+        });
+        roundtrip(&ReplayStateDto {
+            position_nanos: 1_000_000,
+            total_nanos: 5_000_000,
+            speed_percent: 100,
+            playing: true,
+            frame_index: 12,
+            incomplete: false,
+        });
+        roundtrip(&ExportSelectionDto::Session { id: 7 });
+        roundtrip(&ExportPreviewDto {
+            format: ExportFormatDto::Json,
+            level: PayloadLevelDto::MetadataOnly,
+            flows: 10,
+            sessions: 2,
+            hosts: 4,
+            contains_payloads: false,
+            sanitized: vec!["metadata-only: no payloads".into()],
+            provenance: "NetPulse 0.1.0 · metadata-only".into(),
+        });
+        roundtrip(&PluginDescriptorDto {
+            name: "example-dissector".into(),
+            plugin_type: PluginTypeDto::Dissector,
+            capabilities: vec![PluginCapabilityDto::ParseBytes],
+            trust: PluginTrustDto::FirstParty,
+            source: "in-tree".into(),
+            target_contract: 4,
+            compatible: true,
+            enabled: true,
+            disabled_reason: None,
+        });
+    }
+
+    #[test]
+    fn lifecycle_enums_use_expected_reprs() {
+        // The TS emitter mirrors these exact wire strings; a mismatch fails the
+        // drift gate (docs/04 §7).
+        assert_eq!(
+            serde_json::to_string(&PayloadLevelDto::MetadataOnly).unwrap(),
+            r#""metadata_only""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ExportFormatDto::Pcapng).unwrap(),
+            r#""pcapng""#
+        );
+        assert_eq!(
+            serde_json::to_string(&PluginCapabilityDto::ReadLocalData).unwrap(),
+            r#""read_local_data""#
+        );
+        // The export selection is an internally-tagged union.
+        assert_eq!(
+            serde_json::to_string(&ExportSelectionDto::All).unwrap(),
+            r#"{"kind":"all"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&ExportSelectionDto::Window {
+                from_mono_nanos: 1,
+                to_mono_nanos: 2
+            })
+            .unwrap(),
+            r#"{"kind":"window","from_mono_nanos":1,"to_mono_nanos":2}"#
         );
     }
 

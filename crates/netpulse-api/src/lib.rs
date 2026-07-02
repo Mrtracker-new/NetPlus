@@ -27,17 +27,19 @@ pub mod dto;
 pub use dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
     AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
-    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, FanoutNodeDto,
-    FindingCategoryDto, FindingKindDto, GroundedExerciseDto, JourneyStageDto, LessonOfferDto,
-    MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto, ProjectionDepth, SecurityFindingDto,
-    SeverityDto, StageKindDto, VisualEventDto,
+    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
+    GroundedExerciseDto, JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto,
+    PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto,
+    PluginTypeDto, PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto,
+    SecurityFindingDto, SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
-/// and engine can negotiate compatibility (docs/02 §7.2). Phase 4 adds the
-/// intelligence queries/DTOs (docs/17–20: security findings + AI assistant),
-/// advancing the version from Phase 3's `2`.
-pub const API_VERSION: u32 = 3;
+/// and engine can negotiate compatibility (docs/02 §7.2). Phase 5 adds the
+/// lifecycle queries/DTOs (docs/21–24: recordings, replay, export, plugins),
+/// advancing the version from Phase 4's `3`.
+pub const API_VERSION: u32 = 4;
 
 /// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
@@ -104,6 +106,18 @@ pub enum Query {
     /// Ask the grounded AI assistant a natural-language question (docs/19). The
     /// answer is grounded in the committed capture and cites its evidence.
     AskAssistant { question: String },
+    // ---- Phase 5 lifecycle queries (docs/21–24) ----
+    /// List the recordings available for replay/export (docs/22 §3).
+    ListRecordings,
+    /// The current replay playback state (docs/21 §5).
+    ReplayState,
+    /// Preview exactly what an export would contain, before writing it (docs/23 §6).
+    ExportPreview {
+        selection: ExportSelectionDto,
+        format: ExportFormatDto,
+    },
+    /// List the registered plugins with their capabilities and trust (docs/24 §6).
+    ListPlugins,
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -129,6 +143,14 @@ pub enum QueryResponse {
     Findings(Vec<SecurityFindingDto>),
     /// A grounded, cited AI answer (docs/19).
     AssistantAnswer(AssistantAnswerDto),
+    /// The recordings available for replay/export (docs/22).
+    Recordings(Vec<RecordingSummaryDto>),
+    /// The current replay playback state (docs/21 §5).
+    ReplayState(ReplayStateDto),
+    /// A preview of what an export would contain (docs/23 §6).
+    ExportPreview(ExportPreviewDto),
+    /// The registered plugins (docs/24 §6).
+    Plugins(Vec<PluginDescriptorDto>),
 }
 
 /// A user-initiated control write — the only write path UI→engine (docs/02 §7.1).
@@ -150,6 +172,37 @@ pub enum Command {
     SetDepth {
         depth: ProjectionDepth,
     },
+    // ---- Phase 5 lifecycle commands (docs/21–24) ----
+    /// Start replay playback of the selected recording (docs/21 §5).
+    ReplayPlay,
+    /// Pause replay playback (docs/21 §5).
+    ReplayPause,
+    /// Advance replay by one frame/event (docs/21 §5).
+    ReplayStep,
+    /// Seek replay to a monotonic timestamp (docs/21 §5).
+    ReplaySeek {
+        mono_nanos: u64,
+    },
+    /// Set replay speed as a percentage of real time (100 = 1×) (docs/21 §5).
+    ReplaySetSpeed {
+        percent: u32,
+    },
+    /// Produce an export to a local file (docs/23). Explicit, user-initiated, and
+    /// never auto-transmitted — the single egress boundary stays `netpulse-ai`
+    /// (docs/23 §6, docs/02 §10).
+    StartExport {
+        selection: ExportSelectionDto,
+        format: ExportFormatDto,
+        level: PayloadLevelDto,
+    },
+    /// Enable a registered plugin — an explicit, disclosed user choice (docs/24 §5).
+    EnablePlugin {
+        name: String,
+    },
+    /// Disable a registered plugin (docs/24 §6).
+    DisablePlugin {
+        name: String,
+    },
 }
 
 #[cfg(test)]
@@ -157,9 +210,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_advanced_for_phase4() {
-        // Phase 4 adds the intelligence queries/DTOs (docs/17–20).
-        assert_eq!(API_VERSION, 3);
+    fn version_advanced_for_phase5() {
+        // Phase 5 adds the lifecycle queries/DTOs (docs/21–24).
+        assert_eq!(API_VERSION, 4);
+    }
+
+    #[test]
+    fn lifecycle_query_round_trips() {
+        let q = Query::ExportPreview {
+            selection: ExportSelectionDto::Session { id: 7 },
+            format: ExportFormatDto::Json,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let back: Query = serde_json::from_str(&json).unwrap();
+        assert_eq!(q, back);
+    }
+
+    #[test]
+    fn lifecycle_command_round_trips() {
+        let c = Command::ReplaySeek {
+            mono_nanos: 1_500_000,
+        };
+        let json = serde_json::to_string(&c).unwrap();
+        let back: Command = serde_json::from_str(&json).unwrap();
+        assert_eq!(c, back);
     }
 
     #[test]

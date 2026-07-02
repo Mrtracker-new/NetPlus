@@ -63,15 +63,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # No `version:` here — pnpm/action-setup reads it from the root
+      # package.json `packageManager` field (pnpm@9.0.0). Specifying both errors
+      # with ERR_PNPM_BAD_PM_VERSION.
       - name: Install pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 9
 
       - name: Install Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       # No committed pnpm-lock.yaml yet (the scaffold predates a real install);

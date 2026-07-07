@@ -11,6 +11,7 @@ import type { PageJourney } from "@netpulse/contract";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
+import { JourneyFlow } from "../viz";
 
 // The most recent session in the feed — the journey we open by default.
 function latestSessionId(feed: ReturnType<typeof useStore>["feed"]): number | null {
@@ -54,6 +55,9 @@ export function Journey() {
 
   return (
     <section className="np-journey" aria-label="Website journey">
+      {/* The signature flow diagram: stages with traveling packets + fan-out. */}
+      <JourneyFlow stages={journey.stages} fanout={journey.fanout} />
+
       <ol className="np-journey__stages">
         {journey.stages.map((stage, i) => (
           <li className="np-stage" key={`${stage.kind}-${i}`}>

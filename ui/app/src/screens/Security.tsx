@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import type { SecurityFinding } from "@netpulse/contract";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
+import { ConfidenceMeter } from "../viz";
 
 // Human-readable label for the specific finding kind (docs/17 §4 named set).
 const KIND_LABEL: Record<SecurityFinding["kind"], string> = {
@@ -42,8 +43,7 @@ function FindingCard({
           forced to interpret a raw number (docs/17 §5). Never 100 for an
           inference. */}
       <div className="np-finding__confidence">
-        <span className="np-confidence-word">{finding.qualitative}</span>
-        <span className="np-confidence">Confidence: {finding.confidence_percent}%</span>
+        <ConfidenceMeter percent={finding.confidence_percent} qualitative={finding.qualitative} />
       </div>
 
       {/* Every finding explains itself (docs/01 §7). */}

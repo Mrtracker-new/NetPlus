@@ -5,53 +5,55 @@
 
 import type { Breakdown, Diagnosis } from "@netpulse/contract";
 import { useStore } from "../state/store";
-
-function humanBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
-}
-
-function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
-  return (
-    <table className="np-breakdown">
-      <caption>By {breakdown.dimension}</caption>
-      <tbody>
-        {breakdown.rows.map((row) => (
-          <tr key={row.label}>
-            <td>{row.label}</td>
-            <td>{humanBytes(row.bytes)}</td>
-            <td>
-              {row.flows} flow{row.flows === 1 ? "" : "s"}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
+import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes } from "../viz";
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   return (
     <article className="np-diagnosis">
       <p>{diagnosis.explanation}</p>
       {/* Confidence is always shown — honest over reassuring (docs/11 §6.3). */}
-      <span className="np-confidence">Confidence: {diagnosis.confidence_percent}%</span>
+      <ConfidenceMeter percent={diagnosis.confidence_percent} />
       <span className="np-evidence-count">{diagnosis.evidence.length} evidence</span>
     </article>
   );
 }
 
+function HostBars({ breakdown }: { breakdown: Breakdown }) {
+  const rows = [...breakdown.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6);
+  const max = rows.reduce((m, r) => Math.max(m, r.bytes), 0);
+  if (rows.length === 0) return null;
+  return (
+    <section className="np-panel">
+      <h3 className="np-panel__title">Top {breakdown.dimension}</h3>
+      {rows.map((r) => (
+        <BarRow key={r.label} label={r.label} value={r.bytes} max={max} suffix={humanBytes(r.bytes)} />
+      ))}
+    </section>
+  );
+}
+
 export function Monitoring() {
-  const { monitor } = useStore();
+  const { monitor, throughput } = useStore();
   if (!monitor) {
     return <div className="np-empty">Idle — no traffic to measure.</div>;
   }
 
+  const protocolSlices = monitor.by_protocol.rows.map((r) => ({ label: r.label, value: r.bytes }));
+
   return (
     <section className="np-monitor" aria-label="Monitoring">
-      <BreakdownTable breakdown={monitor.by_protocol} />
-      <BreakdownTable breakdown={monitor.by_host} />
+      <div className="np-monitor__top">
+        <section className="np-panel">
+          <h3 className="np-panel__title">Throughput</h3>
+          <AreaChart values={throughput} label="Bytes observed" format={humanBytes} />
+        </section>
+        <section className="np-panel">
+          <h3 className="np-panel__title">By protocol</h3>
+          <Donut slices={protocolSlices} centerLabel="total" format={humanBytes} />
+        </section>
+      </div>
+
+      <HostBars breakdown={monitor.by_host} />
 
       <div className="np-loss">
         {/* Two separate figures — never summed (docs/11 §6.4). */}

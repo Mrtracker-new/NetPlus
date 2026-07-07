@@ -16,11 +16,15 @@
 //!   distinct fields and never summed. Presenting our own dropped packets as the
 //!   network's loss would be both a correctness bug and a lie.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::net::IpAddr;
 
 use netpulse_core::net::L7Proto;
-use netpulse_core::{Confidence, EvidenceRef, Flow};
+use netpulse_core::{Confidence, EvidenceRef, Flow, HostName};
+
+/// The passively-observed `IP → names` map the host breakdown joins against
+/// (docs/08 §5). Owned by the store; borrowed here read-only for the join.
+pub type NameMap = HashMap<IpAddr, Vec<HostName>>;
 
 /// A ranked usage breakdown along one dimension (docs/11 §5): protocol, host,
 /// or interface. Rows are ordered by bytes descending, ties by label, so the
@@ -47,6 +51,11 @@ pub struct BreakdownRow {
     pub label: String,
     pub bytes: u64,
     pub flows: u32,
+    /// Passively-observed names for this row's endpoint, empty when none were
+    /// seen or the dimension has no IP (protocol/interface). The `label` stays the
+    /// raw IP — the authoritative key — and these enrich it for display; a name is
+    /// never substituted *for* the address (docs/08 §5, docs/02 §10.3).
+    pub hostnames: Vec<HostName>,
     /// The flows this row aggregates — the drill-down target (docs/09 §8).
     pub evidence: Vec<EvidenceRef>,
 }
@@ -56,10 +65,22 @@ pub fn breakdown_by_protocol(flows: &[&Flow]) -> Breakdown {
     aggregate(Dimension::Protocol, flows, |f| l7_label(f.l7).to_string())
 }
 
-/// Decompose by destination host IP (docs/11 §5, "by host"). Hostname/org
-/// enrichment (docs/08 §5) happens in a later layer; here the IP is the label.
-pub fn breakdown_by_host(flows: &[&Flow]) -> Breakdown {
-    aggregate(Dimension::Host, flows, |f| f.key.dst_ip.to_string())
+/// Decompose by destination host IP (docs/11 §5, "by host"), joining in the
+/// passively-observed names for each IP (docs/08 §5). The label stays the raw IP
+/// so the row's identity/key is unambiguous; `names` only *enriches* it, and an
+/// IP with no observed name simply carries an empty list — honest about what we
+/// have not seen rather than inventing a label.
+pub fn breakdown_by_host(flows: &[&Flow], names: &NameMap) -> Breakdown {
+    let mut breakdown = aggregate(Dimension::Host, flows, |f| f.key.dst_ip.to_string());
+    for row in &mut breakdown.rows {
+        // The label was just formatted from `dst_ip`, so this parse round-trips.
+        if let Ok(ip) = row.label.parse::<IpAddr>() {
+            if let Some(hostnames) = names.get(&ip) {
+                row.hostnames = hostnames.clone();
+            }
+        }
+    }
+    breakdown
 }
 
 /// Decompose by capture interface (docs/11 §5, "by interface incl. VPN").
@@ -88,6 +109,8 @@ where
             label,
             bytes,
             flows,
+            // Filled by the host breakdown's name join; empty for other dimensions.
+            hostnames: Vec::new(),
             evidence,
         })
         .collect();
@@ -323,10 +346,11 @@ pub fn snapshot(
     flows: &[&Flow],
     loss: LossAccounting,
     dns_setup_gap_nanos: Option<u64>,
+    names: &NameMap,
 ) -> MonitorSnapshot {
     MonitorSnapshot {
         by_protocol: breakdown_by_protocol(flows),
-        by_host: breakdown_by_host(flows),
+        by_host: breakdown_by_host(flows, names),
         diagnoses: diagnose(flows, loss, dns_setup_gap_nanos),
         loss,
     }
@@ -373,6 +397,39 @@ mod tests {
         assert_eq!(b.rows[0].flows, 2);
         // Each row carries its backing flows for drill-down.
         assert_eq!(b.rows[0].evidence.len(), 2);
+    }
+
+    #[test]
+    fn host_breakdown_joins_observed_names_and_keeps_ip_label() {
+        let dst = ip(93, 184, 216, 34);
+        let f1 = flow(1, dst, L7Proto::Tls, 1000, None, 0);
+        let f2 = flow(2, dst, L7Proto::Tls, 500, None, 0);
+        let mut names = NameMap::new();
+        names.insert(
+            dst,
+            vec![HostName {
+                name: "example.com".into(),
+                source: netpulse_core::NameSource::Dns,
+            }],
+        );
+        let b = breakdown_by_host(&[&f1, &f2], &names);
+        assert_eq!(b.rows.len(), 1);
+        let row = &b.rows[0];
+        // Label stays the raw IP — the name only enriches it.
+        assert_eq!(row.label, "93.184.216.34");
+        assert_eq!(row.hostnames.len(), 1);
+        assert_eq!(row.hostnames[0].name, "example.com");
+        assert_eq!(row.bytes, 1500);
+    }
+
+    #[test]
+    fn host_without_observed_name_has_empty_hostnames() {
+        let dst = ip(10, 0, 0, 9);
+        let f = flow(1, dst, L7Proto::Tls, 100, None, 0);
+        // Empty map (nothing resolved) → honest empty list, still a valid row.
+        let b = breakdown_by_host(&[&f], &NameMap::new());
+        assert_eq!(b.rows[0].label, "10.0.0.9");
+        assert!(b.rows[0].hostnames.is_empty());
     }
 
     #[test]
@@ -426,7 +483,7 @@ mod tests {
             network_loss_indicators: 0,
             capture_drops: 42,
         };
-        let snap = snapshot(&[&f], loss, None);
+        let snap = snapshot(&[&f], loss, None, &NameMap::new());
         assert_eq!(snap.loss.capture_drops, 42);
         assert_eq!(snap.loss.network_loss_indicators, 0);
         // Capture drops alone never manufacture a network diagnosis.

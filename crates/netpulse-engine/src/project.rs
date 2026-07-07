@@ -13,7 +13,8 @@ use netpulse_api::dto::{
     AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
     DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
-    JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NarrativeCardDto, PageJourneyDto,
+    HostNameDto, JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NameSourceDto,
+    NarrativeCardDto, PageJourneyDto,
     PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
     PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
     SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
@@ -108,9 +109,26 @@ fn breakdown_dto(b: &Breakdown) -> BreakdownDto {
                 label: r.label.clone(),
                 bytes: r.bytes,
                 flows: r.flows,
+                hostnames: r.hostnames.iter().map(hostname_dto).collect(),
                 evidence: r.evidence.iter().map(evidence_dto).collect(),
             })
             .collect(),
+    }
+}
+
+fn hostname_dto(h: &netpulse_core::HostName) -> HostNameDto {
+    HostNameDto {
+        name: h.name.clone(),
+        source: match h.source {
+            netpulse_core::NameSource::Dns => NameSourceDto::Dns,
+            netpulse_core::NameSource::Sni => NameSourceDto::Sni,
+            netpulse_core::NameSource::HostsFile => NameSourceDto::HostsFile,
+            netpulse_core::NameSource::OsResolver => NameSourceDto::OsResolver,
+            // `NameSource` is #[non_exhaustive]; a future passive source falls back
+            // to OsResolver (a local, non-authoritative hint) rather than dropping
+            // the name or overclaiming it as a wire-seen DNS answer.
+            _ => NameSourceDto::OsResolver,
+        },
     }
 }
 

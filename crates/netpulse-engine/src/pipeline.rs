@@ -116,6 +116,9 @@ fn run_feed<S: FrameFeed>(
     }
 
     let causal_links = engine.causal_links().len();
+    // Passive name table (DNS answers + TLS SNI) — read before `finish`, which
+    // borrows the engine mutably; it is accumulated state, not drained by finish.
+    let resolutions = engine.resolutions();
     let (flows, sessions) = engine.finish();
 
     let flow_count = flows.len();
@@ -124,6 +127,9 @@ fn run_feed<S: FrameFeed>(
     }
     let session_count = sessions.len();
     persist_sessions(store, sessions);
+    for (ip, names) in resolutions {
+        store.set_resolution(ip, names);
+    }
 
     Ok(OfflineReport {
         frames_read,
@@ -288,7 +294,7 @@ pub fn present(
         network_loss_indicators: network_loss,
         capture_drops: capture_stats.dropped,
     };
-    let snap = monitor::snapshot(&all_flows, loss, None);
+    let snap = monitor::snapshot(&all_flows, loss, None, store.resolutions());
 
     PresentationView {
         narratives,

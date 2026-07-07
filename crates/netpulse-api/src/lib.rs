@@ -29,17 +29,18 @@ pub use dto::{
     AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
     DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
-    GroundedExerciseDto, InterfaceDto, JourneyStageDto, LessonOfferDto, MonitorSnapshotDto,
-    NarrativeCardDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto,
+    GroundedExerciseDto, HostNameDto, InterfaceDto, JourneyStageDto, LessonOfferDto,
+    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
+    PluginCapabilityDto, PluginDescriptorDto,
     PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto,
     ReplayStateDto, SecurityFindingDto, SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
-/// and engine can negotiate compatibility (docs/02 §7.2). Phase 5 adds the
-/// lifecycle queries/DTOs (docs/21–24: recordings, replay, export, plugins),
-/// advancing the version from Phase 4's `3`.
-pub const API_VERSION: u32 = 5;
+/// and engine can negotiate compatibility (docs/02 §7.2). v6 adds passive
+/// hostname enrichment on host breakdown rows (`HostNameDto`/`NameSourceDto`,
+/// docs/08 §5), on top of v5's interface picker and Phase 5's lifecycle DTOs.
+pub const API_VERSION: u32 = 6;
 
 /// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
@@ -259,10 +260,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn version_advanced_for_interface_picker() {
-        // v5 adds the `Interfaces` query + `InterfaceDto` for capture-adapter
-        // selection (docs/05), on top of Phase 5's lifecycle DTOs (docs/21–24).
-        assert_eq!(API_VERSION, 5);
+    fn version_advanced_for_hostname_enrichment() {
+        // v6 adds passive hostname enrichment on host breakdown rows
+        // (`HostNameDto`/`NameSourceDto`, docs/08 §5), on top of v5's interface
+        // picker and Phase 5's lifecycle DTOs (docs/21–24).
+        assert_eq!(API_VERSION, 6);
     }
 
     #[test]

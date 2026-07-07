@@ -2,13 +2,15 @@
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
-export const API_VERSION = 5 as const;
+export const API_VERSION = 6 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
 export type Severity = "neutral" | "notable" | "finding";
 
 export type Dimension = "protocol" | "host" | "interface";
+
+export type NameSource = "dns" | "sni" | "hosts_file" | "os_resolver";
 
 export type Cause = "local_wifi" | "distant_server" | "slow_dns" | "congestion";
 
@@ -28,10 +30,16 @@ export interface NarrativeCard {
   at_mono_nanos: number;
 }
 
+export interface HostName {
+  name: string;
+  source: NameSource;
+}
+
 export interface BreakdownRow {
   label: string;
   bytes: number;
   flows: number;
+  hostnames: HostName[];
   evidence: EvidenceRef[];
 }
 

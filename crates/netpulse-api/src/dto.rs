@@ -74,12 +74,43 @@ pub enum DimensionDto {
     Interface,
 }
 
-/// One row of a usage breakdown (docs/11 §5).
+/// How a hostname for an IP was learned (docs/06 §6.1, docs/08 §5). Mirrors
+/// `netpulse_core::NameSource`. Always egress-free — a name we *saw* on the wire
+/// or read from *local* OS state, never a lookup we made — so the UI can label the
+/// provenance honestly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum NameSourceDto {
+    /// A DNS A/AAAA answer resolved this name to the IP.
+    Dns,
+    /// A TLS SNI the client sent to this IP.
+    Sni,
+    /// A static mapping from the machine's `hosts` file.
+    HostsFile,
+    /// A cached entry from the OS DNS resolver (incl. cached mDNS `.local`),
+    /// recovering names for lookups made before capture started.
+    OsResolver,
+}
+
+/// One passively-observed name for a breakdown row's endpoint, tagged with how it
+/// was learned (docs/08 §5). Several may travel for one IP; the UI picks what to
+/// show and can surface the source.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostNameDto {
+    pub name: String,
+    pub source: NameSourceDto,
+}
+
+/// One row of a usage breakdown (docs/11 §5). `label` is the raw key (an IP for
+/// the host dimension); `hostnames` enriches it with any names seen for that IP,
+/// empty when none — the label is never replaced by a name (docs/02 §10.3).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BreakdownRowDto {
     pub label: String,
     pub bytes: u64,
     pub flows: u32,
+    pub hostnames: Vec<HostNameDto>,
     pub evidence: Vec<EvidenceRefDto>,
 }
 
@@ -587,12 +618,22 @@ mod tests {
                     label: "TLS".into(),
                     bytes: 1500,
                     flows: 2,
+                    hostnames: vec![],
                     evidence: vec![EvidenceRefDto::Flow(1)],
                 }],
             },
             by_host: BreakdownDto {
                 dimension: DimensionDto::Host,
-                rows: vec![],
+                rows: vec![BreakdownRowDto {
+                    label: "93.184.216.34".into(),
+                    bytes: 2400,
+                    flows: 1,
+                    hostnames: vec![HostNameDto {
+                        name: "example.com".into(),
+                        source: NameSourceDto::Dns,
+                    }],
+                    evidence: vec![EvidenceRefDto::Flow(2)],
+                }],
             },
             diagnoses: vec![DiagnosisDto {
                 cause: CauseDto::SlowDns,
@@ -619,6 +660,36 @@ mod tests {
     fn cause_uses_snake_case() {
         let json = serde_json::to_string(&CauseDto::LocalWifi).unwrap();
         assert_eq!(json, r#""local_wifi""#);
+    }
+
+    #[test]
+    fn name_source_is_snake_case_and_hostname_round_trips() {
+        assert_eq!(
+            serde_json::to_string(&NameSourceDto::Sni).unwrap(),
+            r#""sni""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NameSourceDto::Dns).unwrap(),
+            r#""dns""#
+        );
+        // The host-environment sources are multi-word; snake_case must match the
+        // codegen union string exactly or the drift gate fails.
+        assert_eq!(
+            serde_json::to_string(&NameSourceDto::HostsFile).unwrap(),
+            r#""hosts_file""#
+        );
+        assert_eq!(
+            serde_json::to_string(&NameSourceDto::OsResolver).unwrap(),
+            r#""os_resolver""#
+        );
+        roundtrip(&HostNameDto {
+            name: "netflix.com".into(),
+            source: NameSourceDto::Sni,
+        });
+        roundtrip(&HostNameDto {
+            name: "nas.local".into(),
+            source: NameSourceDto::OsResolver,
+        });
     }
 
     #[test]

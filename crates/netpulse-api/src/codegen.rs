@@ -37,6 +37,10 @@ pub fn typescript_contract() -> String {
     s.push_str(&union("Severity", &["neutral", "notable", "finding"]));
     s.push_str(&union("Dimension", &["protocol", "host", "interface"]));
     s.push_str(&union(
+        "NameSource",
+        &["dns", "sni", "hosts_file", "os_resolver"],
+    ));
+    s.push_str(&union(
         "Cause",
         &["local_wifi", "distant_server", "slow_dns", "congestion"],
     ));
@@ -63,11 +67,16 @@ pub fn typescript_contract() -> String {
         ],
     ));
     s.push_str(&iface(
+        "HostName",
+        &[("name", "string"), ("source", "NameSource")],
+    ));
+    s.push_str(&iface(
         "BreakdownRow",
         &[
             ("label", "string"),
             ("bytes", "number"),
             ("flows", "number"),
+            ("hostnames", "HostName[]"),
             ("evidence", "EvidenceRef[]"),
         ],
     ));

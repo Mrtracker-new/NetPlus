@@ -3,5 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "description": "Design tokens: colors, protocol iconography, severity styles. The single source of visual language.",
-  "license": "MIT OR Apache-2.0"
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "exports": {
+    "./styles.css": "./src/index.css",
+    "./tokens.css": "./src/tokens.css"
+  }
 }

@@ -19,8 +19,9 @@
 
 use netpulse_api::dto::{MonitorSnapshotDto, NarrativeCardDto};
 use netpulse_capture::{CaptureStats, FileCapture, FrameFeed, Recording, ReplaySource};
+use netpulse_core::traits::RawFrame;
 use netpulse_core::{Depth, Session, Timestamp};
-use netpulse_decode::decode_frame;
+use netpulse_decode::{decode_frame, LinkType};
 use netpulse_flow::{FlowEngine, PacketView};
 use netpulse_narrative::{build_cards, SessionView};
 use netpulse_storage::{CaptureStore, PayloadPolicy};
@@ -160,6 +161,70 @@ pub fn analyze_file(
 ) -> netpulse_core::Result<(CaptureStore, OfflineReport)> {
     let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
     let report = run_feed(capture, shards, &mut store)?;
+    Ok((store, report))
+}
+
+/// Map a libpcap link-layer type (DLT) to the decoder's [`LinkType`] (docs/07
+/// §4.2). Mirrors the pcap file reader's mapping so live and file captures decode
+/// identically. `1` (Ethernet) is the near-universal case and the default.
+pub fn link_type_from_dlt(dlt: u32) -> LinkType {
+    match dlt {
+        0 => LinkType::Loopback,          // DLT_NULL
+        12 | 14 | 101 => LinkType::RawIp, // DLT_RAW family
+        _ => LinkType::Ethernet,          // 1 = EN10MB, and the safe default
+    }
+}
+
+/// A [`FrameFeed`] over frames already captured in memory — the seam for **live
+/// capture** (docs/05 §12). The live loop accumulates [`RawFrame`]s from the
+/// platform backend and periodically feeds a snapshot through this, so live
+/// reconstruction runs the *exact same* pipeline as file import and replay
+/// (docs/21 §4). Wall time falls back to each frame's monotonic reading (the live
+/// frames already carry a monotonic base — docs/05 §6).
+struct SliceFeed<'a> {
+    link: LinkType,
+    frames: &'a [RawFrame],
+    cursor: usize,
+    batch: usize,
+}
+
+impl FrameFeed for SliceFeed<'_> {
+    fn link_type(&self) -> LinkType {
+        self.link
+    }
+
+    fn wall_nanos_at(&self, _i: usize) -> Option<u64> {
+        None
+    }
+
+    fn next_frames(&mut self) -> netpulse_core::Result<Vec<RawFrame>> {
+        if self.cursor >= self.frames.len() {
+            return Ok(Vec::new());
+        }
+        let end = (self.cursor + self.batch).min(self.frames.len());
+        let out = self.frames[self.cursor..end].to_vec();
+        self.cursor = end;
+        Ok(out)
+    }
+}
+
+/// Reconstruct a store from a batch of live-captured frames (docs/05 §12). Runs
+/// the identical offline pipeline over an in-memory [`SliceFeed`], so what a user
+/// sees live is exactly what file import / replay would produce (docs/21 §4).
+/// `dlt` is the interface's libpcap link type (see [`link_type_from_dlt`]).
+pub fn analyze_frames(
+    dlt: u32,
+    frames: &[RawFrame],
+    shards: u16,
+) -> netpulse_core::Result<(CaptureStore, OfflineReport)> {
+    let feed = SliceFeed {
+        link: link_type_from_dlt(dlt),
+        frames,
+        cursor: 0,
+        batch: 256,
+    };
+    let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+    let report = run_feed(feed, shards, &mut store)?;
     Ok((store, report))
 }
 

@@ -1,10 +1,11 @@
-/* NetPulse global stylesheet — the "Signal" design language applied to every
+/* NetPulse global stylesheet — the "Soft Signal" design language applied to every
  * screen. Components across the app already carry consistent `np-*` class names
  * (docs/01 §9: one visual vocabulary); this file gives them form. Import once
  * from the app root:  import "@netpulse/design-system/styles.css".
  *
- * Structure: tokens → reset → app shell → primitives → per-screen. Density scales
- * with disclosure mode via the [data-depth] attribute the shell sets. */
+ * Structure: tokens → reset → app shell → primitives → constellation → per-screen.
+ * Light neumorphic is the default; a deep-observatory dark theme lives under
+ * [data-theme="dark"]. Density scales with disclosure via [data-depth]. */
 
 @import "./tokens.css";
 
@@ -40,8 +41,8 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 650;
+  letter-spacing: -0.02em;
 }
 
 p {
@@ -52,6 +53,12 @@ button {
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  border-radius: var(--np-radius-sm);
 }
 
 ::selection {
@@ -78,83 +85,134 @@ button {
 
 .np-app {
   display: grid;
-  grid-template-columns: var(--np-rail) 1fr;
+  grid-template-columns: var(--np-rail) 1fr var(--np-rail-right);
   height: 100vh;
   overflow: hidden;
+  padding: var(--np-4);
+  gap: var(--np-4);
+}
+@media (max-width: 1120px) {
+  .np-app {
+    grid-template-columns: var(--np-rail) 1fr;
+  }
+  .np-rail-right {
+    display: none;
+  }
 }
 
-/* Left icon rail navigation. */
+/* ---- Left icon rail ---- */
 .np-nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: var(--np-4) var(--np-3);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 40%),
-    var(--np-surface-1);
-  border-right: 1px solid var(--np-border);
-  overflow-y: auto;
+  align-items: center;
+  gap: var(--np-2);
+  padding: var(--np-4) var(--np-2);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+  /* Must NOT clip: the hover tooltips sit outside the rail (left: 100%). A
+     scroll container would clip them, so the rail never scrolls — the 13 items
+     fit the column; on a short window they compress via the gap below. */
+  overflow: visible;
+  min-height: 0;
 }
-
+.np-nav__brand {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--np-3);
+  border-radius: var(--np-radius);
+  color: var(--np-on-accent);
+  background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
+  box-shadow: var(--np-neu-sm);
+  flex: none;
+}
 .np-nav__item {
   position: relative;
-  text-align: left;
-  padding: var(--np-2) var(--np-3);
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
   border: none;
-  border-radius: var(--np-radius-sm);
+  border-radius: var(--np-radius);
   background: transparent;
-  color: var(--np-text-dim);
-  font-size: var(--np-fs-base);
-  font-weight: 500;
-  letter-spacing: var(--np-tracking);
-  transition: background var(--np-t), color var(--np-t);
+  color: var(--np-text-mute);
+  transition: background var(--np-t), color var(--np-t), box-shadow var(--np-t),
+    transform var(--np-t);
 }
 .np-nav__item:hover {
-  background: var(--np-surface-2);
   color: var(--np-text);
+  background: var(--np-surface-2);
+}
+.np-nav__item:active {
+  transform: scale(0.94);
 }
 .np-nav__item--active {
-  background: var(--np-accent-soft);
   color: var(--np-accent-strong);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-inset);
 }
-.np-nav__item--active::before {
-  content: "";
+.np-nav__item svg {
+  width: 20px;
+  height: 20px;
+}
+/* Tooltip label on hover — the rail is icon-only (ref). */
+.np-nav__item::after {
+  content: attr(data-label);
   position: absolute;
-  left: -3px;
+  left: calc(100% + 10px);
   top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 60%;
+  transform: translateY(-50%) scale(0.96);
+  padding: var(--np-1) var(--np-3);
   border-radius: var(--np-radius-pill);
-  background: var(--np-accent);
-  box-shadow: 0 0 12px var(--np-accent);
+  background: var(--np-glass-bg);
+  -webkit-backdrop-filter: var(--np-glass-blur);
+  backdrop-filter: var(--np-glass-blur);
+  border: 1px solid var(--np-glass-border);
+  box-shadow: var(--np-neu-sm);
+  color: var(--np-text);
+  font-size: var(--np-fs-sm);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--np-t), transform var(--np-t);
+  z-index: 50;
+}
+.np-nav__item:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
 }
 
-/* Main column: sticky header + scrolling content. */
+/* ---- Main column: glass header + scrolling content ---- */
 .np-main {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: var(--np-4);
   overflow: hidden;
 }
 
 .np-header {
   display: flex;
   align-items: center;
-  gap: var(--np-4);
-  padding: var(--np-3) var(--np-6);
-  border-bottom: 1px solid var(--np-border);
-  background: color-mix(in srgb, var(--np-surface-1) 70%, transparent);
-  backdrop-filter: blur(12px);
+  gap: var(--np-3);
+  padding: var(--np-2) var(--np-3) var(--np-2) var(--np-5);
+  border-radius: var(--np-radius-pill);
+  background: var(--np-glass-bg);
+  -webkit-backdrop-filter: var(--np-glass-blur);
+  backdrop-filter: var(--np-glass-blur);
+  border: 1px solid var(--np-glass-border);
+  box-shadow: var(--np-neu-sm);
+  flex: none;
 }
 
 .np-brand {
-  font-weight: 700;
+  font-weight: 750;
   font-size: var(--np-fs-md);
-  letter-spacing: -0.01em;
-  background: linear-gradient(90deg, var(--np-text), var(--np-accent-strong));
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.02em;
+  color: var(--np-text);
 }
 /* A breathing pulse dot beside the wordmark — the "live" motif (docs/17 §8). */
 .np-brand::before {
@@ -170,10 +228,102 @@ button {
   vertical-align: middle;
 }
 
+/* A non-functional search affordance to anchor the header (ref). */
+.np-search {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-2);
+  padding: var(--np-2) var(--np-4);
+  min-width: 200px;
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-text-mute);
+  font-size: var(--np-fs-sm);
+}
+.np-search svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+
+.np-header__spacer {
+  flex: 1;
+}
+
 .np-main > main {
   flex: 1;
   overflow-y: auto;
-  padding: var(--np-6);
+  padding: var(--np-1) var(--np-2) var(--np-6);
+}
+
+/* ---- Right context rail (real NetPulse content, not the ref's social feed) ---- */
+.np-rail-right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+  padding: var(--np-2);
+  overflow-y: auto;
+}
+.np-rail-card {
+  padding: var(--np-4);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+}
+.np-rail-card__title {
+  font-size: var(--np-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+  color: var(--np-text-mute);
+  margin-bottom: var(--np-3);
+}
+.np-rail-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+}
+.np-rail-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--np-3);
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+}
+.np-rail-list__val {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+}
+
+/* Icon-only round button (theme toggle, header actions). */
+.np-iconbtn {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border: none;
+  border-radius: 50%;
+  background: var(--np-surface-1);
+  color: var(--np-text-dim);
+  box-shadow: var(--np-neu-sm);
+  transition: box-shadow var(--np-t), color var(--np-t), transform var(--np-t);
+}
+.np-iconbtn:hover {
+  color: var(--np-accent-strong);
+}
+.np-iconbtn:active {
+  box-shadow: var(--np-neu-inset);
+  transform: scale(0.96);
+}
+.np-iconbtn svg {
+  width: 18px;
+  height: 18px;
 }
 
 /* ---- Live capture control (mandatory visible indicator, docs/17 §8) ---- */
@@ -191,45 +341,44 @@ button {
   animation: np-pulse 1.4s ease-in-out infinite;
 }
 .np-capture__btn--live {
-  border-color: var(--np-finding);
   color: var(--np-finding);
   background: var(--np-finding-soft);
+  box-shadow: var(--np-neu-inset);
 }
 .np-capture__iface {
-  max-width: 200px;
-  padding: var(--np-1) var(--np-3);
-  background: var(--np-surface-2);
+  max-width: 190px;
+  padding: var(--np-2) var(--np-3);
+  background: var(--np-surface-1);
   color: var(--np-text-dim);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius-sm);
+  border: none;
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
   font: inherit;
   font-size: var(--np-fs-sm);
 }
 .np-capture__iface:disabled {
-  opacity: 0.55;
+  opacity: 0.6;
 }
 .np-capture__iface:focus {
   outline: none;
-  border-color: var(--np-accent);
 }
 .np-capture__err {
   font-size: var(--np-fs-xs);
-  color: var(--np-notable);
-  max-width: 40ch;
+  color: var(--np-finding);
+  max-width: 32ch;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ---- Disclosure mode switch (segmented control) ---- */
+/* ---- Disclosure mode switch (segmented pill control) ---- */
 .np-modes {
   display: inline-flex;
-  margin-left: auto;
-  padding: 3px;
+  padding: 4px;
   gap: 2px;
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-border);
+  background: var(--np-surface-1);
   border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
 }
 .np-mode {
   border: none;
@@ -239,15 +388,16 @@ button {
   border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-sm);
   text-transform: capitalize;
-  transition: background var(--np-t), color var(--np-t);
+  transition: background var(--np-t), color var(--np-t), box-shadow var(--np-t);
 }
 .np-mode:hover {
   color: var(--np-text);
 }
 .np-mode--active {
-  background: var(--np-accent);
-  color: #06201e;
-  font-weight: 600;
+  background: var(--np-surface-1);
+  color: var(--np-accent-strong);
+  font-weight: 650;
+  box-shadow: var(--np-neu-sm);
 }
 
 /* ============================ Primitives ============================ */
@@ -256,9 +406,9 @@ button {
 .np-empty {
   display: grid;
   place-items: center;
-  min-height: 50vh;
-  max-width: 42ch;
-  margin: 0 auto;
+  min-height: 46vh;
+  max-width: 44ch;
+  margin: var(--np-7) auto;
   text-align: center;
   color: var(--np-text-dim);
   font-size: var(--np-fs-md);
@@ -266,17 +416,28 @@ button {
 .np-empty::before {
   content: "";
   display: block;
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
   margin-bottom: var(--np-4);
   border-radius: 50%;
-  border: 1px solid var(--np-border-strong);
-  background: radial-gradient(circle at 50% 50%, var(--np-accent-soft), transparent 70%);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu);
+  position: relative;
+}
+.np-empty::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin-top: -44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, var(--np-accent), transparent 70%);
   animation: np-pulse 3s ease-in-out infinite;
 }
 
 .np-ok {
   color: var(--np-good);
+  font-weight: 550;
 }
 .np-loss {
   display: flex;
@@ -285,43 +446,49 @@ button {
   color: var(--np-text-dim);
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
-  padding: var(--np-3) 0;
+  padding: var(--np-3) var(--np-4);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius);
+  box-shadow: var(--np-neu-inset);
 }
 
-/* Buttons */
+/* Buttons — soft raised, press = inset. */
 .np-btn {
-  border: 1px solid var(--np-border-strong);
-  background: var(--np-surface-2);
+  border: none;
+  background: var(--np-surface-1);
   color: var(--np-text);
-  padding: var(--np-2) var(--np-4);
-  border-radius: var(--np-radius-sm);
+  padding: var(--np-2) var(--np-5);
+  border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-sm);
-  transition: background var(--np-t), border-color var(--np-t), transform var(--np-t);
+  font-weight: 550;
+  box-shadow: var(--np-neu-sm);
+  transition: box-shadow var(--np-t), color var(--np-t), transform var(--np-t),
+    background var(--np-t);
 }
 .np-btn:hover {
-  background: var(--np-surface-3);
-  border-color: var(--np-accent-line);
+  color: var(--np-accent-strong);
 }
 .np-btn:active {
+  box-shadow: var(--np-neu-inset);
   transform: translateY(1px);
 }
 .np-btn--active {
-  border-color: var(--np-accent);
   color: var(--np-accent-strong);
-  background: var(--np-accent-soft);
+  box-shadow: var(--np-neu-inset);
 }
 .np-btn--primary {
-  background: var(--np-accent);
-  color: #06201e;
-  border-color: transparent;
-  font-weight: 600;
+  background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
+  color: var(--np-on-accent);
+  font-weight: 650;
 }
 .np-btn--primary:hover {
-  background: var(--np-accent-strong);
+  color: var(--np-on-accent);
+  filter: brightness(1.04);
 }
 .np-btn:disabled {
   opacity: 0.5;
   cursor: default;
+  box-shadow: var(--np-neu-inset);
 }
 
 /* Confidence & evidence chips — used across findings, journeys, diagnoses. */
@@ -335,26 +502,26 @@ button {
   color: var(--np-text-mute);
 }
 .np-confidence-word {
-  color: var(--np-accent);
+  color: var(--np-accent-strong);
 }
 .np-evidence,
 .np-evidence-count {
   display: inline-flex;
   align-items: center;
   gap: var(--np-1);
-  padding: 2px var(--np-2);
+  padding: var(--np-1) var(--np-3);
   border-radius: var(--np-radius-pill);
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-border);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
   color: var(--np-text-dim);
 }
 .np-evidence {
   border: none;
-  transition: color var(--np-t), background var(--np-t);
+  transition: color var(--np-t), box-shadow var(--np-t);
 }
 .np-evidence:hover {
   color: var(--np-accent-strong);
-  background: var(--np-accent-soft);
+  box-shadow: var(--np-neu-inset);
 }
 
 /* Generic tables (Apps, Monitor breakdowns). */
@@ -374,7 +541,7 @@ button {
 }
 .np-breakdown td,
 .np-apps td {
-  padding: var(--np-2) var(--np-3);
+  padding: var(--np-3) var(--np-3);
   border-bottom: 1px solid var(--np-hairline);
 }
 .np-apps tr:hover td,
@@ -387,37 +554,67 @@ button {
   color: var(--np-text-dim);
 }
 
+/* ---- Stat tiles / KPI row (ref "You have been online 124 / visited 315") ---- */
+.np-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--np-4);
+}
+.np-kpi {
+  padding: var(--np-4) var(--np-5);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+}
+.np-kpi__label {
+  font-size: var(--np-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+  color: var(--np-text-mute);
+}
+.np-kpi__value {
+  margin-top: var(--np-1);
+  font-size: var(--np-fs-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--np-text);
+  line-height: 1.1;
+}
+.np-kpi__value span {
+  font-size: var(--np-fs-sm);
+  font-weight: 500;
+  color: var(--np-text-mute);
+  margin-left: 4px;
+}
+
 /* ============================ Cards & feed ============================ */
 
 .np-feed {
   display: flex;
   flex-direction: column;
-  gap: var(--np-3);
-  max-width: 68ch;
-  margin: 0 auto;
+  gap: var(--np-4);
 }
 
 .np-card {
   position: relative;
-  padding: var(--np-4) var(--np-5);
+  padding: var(--np-5) var(--np-5) var(--np-5) var(--np-6);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius);
-  box-shadow: var(--np-shadow);
-  transition: border-color var(--np-t), transform var(--np-t);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+  transition: box-shadow var(--np-t), transform var(--np-t);
 }
 .np-card:hover {
-  border-color: var(--np-border-strong);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--np-neu-lg);
 }
 /* A severity spine on the card's left edge — shape+color, never color alone. */
 .np-card::before {
   content: "";
   position: absolute;
-  left: 0;
-  top: var(--np-4);
-  bottom: var(--np-4);
-  width: 3px;
+  left: var(--np-4);
+  top: var(--np-5);
+  bottom: var(--np-5);
+  width: 4px;
   border-radius: var(--np-radius-pill);
   background: var(--np-neutral);
 }
@@ -431,7 +628,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--np-2);
-  font-weight: 600;
+  font-weight: 650;
   font-size: var(--np-fs-md);
 }
 .np-card--notable .np-card__headline > [aria-hidden] {
@@ -460,6 +657,28 @@ button {
   gap: var(--np-2);
 }
 
+/* ============================ Dashboard hero ============================ */
+.np-hero__title {
+  font-size: var(--np-fs-2xl);
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  margin-bottom: var(--np-1);
+}
+.np-hero__sub {
+  color: var(--np-text-dim);
+  margin-bottom: var(--np-5);
+}
+.np-dash {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-5);
+}
+.np-dash__section-title {
+  font-size: var(--np-fs-lg);
+  font-weight: 700;
+  margin-bottom: var(--np-3);
+}
+
 /* ============================ Section wrappers ============================ */
 
 .np-monitor,
@@ -474,14 +693,14 @@ button {
 .np-replay,
 .np-export,
 .np-plugins {
-  max-width: 960px;
+  max-width: 1000px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--np-4);
 }
 
-/* Shared "panel" look for the many block-level containers. */
+/* Shared soft-plate look for the many block-level containers. */
 .np-diagnosis,
 .np-finding,
 .np-stage,
@@ -491,10 +710,10 @@ button {
 .np-ref,
 .np-fanout,
 .np-assistant__answer {
-  padding: var(--np-4);
+  padding: var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
 }
 
 /* ---- Monitor ---- */
@@ -503,7 +722,7 @@ button {
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--np-2) var(--np-4);
-  border-left: 3px solid var(--np-notable);
+  border-left: 4px solid var(--np-notable);
 }
 .np-diagnosis p {
   flex: 1 1 100%;
@@ -512,7 +731,7 @@ button {
 
 /* ---- Security findings ---- */
 .np-finding {
-  border-left: 3px solid var(--np-finding);
+  border-left: 4px solid var(--np-finding);
 }
 .np-finding--expected {
   opacity: 0.66;
@@ -525,7 +744,7 @@ button {
   gap: var(--np-3);
 }
 .np-finding__title {
-  font-weight: 600;
+  font-weight: 650;
   font-size: var(--np-fs-md);
 }
 .np-finding__kind {
@@ -535,7 +754,7 @@ button {
   letter-spacing: var(--np-tracking-wide);
   color: var(--np-notable);
   background: var(--np-notable-soft);
-  padding: 2px var(--np-2);
+  padding: 2px var(--np-3);
   border-radius: var(--np-radius-pill);
   white-space: nowrap;
 }
@@ -553,10 +772,10 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
   color: var(--np-text-mute);
-  padding: var(--np-2) var(--np-3);
-  background: var(--np-bg);
+  padding: var(--np-3);
+  background: var(--np-surface-1);
   border-radius: var(--np-radius-sm);
-  border: 1px solid var(--np-hairline);
+  box-shadow: var(--np-neu-inset);
 }
 .np-finding__corroboration {
   margin-top: var(--np-2);
@@ -569,7 +788,7 @@ button {
 }
 .np-finding__benign summary {
   cursor: pointer;
-  color: var(--np-accent);
+  color: var(--np-accent-strong);
   user-select: none;
 }
 .np-finding__benign ul {
@@ -591,16 +810,20 @@ button {
 }
 .np-finding__expected-btn {
   margin-left: auto;
-  border: 1px solid var(--np-border-strong);
-  background: var(--np-surface-2);
+  border: none;
+  background: var(--np-surface-1);
   color: var(--np-text-dim);
-  padding: var(--np-1) var(--np-3);
-  border-radius: var(--np-radius-sm);
+  padding: var(--np-1) var(--np-4);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-sm);
   font-size: var(--np-fs-sm);
 }
 .np-finding__expected-btn:hover:not(:disabled) {
-  border-color: var(--np-accent-line);
   color: var(--np-text);
+}
+.np-finding__expected-btn:disabled {
+  box-shadow: var(--np-neu-inset);
+  cursor: default;
 }
 
 /* ---- Journey ---- */
@@ -610,7 +833,6 @@ button {
   padding: 0 0 0 var(--np-5);
   position: relative;
 }
-/* A vertical "signal path" spine through the stages. */
 .np-journey__stages::before {
   content: "";
   position: absolute;
@@ -623,21 +845,21 @@ button {
 .np-stage {
   position: relative;
   margin-bottom: var(--np-3);
-  border-left: 3px solid var(--np-accent-line);
+  border-left: 4px solid var(--np-accent-line);
 }
 .np-stage::before {
   content: "";
   position: absolute;
   left: calc(-1 * var(--np-5) - 1px);
-  top: var(--np-4);
-  width: 10px;
-  height: 10px;
+  top: var(--np-5);
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   background: var(--np-accent);
   box-shadow: 0 0 10px var(--np-accent);
 }
 .np-stage__title {
-  font-weight: 600;
+  font-weight: 650;
 }
 .np-stage__narration {
   margin-top: var(--np-1);
@@ -669,7 +891,7 @@ button {
   border-bottom: 1px solid var(--np-hairline);
 }
 .np-fanout__label {
-  font-weight: 500;
+  font-weight: 550;
 }
 .np-fanout__meta {
   font-family: var(--np-font-mono);
@@ -700,10 +922,9 @@ button {
   align-items: center;
 }
 .np-span {
-  padding: 2px var(--np-2);
-  border-radius: var(--np-radius-sm);
+  padding: var(--np-1) var(--np-3);
+  border-radius: var(--np-radius-pill);
   background: var(--np-accent-soft);
-  border: 1px solid var(--np-accent-line);
   color: var(--np-accent-strong);
   font-size: var(--np-fs-sm);
   white-space: nowrap;
@@ -719,17 +940,37 @@ button {
 }
 .np-assistant__input {
   flex: 1;
-  padding: var(--np-3) var(--np-4);
+  padding: var(--np-3) var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border-strong);
-  border-radius: var(--np-radius);
+  border: none;
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
   color: var(--np-text);
   font: inherit;
 }
 .np-assistant__input:focus {
   outline: none;
-  border-color: var(--np-accent);
-  box-shadow: var(--np-glow);
+}
+.np-assistant__ask {
+  border: none;
+  padding: var(--np-3) var(--np-6);
+  border-radius: var(--np-radius-pill);
+  background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
+  color: var(--np-on-accent);
+  font-weight: 650;
+  box-shadow: var(--np-neu-sm);
+  transition: box-shadow var(--np-t), filter var(--np-t), transform var(--np-t);
+}
+.np-assistant__ask:hover {
+  filter: brightness(1.04);
+}
+.np-assistant__ask:active {
+  box-shadow: var(--np-neu-inset);
+  transform: translateY(1px);
+}
+.np-assistant__ask:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 .np-assistant__suggestions {
   display: flex;
@@ -737,16 +978,18 @@ button {
   gap: var(--np-2);
 }
 .np-suggestion {
-  border: 1px solid var(--np-border);
-  background: var(--np-surface-2);
+  border: none;
+  background: var(--np-surface-1);
   color: var(--np-text-dim);
-  padding: var(--np-1) var(--np-3);
+  padding: var(--np-1) var(--np-4);
   border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-sm);
   font-size: var(--np-fs-sm);
+  transition: color var(--np-t), box-shadow var(--np-t);
 }
 .np-suggestion:hover {
   color: var(--np-accent-strong);
-  border-color: var(--np-accent-line);
+  box-shadow: var(--np-neu-inset);
 }
 .np-assistant__text {
   color: var(--np-text);
@@ -767,7 +1010,7 @@ button {
   font-size: var(--np-fs-xs);
   text-transform: uppercase;
   letter-spacing: var(--np-tracking-wide);
-  padding: 2px var(--np-2);
+  padding: 2px var(--np-3);
   border-radius: var(--np-radius-pill);
 }
 .np-posture--local,
@@ -784,17 +1027,16 @@ button {
 /* ---- Explorer ---- */
 .np-explorer__search {
   width: 100%;
-  padding: var(--np-3) var(--np-4);
+  padding: var(--np-3) var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border-strong);
-  border-radius: var(--np-radius);
+  border: none;
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
   color: var(--np-text);
   font: inherit;
 }
 .np-explorer__search:focus {
   outline: none;
-  border-color: var(--np-accent);
-  box-shadow: var(--np-glow);
 }
 .np-ref {
   display: flex;
@@ -802,7 +1044,7 @@ button {
   gap: var(--np-1);
 }
 .np-ref__key {
-  font-weight: 600;
+  font-weight: 650;
 }
 .np-ref__id {
   font-family: var(--np-font-mono);
@@ -818,12 +1060,12 @@ button {
   color: var(--np-text-mute);
 }
 .np-ref__mine {
-  color: var(--np-accent);
+  color: var(--np-accent-strong);
 }
 
 /* ---- Learn ---- */
 .np-lesson {
-  border-left: 3px solid var(--np-accent-2);
+  border-left: 4px solid var(--np-accent-2);
 }
 .np-lesson__level {
   font-family: var(--np-font-mono);
@@ -833,7 +1075,7 @@ button {
   color: var(--np-accent-2);
 }
 .np-lesson__title {
-  font-weight: 600;
+  font-weight: 650;
   font-size: var(--np-fs-md);
   margin: var(--np-1) 0;
 }
@@ -841,10 +1083,10 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
   color: var(--np-text-dim);
-  background: var(--np-bg);
-  padding: var(--np-2) var(--np-3);
+  background: var(--np-surface-1);
+  padding: var(--np-3);
   border-radius: var(--np-radius-sm);
-  border: 1px solid var(--np-hairline);
+  box-shadow: var(--np-neu-inset);
 }
 .np-lesson__check,
 .np-lesson__answer,
@@ -880,7 +1122,7 @@ button {
   gap: var(--np-3);
 }
 .np-recording__title {
-  font-weight: 600;
+  font-weight: 650;
 }
 .np-recording__level,
 .np-recording__meta,
@@ -928,15 +1170,52 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
   color: var(--np-text-dim);
-  background: var(--np-bg);
-  padding: var(--np-3);
+  background: var(--np-surface-1);
+  padding: var(--np-4);
   border-radius: var(--np-radius-sm);
-  border: 1px solid var(--np-hairline);
+  box-shadow: var(--np-neu-inset);
   white-space: pre-wrap;
 }
 .np-export__egress {
   color: var(--np-good);
   font-size: var(--np-fs-sm);
+}
+.np-export__preview h3 {
+  font-size: var(--np-fs-base);
+  margin-bottom: var(--np-2);
+}
+.np-export__preview ul {
+  margin: 0;
+  padding-left: var(--np-4);
+  color: var(--np-text-dim);
+  font-family: var(--np-font);
+}
+.np-export__preview li {
+  margin: 2px 0;
+}
+/* Recording version-pin + detail lists read as compact mono rows. */
+.np-recording__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--np-2) var(--np-4);
+  margin: var(--np-2) 0;
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+}
+.np-recording__pins ul,
+.np-plugin__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--np-2) var(--np-4);
+  margin: var(--np-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+.np-replay__readout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--np-2) var(--np-4);
 }
 
 /* ---- Plugins ---- */
@@ -946,7 +1225,7 @@ button {
   gap: var(--np-2);
 }
 .np-plugin--on {
-  border-color: var(--np-accent-line);
+  outline: 1px solid var(--np-accent-line);
 }
 .np-plugin__head {
   display: flex;
@@ -955,7 +1234,7 @@ button {
   gap: var(--np-3);
 }
 .np-plugin__name {
-  font-weight: 600;
+  font-weight: 650;
 }
 .np-plugin__type {
   font-family: var(--np-font-mono);
@@ -973,9 +1252,9 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
   color: var(--np-text-dim);
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-border);
-  padding: 2px var(--np-2);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  padding: 2px var(--np-3);
   border-radius: var(--np-radius-pill);
 }
 .np-plugin__meta,
@@ -1005,10 +1284,10 @@ button {
 /* ============================ Visualization ============================ */
 
 .np-panel {
-  padding: var(--np-4);
+  padding: var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
 }
 .np-panel__title {
   font-size: var(--np-fs-xs);
@@ -1113,7 +1392,7 @@ button {
   grid-template-columns: 12ch 1fr 9ch;
   align-items: center;
   gap: var(--np-3);
-  padding: 3px 0;
+  padding: var(--np-1) 0;
 }
 .np-viz-bar__label {
   font-size: var(--np-fs-sm);
@@ -1123,9 +1402,10 @@ button {
   white-space: nowrap;
 }
 .np-viz-bar__track {
-  height: 8px;
-  background: var(--np-surface-3);
+  height: 10px;
+  background: var(--np-surface-1);
   border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
   overflow: hidden;
 }
 .np-viz-bar__fill {
@@ -1149,10 +1429,11 @@ button {
 }
 .np-viz-conf__track {
   flex: 1;
-  height: 6px;
+  height: 8px;
   max-width: 220px;
-  background: var(--np-surface-3);
+  background: var(--np-surface-1);
   border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
   overflow: hidden;
 }
 .np-viz-conf__fill {
@@ -1172,10 +1453,10 @@ button {
 
 /* ---- Timeline ribbon (docs/10) ---- */
 .np-ribbon {
-  padding: var(--np-4);
+  padding: var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
 }
 .np-ribbon__lane {
   display: grid;
@@ -1192,16 +1473,16 @@ button {
 }
 .np-ribbon__track {
   position: relative;
-  height: 20px;
+  height: 22px;
   border-radius: var(--np-radius-pill);
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-hairline);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-inset);
 }
 .np-ribbon__mark {
   position: absolute;
   top: 50%;
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
   margin-left: -5px;
   transform: translateY(-50%) rotate(45deg);
   border-radius: 2px;
@@ -1232,10 +1513,10 @@ button {
 
 /* ---- Journey flow diagram (docs/14) ---- */
 .np-jflow {
-  padding: var(--np-5) var(--np-4);
+  padding: var(--np-5);
   background: var(--np-surface-1);
-  border: 1px solid var(--np-border);
-  border-radius: var(--np-radius);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
   overflow-x: auto;
 }
 .np-jflow__track {
@@ -1255,13 +1536,13 @@ button {
 .np-jflow__glyph {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   font-size: 18px;
   color: var(--np-accent-strong);
-  background: var(--np-accent-soft);
-  border: 1px solid var(--np-accent-line);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
 }
 .np-jflow__label {
   font-size: var(--np-fs-xs);
@@ -1272,11 +1553,10 @@ button {
   position: relative;
   flex: 1;
   min-width: 40px;
-  height: 44px;
+  height: 48px;
   display: flex;
   align-items: center;
 }
-/* The connector line the packet rides. */
 .np-jflow__link::before {
   content: "";
   position: absolute;
@@ -1285,7 +1565,6 @@ button {
   height: 2px;
   background: linear-gradient(90deg, var(--np-accent-line), var(--np-border-strong));
 }
-/* A packet traveling the link left→right, on repeat. */
 .np-jflow__packet {
   position: absolute;
   width: 7px;
@@ -1307,13 +1586,13 @@ button {
   flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   font-family: var(--np-font-mono);
   color: var(--np-accent-2);
-  background: var(--np-accent-2-soft);
-  border: 1px solid var(--np-accent-2);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
 }
 .np-jflow__dests {
   list-style: none;
@@ -1328,9 +1607,9 @@ button {
   display: flex;
   flex-direction: column;
   padding: var(--np-2) var(--np-3);
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-border);
+  background: var(--np-surface-1);
   border-radius: var(--np-radius-sm);
+  box-shadow: var(--np-neu-sm);
   max-width: 22ch;
 }
 .np-jflow__dest-label {
@@ -1344,6 +1623,226 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
   color: var(--np-text-mute);
+}
+
+/* ============================ Network Constellation ============================
+ * The Dashboard centerpiece: a you-at-center radial map of real observed hosts.
+ * Hand-rolled SVG; every figure it shows is real (docs honesty-by-construction). */
+.np-cons {
+  position: relative;
+  padding: var(--np-4);
+  background: radial-gradient(
+      120% 90% at 50% 30%,
+      var(--np-accent-soft) 0%,
+      transparent 55%
+    ),
+    var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+  overflow: hidden;
+}
+/* Relative stage so the HTML tooltip can be positioned against the SVG box.
+ * The SVG uses width:100%;height:auto with a viewBox, so its box matches the
+ * viewBox aspect exactly (no letterboxing) — percentage mapping is precise. */
+.np-cons__stage {
+  position: relative;
+}
+.np-cons__stage {
+  position: relative;
+}
+.np-cons__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.np-cons__svg:active {
+  cursor: grabbing;
+}
+.np-cons__ring {
+  fill: none;
+  stroke: var(--np-border-strong);
+  stroke-dasharray: 2 6;
+  opacity: 0.6;
+}
+.np-cons__arc {
+  fill: none;
+  stroke: var(--np-accent-line);
+  stroke-linecap: round;
+  transition: stroke var(--np-t);
+}
+.np-cons__arc--idle {
+  stroke: var(--np-border-strong);
+}
+.np-cons__arc--degraded {
+  stroke: var(--np-notable);
+}
+.np-cons__packet {
+  fill: var(--np-accent);
+  filter: drop-shadow(0 0 4px var(--np-accent));
+}
+.np-cons__you {
+  fill: url(#np-cons-you);
+}
+.np-cons__you-ring {
+  fill: none;
+  stroke: var(--np-accent);
+  opacity: 0.5;
+  transform-origin: center;
+  animation: np-cons-ping 3s ease-out infinite;
+}
+.np-cons__node {
+  cursor: pointer;
+}
+.np-cons__node-dot {
+  stroke: var(--np-surface-1);
+  stroke-width: 2;
+  transition: r var(--np-t);
+}
+.np-cons__node-dot--active {
+  fill: var(--np-accent);
+}
+.np-cons__node-dot--idle {
+  fill: var(--np-neutral);
+}
+.np-cons__node-dot--degraded {
+  fill: var(--np-notable);
+}
+/* Reveal scales the INNER group only (the outer group owns the translate
+   attribute). fill-box keeps the scale origin at the node's own center. */
+.np-cons__node-in--reveal {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: np-cons-reveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.np-cons__node-label {
+  fill: var(--np-text-dim);
+  font-size: 10px;
+  font-family: var(--np-font-mono);
+  text-anchor: middle;
+  pointer-events: none;
+}
+.np-cons__you-label {
+  fill: var(--np-accent-strong);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-anchor: middle;
+  pointer-events: none;
+}
+/* Glass tooltip + expanded detail card (HTML overlay above the SVG). */
+.np-cons__tip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 14px));
+  padding: var(--np-3) var(--np-4);
+  min-width: 150px;
+  border-radius: var(--np-radius);
+  background: var(--np-glass-bg);
+  -webkit-backdrop-filter: var(--np-glass-blur);
+  backdrop-filter: var(--np-glass-blur);
+  border: 1px solid var(--np-glass-border);
+  box-shadow: var(--np-neu);
+  pointer-events: none;
+  z-index: 5;
+}
+.np-cons__tip-host {
+  font-weight: 650;
+  font-size: var(--np-fs-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+.np-cons__tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--np-4);
+  margin-top: var(--np-1);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+.np-cons__tip-row b {
+  font-family: var(--np-font-mono);
+  font-weight: 600;
+  color: var(--np-text);
+}
+.np-cons__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-1);
+  font-size: var(--np-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+}
+.np-cons__status--active {
+  color: var(--np-good);
+}
+.np-cons__status--idle {
+  color: var(--np-text-mute);
+}
+.np-cons__status--degraded {
+  color: var(--np-notable);
+}
+/* Legend + controls under the map. */
+.np-cons__foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3) var(--np-5);
+  margin-top: var(--np-3);
+  padding: 0 var(--np-2);
+}
+.np-cons__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-2);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+.np-cons__legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.np-cons__hint {
+  margin-left: auto;
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+}
+/* Screen-reader parity list (visually hidden). */
+.np-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes np-cons-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+@keyframes np-cons-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 @keyframes np-packet {
@@ -1385,7 +1884,7 @@ button {
   max-width: 100%;
 }
 [data-depth="expert"] .np-main > main {
-  padding: var(--np-4) var(--np-6);
+  padding: var(--np-1) var(--np-2) var(--np-5);
 }
 
 /* Respect reduced-motion (docs/16 §perf, accessibility). */

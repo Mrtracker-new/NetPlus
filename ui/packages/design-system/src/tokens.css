@@ -1,50 +1,53 @@
-/* NetPulse design tokens — "Signal": a calm deep-observatory visual language.
+/* NetPulse design tokens — "Soft Signal": a calm, premium, light neumorphic
+ * visual language (Linear / Arc / Nothing OS / Raycast / Vercel lineage).
  *
  * The single source of NetPulse's visual vocabulary (docs/01 §9): one place
  * defines what a surface, an accent, or a severity looks like, so every screen
- * agrees. The motif is the pulse/waveform from the app mark — signals traveling
- * through darkness, made visible — expressed as near-black layered glass, a
- * luminous cyan accent, and CALM (never alarmist) severity colors (docs/09
- * §5.2, docs/17 §7.1).
+ * agrees. The motif is still the pulse/waveform — signals traveling, made
+ * visible — but expressed now as soft raised light surfaces (neumorphism),
+ * frosted glass, a calm mint accent, and CALM (never alarmist) severity colors
+ * (docs/09 §5.2, docs/17 §7.1).
  *
- * Dark is the default; a light theme is provided via [data-theme="light"].
- * Color is never the sole carrier of meaning (docs/09 §12) — glyphs and labels
- * always accompany it in the components. */
+ * Light is the default; the original deep-observatory dark theme is preserved
+ * under [data-theme="dark"]. Color is never the sole carrier of meaning (docs/09
+ * §12) — glyphs and labels always accompany it in the components. */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* ---- Surfaces: layered depth, near-black blue ---- */
-  --np-bg: #0b0e14;
-  --np-bg-grad: radial-gradient(1200px 600px at 78% -10%, #141b2b 0%, #0b0e14 55%);
-  --np-surface-1: #10151f;
-  --np-surface-2: #161d2b;
-  --np-surface-3: #1e2636;
-  --np-border: rgba(255, 255, 255, 0.07);
-  --np-border-strong: rgba(255, 255, 255, 0.13);
-  --np-hairline: rgba(255, 255, 255, 0.05);
+  /* ---- Surfaces: soft, airy, faintly cool white ---- */
+  --np-bg: #e9edf3;
+  --np-bg-grad: radial-gradient(1200px 720px at 78% -12%, #f2f5fb 0%, #e6eaf1 60%);
+  --np-surface-1: #eef1f7; /* the neumorphic plate — same family as bg, lifts via shadow */
+  --np-surface-2: #e4e8f0;
+  --np-surface-3: #d8deea;
+  --np-border: rgba(24, 34, 58, 0.06);
+  --np-border-strong: rgba(24, 34, 58, 0.12);
+  --np-hairline: rgba(24, 34, 58, 0.05);
 
   /* ---- Text ---- */
-  --np-text: #e7ebf3;
-  --np-text-dim: #9aa3b8;
-  --np-text-mute: #616a7e;
+  --np-text: #232a3a;
+  --np-text-dim: #5a6478;
+  --np-text-mute: #8a93a6;
 
-  /* ---- Accent: the pulse ---- */
-  --np-accent: #2fe0d6;
-  --np-accent-strong: #5cf0e7;
-  --np-accent-soft: rgba(47, 224, 214, 0.14);
-  --np-accent-line: rgba(47, 224, 214, 0.4);
-  --np-accent-2: #6f76f5;
-  --np-accent-2-soft: rgba(111, 118, 245, 0.16);
+  /* ---- Accent: the pulse, now a calm mint ---- */
+  --np-accent: #57c9ac;
+  --np-accent-strong: #2fa789;
+  --np-accent-soft: rgba(87, 201, 172, 0.16);
+  --np-accent-line: rgba(87, 201, 172, 0.42);
+  --np-accent-2: #7c83f7;
+  --np-accent-2-soft: rgba(124, 131, 247, 0.16);
+  /* Ink used on top of a filled accent surface (buttons, active pills). */
+  --np-on-accent: #08312a;
 
   /* ---- Semantics: calm, not alarmist ---- */
-  --np-neutral: #8b93a8;
-  --np-good: #46c48d;
-  --np-good-soft: rgba(70, 196, 141, 0.13);
-  --np-notable: #f2b64d;
-  --np-notable-soft: rgba(242, 182, 77, 0.13);
-  --np-finding: #ef6167;
-  --np-finding-soft: rgba(239, 97, 103, 0.13);
+  --np-neutral: #97a0b4;
+  --np-good: #35b085;
+  --np-good-soft: rgba(53, 176, 133, 0.15);
+  --np-notable: #e0982f;
+  --np-notable-soft: rgba(224, 152, 47, 0.16);
+  --np-finding: #e56b71;
+  --np-finding-soft: rgba(229, 107, 113, 0.15);
 
   /* ---- Typography ---- */
   --np-font: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
@@ -55,6 +58,7 @@
   --np-fs-md: 0.98rem;     /* ~16px */
   --np-fs-lg: 1.22rem;     /* ~20px */
   --np-fs-xl: 1.6rem;      /* ~26px */
+  --np-fs-2xl: 2.4rem;     /* ~38px — hero titles (ref "Verification stats") */
   --np-lh: 1.55;
   --np-tracking: 0.01em;
   --np-tracking-wide: 0.08em;
@@ -69,45 +73,83 @@
   --np-7: 48px;
   --np-8: 64px;
 
-  /* ---- Radius ---- */
-  --np-radius-sm: 8px;
-  --np-radius: 12px;
-  --np-radius-lg: 16px;
+  /* ---- Radius: generous, pill-friendly ---- */
+  --np-radius-sm: 12px;
+  --np-radius: 18px;
+  --np-radius-lg: 28px;
   --np-radius-pill: 999px;
 
-  /* ---- Elevation ---- */
-  --np-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.28);
-  --np-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45);
+  /* ---- Neumorphic elevation: the signature dual light/dark soft shadow ----
+   * Raised plates catch light top-left, cast shadow bottom-right. Inset = pressed.
+   * Tuned against the --np-surface-1 plate; components apply these on that family. */
+  --np-neu: -7px -7px 16px rgba(255, 255, 255, 0.92), 8px 8px 20px rgba(28, 40, 66, 0.12);
+  --np-neu-sm: -4px -4px 9px rgba(255, 255, 255, 0.85), 4px 4px 11px rgba(28, 40, 66, 0.1);
+  --np-neu-inset: inset 3px 3px 7px rgba(28, 40, 66, 0.13),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.9);
+  --np-neu-lg: -12px -12px 28px rgba(255, 255, 255, 0.9), 14px 14px 36px rgba(28, 40, 66, 0.16);
+
+  /* Legacy elevation aliases kept so any lingering usage still resolves. */
+  --np-shadow: var(--np-neu-sm);
+  --np-shadow-lg: var(--np-neu-lg);
   --np-glow: 0 0 0 1px var(--np-accent-line), 0 0 24px -6px var(--np-accent-soft);
 
+  /* ---- Glass (frosted header / tooltips / overlays) ---- */
+  --np-glass-bg: rgba(255, 255, 255, 0.55);
+  --np-glass-border: rgba(255, 255, 255, 0.7);
+  --np-glass-blur: blur(18px) saturate(1.4);
+
   /* ---- Motion ---- */
-  --np-t: 180ms cubic-bezier(0.4, 0, 0.2, 1);
-  --np-t-slow: 320ms cubic-bezier(0.4, 0, 0.2, 1);
+  --np-t: 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --np-t-slow: 360ms cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Layout ---- */
-  --np-rail: 236px;
+  --np-rail: 76px;         /* slim icon rail (ref) */
+  --np-rail-right: 300px;  /* right context rail */
 }
 
-[data-theme="light"] {
-  color-scheme: light;
-  --np-bg: #f5f7fb;
-  --np-bg-grad: radial-gradient(1200px 600px at 78% -10%, #e9eefb 0%, #f5f7fb 55%);
-  --np-surface-1: #ffffff;
-  --np-surface-2: #f2f5fa;
-  --np-surface-3: #e9eef6;
-  --np-border: rgba(16, 22, 34, 0.1);
-  --np-border-strong: rgba(16, 22, 34, 0.18);
-  --np-hairline: rgba(16, 22, 34, 0.06);
-  --np-text: #141a26;
-  --np-text-dim: #4a5468;
-  --np-text-mute: #7b8598;
-  --np-accent: #0fb0a8;
-  --np-accent-strong: #0a8f88;
-  --np-accent-soft: rgba(15, 176, 168, 0.12);
-  --np-accent-line: rgba(15, 176, 168, 0.35);
-  --np-good: #17976a;
-  --np-notable: #b9791a;
-  --np-finding: #d23b42;
-  --np-shadow: 0 1px 2px rgba(16, 22, 34, 0.08), 0 6px 20px rgba(16, 22, 34, 0.08);
-  --np-shadow-lg: 0 12px 40px rgba(16, 22, 34, 0.14);
+/* ============================ Dark theme ============================
+ * The original "deep observatory" identity, preserved and toggleable. */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --np-bg: #0b0e14;
+  --np-bg-grad: radial-gradient(1200px 600px at 78% -10%, #141b2b 0%, #0b0e14 55%);
+  --np-surface-1: #131a26;
+  --np-surface-2: #161d2b;
+  --np-surface-3: #1e2636;
+  --np-border: rgba(255, 255, 255, 0.07);
+  --np-border-strong: rgba(255, 255, 255, 0.13);
+  --np-hairline: rgba(255, 255, 255, 0.05);
+
+  --np-text: #e7ebf3;
+  --np-text-dim: #9aa3b8;
+  --np-text-mute: #616a7e;
+
+  --np-accent: #2fe0d6;
+  --np-accent-strong: #5cf0e7;
+  --np-accent-soft: rgba(47, 224, 214, 0.14);
+  --np-accent-line: rgba(47, 224, 214, 0.4);
+  --np-accent-2: #6f76f5;
+  --np-accent-2-soft: rgba(111, 118, 245, 0.16);
+  --np-on-accent: #06201e;
+
+  --np-neutral: #8b93a8;
+  --np-good: #46c48d;
+  --np-good-soft: rgba(70, 196, 141, 0.13);
+  --np-notable: #f2b64d;
+  --np-notable-soft: rgba(242, 182, 77, 0.13);
+  --np-finding: #ef6167;
+  --np-finding-soft: rgba(239, 97, 103, 0.13);
+
+  /* In dark, "neumorphism" reads as layered glass rather than soft plaster:
+     a top highlight hairline + deep drop shadow. */
+  --np-neu: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 12px 30px rgba(0, 0, 0, 0.4);
+  --np-neu-sm: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 8px rgba(0, 0, 0, 0.4);
+  --np-neu-inset: inset 0 2px 6px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --np-neu-lg: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px rgba(0, 0, 0, 0.55);
+
+  --np-glass-bg: rgba(19, 26, 38, 0.6);
+  --np-glass-border: rgba(255, 255, 255, 0.08);
+  --np-glass-blur: blur(16px) saturate(1.2);
 }

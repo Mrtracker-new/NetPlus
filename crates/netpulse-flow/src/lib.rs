@@ -19,6 +19,7 @@ pub mod decode_view;
 pub mod engine;
 pub mod identity;
 pub mod metrics;
+pub mod resolution;
 pub mod session;
 pub mod state;
 pub mod table;
@@ -26,6 +27,7 @@ pub mod table;
 pub use decode_view::{DnsResolution, PacketView, TcpSignals};
 pub use engine::{FinalizedFlow, FlowEngine};
 pub use identity::{CanonicalKey, Direction};
+pub use resolution::ResolutionTable;
 pub use session::{CausalLink, SessionReconstructor};
 pub use state::TcpState;
 

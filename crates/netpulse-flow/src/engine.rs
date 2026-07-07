@@ -8,20 +8,25 @@
 //! future thread-per-shard build needs — the design is preserved, only the
 //! executor differs.
 
-use netpulse_core::{Flow, ProtoEvent, Session, Timestamp};
+use std::net::IpAddr;
+
+use netpulse_core::{Flow, HostName, ProtoEvent, Session, Timestamp};
 
 use crate::decode_view::PacketView;
 use crate::identity::CanonicalKey;
+use crate::resolution::ResolutionTable;
 use crate::session::{CausalLink, SessionReconstructor};
 use crate::shard_for;
 use crate::table::Shard;
 
-/// The reconstruction engine: shards of flow state plus the session builder.
+/// The reconstruction engine: shards of flow state plus the session builder and
+/// the passive name-resolution table.
 #[derive(Debug)]
 pub struct FlowEngine {
     shards: Vec<Shard>,
     shard_count: u16,
     sessions: SessionReconstructor,
+    resolutions: ResolutionTable,
     next_flow_id: u64,
     next_session_id: u64,
 }
@@ -42,18 +47,21 @@ impl FlowEngine {
             shards: (0..n).map(|_| Shard::default()).collect(),
             shard_count: n,
             sessions: SessionReconstructor::new(),
+            resolutions: ResolutionTable::new(),
             next_flow_id: 0,
             next_session_id: 0,
         }
     }
 
     /// Ingest one decoded packet: route to its shard, update flow state and
-    /// metrics, and feed the session reconstructor.
+    /// metrics, feed the session reconstructor, and record any passive naming
+    /// signals (DNS answers, TLS SNI) into the resolution table.
     pub fn ingest(&mut self, pv: &PacketView) {
         let key = CanonicalKey::from_tuple(&pv.tuple);
         let idx = self.shard_index(key);
         let flow_id = self.shards[idx].ingest(pv, &mut self.next_flow_id);
         self.sessions.observe(pv, flow_id);
+        self.resolutions.observe(pv);
     }
 
     fn shard_index(&self, key: CanonicalKey) -> usize {
@@ -92,6 +100,13 @@ impl FlowEngine {
     /// The causal links discovered so far (docs/06 §6.2).
     pub fn causal_links(&self) -> &[CausalLink] {
         self.sessions.links()
+    }
+
+    /// The passively-observed `IP → names` table, as deterministic `(ip, names)`
+    /// pairs ready to persist (docs/08 §5). Accumulated over the whole run; safe
+    /// to read after [`finish`](Self::finish), which does not consume it.
+    pub fn resolutions(&self) -> Vec<(IpAddr, Vec<HostName>)> {
+        self.resolutions.entries()
     }
 
     /// Total live flows across all shards.

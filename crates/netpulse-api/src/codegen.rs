@@ -102,6 +102,14 @@ pub fn typescript_contract() -> String {
             ("process_name", "string | null"),
         ],
     ));
+    s.push_str(&iface(
+        "Interface",
+        &[
+            ("id", "number"),
+            ("name", "string"),
+            ("description", "string | null"),
+        ],
+    ));
 
     // --- Phase 3 education enums (docs/13–16) ---
     s.push_str(&union(
@@ -418,6 +426,7 @@ mod tests {
             "Diagnosis",
             "MonitorSnapshot",
             "Attribution",
+            "Interface",
             "ExerciseKind",
             "StageKind",
             "Direction",

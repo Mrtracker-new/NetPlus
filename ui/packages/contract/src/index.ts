@@ -27,6 +27,7 @@ import type {
   ExportFormat,
   PayloadLevel,
   PluginDescriptor,
+  Interface,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -58,7 +59,8 @@ export type Query =
   | { kind: "listRecordings" }
   | { kind: "replayState" }
   | { kind: "exportPreview"; selection: ExportSelection; format: ExportFormat }
-  | { kind: "listPlugins" };
+  | { kind: "listPlugins" }
+  | { kind: "interfaces" };
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
@@ -79,7 +81,8 @@ export type QueryResponse =
   | { kind: "recordings"; recordings: RecordingSummary[] }
   | { kind: "replayState"; state: ReplayState }
   | { kind: "exportPreview"; preview: ExportPreview }
-  | { kind: "plugins"; plugins: PluginDescriptor[] };
+  | { kind: "plugins"; plugins: PluginDescriptor[] }
+  | { kind: "interfaces"; interfaces: Interface[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic (docs/02 §10). */

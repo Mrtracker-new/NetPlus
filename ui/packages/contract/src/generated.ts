@@ -2,7 +2,7 @@
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
-export const API_VERSION = 4 as const;
+export const API_VERSION = 5 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
@@ -59,6 +59,12 @@ export interface Attribution {
   pid: number | null;
   confidence: AttributionConfidence;
   process_name: string | null;
+}
+
+export interface Interface {
+  id: number;
+  name: string;
+  description: string | null;
 }
 
 export type ExerciseKind = "identify" | "explain_back" | "predict" | "diagnose";

@@ -143,6 +143,16 @@ pub struct AttributionDto {
     pub process_name: Option<String>,
 }
 
+/// A capture-capable network interface offered for selection (docs/05). `id` is
+/// the handle passed back in `StartCapture`; `0` means "let the platform pick the
+/// default adapter".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InterfaceDto {
+    pub id: u16,
+    pub name: String,
+    pub description: Option<String>,
+}
+
 // ===== Phase 3 — Education (docs/13–16) ====================================
 //
 // The wire projections of the education surfaces. Like the Phase 2 DTOs above,
@@ -597,6 +607,11 @@ mod tests {
             pid: None,
             confidence: AttributionConfidenceDto::Unknown,
             process_name: None,
+        });
+        roundtrip(&InterfaceDto {
+            id: 3,
+            name: "\\Device\\NPF_{GUID}".into(),
+            description: Some("Wi-Fi".into()),
         });
     }
 

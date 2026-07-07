@@ -102,7 +102,7 @@ export function Dashboard() {
         {feed.length === 0 ? (
           // Calm empty state — a quiet network shows "nothing notable", not a void
           // (docs/09 §11).
-          <div className="np-empty">Quiet — nothing notable right now.</div>
+          <div className="np-empty np-empty--compact">Quiet — nothing notable right now.</div>
         ) : (
           <div className="np-feed">
             {feed.map((card) => (

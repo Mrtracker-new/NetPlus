@@ -231,7 +231,7 @@ export function Constellation({
   const quiet = placed.length === 0;
 
   return (
-    <div className="np-cons">
+    <div className={quiet ? "np-cons np-cons--quiet" : "np-cons"}>
       <div className="np-cons__stage">
         <svg
           className="np-cons__svg"

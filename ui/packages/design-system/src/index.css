@@ -413,6 +413,14 @@ button {
   color: var(--np-text-dim);
   font-size: var(--np-fs-md);
 }
+/* Compact variant — for empty states that sit under another block (e.g. the
+   dashboard feed below the constellation), so idle screens don't stack two
+   tall voids and force a long scroll. */
+.np-empty--compact {
+  min-height: 0;
+  margin: var(--np-5) auto;
+  font-size: var(--np-fs-base);
+}
 .np-empty::before {
   content: "";
   display: block;
@@ -1656,6 +1664,15 @@ button {
   height: auto;
   touch-action: none;
   cursor: grab;
+}
+/* Idle: no hosts to plot, so don't reserve the full ~500px stage — collapse to a
+   calm band with just the YOU pulse, so the dashboard doesn't scroll into a void. */
+.np-cons--quiet .np-cons__svg {
+  height: 220px;
+  cursor: default;
+}
+.np-cons--quiet {
+  padding-bottom: var(--np-2);
 }
 .np-cons__svg:active {
   cursor: grabbing;

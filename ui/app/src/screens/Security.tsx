@@ -128,8 +128,27 @@ export function Security() {
     );
   }
 
+  // Real counts by category — a calm summary, never an alarm banner (docs/17 §7.1).
+  const byCat = (c: SecurityFinding["category"]) =>
+    findings.filter((f) => f.category === c).length;
+  const summary = [
+    { label: "Findings", value: findings.length },
+    { label: "Anomaly", value: byCat("anomaly") },
+    { label: "Suspicious", value: byCat("suspicious") },
+    { label: "Informational", value: byCat("informational") },
+  ];
+
   return (
     <section className="np-security" aria-label="Security findings">
+      <div className="np-kpis">
+        {summary.map((s) => (
+          <div className="np-kpi" key={s.label}>
+            <div className="np-kpi__label">{s.label}</div>
+            <div className="np-kpi__value">{s.value}</div>
+          </div>
+        ))}
+      </div>
+
       {findings.map((f) => {
         const k = keyOf(f);
         return (

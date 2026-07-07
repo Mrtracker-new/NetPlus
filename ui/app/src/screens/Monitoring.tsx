@@ -39,9 +39,27 @@ export function Monitoring() {
   }
 
   const protocolSlices = monitor.by_protocol.rows.map((r) => ({ label: r.label, value: r.bytes }));
+  // Real headline figures, straight from the snapshot — never derived by guess.
+  const totalBytes = monitor.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
+  const totalFlows = monitor.by_host.rows.reduce((s, r) => s + r.flows, 0);
+  const kpis = [
+    { label: "Traffic seen", value: humanBytes(totalBytes) },
+    { label: "Protocols", value: String(monitor.by_protocol.rows.length) },
+    { label: "Hosts", value: String(monitor.by_host.rows.length) },
+    { label: "Active flows", value: String(totalFlows) },
+  ];
 
   return (
     <section className="np-monitor" aria-label="Monitoring">
+      <div className="np-kpis">
+        {kpis.map((k) => (
+          <div className="np-kpi" key={k.label}>
+            <div className="np-kpi__label">{k.label}</div>
+            <div className="np-kpi__value">{k.value}</div>
+          </div>
+        ))}
+      </div>
+
       <div className="np-monitor__top">
         <section className="np-panel">
           <h3 className="np-panel__title">Throughput</h3>

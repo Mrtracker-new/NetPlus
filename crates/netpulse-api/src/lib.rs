@@ -31,9 +31,9 @@ pub use dto::{
     ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
     GroundedExerciseDto, HostNameDto, InterfaceDto, JourneyStageDto, LessonOfferDto,
     MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
-    PluginCapabilityDto, PluginDescriptorDto,
-    PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto,
-    ReplayStateDto, SecurityFindingDto, SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
+    StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI

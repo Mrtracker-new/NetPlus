@@ -58,10 +58,7 @@ impl ResolutionTable {
             return;
         }
         let names = self.by_ip.entry(ip).or_default();
-        if names
-            .iter()
-            .any(|h| h.name == name && h.source == source)
-        {
+        if names.iter().any(|h| h.name == name && h.source == source) {
             return;
         }
         names.push(HostName {

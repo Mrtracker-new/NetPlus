@@ -115,7 +115,10 @@ impl CaptureStore {
         }
         let existing = self.resolutions.entry(ip).or_default();
         for n in names {
-            if !existing.iter().any(|h| h.name == n.name && h.source == n.source) {
+            if !existing
+                .iter()
+                .any(|h| h.name == n.name && h.source == n.source)
+            {
                 existing.push(n);
             }
         }

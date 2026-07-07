@@ -2,9 +2,11 @@
 // screen (docs/09 §4). Beginner/Intermediate/Expert is a global control here,
 // with per-item escape hatches living inside the screens (docs/09 §6.3).
 
-import { useState } from "react";
-import type { ProjectionDepth } from "@netpulse/contract";
+import { useEffect, useState } from "react";
+import type { ProjectionDepth, Interface as InterfaceDto } from "@netpulse/contract";
 import { DisclosureProvider, useDisclosure, DEPTHS } from "./modes/DisclosureContext";
+import { useLiveData } from "./state/useLiveData";
+import { command, query } from "./ipc";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";
@@ -70,10 +72,95 @@ function ModeSwitch() {
   );
 }
 
+// The live-capture control and its honest, always-visible state (docs/17 §8: a
+// capture indicator is mandatory). Observe-only: this starts/stops a read-only
+// frame stream, never touching traffic (docs/01 X1). The picker chooses an
+// adapter; id 0 = "Default adapter", which the platform backend resolves.
+function CaptureControl() {
+  const [running, setRunning] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [interfaces, setInterfaces] = useState<InterfaceDto[]>([]);
+  const [ifaceId, setIfaceId] = useState(0);
+
+  // Enumerate adapters once on mount. Absent a backend the list is empty and only
+  // "Default adapter" is offered — the real error surfaces on Start (docs/02 §11).
+  useEffect(() => {
+    let cancelled = false;
+    query({ kind: "interfaces" })
+      .then((res) => {
+        if (!cancelled && res.kind === "interfaces") setInterfaces(res.interfaces);
+      })
+      .catch(() => {
+        /* no backend (browser preview / Npcap absent) — keep the default option */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function toggle() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (running) {
+        await command({ kind: "stopCapture", iface_id: ifaceId });
+        setRunning(false);
+      } else {
+        await command({ kind: "startCapture", iface_id: ifaceId });
+        setRunning(true);
+      }
+    } catch (e) {
+      // Fail honestly — Npcap missing, no admin, or browser preview (docs/02 §11).
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="np-capture" title={error ?? undefined}>
+      {running && <span className="np-capture__dot" aria-hidden="true" />}
+      <select
+        className="np-capture__iface"
+        value={ifaceId}
+        disabled={running || busy}
+        aria-label="Capture interface"
+        onChange={(e) => setIfaceId(Number(e.target.value))}
+      >
+        <option value={0}>Default adapter</option>
+        {interfaces.map((i) => (
+          <option key={i.id} value={i.id}>
+            {i.description ?? i.name}
+          </option>
+        ))}
+      </select>
+      <button
+        className={running ? "np-btn np-capture__btn--live" : "np-btn np-btn--primary"}
+        onClick={toggle}
+        disabled={busy}
+      >
+        {busy ? "…" : running ? "Stop capture" : "Start capture"}
+      </button>
+      {error && (
+        <span className="np-capture__err" role="status" title={error}>
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function Shell() {
   const [screen, setScreen] = useState<Screen>("dashboard");
+  // The data pump: feeds the client store from the engine (feed + monitor), and
+  // subscribes to live capture deltas when running in Tauri.
+  useLiveData();
+  // Disclosure mode drives visual density via the [data-depth] CSS hook
+  // (docs/09 §6.3): beginners get roomier type, experts get compact data.
+  const { depth } = useDisclosure();
   return (
-    <div className="np-app">
+    <div className="np-app" data-depth={depth}>
       <nav className="np-nav">
         {NAV.map((item) => (
           <button
@@ -88,6 +175,7 @@ function Shell() {
       <div className="np-main">
         <header className="np-header">
           <span className="np-brand">NetPulse</span>
+          <CaptureControl />
           <ModeSwitch />
         </header>
         <main>

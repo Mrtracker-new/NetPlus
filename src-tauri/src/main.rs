@@ -5,23 +5,25 @@
 //! IPC path that modifies traffic.
 //!
 //! This shell is intentionally thin. All analysis lives in `netpulse-engine`;
-//! the shell only owns the committed store and maps a [`Query`] to a
-//! [`QueryResponse`] over the engine's read-only presentation view (docs/11
-//! §14). Live capture is not wired here because the per-OS capture backend is
-//! still a documented stub in `netpulse-platform` (docs/05, Phase 1 memo), so
-//! `StartCapture` refuses honestly rather than pretending (docs/02 §11: fail
-//! closed on missing capability).
+//! the shell owns the committed store and maps a [`Query`] to a [`QueryResponse`]
+//! over the engine's read-only presentation view (docs/11 §14). `StartCapture`
+//! opens the platform's live backend (Windows/Npcap, docs/05) and drives a
+//! background reconstruction loop; where the backend is unavailable it fails
+//! closed honestly rather than pretending (docs/02 §11). Capture is observe-only:
+//! a read-only frame stream wired to no injection API (docs/01 X1).
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 
-use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto};
+use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto, InterfaceDto};
 use netpulse_api::{Command, ProjectionDepth, Query, QueryResponse};
 use netpulse_capture::{CaptureStats, Recording, ReplayController, ReplayState};
+use netpulse_core::traits::{CaptureSource, RawFrame, SocketTableSource};
 use netpulse_core::Depth;
-use netpulse_engine::attribution::Attribution;
+use netpulse_engine::attribution::{Attribution, Correlator};
 use netpulse_engine::education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
 };
@@ -39,24 +41,229 @@ use netpulse_storage::{CaptureStore, PayloadPolicy};
 /// and the plugin registry (seeded with the first-party reference plugins). Behind
 /// `Mutex`es so Tauri can share it across command invocations.
 struct AppState {
-    store: Mutex<CaptureStore>,
+    // `Arc` so the background live-capture thread can share the same store/stats
+    // the query handler reads (the thread swaps in fresh reconstructions).
+    store: Arc<Mutex<CaptureStore>>,
     depth: Mutex<Depth>,
-    stats: Mutex<CaptureStats>,
+    stats: Arc<Mutex<CaptureStats>>,
     recordings: Mutex<Vec<Recording>>,
     replay: Mutex<Option<ReplayController>>,
     registry: Mutex<PluginRegistry>,
+    /// Handle to the running live capture, if any (docs/05). `None` when idle.
+    capture: Mutex<Option<CaptureControl>>,
+    /// The time-indexed flow→process correlator (docs/12), fed socket-table
+    /// snapshots by the capture loop and queried by `AttributionOfFlow`.
+    correlator: Arc<Mutex<Correlator>>,
+    /// The live socket→PID source, or `None` where no backend exists (attribution
+    /// then stays honestly Unknown, docs/12 §8).
+    sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
+}
+
+/// Control handle for the background live-capture thread: a stop flag it polls
+/// between batches, and its join handle so [`stop_capture`] can wait for a clean
+/// shutdown (docs/05 §4).
+struct CaptureControl {
+    stop: Arc<AtomicBool>,
+    handle: std::thread::JoinHandle<()>,
 }
 
 impl Default for AppState {
     fn default() -> Self {
+        // The shell boots empty; data arrives from live capture (Start capture in
+        // the UI) or, for offline work, by setting `NETPULSE_PCAP=<path>` to seed
+        // the store from a saved capture — the same import path the engine CLI
+        // uses (docs/23 §5). Without either, the UI shows its honest empty states
+        // (docs/02 §11).
+        let (store, stats) = seed_store_from_env();
         Self {
-            // Metadata-only is the private default (docs/08 §4).
-            store: Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)),
+            store: Arc::new(Mutex::new(store)),
             depth: Mutex::new(Depth::Beginner),
-            stats: Mutex::new(CaptureStats::default()),
+            stats: Arc::new(Mutex::new(stats)),
             recordings: Mutex::new(Vec::new()),
             replay: Mutex::new(None),
             registry: Mutex::new(seed_registry()),
+            capture: Mutex::new(None),
+            correlator: Arc::new(Mutex::new(Correlator::new())),
+            sockets: netpulse_platform::socket_table(),
+        }
+    }
+}
+
+/// Start live capture on `iface_id` and spawn the background reconstruction loop
+/// (docs/05). The capture handle is opened *inside* the thread so the (possibly
+/// non-`Send`) backend never crosses a thread boundary; the open result is
+/// reported back so the UI gets an immediate, honest error if Npcap is missing or
+/// privileges are insufficient (docs/02 §11).
+fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
+    let mut guard = state.capture.lock().map_err(|_| "state poisoned")?;
+    if guard.is_some() {
+        return Err("capture is already running".into());
+    }
+
+    let store = Arc::clone(&state.store);
+    let stats = Arc::clone(&state.stats);
+    let correlator = Arc::clone(&state.correlator);
+    let sockets = state.sockets.clone();
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_thread = Arc::clone(&stop);
+    let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+
+    let handle = std::thread::spawn(move || match netpulse_platform::open_capture(iface_id) {
+        Ok(capture) => {
+            let dlt = capture.link_dlt();
+            let _ = tx.send(Ok(()));
+            live_loop(capture, dlt, store, stats, correlator, sockets, stop_thread);
+        }
+        Err(e) => {
+            let _ = tx.send(Err(e.to_string()));
+        }
+    });
+
+    match rx.recv() {
+        Ok(Ok(())) => {
+            *guard = Some(CaptureControl { stop, handle });
+            Ok(())
+        }
+        Ok(Err(e)) => {
+            let _ = handle.join();
+            Err(e)
+        }
+        Err(_) => Err("capture thread failed to start".into()),
+    }
+}
+
+/// Stop the running live capture and wait for the thread to finish; the last
+/// reconstruction stays in the store so the screens keep showing what was seen.
+fn stop_capture(state: &AppState) -> Result<(), String> {
+    let ctrl = state.capture.lock().map_err(|_| "state poisoned")?.take();
+    match ctrl {
+        Some(ctrl) => {
+            ctrl.stop.store(true, Ordering::Relaxed);
+            let _ = ctrl.handle.join();
+            Ok(())
+        }
+        None => Err("no capture is running".into()),
+    }
+}
+
+/// The background live-capture loop (docs/05 §4). Drains frames from the backend
+/// into a bounded buffer and, about once a second, rebuilds the committed store
+/// via the *same* offline pipeline (`analyze_frames`) so live reconstruction
+/// matches file/replay exactly (docs/21 §4). Runs until the stop flag is set or
+/// the source closes.
+fn live_loop(
+    mut capture: netpulse_platform::LiveCapture,
+    dlt: u32,
+    store: Arc<Mutex<CaptureStore>>,
+    stats: Arc<Mutex<CaptureStats>>,
+    correlator: Arc<Mutex<Correlator>>,
+    sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
+    stop: Arc<AtomicBool>,
+) {
+    // Bound memory and rebuild cost: keep only the most recent frames (docs/08
+    // §4 bounded/private). A first-slice reprocess-the-window model; an
+    // incremental flow engine is the follow-up optimization.
+    const MAX_FRAMES: usize = 200_000;
+    let mut buffer: Vec<RawFrame> = Vec::new();
+    let mut latest_mono = 0u64;
+    let mut last_rebuild = std::time::Instant::now();
+
+    while !stop.load(Ordering::Relaxed) {
+        let batch = match capture.next_batch() {
+            Ok(b) => b,
+            Err(_) => break, // source closed or errored — end capture honestly
+        };
+        if !batch.is_empty() {
+            if let Some(f) = batch.last() {
+                latest_mono = latest_mono.max(f.mono_nanos);
+            }
+            buffer.extend(batch);
+            if buffer.len() > MAX_FRAMES {
+                let overflow = buffer.len() - MAX_FRAMES;
+                buffer.drain(0..overflow);
+            }
+        }
+
+        if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
+            last_rebuild = std::time::Instant::now();
+            if let Ok((new_store, _report)) =
+                netpulse_engine::pipeline::analyze_frames(dlt, &buffer, 16)
+            {
+                let (received, dropped) = capture.stats();
+                if let Ok(mut s) = store.lock() {
+                    *s = new_store;
+                }
+                if let Ok(mut st) = stats.lock() {
+                    *st = CaptureStats { received, dropped };
+                }
+            }
+
+            // Poll the OS socket tables and feed the correlator, timestamped in the
+            // same capture-relative monotonic clock the flows use (docs/12 §5).
+            if let Some(source) = &sockets {
+                if let Ok(owners) = source.snapshot() {
+                    if let Ok(mut c) = correlator.lock() {
+                        c.ingest_snapshot(latest_mono, &owners);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Optionally seed the committed store from a pcap named by `NETPULSE_PCAP`,
+/// running the identical offline pipeline the CLI does (`analyze_pcap`). Any
+/// problem (unset var, unreadable file, undecodable capture) falls back to an
+/// empty metadata-only store rather than failing the launch — the UI then shows
+/// its empty states honestly (docs/02 §11: never fabricate data).
+fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
+    // Metadata-only is the private default (docs/08 §4).
+    let empty = || {
+        (
+            CaptureStore::new(PayloadPolicy::MetadataOnly),
+            CaptureStats::default(),
+        )
+    };
+
+    let Some(path) = std::env::var_os("NETPULSE_PCAP") else {
+        return empty();
+    };
+    let bytes = match std::fs::read(&path) {
+        Ok(b) => b,
+        Err(e) => {
+            eprintln!(
+                "NetPulse: NETPULSE_PCAP={} could not be read ({e}); starting with an empty store.",
+                path.to_string_lossy()
+            );
+            return empty();
+        }
+    };
+    match netpulse_engine::pipeline::analyze_pcap(&bytes, 16) {
+        Ok((store, report)) => {
+            // An offline file is lossless: every frame read was "received" and none
+            // was dropped, so the monitor keeps capture loss honestly at zero
+            // (docs/11 §6.4).
+            let stats = CaptureStats {
+                received: report.frames_read as u64,
+                dropped: 0,
+            };
+            eprintln!(
+                "NetPulse: loaded {} — {} frames, {} decoded, {} flows, {} sessions, {} causal links.",
+                path.to_string_lossy(),
+                report.frames_read,
+                report.packets_decoded,
+                report.flows,
+                report.sessions,
+                report.causal_links,
+            );
+            (store, stats)
+        }
+        Err(e) => {
+            eprintln!(
+                "NetPulse: NETPULSE_PCAP={} is not an analyzable capture ({e}); starting with an empty store.",
+                path.to_string_lossy()
+            );
+            empty()
         }
     }
 }
@@ -163,12 +370,16 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
     match query {
         Query::NarrativeFeed { depth, .. } => {
             let view = present(&store, to_depth(depth), stats);
-            Ok(QueryResponse::NarrativeFeed(view.narratives))
+            Ok(QueryResponse::NarrativeFeed {
+                cards: view.narratives,
+            })
         }
         Query::MonitorSnapshot { .. } => {
             let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
             let view = present(&store, depth, stats);
-            Ok(QueryResponse::MonitorSnapshot(view.monitor))
+            Ok(QueryResponse::MonitorSnapshot {
+                snapshot: view.monitor,
+            })
         }
         Query::JourneyOfSession { session_id, depth } => {
             let view = present(&store, to_depth(depth), stats);
@@ -187,15 +398,29 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                     s
                 })
                 .unwrap_or_default();
-            Ok(QueryResponse::Journey(sentences))
+            Ok(QueryResponse::Journey { sentences })
         }
-        Query::AttributionOfFlow { .. } => {
-            // No live SocketTableSource is wired in this build (docs/12 §4 stub),
-            // so attribution is honestly Unknown rather than guessed (docs/12 §8).
-            Ok(QueryResponse::Attribution(project::attribution_dto(
-                &Attribution::unknown(),
-                None,
-            )))
+        Query::AttributionOfFlow { flow_id } => {
+            // Correlate the flow's 5-tuple against the polled socket-table history
+            // (docs/12 §5). Unknown when there is no match or no backend — never a
+            // guessed PID (docs/12 §8).
+            let attribution = match store.flow(flow_id) {
+                Some(flow) => {
+                    let corr = state.correlator.lock().map_err(|_| "state poisoned")?;
+                    corr.attribute(&flow.key, flow.first_ts.mono_nanos)
+                }
+                None => Attribution::unknown(),
+            };
+            // Resolve the process name lazily, only for a matched PID (docs/12 §6).
+            let name = match (attribution.pid, state.sockets.as_ref()) {
+                (Some(pid), Some(source)) => {
+                    source.process_info(pid).ok().flatten().map(|p| p.name)
+                }
+                _ => None,
+            };
+            Ok(QueryResponse::Attribution {
+                attribution: project::attribution_dto(&attribution, name),
+            })
         }
         Query::PacketsOfFlow { .. } => {
             // Metadata-only store: raw bytes were never retained (docs/09 §8).
@@ -215,7 +440,7 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                     })
                 })
                 .collect();
-            Ok(QueryResponse::LessonOffers(offers))
+            Ok(QueryResponse::LessonOffers { offers })
         }
         Query::JourneyStagesOfSession { session_id, depth } => {
             let view = present_education(&store, to_depth(depth));
@@ -228,15 +453,17 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                     stages: Vec::new(),
                     fanout: Vec::new(),
                 });
-            Ok(QueryResponse::PageJourney(journey))
+            Ok(QueryResponse::PageJourney { journey })
         }
-        Query::ExplorerBrowse => Ok(QueryResponse::ExplorerEntries(explorer_browse(&store))),
-        Query::ExplorerSearch { term } => Ok(QueryResponse::ExplorerEntries(explorer_search(
-            &store, &term,
-        ))),
+        Query::ExplorerBrowse => Ok(QueryResponse::ExplorerEntries {
+            entries: explorer_browse(&store),
+        }),
+        Query::ExplorerSearch { term } => Ok(QueryResponse::ExplorerEntries {
+            entries: explorer_search(&store, &term),
+        }),
         Query::HandshakeAnimationForFlow { flow_id } => {
             match handshake_animation_for_flow(&store, flow_id) {
-                Some(anim) => Ok(QueryResponse::Animation(anim)),
+                Some(animation) => Ok(QueryResponse::Animation { animation }),
                 // No observable RTT: we never fabricate a timing (docs/16 §11).
                 None => Ok(QueryResponse::PayloadsUnavailable),
             }
@@ -247,18 +474,15 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
             to_mono_nanos,
         } => {
             let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
-            Ok(QueryResponse::Findings(present_security(
-                &store,
-                from_mono_nanos,
-                to_mono_nanos,
-                depth,
-            )))
+            Ok(QueryResponse::Findings {
+                findings: present_security(&store, from_mono_nanos, to_mono_nanos, depth),
+            })
         }
         Query::AskAssistant { question } => {
             // Grounded in the committed store, local-default backend (docs/19 §4.1).
-            Ok(QueryResponse::AssistantAnswer(ask_assistant(
-                &store, &question,
-            )))
+            Ok(QueryResponse::AssistantAnswer {
+                answer: ask_assistant(&store, &question),
+            })
         }
         // ---- Phase 5 lifecycle queries (docs/21–24) ----
         Query::ListRecordings => {
@@ -272,7 +496,9 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                     project::recording_summary_dto(i as u64, r, false)
                 })
                 .collect();
-            Ok(QueryResponse::Recordings(summaries))
+            Ok(QueryResponse::Recordings {
+                recordings: summaries,
+            })
         }
         Query::ReplayState => {
             let replay = state.replay.lock().map_err(|_| "state poisoned")?;
@@ -280,7 +506,9 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                 .as_ref()
                 .map(|c| c.state())
                 .unwrap_or_else(empty_replay_state);
-            Ok(QueryResponse::ReplayState(project::replay_state_dto(&s)))
+            Ok(QueryResponse::ReplayState {
+                state: project::replay_state_dto(&s),
+            })
         }
         Query::ExportPreview { selection, format } => {
             // Preview exactly what an export would contain before any byte is
@@ -291,9 +519,9 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                 to_format(format),
                 &Sanitizer::default(),
             );
-            Ok(QueryResponse::ExportPreview(project::export_preview_dto(
-                &preview,
-            )))
+            Ok(QueryResponse::ExportPreview {
+                preview: project::export_preview_dto(&preview),
+            })
         }
         Query::ListPlugins => {
             let registry = state.registry.lock().map_err(|_| "state poisoned")?;
@@ -302,7 +530,27 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                 .iter()
                 .map(|p| project::plugin_descriptor_dto(p, netpulse_api::API_VERSION))
                 .collect();
-            Ok(QueryResponse::Plugins(descriptors))
+            Ok(QueryResponse::Plugins {
+                plugins: descriptors,
+            })
+        }
+        Query::Interfaces => {
+            // Enumerate capture adapters for the picker (docs/05). Where no backend
+            // exists (feature off / Npcap absent), return an empty list — the UI
+            // still offers the implicit "Default adapter" (id 0), which the
+            // platform resolves, and reports the real error only on Start.
+            let interfaces = netpulse_platform::list_interfaces()
+                .map(|list| {
+                    list.into_iter()
+                        .map(|i| InterfaceDto {
+                            id: i.id,
+                            name: i.name,
+                            description: i.description,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+            Ok(QueryResponse::Interfaces { interfaces })
         }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
@@ -317,11 +565,8 @@ fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), St
             *state.depth.lock().map_err(|_| "state poisoned")? = to_depth(depth);
             Ok(())
         }
-        Command::StartCapture { .. } | Command::StopCapture { .. } => {
-            // Live capture backend is a documented stub (docs/05); fail closed
-            // and honestly rather than pretend to capture (docs/02 §11).
-            Err("live capture is not available in this build (platform backend is a stub)".into())
-        }
+        Command::StartCapture { iface_id } => start_capture(&state, iface_id),
+        Command::StopCapture { .. } => stop_capture(&state),
         Command::StartRecording | Command::StopRecording => {
             // Recording captures a live stream; with the platform backend stubbed
             // there is nothing to record. Fail closed honestly (docs/02 §11) rather

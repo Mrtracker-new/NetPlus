@@ -23,6 +23,13 @@ netpulse-engine = { path = "../crates/netpulse-engine" }
 netpulse-storage = { path = "../crates/netpulse-storage" }
 netpulse-capture = { path = "../crates/netpulse-capture" }
 netpulse-plugin = { path = "../crates/netpulse-plugin" }
+netpulse-platform = { path = "../crates/netpulse-platform" }
+
+# Live capture is a Windows/Npcap capability today (docs/05); enable the platform
+# backend only there so the shell still builds on other targets (the feature
+# stays off and capture fails closed honestly).
+[target.'cfg(windows)'.dependencies]
+netpulse-platform = { path = "../crates/netpulse-platform", features = ["live-capture"] }
 
 [features]
 # Tauri's default custom-protocol feature for production builds.

@@ -24,7 +24,8 @@ pub use disclosure::Depth;
 pub use error::{NpError, Result};
 pub use model::{
     AttributionConfidence, Confidence, EvidenceRef, Finding, FindingCategory, Flow, FlowMetrics,
-    FlowState, Host, Journey, Packet, Process, ProtoEvent, ProtoEventKind, Session, SocketOwner,
+    FlowState, Host, HostName, Journey, NameSource, Packet, Process, ProtoEvent, ProtoEventKind,
+    Session, SocketOwner,
 };
 pub use net::{FiveTuple, L4Proto, L7Proto};
 pub use time::Timestamp;

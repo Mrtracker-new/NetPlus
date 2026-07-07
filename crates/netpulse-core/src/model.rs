@@ -172,6 +172,42 @@ pub struct Host {
     pub org: Option<String>,
 }
 
+/// How a hostname for an IP was learned — always from traffic we *observed*,
+/// never an active lookup. NetPulse resolves names passively (a DNS answer it
+/// saw, a TLS SNI the client sent) so naming stays offline and deterministic; it
+/// never issues a reverse-DNS/PTR query, which would be egress (docs/02 §10.3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum NameSource {
+    /// A DNS A/AAAA answer that resolved this name to the IP — the authoritative
+    /// name→address mapping, seen on the wire *this session* (docs/06 §6.1).
+    Dns,
+    /// A TLS SNI the client sent when opening a connection to this IP — the
+    /// hostname the user's software *asked for*, often the real site behind a
+    /// shared CDN address. Seen on the wire this session.
+    Sni,
+    /// A static mapping from the machine's `hosts` file. Local host configuration,
+    /// not wire traffic — names LAN devices and developer overrides the capture
+    /// itself may never carry a DNS answer for.
+    HostsFile,
+    /// A cached entry read from the OS DNS resolver (e.g. Windows DNS Client
+    /// cache). This is how a name is recovered for a connection whose DNS lookup
+    /// happened *before* capture started, and it includes any mDNS `.local` names
+    /// the resolver already cached. It is read from local OS state only — NetPulse
+    /// never issues a query to populate it, so no egress occurs (docs/02 §10.3).
+    OsResolver,
+}
+
+/// One passively-observed name for an IP, tagged with how it was learned. An IP
+/// can carry several (a CDN address serves many sites, a DNS name and its SNI may
+/// differ), so these are collected as a set rather than reduced to one guessed
+/// "primary" — presenting a single name as authoritative would overclaim.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HostName {
+    pub name: String,
+    pub source: NameSource,
+}
+
 /// A security or anomaly observation.
 ///
 /// Per the honesty principle (docs/01 §7.2), a finding is never a bare verdict:

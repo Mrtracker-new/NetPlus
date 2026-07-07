@@ -13,8 +13,9 @@
 //!   "evidence aged out", so the UI never dangles a link to nowhere.
 
 use std::collections::HashMap;
+use std::net::IpAddr;
 
-use netpulse_core::{EvidenceRef, Finding, Flow, Host, ProtoEvent, Session};
+use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, Session};
 
 use crate::PayloadPolicy;
 
@@ -26,6 +27,10 @@ pub struct CaptureStore {
     flows: HashMap<u64, Flow>,
     sessions: HashMap<u64, Session>,
     hosts: HashMap<u64, Host>,
+    /// Passively-observed names per IP (docs/08 §5.1). Distinct from `hosts`
+    /// (which is full geo/ASN/org enrichment): this is only what we saw on the
+    /// wire — DNS answers and TLS SNI — so the UI can label a raw IP.
+    resolutions: HashMap<IpAddr, Vec<HostName>>,
     findings: HashMap<u64, StoredFinding>,
     /// PROTO_EVENTS by flow id (docs/08 §5.1).
     events_by_flow: HashMap<u64, Vec<ProtoEvent>>,
@@ -50,6 +55,7 @@ impl CaptureStore {
             flows: HashMap::new(),
             sessions: HashMap::new(),
             hosts: HashMap::new(),
+            resolutions: HashMap::new(),
             findings: HashMap::new(),
             events_by_flow: HashMap::new(),
             payload_records: 0,
@@ -80,6 +86,50 @@ impl CaptureStore {
     /// Persist an enriched host record (docs/08 §5.1 HOSTS).
     pub fn insert_host(&mut self, id: u64, host: Host) {
         self.hosts.insert(id, host);
+    }
+
+    /// Record the passively-observed names for one IP (docs/08 §5.1), replacing
+    /// any prior set for that IP. The reconstruction engine hands over the full
+    /// deterministic table each projection; this is the authoritative store copy
+    /// the monitor breakdown joins against.
+    pub fn set_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if names.is_empty() {
+            self.resolutions.remove(&ip);
+        } else {
+            self.resolutions.insert(ip, names);
+        }
+    }
+
+    /// Merge additional names for one IP into the existing set, de-duplicating on
+    /// the exact `(name, source)` pair — never replacing what is already there.
+    ///
+    /// This is the seam for *host-environment* enrichment (OS DNS cache, hosts
+    /// file, cached mDNS) that the shell layers on top of the engine's wire-only
+    /// resolutions after each rebuild: [`set_resolution`](Self::set_resolution)
+    /// installs the authoritative on-the-wire names, then this unions in the local
+    /// hints without clobbering them, so a lower-trust `OsResolver` guess can never
+    /// overwrite a DNS answer we actually saw (docs/08 §5.1, docs/02 §10.3).
+    pub fn merge_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if names.is_empty() {
+            return;
+        }
+        let existing = self.resolutions.entry(ip).or_default();
+        for n in names {
+            if !existing.iter().any(|h| h.name == n.name && h.source == n.source) {
+                existing.push(n);
+            }
+        }
+    }
+
+    /// The names observed for one IP, empty if none — the lookup the host
+    /// breakdown uses to label a raw address.
+    pub fn names_for(&self, ip: &IpAddr) -> &[HostName] {
+        self.resolutions.get(ip).map_or(&[], |v| v.as_slice())
+    }
+
+    /// The whole `IP → names` map, for bulk joins (e.g. the monitor snapshot).
+    pub fn resolutions(&self) -> &HashMap<IpAddr, Vec<HostName>> {
+        &self.resolutions
     }
 
     /// Persist a finding with its evidence references (docs/08 §6).

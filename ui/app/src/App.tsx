@@ -1,12 +1,18 @@
-// The application shell: left nav, the disclosure-mode switch, and the active
-// screen (docs/09 §4). Beginner/Intermediate/Expert is a global control here,
-// with per-item escape hatches living inside the screens (docs/09 §6.3).
+// The application shell: slim icon rail, a floating glass header, the active
+// screen, and a right context rail (docs/09 §4). Beginner/Intermediate/Expert is
+// a global control here, with per-item escape hatches living inside the screens
+// (docs/09 §6.3). Light neumorphic is the default look; a theme toggle flips to
+// the original deep-observatory dark (tokens.css [data-theme="dark"]).
 
 import { useEffect, useState } from "react";
 import type { ProjectionDepth, Interface as InterfaceDto } from "@netpulse/contract";
 import { DisclosureProvider, useDisclosure, DEPTHS } from "./modes/DisclosureContext";
+import { useTheme } from "./modes/useTheme";
 import { useLiveData } from "./state/useLiveData";
+import { useStore } from "./state/store";
 import { command, query } from "./ipc";
+import { Icon, type IconName } from "./icons";
+import { humanBytes } from "./viz";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";
@@ -36,22 +42,38 @@ type Screen =
   | "export"
   | "plugins";
 
-const NAV: Array<{ id: Screen; label: string }> = [
-  { id: "dashboard", label: "Dashboard" },
-  { id: "journey", label: "Journey" },
-  { id: "timeline", label: "Timeline" },
-  { id: "monitoring", label: "Monitor" },
-  { id: "apps", label: "Apps" },
-  { id: "security", label: "Security" },
-  { id: "assistant", label: "Assistant" },
-  { id: "learn", label: "Learn" },
-  { id: "explorer", label: "Explorer" },
+const NAV: Array<{ id: Screen; label: string; icon: IconName }> = [
+  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "journey", label: "Journey", icon: "journey" },
+  { id: "timeline", label: "Timeline", icon: "timeline" },
+  { id: "monitoring", label: "Monitor", icon: "monitoring" },
+  { id: "apps", label: "Apps", icon: "apps" },
+  { id: "security", label: "Security", icon: "security" },
+  { id: "assistant", label: "Assistant", icon: "assistant" },
+  { id: "learn", label: "Learn", icon: "learn" },
+  { id: "explorer", label: "Explorer", icon: "explorer" },
   // Phase 5 lifecycle surfaces (docs/21–24).
-  { id: "recordings", label: "Recordings" },
-  { id: "replay", label: "Replay" },
-  { id: "export", label: "Export" },
-  { id: "plugins", label: "Plugins" },
+  { id: "recordings", label: "Recordings", icon: "recordings" },
+  { id: "replay", label: "Replay", icon: "replay" },
+  { id: "export", label: "Export", icon: "export" },
+  { id: "plugins", label: "Plugins", icon: "plugins" },
 ];
+
+const SCREEN_TITLE: Record<Screen, string> = {
+  dashboard: "Dashboard",
+  journey: "Page Journey",
+  timeline: "Timeline",
+  monitoring: "Monitoring",
+  apps: "Applications",
+  security: "Security",
+  assistant: "Assistant",
+  learn: "Learn",
+  explorer: "Explorer",
+  recordings: "Recordings",
+  replay: "Replay",
+  export: "Export",
+  plugins: "Plugins",
+};
 
 function ModeSwitch() {
   const { depth, setDepth } = useDisclosure();
@@ -151,6 +173,86 @@ function CaptureControl() {
   );
 }
 
+function ThemeToggle() {
+  const [theme, toggle] = useTheme();
+  return (
+    <button
+      className="np-iconbtn"
+      onClick={toggle}
+      aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+      title={theme === "dark" ? "Light theme" : "Dark theme"}
+    >
+      <Icon name={theme === "dark" ? "sun" : "moon"} />
+    </button>
+  );
+}
+
+// The right context rail — real NetPulse content only (docs honesty: no invented
+// users/resources). Capture status, the top observed hosts, and quick controls.
+function RightRail() {
+  const { monitor, feed } = useStore();
+  const hosts = monitor
+    ? [...monitor.by_host.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6)
+    : [];
+  const totalFlows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
+
+  return (
+    <aside className="np-rail-right" aria-label="Context">
+      <section className="np-rail-card">
+        <h2 className="np-rail-card__title">This session</h2>
+        <ul className="np-rail-list">
+          <li>
+            Hosts observed
+            <span className="np-rail-list__val">{monitor?.by_host.rows.length ?? 0}</span>
+          </li>
+          <li>
+            Active flows
+            <span className="np-rail-list__val">{totalFlows}</span>
+          </li>
+          <li>
+            Narrative cards
+            <span className="np-rail-list__val">{feed.length}</span>
+          </li>
+          <li>
+            Capture drops
+            <span className="np-rail-list__val">{monitor?.capture_drops ?? 0}</span>
+          </li>
+        </ul>
+      </section>
+
+      <section className="np-rail-card">
+        <h2 className="np-rail-card__title">Top hosts</h2>
+        {hosts.length === 0 ? (
+          <p className="np-cons__hint">Quiet — no hosts yet.</p>
+        ) : (
+          <ul className="np-rail-list">
+            {hosts.map((h) => (
+              <li key={h.label}>
+                <span
+                  style={{
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={h.label}
+                >
+                  {h.label}
+                </span>
+                <span className="np-rail-list__val">{humanBytes(h.bytes)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="np-rail-card">
+        <h2 className="np-rail-card__title">View density</h2>
+        <ModeSwitch />
+      </section>
+    </aside>
+  );
+}
+
 function Shell() {
   const [screen, setScreen] = useState<Screen>("dashboard");
   // The data pump: feeds the client store from the engine (feed + monitor), and
@@ -161,22 +263,34 @@ function Shell() {
   const { depth } = useDisclosure();
   return (
     <div className="np-app" data-depth={depth}>
-      <nav className="np-nav">
+      <nav className="np-nav" aria-label="Primary">
+        <div className="np-nav__brand" title="NetPulse">
+          <Icon name="brand" />
+        </div>
         {NAV.map((item) => (
           <button
             key={item.id}
+            data-label={item.label}
+            aria-label={item.label}
+            aria-current={item.id === screen ? "page" : undefined}
             className={item.id === screen ? "np-nav__item np-nav__item--active" : "np-nav__item"}
             onClick={() => setScreen(item.id)}
           >
-            {item.label}
+            <Icon name={item.icon} />
           </button>
         ))}
       </nav>
+
       <div className="np-main">
         <header className="np-header">
           <span className="np-brand">NetPulse</span>
+          <span className="np-search" aria-hidden="true">
+            <Icon name="search" />
+            {SCREEN_TITLE[screen]}
+          </span>
+          <span className="np-header__spacer" />
           <CaptureControl />
-          <ModeSwitch />
+          <ThemeToggle />
         </header>
         <main>
           {screen === "dashboard" && <Dashboard />}
@@ -194,6 +308,8 @@ function Shell() {
           {screen === "plugins" && <Plugins />}
         </main>
       </div>
+
+      <RightRail />
     </div>
   );
 }

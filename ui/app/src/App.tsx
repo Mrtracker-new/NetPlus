@@ -12,7 +12,7 @@ import { useLiveData } from "./state/useLiveData";
 import { useStore } from "./state/store";
 import { command, query } from "./ipc";
 import { Icon, type IconName } from "./icons";
-import { humanBytes } from "./viz";
+import { humanBytes, primaryHostName } from "./viz";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";
@@ -226,21 +226,26 @@ function RightRail() {
           <p className="np-cons__hint">Quiet — no hosts yet.</p>
         ) : (
           <ul className="np-rail-list">
-            {hosts.map((h) => (
-              <li key={h.label}>
-                <span
-                  style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={h.label}
-                >
-                  {h.label}
-                </span>
-                <span className="np-rail-list__val">{humanBytes(h.bytes)}</span>
-              </li>
-            ))}
+            {hosts.map((h) => {
+              const nm = primaryHostName(h);
+              return (
+                <li key={h.label}>
+                  <span
+                    style={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    // The raw IP is always available on hover, even when a name
+                    // is foregrounded — the address stays the source of truth.
+                    title={nm ? `${nm.name} · ${h.label}` : h.label}
+                  >
+                    {nm ? nm.name : h.label}
+                  </span>
+                  <span className="np-rail-list__val">{humanBytes(h.bytes)}</span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

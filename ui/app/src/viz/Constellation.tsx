@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { BreakdownRow } from "@netpulse/contract";
-import { humanBytes } from "./index";
+import { humanBytes, hostSourceLabel, primaryHostName } from "./index";
 
 // viewBox geometry (SVG scales to container width; aspect is fixed so the HTML
 // tooltip can map viewBox coords → percentage of the stage box precisely).
@@ -323,7 +323,7 @@ export function Constellation({
                     r={isSel ? p.size + 3 : p.size}
                   />
                   <text className="np-cons__node-label" y={p.size + 13}>
-                    {truncate(p.row.label)}
+                    {truncate(primaryHostName(p.row)?.name ?? p.row.label)}
                   </text>
                 </g>
               </g>
@@ -337,7 +337,22 @@ export function Constellation({
             className="np-cons__tip"
             style={{ left: `${(tipPos.x / W) * 100}%`, top: `${(tipPos.y / H) * 100}%` }}
           >
-            <div className="np-cons__tip-host">{tip.row.label}</div>
+            {(() => {
+              const nm = primaryHostName(tip.row);
+              return nm ? (
+                <>
+                  <div className="np-cons__tip-host" title={`${nm.name} (via ${hostSourceLabel(nm.source)})`}>
+                    {nm.name}
+                  </div>
+                  <div className="np-cons__tip-ip">
+                    {tip.row.label}
+                    <span className="np-cons__tip-src"> · {hostSourceLabel(nm.source)}</span>
+                  </div>
+                </>
+              ) : (
+                <div className="np-cons__tip-host">{tip.row.label}</div>
+              );
+            })()}
             <div className="np-cons__tip-row">
               <span>Traffic</span>
               <b>{humanBytes(tip.row.bytes)}</b>
@@ -390,7 +405,16 @@ export function Constellation({
       {/* Pinned detail — real evidence-backed figures, no invented sub-nodes. */}
       {selectedPlaced && (
         <div className="np-loss" style={{ marginTop: "var(--np-3)" }}>
-          <span>host: {selectedPlaced.row.label}</span>
+          {(() => {
+            const nm = primaryHostName(selectedPlaced.row);
+            return nm ? (
+              <span>
+                host: {nm.name} <span className="np-cons__tip-src">({selectedPlaced.row.label} · {hostSourceLabel(nm.source)})</span>
+              </span>
+            ) : (
+              <span>host: {selectedPlaced.row.label}</span>
+            );
+          })()}
           <span>{humanBytes(selectedPlaced.row.bytes)}</span>
           <span>{selectedPlaced.row.flows} flows</span>
           <span>{selectedPlaced.row.evidence.length} evidence</span>
@@ -407,11 +431,15 @@ export function Constellation({
         </p>
       )}
       <ul className="np-sr-only">
-        {placed.map((p) => (
-          <li key={p.key}>
-            {p.row.label}: {humanBytes(p.row.bytes)}, {p.row.flows} flows, {p.status}
-          </li>
-        ))}
+        {placed.map((p) => {
+          const nm = primaryHostName(p.row);
+          const who = nm ? `${nm.name} (${p.row.label})` : p.row.label;
+          return (
+            <li key={p.key}>
+              {who}: {humanBytes(p.row.bytes)}, {p.row.flows} flows, {p.status}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

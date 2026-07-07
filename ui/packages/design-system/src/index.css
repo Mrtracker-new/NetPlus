@@ -1754,6 +1754,23 @@ button {
   white-space: nowrap;
   max-width: 28ch;
 }
+/* The raw IP under a foregrounded hostname — muted, monospace, the source of
+   truth kept visible even when a name is shown. */
+.np-cons__tip-ip {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+/* Provenance tag (DNS / TLS SNI) so a name is never mistaken for a lookup. */
+.np-cons__tip-src {
+  color: var(--np-text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+}
 .np-cons__tip-row {
   display: flex;
   justify-content: space-between;

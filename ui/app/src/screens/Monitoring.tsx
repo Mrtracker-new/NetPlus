@@ -5,7 +5,7 @@
 
 import type { Breakdown, Diagnosis } from "@netpulse/contract";
 import { useStore } from "../state/store";
-import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes } from "../viz";
+import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "../viz";
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   return (
@@ -25,9 +25,20 @@ function HostBars({ breakdown }: { breakdown: Breakdown }) {
   return (
     <section className="np-panel">
       <h3 className="np-panel__title">Top {breakdown.dimension}</h3>
-      {rows.map((r) => (
-        <BarRow key={r.label} label={r.label} value={r.bytes} max={max} suffix={humanBytes(r.bytes)} />
-      ))}
+      {rows.map((r) => {
+        // For the host dimension, foreground an observed name when we have one;
+        // the raw IP stays the row key. Other dimensions have no name to join.
+        const nm = primaryHostName(r);
+        return (
+          <BarRow
+            key={r.label}
+            label={nm ? `${nm.name} (${r.label})` : r.label}
+            value={r.bytes}
+            max={max}
+            suffix={humanBytes(r.bytes)}
+          />
+        );
+      })}
     </section>
   );
 }

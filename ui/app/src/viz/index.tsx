@@ -10,7 +10,72 @@
 
 import { Fragment } from "react";
 import type { ReactElement } from "react";
-import type { JourneyStage, FanoutNode, StageKind, Severity } from "@netpulse/contract";
+import type {
+  BreakdownRow,
+  FanoutNode,
+  HostName,
+  JourneyStage,
+  Severity,
+  StageKind,
+} from "@netpulse/contract";
+
+// ---------------------------------------------------------- Host name display
+//
+// The engine labels host breakdown rows with the raw destination IP (the
+// authoritative key) and attaches any names for it. Two come from the wire and
+// never involve a lookup we made — DNS answers and TLS SNI (netpulse-flow
+// resolution.rs); two more are read from *local* machine state by the shell to
+// recover names for lookups that predated capture — the hosts file and the OS
+// DNS resolver cache (incl. cached mDNS), still with zero egress. These helpers
+// choose what to *foreground* for a human without ever discarding the IP.
+
+/** Preference order when foregrounding one name, most-trusted/most-relevant
+ *  first: SNI (what the client asked for) → DNS (authoritative, seen on the wire)
+ *  → hosts file (static local truth) → OS resolver cache (a local hint). */
+function hostSourceRank(s: HostName["source"]): number {
+  switch (s) {
+    case "sni":
+      return 0;
+    case "dns":
+      return 1;
+    case "hosts_file":
+      return 2;
+    case "os_resolver":
+      return 3;
+    default:
+      return 4;
+  }
+}
+
+/** A short, honest provenance tag so a foregrounded name is never mistaken for a
+ *  lookup we performed against the network. */
+export function hostSourceLabel(s: HostName["source"]): string {
+  switch (s) {
+    case "sni":
+      return "TLS SNI";
+    case "dns":
+      return "DNS";
+    case "hosts_file":
+      return "hosts file";
+    case "os_resolver":
+      return "OS DNS cache";
+    default:
+      return "local";
+  }
+}
+
+/** The single most legible name for a row, or null if none was observed. Prefers
+ *  SNI over DNS, then the shortest name (a bare apex reads better than a long CDN
+ *  label), ties broken alphabetically for a stable choice. */
+export function primaryHostName(row: BreakdownRow): HostName | null {
+  if (!row.hostnames || row.hostnames.length === 0) return null;
+  return [...row.hostnames].sort(
+    (a, b) =>
+      hostSourceRank(a.source) - hostSourceRank(b.source) ||
+      a.name.length - b.name.length ||
+      a.name.localeCompare(b.name),
+  )[0]!;
+}
 
 /** CVD-safe categorical hues, fixed order (validated: lightness band, chroma,
  *  adjacent-pair CVD ≥ 12, contrast). Assigned by entity, never by rank. */

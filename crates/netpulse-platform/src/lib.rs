@@ -40,6 +40,13 @@ use std::sync::Arc;
 
 use netpulse_core::traits::SocketTableSource;
 
+// Host-environment name hints (hosts file + OS resolver cache). Pure-std and
+// egress-free, so it is always available — no `live-capture` gate — and portable
+// across OSes (the resolver-cache reader is Windows-only inside; other platforms
+// contribute only hosts-file entries).
+pub mod names;
+pub use names::host_name_hints;
+
 // The real backend is compiled only when live capture is both requested
 // (`live-capture`) and available for the target OS (Windows/Npcap today).
 #[cfg(all(windows, feature = "live-capture"))]

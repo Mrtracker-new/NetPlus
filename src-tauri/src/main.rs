@@ -164,9 +164,18 @@ fn live_loop(
     // §4 bounded/private). A first-slice reprocess-the-window model; an
     // incremental flow engine is the follow-up optimization.
     const MAX_FRAMES: usize = 200_000;
+    // How often to re-read the OS name hints (hosts file + DNS resolver cache).
+    // The read spawns a helper process, so we cache it between refreshes rather
+    // than paying that cost on every ~1s rebuild.
+    const HINT_REFRESH_SECS: u64 = 30;
     let mut buffer: Vec<RawFrame> = Vec::new();
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
+    // Cached host-environment name overlay and when it was last refreshed
+    // (`None` = not yet read; forces a read on the first rebuild).
+    let mut hint_cache: std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>> =
+        std::collections::BTreeMap::new();
+    let mut last_hint_refresh: Option<std::time::Instant> = None;
 
     while !stop.load(Ordering::Relaxed) {
         let batch = match capture.next_batch() {
@@ -186,9 +195,27 @@ fn live_loop(
 
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
-            if let Ok((new_store, _report)) =
+            if let Ok((mut new_store, _report)) =
                 netpulse_engine::pipeline::analyze_frames(dlt, &buffer, 16)
             {
+                // Overlay host-environment name hints (OS DNS cache, hosts file,
+                // cached mDNS) onto the wire-only resolutions, so IPs whose lookup
+                // predated capture still get a name (docs/08 §5.1). The engine's
+                // rebuild is authoritative and deterministic; this overlay is a
+                // live-only, machine-local complement layered on top of it, and is
+                // merged (never clobbers a name seen on the wire). Refreshed
+                // periodically since reading the OS cache spawns a helper process.
+                if last_hint_refresh
+                    .map(|t: std::time::Instant| t.elapsed().as_secs() >= HINT_REFRESH_SECS)
+                    .unwrap_or(true)
+                {
+                    hint_cache = netpulse_platform::host_name_hints();
+                    last_hint_refresh = Some(std::time::Instant::now());
+                }
+                for (ip, names) in &hint_cache {
+                    new_store.merge_resolution(*ip, names.clone());
+                }
+
                 let (received, dropped) = capture.stats();
                 if let Ok(mut s) = store.lock() {
                     *s = new_store;

@@ -111,69 +111,171 @@ fn parse_hosts(text: &str) -> Vec<(IpAddr, String)> {
     out
 }
 
-/// Read the OS DNS resolver cache into `(ip, name)` pairs. Windows-only for now
-/// (PowerShell's `Get-DnsClientCache`); other platforms return nothing until a
-/// native reader is added — an empty overlay, never a fabricated one.
+/// Maximum number of DNS resolver cache entries parsed defensively to prevent unbounded allocation.
+pub const MAX_RESOLVER_ENTRIES: usize = 10_000;
+
+/// Normalize a hostname: trim whitespace, strip trailing dots, and convert to lowercase.
+pub fn normalize_hostname(name: &str) -> String {
+    let mut s = name.trim().to_lowercase();
+    if s.ends_with('.') && s.len() > 1 {
+        s.pop();
+    }
+    s
+}
+
+/// Read the OS DNS resolver cache into `(ip, name)` pairs.
+///
+/// Executes `%SystemRoot%\System32\ipconfig.exe /displaydns` safely without PowerShell string
+/// interpolation or execution policy dependencies. Enforces a 2-second non-busy process timeout.
+/// Fails soft (returns empty vector) on any missing executable, timeout, non-zero exit code, or
+/// non-English localized label mismatch — an optimization overlay, never a correctness dependency.
 #[cfg(windows)]
 fn read_os_resolver_cache() -> Vec<(IpAddr, String)> {
-    use std::process::Command;
+    use std::path::PathBuf;
+    use std::process::{Command, Stdio};
+    use std::thread::sleep;
+    use std::time::Duration;
 
-    // Emit CSV of (name, resolved-data) directly, avoiding locale-dependent table
-    // formatting. `Data` holds the resolved address for A/AAAA records; `Name` is
-    // the queried hostname. `-Type` filters to address records so we skip PTR/SOA
-    // noise. Failure to spawn or non-UTF8 output → no hints.
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            "Get-DnsClientCache | Where-Object {$_.Type -eq 'A' -or $_.Type -eq 'AAAA'} \
-             | ForEach-Object { \"$($_.Name)`t$($_.Data)\" }",
-        ])
-        .output();
-    let Ok(output) = output else {
-        return Vec::new();
+    let sys_root = std::env::var_os("SystemRoot")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"));
+    let ipconfig_path = sys_root.join("System32").join("ipconfig.exe");
+
+    let child = Command::new(&ipconfig_path)
+        .arg("/displaydns")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn();
+
+    let mut child = match child {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::debug!(
+                event = "resolver_cache.spawn_failed",
+                path = %ipconfig_path.display(),
+                error = %e,
+                "Failed to spawn system ipconfig.exe"
+            );
+            return Vec::new();
+        }
     };
+
+    // Poll child status with non-busy sleep (25ms cadence, max 80 iterations = 2.0 seconds)
+    let timeout = Duration::from_millis(2000);
+    let poll_interval = Duration::from_millis(25);
+    let start = std::time::Instant::now();
+    let mut finished = false;
+
+    while start.elapsed() < timeout {
+        match child.try_wait() {
+            Ok(Some(_status)) => {
+                finished = true;
+                break;
+            }
+            Ok(None) => sleep(poll_interval),
+            Err(_) => break,
+        }
+    }
+
+    if !finished {
+        tracing::debug!(
+            event = "resolver_cache.timeout",
+            "ipconfig /displaydns execution exceeded 2.0s time budget; terminating child"
+        );
+        let _ = child.kill();
+        let _ = child.wait();
+        return Vec::new();
+    }
+
+    let output = match child.wait_with_output() {
+        Ok(o) => o,
+        Err(e) => {
+            tracing::debug!(
+                event = "resolver_cache.read_failed",
+                error = %e,
+                "Failed to read ipconfig stdout"
+            );
+            return Vec::new();
+        }
+    };
+
     if !output.status.success() {
         return Vec::new();
     }
-    let Ok(text) = String::from_utf8(output.stdout) else {
-        return Vec::new();
-    };
-    parse_resolver_lines(&text)
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    parse_displaydns_output(&text)
 }
 
 #[cfg(not(windows))]
 fn read_os_resolver_cache() -> Vec<(IpAddr, String)> {
-    // No portable resolver-cache reader on Unix (nscd/systemd-resolved caches are
-    // not reliably introspectable without egress); contribute nothing.
     Vec::new()
 }
 
-/// Parse tab-separated `name<TAB>address` lines (the shape the Windows reader
-/// emits) into `(ip, name)` pairs. Split out for testability. A `.local` name is
-/// kept like any other — cached mDNS results are legitimate local hints.
-#[cfg_attr(not(windows), allow(dead_code))]
-fn parse_resolver_lines(text: &str) -> Vec<(IpAddr, String)> {
-    let mut out = Vec::new();
+/// Parse Windows `ipconfig /displaydns` output into deduplicated, deterministically sorted `(ip, name)` pairs.
+///
+/// Supports standard `ipconfig /displaydns` blocks as well as tab-separated fallback lines.
+/// Normalizes hostnames (lowercased, trailing dots stripped) and caps output at [`MAX_RESOLVER_ENTRIES`].
+pub fn parse_displaydns_output(text: &str) -> Vec<(IpAddr, String)> {
+    use std::collections::HashSet;
+
+    let mut set: HashSet<(IpAddr, String)> = HashSet::new();
+    let mut current_name: Option<String> = None;
+
     for line in text.lines() {
-        let line = line.trim();
-        if line.is_empty() {
+        if set.len() >= MAX_RESOLVER_ENTRIES {
+            break;
+        }
+
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
             continue;
         }
-        let mut parts = line.split('\t');
-        let (Some(name), Some(addr)) = (parts.next(), parts.next()) else {
+
+        // Support tab-separated fallback format: name<TAB>address
+        if let Some((name_part, addr_part)) = trimmed.split_once('\t') {
+            let name = normalize_hostname(name_part);
+            if let Ok(ip) = addr_part.trim().parse::<IpAddr>() {
+                if !name.is_empty() {
+                    set.insert((ip, name));
+                }
+            }
             continue;
-        };
-        let name = name.trim();
-        let Ok(ip) = addr.trim().parse::<IpAddr>() else {
-            continue;
-        };
-        if !name.is_empty() {
-            out.push((ip, name.to_string()));
+        }
+
+        // Key-value pair format: Record Name . . . . . : example.com
+        if let Some((key, val)) = trimmed.split_once(':') {
+            let key_norm = key.trim().to_lowercase();
+            let val_str = val.trim();
+
+            if key_norm.starts_with("record name") {
+                if !val_str.is_empty() {
+                    current_name = Some(normalize_hostname(val_str));
+                } else {
+                    current_name = None;
+                }
+            } else if key_norm.contains("record") || key_norm.contains("address") || key_norm.contains("data") {
+                if let Ok(ip) = val_str.parse::<IpAddr>() {
+                    if let Some(ref name) = current_name {
+                        if !name.is_empty() {
+                            set.insert((ip, name.clone()));
+                        }
+                    }
+                }
+            }
         }
     }
-    out
+
+    // Sort deterministically by (name, ip) for reproducible behavior
+    let mut list: Vec<(IpAddr, String)> = set.into_iter().map(|(ip, name)| (ip, name)).collect();
+    list.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
+    list
+}
+
+/// Legacy alias preserved for backwards compatibility in unit tests.
+#[allow(dead_code)]
+fn parse_resolver_lines(text: &str) -> Vec<(IpAddr, String)> {
+    parse_displaydns_output(text)
 }
 
 #[cfg(test)]
@@ -237,5 +339,45 @@ bad.example\tnot-an-ip\n";
         assert!(names
             .iter()
             .any(|h| h.name == "a.example" && h.source == NameSource::OsResolver));
+    }
+
+    #[test]
+    fn test_normalize_hostname() {
+        assert_eq!(normalize_hostname(" EXAMPLE.COM. "), "example.com");
+        assert_eq!(normalize_hostname("nas.local."), "nas.local");
+        assert_eq!(normalize_hostname("  foo.bar  "), "foo.bar");
+    }
+
+    #[test]
+    fn test_parse_displaydns_output_key_value_blocks() {
+        let text = "\
+    Record Name . . . . . : Example.COM.\n\
+    Record Type . . . . . : 1\n\
+    Time To Live  . . . . : 280\n\
+    Data Length . . . . . : 4\n\
+    Section . . . . . . . : Answer\n\
+    A (Host) Record . . . : 93.184.216.34\n\
+    \n\
+    Record Name . . . . . : ipv6.example.com\n\
+    Record Type . . . . . : 28\n\
+    AAAA Record . . . . . : 2606:4700:4700::1111\n\
+";
+        let got = parse_displaydns_output(text);
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0], (IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)), "example.com".to_string()));
+        assert_eq!(got[1], ("2606:4700:4700::1111".parse().unwrap(), "ipv6.example.com".to_string()));
+    }
+
+    #[test]
+    fn test_deduplication_and_deterministic_sorting() {
+        let text = "\
+b.example.com\t10.0.0.2\n\
+a.example.com\t10.0.0.1\n\
+b.example.com\t10.0.0.2\n\
+";
+        let got = parse_displaydns_output(text);
+        assert_eq!(got.len(), 2);
+        assert_eq!(got[0], (IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), "a.example.com".to_string()));
+        assert_eq!(got[1], (IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)), "b.example.com".to_string()));
     }
 }

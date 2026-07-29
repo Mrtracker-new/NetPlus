@@ -990,6 +990,7 @@ dependencies = [
  "netstat2",
  "pcap",
  "sysinfo",
+ "tracing",
 ]
 
 [[package]]

@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

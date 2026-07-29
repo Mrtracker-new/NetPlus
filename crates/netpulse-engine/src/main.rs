@@ -11,15 +11,50 @@
 //! the flows and sessions recovered — the same code path integration tests use.
 #![forbid(unsafe_code)]
 
+use netpulse_core::telemetry::{init_telemetry, read_env_config};
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
-    println!(
-        "NetPulse engine v{} — Phase 1 capture-core. \
-         Query/Stream API v{}. Offline pipeline: capture → decode → flow → storage.",
-        env!("CARGO_PKG_VERSION"),
-        netpulse_api::API_VERSION,
+    let config = read_env_config("netpulse-engine", env!("CARGO_PKG_VERSION"));
+    let _telemetry_handle = match init_telemetry(config) {
+        Ok(handle) => handle,
+        Err(e) => {
+            eprintln!("Warning: Failed to initialize telemetry: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let root_span = tracing::info_span!(
+        "engine_root",
+        service = "netpulse-engine",
+        version = env!("CARGO_PKG_VERSION"),
+        pid = std::process::id()
     );
+    let _entered = root_span.enter();
+
+    tracing::info!(
+        event = "engine.start",
+        version = env!("CARGO_PKG_VERSION"),
+        api_version = netpulse_api::API_VERSION,
+        "NetPulse engine started — Phase 1 capture-core"
+    );
+
+    let health_config = netpulse_core::health::read_env_health_config();
+    let health_stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if health_config.enabled {
+        let tracker = std::sync::Arc::new(netpulse_core::health::AtomicHealthTracker::default());
+        let provider = std::sync::Arc::new(netpulse_core::health::CompositeHealthProvider::new(
+            "netpulse-engine",
+            env!("CARGO_PKG_VERSION"),
+            tracker,
+        ));
+        let _health_thread = netpulse_core::health::spawn_health_server(
+            health_config,
+            provider,
+            health_stop.clone(),
+        )
+        .ok();
+    }
 
     // Privacy-preserving storage default is asserted at startup (docs/08 §4).
     debug_assert_eq!(
@@ -29,27 +64,34 @@ fn main() -> ExitCode {
 
     let mut args = std::env::args().skip(1);
     let Some(path) = args.next() else {
-        println!("usage: netpulse-engine <capture.pcap>   (analyzes a pcap offline)");
+        tracing::info!("usage: netpulse-engine <capture.pcap>   (analyzes a pcap offline)");
         return ExitCode::SUCCESS;
     };
 
     let bytes = match std::fs::read(&path) {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("error: cannot read {path}: {e}");
+            tracing::error!(
+                event = "engine.read_failed",
+                path = %path,
+                error = %e,
+                "Failed to read pcap file"
+            );
             return ExitCode::FAILURE;
         }
     };
 
     match netpulse_engine::analyze_pcap(&bytes, 16) {
         Ok((store, report)) => {
-            println!(
-                "Analyzed {path}: {} frames, {} decoded, {} flows, {} sessions, {} causal links.",
-                report.frames_read,
-                report.packets_decoded,
-                report.flows,
-                report.sessions,
-                report.causal_links,
+            tracing::info!(
+                event = "pipeline.analysis_completed",
+                path = %path,
+                frames_read = report.frames_read,
+                packets_decoded = report.packets_decoded,
+                flows_created = report.flows,
+                sessions_created = report.sessions,
+                causal_links = report.causal_links,
+                "Analyzed pcap successfully"
             );
             // The pipeline stores metadata only; payloads are never written
             // under the default policy (docs/08 §4).
@@ -57,7 +99,12 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(e) => {
-            eprintln!("error analyzing {path}: {e}");
+            tracing::error!(
+                event = "pipeline.analysis_failed",
+                path = %path,
+                error = %e,
+                "Failed to analyze pcap file"
+            );
             ExitCode::FAILURE
         }
     }

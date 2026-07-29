@@ -16,8 +16,10 @@ path = "src/main.rs"
 # holds capture capability and nothing else; its deps are reviewed on every
 # change to keep the trusted computing base small (docs/02 §5.1, docs/04 §3.12).
 [dependencies]
+netpulse-core = { path = "../netpulse-core" }
 netpulse-capture = { path = "../netpulse-capture" }
 netpulse-platform = { path = "../netpulse-platform" }
+tracing = { workspace = true }
 
 [lints]
 workspace = true

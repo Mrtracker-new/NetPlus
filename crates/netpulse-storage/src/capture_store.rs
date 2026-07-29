@@ -68,6 +68,7 @@ impl CaptureStore {
     }
 
     /// Persist a finalized flow and its protocol events (docs/06 §8 → docs/08).
+    #[tracing::instrument(level = "debug", skip(self, flow, events), fields(flow_id = flow.id, events_count = events.len()))]
     pub fn insert_flow(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
         if !events.is_empty() {
             self.events_by_flow
@@ -79,6 +80,7 @@ impl CaptureStore {
     }
 
     /// Persist a reconstructed session (docs/06 §6 → docs/08).
+    #[tracing::instrument(level = "debug", skip(self, session), fields(session_id = session.id))]
     pub fn insert_session(&mut self, session: Session) {
         self.sessions.insert(session.id, session);
     }

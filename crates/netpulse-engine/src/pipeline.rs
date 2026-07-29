@@ -49,6 +49,7 @@ pub struct OfflineReport {
 /// `shards` sets the flow engine's shard count (docs/06 §7). The store's payload
 /// policy governs whether any payload bytes could be written (they are not, in
 /// this metadata pipeline — docs/08 §4).
+#[tracing::instrument(level = "info", skip(pcap_bytes), fields(bytes_processed = pcap_bytes.len()))]
 pub fn run_offline(
     pcap_bytes: &[u8],
     shards: u16,
@@ -81,6 +82,12 @@ fn run_feed<S: FrameFeed>(
     shards: u16,
     store: &mut CaptureStore,
 ) -> netpulse_core::Result<OfflineReport> {
+    let start_time = std::time::Instant::now();
+    tracing::debug!(
+        event = "pipeline.analysis_started",
+        "Pipeline feed execution started"
+    );
+
     let link = capture.link_type();
     let mut engine = FlowEngine::new(shards);
 
@@ -130,6 +137,18 @@ fn run_feed<S: FrameFeed>(
     for (ip, names) in resolutions {
         store.set_resolution(ip, names);
     }
+
+    let analysis_ms = start_time.elapsed().as_millis() as u64;
+    tracing::debug!(
+        event = "pipeline.analysis_completed",
+        analysis_ms = analysis_ms,
+        frames_read = frames_read,
+        packets_decoded = packets_decoded,
+        flows_created = flow_count,
+        sessions_created = session_count,
+        causal_links = causal_links,
+        "Pipeline feed execution completed"
+    );
 
     Ok(OfflineReport {
         frames_read,
@@ -218,6 +237,7 @@ impl FrameFeed for SliceFeed<'_> {
 /// the identical offline pipeline over an in-memory [`SliceFeed`], so what a user
 /// sees live is exactly what file import / replay would produce (docs/21 §4).
 /// `dlt` is the interface's libpcap link type (see [`link_type_from_dlt`]).
+#[tracing::instrument(level = "debug", skip(frames), fields(frames_count = frames.len()))]
 pub fn analyze_frames(
     dlt: u32,
     frames: &[RawFrame],

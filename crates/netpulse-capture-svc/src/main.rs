@@ -13,14 +13,39 @@
 //! **Status: foundation stub.** Real capture lands in Phase 1, docs/05.
 #![forbid(unsafe_code)]
 
+use netpulse_core::telemetry::{init_telemetry, read_env_config};
+
 fn main() {
-    println!(
-        "NetPulse capture service v{} — foundation scaffold. \
-         Privileged, observe-only. Backends: Phase 1 (see docs/05).",
-        env!("CARGO_PKG_VERSION"),
+    let config = read_env_config("netpulse-capture-svc", env!("CARGO_PKG_VERSION"));
+    let _handle = match init_telemetry(config) {
+        Ok(h) => h,
+        Err(e) => {
+            eprintln!("Failed to initialize telemetry in netpulse-capture-svc: {e}");
+            return;
+        }
+    };
+
+    let root_span = tracing::info_span!(
+        "capture_svc_root",
+        service = "netpulse-capture-svc",
+        version = env!("CARGO_PKG_VERSION"),
+        pid = std::process::id()
     );
+    let _entered = root_span.enter();
+
+    tracing::info!(
+        event = "capture.started",
+        version = env!("CARGO_PKG_VERSION"),
+        "NetPulse capture service started — Privileged, observe-only"
+    );
+
     // Foundation stub: enumerating interfaces is unimplemented until Phase 1.
     // Referencing the type keeps the platform dependency exercised.
     let _list_fn = netpulse_platform::list_interfaces;
     let _shed = netpulse_capture::ShedStage::None;
+
+    tracing::info!(
+        event = "capture.stopped",
+        "NetPulse capture service finished execution"
+    );
 }

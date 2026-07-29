@@ -15,8 +15,10 @@
 
 pub mod disclosure;
 pub mod error;
+pub mod health;
 pub mod model;
 pub mod net;
+pub mod telemetry;
 pub mod time;
 pub mod traits;
 

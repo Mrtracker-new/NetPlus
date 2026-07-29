@@ -25,6 +25,18 @@ cargo tauri dev                          # from src-tauri/
   `netpulse-platform` (Phase 1). Attribution answers `Unknown` until a live
   `SocketTableSource` is wired (`docs/12` §4).
 
+## Npcap SDK Path Configuration (Windows Live Capture)
+
+When compiling on Windows with Npcap live capture support, the build script dynamically resolves the Npcap SDK linker search path in the following order:
+
+1. `NPCAP_SDK_PATH` environment variable (e.g., `NPCAP_SDK_PATH=C:\npcap-sdk`)
+2. `LIB` environment variable
+3. `VCPKG_ROOT` directory (`%VCPKG_ROOT%\installed\x64-windows\lib`)
+4. `%ProgramFiles%\Npcap SDK\Lib\x64`
+5. `C:\npcap-sdk\Lib\x64`
+
+No hardcoded machine paths are committed in `.cargo/config.toml`.
+
 ## Note on assets
 
 `icons/icon.png` and a real code-signing/bundle config are added when packaging

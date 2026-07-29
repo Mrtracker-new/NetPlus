@@ -1972,7 +1972,9 @@ dependencies = [
 name = "netpulse-core"
 version = "0.1.0"
 dependencies = [
+ "httparse",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "time",
  "tracing",
@@ -2049,6 +2051,7 @@ dependencies = [
  "netstat2",
  "pcap",
  "sysinfo",
+ "tracing",
 ]
 
 [[package]]

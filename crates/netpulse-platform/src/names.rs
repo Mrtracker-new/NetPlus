@@ -254,7 +254,10 @@ pub fn parse_displaydns_output(text: &str) -> Vec<(IpAddr, String)> {
                 } else {
                     current_name = None;
                 }
-            } else if key_norm.contains("record") || key_norm.contains("address") || key_norm.contains("data") {
+            } else if key_norm.contains("record")
+                || key_norm.contains("address")
+                || key_norm.contains("data")
+            {
                 if let Ok(ip) = val_str.parse::<IpAddr>() {
                     if let Some(ref name) = current_name {
                         if !name.is_empty() {
@@ -267,7 +270,7 @@ pub fn parse_displaydns_output(text: &str) -> Vec<(IpAddr, String)> {
     }
 
     // Sort deterministically by (name, ip) for reproducible behavior
-    let mut list: Vec<(IpAddr, String)> = set.into_iter().map(|(ip, name)| (ip, name)).collect();
+    let mut list: Vec<(IpAddr, String)> = set.into_iter().collect();
     list.sort_by(|a, b| a.1.cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
     list
 }
@@ -364,8 +367,20 @@ bad.example\tnot-an-ip\n";
 ";
         let got = parse_displaydns_output(text);
         assert_eq!(got.len(), 2);
-        assert_eq!(got[0], (IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)), "example.com".to_string()));
-        assert_eq!(got[1], ("2606:4700:4700::1111".parse().unwrap(), "ipv6.example.com".to_string()));
+        assert_eq!(
+            got[0],
+            (
+                IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)),
+                "example.com".to_string()
+            )
+        );
+        assert_eq!(
+            got[1],
+            (
+                "2606:4700:4700::1111".parse().unwrap(),
+                "ipv6.example.com".to_string()
+            )
+        );
     }
 
     #[test]
@@ -377,7 +392,19 @@ b.example.com\t10.0.0.2\n\
 ";
         let got = parse_displaydns_output(text);
         assert_eq!(got.len(), 2);
-        assert_eq!(got[0], (IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)), "a.example.com".to_string()));
-        assert_eq!(got[1], (IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)), "b.example.com".to_string()));
+        assert_eq!(
+            got[0],
+            (
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                "a.example.com".to_string()
+            )
+        );
+        assert_eq!(
+            got[1],
+            (
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+                "b.example.com".to_string()
+            )
+        );
     }
 }

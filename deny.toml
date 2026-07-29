@@ -13,7 +13,9 @@ vulnerability = "deny"
 unmaintained = "warn"
 yanked = "deny"
 notice = "warn"
-ignore = []
+# paste v1.0.15 unmaintained — transitive dep via netstat2 → netlink-packet-utils (Linux only).
+# No upstream replacement available; netstat2 has not migrated off paste.
+ignore = ["RUSTSEC-2024-0436"]
 
 [licenses]
 unlicensed = "deny"

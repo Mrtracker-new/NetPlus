@@ -9,17 +9,14 @@ targets = [
 ]
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "workspace"
 yanked = "deny"
-notice = "warn"
+unmaintained = "workspace"
 # paste v1.0.15 unmaintained — transitive dep via netstat2 -> netlink-packet-utils (Linux only).
 # No upstream replacement available; netstat2 has not migrated off paste.
 ignore = ["RUSTSEC-2024-0436"]
 
 [licenses]
-unlicensed = "deny"
-copyleft = "warn"
+confidence-threshold = 0.8
 allow = [
     "MIT",
     "Apache-2.0",

@@ -41,6 +41,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"]
 tracing-appender = "0.2"
 time = { version = "0.3", features = ["formatting", "macros"] }
 httparse = "1.8"
+sentry = "0.34"
+sentry-tracing = "0.34"
 
 # Workspace-wide lints. Memory safety on hostile input is the defining
 # requirement of this codebase (docs/03 §3), so unsafe is denied by default.

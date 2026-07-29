@@ -13,6 +13,7 @@ concurrency:
 permissions:
   contents: read
   security-events: write
+  id-token: write
 
 jobs:
   analysis:
@@ -27,6 +28,7 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           publish_results: false
 
       - name: Upload SARIF Results

@@ -26,14 +26,14 @@ pub mod dto;
 
 pub use dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
-    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
-    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, ComponentCheckDto, DiagnosisDto,
+    DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
-    GroundedExerciseDto, HostNameDto, InterfaceDto, JourneyStageDto, LessonOfferDto,
-    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
-    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
-    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
-    StageKindDto, VersionPinsDto, VisualEventDto,
+    GroundedExerciseDto, HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto,
+    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
+    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
+    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
+    SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
@@ -126,6 +126,8 @@ pub enum Query {
     ListPlugins,
     /// List the capture-capable network interfaces to choose from (docs/05).
     Interfaces,
+    /// Fetch health, readiness, and liveness status of the backend.
+    HealthCheck,
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -197,6 +199,10 @@ pub enum QueryResponse {
     /// The capture-capable interfaces to choose from (docs/05).
     Interfaces {
         interfaces: Vec<InterfaceDto>,
+    },
+    /// Backend health and liveness status.
+    Health {
+        status: HealthStatusDto,
     },
 }
 

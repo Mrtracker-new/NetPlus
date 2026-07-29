@@ -24,6 +24,8 @@ netpulse-storage = { path = "../crates/netpulse-storage" }
 netpulse-capture = { path = "../crates/netpulse-capture" }
 netpulse-plugin = { path = "../crates/netpulse-plugin" }
 netpulse-platform = { path = "../crates/netpulse-platform" }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
 
 # Live capture is a Windows/Npcap capability today (docs/05); enable the platform
 # backend only there so the shell still builds on other targets (the feature

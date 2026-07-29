@@ -390,6 +390,7 @@ fn empty_replay_state() -> ReplayState {
 
 /// The single pull entry point (docs/02 §7.1). Every historical/aggregated read
 /// the UI performs comes through here and is answered from the committed store.
+#[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
 fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
     let store = state.store.lock().map_err(|_| "state poisoned")?;
@@ -579,12 +580,36 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
                 .unwrap_or_default();
             Ok(QueryResponse::Interfaces { interfaces })
         }
+        Query::HealthCheck => {
+            let capture_running = state.capture.lock().map_err(|_| "state poisoned")?.is_some();
+            let flow_count = store.flow_count();
+            let session_count = store.session_count();
+            let check = netpulse_api::ComponentCheckDto {
+                component: "storage".into(),
+                status: "healthy".into(),
+                message: None,
+            };
+            let status = netpulse_api::HealthStatusDto {
+                schema_version: 1,
+                status: "healthy".into(),
+                uptime_secs: 0,
+                capture_running,
+                active_flows: flow_count,
+                active_sessions: session_count,
+                store_records: (flow_count + session_count) as u64,
+                checks: vec![check],
+                version: "0.1.0".into(),
+                api_version: netpulse_api::API_VERSION,
+            };
+            Ok(QueryResponse::Health { status })
+        }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
 }
 
 /// The single control entry point (docs/02 §7.1) — the only write path UI→engine.
 /// Observe-only: nothing here touches network traffic.
+#[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
 fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), String> {
     match command {
@@ -652,6 +677,36 @@ fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), St
 }
 
 fn main() {
+    let config = netpulse_core::telemetry::read_env_config("netpulse-shell", "0.1.0");
+    let _telemetry_handle = netpulse_core::telemetry::init_telemetry(config).ok();
+
+    let root_span = tracing::info_span!(
+        "shell_root",
+        service = "netpulse-shell",
+        version = "0.1.0",
+        pid = std::process::id()
+    );
+    let _entered = root_span.enter();
+
+    tracing::info!(event = "engine.start", "NetPulse desktop shell starting");
+
+    let health_config = netpulse_core::health::read_env_health_config();
+    let health_stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if health_config.enabled {
+        let tracker = std::sync::Arc::new(netpulse_core::health::AtomicHealthTracker::default());
+        let provider = std::sync::Arc::new(netpulse_core::health::CompositeHealthProvider::new(
+            "netpulse-shell",
+            "0.1.0",
+            tracker,
+        ));
+        let _health_thread = netpulse_core::health::spawn_health_server(
+            health_config,
+            provider,
+            health_stop.clone(),
+        )
+        .ok();
+    }
+
     tauri::Builder::default()
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![query, command])

@@ -580,6 +580,29 @@ pub struct PluginDescriptorDto {
     pub disabled_reason: Option<String>,
 }
 
+/// Individual component check item for health DTO reporting.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ComponentCheckDto {
+    pub component: String,
+    pub status: String,
+    pub message: Option<String>,
+}
+
+/// Comprehensive health and liveness status DTO.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HealthStatusDto {
+    pub schema_version: u32,
+    pub status: String,
+    pub uptime_secs: u64,
+    pub capture_running: bool,
+    pub active_flows: usize,
+    pub active_sessions: usize,
+    pub store_records: u64,
+    pub checks: Vec<ComponentCheckDto>,
+    pub version: String,
+    pub api_version: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

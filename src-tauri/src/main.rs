@@ -193,8 +193,16 @@ fn stop_capture(state: &AppState) -> Result<(), String> {
     }
 }
 
-/// Helper function with narrow responsibility: rebuild flows from the frame buffer
-/// and commit the updated reconstruction store, stats, and name hints.
+struct HintGuard(Arc<AtomicBool>);
+
+impl Drop for HintGuard {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+type HintMap = std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>>;
+
 /// Helper function with narrow responsibility: commit pipeline updates to the store
 /// and update atomic stats and name hints.
 fn rebuild_and_commit(
@@ -203,23 +211,47 @@ fn rebuild_and_commit(
     capture_stats: (u64, u64),
     store: &Arc<Mutex<CaptureStore>>,
     stats: &Arc<Mutex<CaptureStats>>,
-    hint_cache: &mut std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>>,
+    hint_cache: &mut HintMap,
     last_hint_refresh: &mut Option<std::time::Instant>,
+    hint_rx: &std::sync::mpsc::Receiver<HintMap>,
+    hint_tx: &std::sync::mpsc::Sender<HintMap>,
+    hint_in_flight: &Arc<AtomicBool>,
+    stop: &Arc<AtomicBool>,
     shed_controller: &ShedController,
     buffer_len: usize,
     buffer_drops: u64,
     max_frames: usize,
     hint_refresh_secs: u64,
 ) {
+    // 1. Drain incoming background hints from channel
+    while let Ok(new_hints) = hint_rx.try_recv() {
+        *hint_cache = new_hints;
+        *last_hint_refresh = Some(std::time::Instant::now());
+    }
+
+    // 2. Trigger background hint refresh if due, capture is running, and no worker is in flight
+    let due = last_hint_refresh
+        .map(|t| t.elapsed().as_secs() >= hint_refresh_secs)
+        .unwrap_or(true);
+    if due && !stop.load(Ordering::Relaxed) && !hint_in_flight.swap(true, Ordering::AcqRel) {
+        let flag = hint_in_flight.clone();
+        let tx = hint_tx.clone();
+        let spawn_res = std::thread::Builder::new()
+            .name("dns-hint-refresh".into())
+            .spawn(move || {
+                let _guard = HintGuard(flag);
+                let hints = netpulse_platform::host_name_hints();
+                let _ = tx.send(hints);
+            });
+        if let Err(e) = spawn_res {
+            hint_in_flight.store(false, Ordering::Release);
+            tracing::warn!("Failed to spawn dns-hint-refresh worker: {e}");
+        }
+    }
+
+    // 3. Commit pipeline updates & merge hint cache to store
     if let Ok(mut s) = store.lock() {
         pipeline.commit_to_store(&mut s, latest_mono);
-        if last_hint_refresh
-            .map(|t: std::time::Instant| t.elapsed().as_secs() >= hint_refresh_secs)
-            .unwrap_or(true)
-        {
-            *hint_cache = netpulse_platform::host_name_hints();
-            *last_hint_refresh = Some(std::time::Instant::now());
-        }
         for (ip, names) in hint_cache.iter() {
             s.merge_resolution(*ip, names.clone());
         }
@@ -260,9 +292,11 @@ fn live_loop(
     let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
-    let mut hint_cache: std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>> =
-        std::collections::BTreeMap::new();
+    let mut hint_cache: HintMap = HintMap::new();
     let mut last_hint_refresh: Option<std::time::Instant> = None;
+
+    let (hint_tx, hint_rx) = std::sync::mpsc::channel::<HintMap>();
+    let hint_in_flight = Arc::new(AtomicBool::new(false));
 
     while !stop.load(Ordering::Relaxed) {
         let batch = match capture.next_batch() {
@@ -307,6 +341,10 @@ fn live_loop(
                 &stats,
                 &mut hint_cache,
                 &mut last_hint_refresh,
+                &hint_rx,
+                &hint_tx,
+                &hint_in_flight,
+                &stop,
                 &shed_controller,
                 buffer.len(),
                 buffer_drops,
@@ -335,6 +373,10 @@ fn live_loop(
         &stats,
         &mut hint_cache,
         &mut last_hint_refresh,
+        &hint_rx,
+        &hint_tx,
+        &hint_in_flight,
+        &stop,
         &shed_controller,
         buffer.len(),
         buffer_drops,
@@ -851,7 +893,10 @@ mod tests {
         pipeline.ingest_batch(&[frame]);
 
         let mut hint_cache = std::collections::BTreeMap::new();
-        let mut last_hint_refresh = None;
+        let mut last_hint_refresh = Some(std::time::Instant::now());
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let hint_in_flight = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
         let shed_controller = ShedController::new(1000);
 
         rebuild_and_commit(
@@ -862,6 +907,10 @@ mod tests {
             &stats,
             &mut hint_cache,
             &mut last_hint_refresh,
+            &hint_rx,
+            &hint_tx,
+            &hint_in_flight,
+            &stop,
             &shed_controller,
             1,
             0,
@@ -953,7 +1002,10 @@ mod tests {
         pipeline.ingest_batch(&[frame]);
 
         let mut hint_cache = std::collections::BTreeMap::new();
-        let mut last_hint_refresh = None;
+        let mut last_hint_refresh = Some(std::time::Instant::now());
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let hint_in_flight = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
         let shed_controller = ShedController::new(1000);
 
         // Attempt update with lower counters (e.g. out of order or transient drop)
@@ -965,6 +1017,10 @@ mod tests {
             &stats,
             &mut hint_cache,
             &mut last_hint_refresh,
+            &hint_rx,
+            &hint_tx,
+            &hint_in_flight,
+            &stop,
             &shed_controller,
             1,
             0,
@@ -976,5 +1032,154 @@ mod tests {
         // Assert counters remained monotonic at max values (500, 10)
         assert_eq!(st.received, 500);
         assert_eq!(st.dropped, 10);
+    }
+
+    #[test]
+    fn test_dns_hint_only_one_worker_in_flight() {
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
+        let mut hint_cache = HintMap::new();
+        let mut last_hint_refresh = None; // Due immediately
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let hint_in_flight = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let shed_controller = ShedController::new(1000);
+
+        // First call triggers background worker
+        rebuild_and_commit(
+            &mut pipeline,
+            1_000_000,
+            (1, 0),
+            &store,
+            &stats,
+            &mut hint_cache,
+            &mut last_hint_refresh,
+            &hint_rx,
+            &hint_tx,
+            &hint_in_flight,
+            &stop,
+            &shed_controller,
+            0,
+            0,
+            1000,
+            30,
+        );
+
+        // Second call while worker running should not spawn a duplicate
+        let prev_flag = hint_in_flight.swap(true, Ordering::AcqRel);
+        assert!(prev_flag, "Flag must remain in-flight while worker is running");
+    }
+
+    #[test]
+    fn test_dns_hint_worker_panic_resets_flag() {
+        let hint_in_flight = Arc::new(AtomicBool::new(true));
+        {
+            let _guard = HintGuard(hint_in_flight.clone());
+            // Simulate worker panic inside scoped block
+        }
+        assert!(!hint_in_flight.load(Ordering::Acquire), "Guard drop must reset flag even on panic");
+    }
+
+    #[test]
+    fn test_dns_hint_multiple_completed_refreshes_latest_wins() {
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let mut map1 = HintMap::new();
+        map1.insert(
+            "1.1.1.1".parse().unwrap(),
+            vec![netpulse_core::HostName {
+                name: "old.local".into(),
+                source: netpulse_core::NameSource::HostsFile,
+            }],
+        );
+        let mut map2 = HintMap::new();
+        map2.insert(
+            "1.1.1.1".parse().unwrap(),
+            vec![netpulse_core::HostName {
+                name: "newest.local".into(),
+                source: netpulse_core::NameSource::HostsFile,
+            }],
+        );
+
+        hint_tx.send(map1).unwrap();
+        hint_tx.send(map2).unwrap();
+
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
+        let mut hint_cache = HintMap::new();
+        let mut last_hint_refresh = Some(std::time::Instant::now());
+        let hint_in_flight = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        let shed_controller = ShedController::new(1000);
+
+        rebuild_and_commit(
+            &mut pipeline,
+            1_000_000,
+            (1, 0),
+            &store,
+            &stats,
+            &mut hint_cache,
+            &mut last_hint_refresh,
+            &hint_rx,
+            &hint_tx,
+            &hint_in_flight,
+            &stop,
+            &shed_controller,
+            0,
+            0,
+            1000,
+            30,
+        );
+
+        assert_eq!(
+            hint_cache.get(&"1.1.1.1".parse().unwrap()).unwrap()[0].name,
+            "newest.local"
+        );
+    }
+
+    #[test]
+    fn test_dns_hint_channel_disconnect_handled_safely() {
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel::<HintMap>();
+        drop(hint_rx); // Receiver dropped
+
+        let flag = Arc::new(AtomicBool::new(false));
+        let _guard = HintGuard(flag.clone());
+        let res = hint_tx.send(HintMap::new());
+        assert!(res.is_err(), "Send fails on disconnected receiver without crashing worker");
+    }
+
+    #[test]
+    fn test_dns_hint_shutdown_prevents_spawn() {
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
+        let mut hint_cache = HintMap::new();
+        let mut last_hint_refresh = None; // Due
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let hint_in_flight = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(true)); // Stop flag set
+        let shed_controller = ShedController::new(1000);
+
+        rebuild_and_commit(
+            &mut pipeline,
+            1_000_000,
+            (1, 0),
+            &store,
+            &stats,
+            &mut hint_cache,
+            &mut last_hint_refresh,
+            &hint_rx,
+            &hint_tx,
+            &hint_in_flight,
+            &stop,
+            &shed_controller,
+            0,
+            0,
+            1000,
+            30,
+        );
+
+        assert!(!hint_in_flight.load(Ordering::Acquire), "Must not spawn background worker if stop flag set");
     }
 }

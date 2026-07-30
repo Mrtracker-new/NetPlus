@@ -25,8 +25,9 @@ pub fn typescript_contract() -> String {
     let mut s = String::new();
     s.push_str(HEADER);
     s.push_str(&format!(
-        "\nexport const API_VERSION = {} as const;\n",
-        crate::API_VERSION
+        "\nexport const API_VERSION = {} as const;\nexport const MIN_SUPPORTED_API_VERSION = {} as const;\n",
+        crate::API_VERSION,
+        crate::MIN_SUPPORTED_API_VERSION
     ));
 
     // --- Enums (string unions, matching the serde reprs in dto.rs) ---
@@ -382,6 +383,19 @@ pub fn typescript_contract() -> String {
             ("disabled_reason", "string | null"),
         ],
     ));
+    s.push_str(&iface(
+        "HandshakeResponse",
+        &[
+            ("compatible", "boolean"),
+            ("negotiated_version", "number | null"),
+            ("host_version", "number"),
+            ("min_supported_version", "number"),
+            ("warning_code", "string | null"),
+            ("warning", "string | null"),
+            ("error_code", "string | null"),
+            ("error", "string | null"),
+        ],
+    ));
 
     s
 }
@@ -464,6 +478,7 @@ mod tests {
             "ReplayState",
             "ExportPreview",
             "PluginDescriptor",
+            "HandshakeResponse",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

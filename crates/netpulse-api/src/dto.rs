@@ -588,6 +588,33 @@ pub struct ComponentCheckDto {
     pub message: Option<String>,
 }
 
+/// Machine-readable warning codes for API version negotiation.
+pub mod handshake_codes {
+    pub const DEPRECATED_API_VERSION: &str = "DEPRECATED_API_VERSION";
+}
+
+/// Machine-readable error codes for API version negotiation failures.
+pub mod handshake_error_codes {
+    pub const UNSUPPORTED_CLIENT_VERSION_TOO_OLD: &str = "UNSUPPORTED_CLIENT_VERSION_TOO_OLD";
+    pub const UNSUPPORTED_CLIENT_VERSION_TOO_NEW: &str = "UNSUPPORTED_CLIENT_VERSION_TOO_NEW";
+    pub const INVALID_VERSION_RANGE: &str = "INVALID_VERSION_RANGE";
+}
+
+/// API handshake result DTO returned directly by version negotiation (docs/02 §7.2).
+/// The client MUST execute a handshake query upon connection before issuing other queries.
+/// The `negotiated_version` is authoritative for all subsequent communication.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HandshakeResponseDto {
+    pub compatible: bool,
+    pub negotiated_version: Option<u32>,
+    pub host_version: u32,
+    pub min_supported_version: u32,
+    pub warning_code: Option<String>,
+    pub warning: Option<String>,
+    pub error_code: Option<String>,
+    pub error: Option<String>,
+}
+
 /// Comprehensive health and liveness status DTO.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HealthStatusDto {

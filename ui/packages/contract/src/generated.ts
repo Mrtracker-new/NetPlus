@@ -3,6 +3,7 @@
 // A CI drift check fails the build if this file is out of sync (docs/04 §7).
 
 export const API_VERSION = 6 as const;
+export const MIN_SUPPORTED_API_VERSION = 5 as const;
 
 export type ProjectionDepth = "beginner" | "intermediate" | "expert";
 
@@ -242,4 +243,15 @@ export interface PluginDescriptor {
   compatible: boolean;
   enabled: boolean;
   disabled_reason: string | null;
+}
+
+export interface HandshakeResponse {
+  compatible: boolean;
+  negotiated_version: number | null;
+  host_version: number;
+  min_supported_version: number;
+  warning_code: string | null;
+  warning: string | null;
+  error_code: string | null;
+  error: string | null;
 }

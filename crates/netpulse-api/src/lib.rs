@@ -25,15 +25,16 @@ pub mod codegen;
 pub mod dto;
 
 pub use dto::{
-    AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
-    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, ComponentCheckDto, DiagnosisDto,
-    DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
-    ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
-    GroundedExerciseDto, HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto,
-    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
-    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
-    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
-    SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    handshake_codes, handshake_error_codes, AnimationKindDto, AnimationModelDto,
+    AssistantAnswerDto, AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto,
+    CauseDto, ComponentCheckDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
+    ExerciseKindDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto, ExportSelectionDto,
+    FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto, HandshakeResponseDto,
+    HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto, LessonOfferDto,
+    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
+    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
+    StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
@@ -41,6 +42,93 @@ pub use dto::{
 /// hostname enrichment on host breakdown rows (`HostNameDto`/`NameSourceDto`,
 /// docs/08 §5), on top of v5's interface picker and Phase 5's lifecycle DTOs.
 pub const API_VERSION: u32 = 6;
+
+/// Minimum API version supported by the host (v-1 backward compatibility, docs/02 §7.2).
+pub const MIN_SUPPORTED_API_VERSION: u32 = 5;
+
+/// Negotiate API version given a client version range.
+///
+/// Intersects client range `[client_min, client_max]` with host range
+/// `[MIN_SUPPORTED_API_VERSION, API_VERSION]`. Returns a [`HandshakeResponseDto`]
+/// with machine-readable warning/error codes.
+pub fn negotiate_api_version_range(client_min: u32, client_max: u32) -> HandshakeResponseDto {
+    if client_min > client_max {
+        return HandshakeResponseDto {
+            compatible: false,
+            negotiated_version: None,
+            host_version: API_VERSION,
+            min_supported_version: MIN_SUPPORTED_API_VERSION,
+            warning_code: None,
+            warning: None,
+            error_code: Some(handshake_error_codes::INVALID_VERSION_RANGE.into()),
+            error: Some(format!(
+                "Invalid client version range: min {client_min} > max {client_max}"
+            )),
+        };
+    }
+
+    let host_min = MIN_SUPPORTED_API_VERSION;
+    let host_max = API_VERSION;
+
+    let start = client_min.max(host_min);
+    let end = client_max.min(host_max);
+
+    if start <= end {
+        let negotiated = end;
+        let (warning_code, warning) = if negotiated < host_max {
+            (
+                Some(handshake_codes::DEPRECATED_API_VERSION.into()),
+                Some(format!(
+                    "Client requested version {negotiated}, host is on version {host_max}. Backward compatibility mode enabled."
+                )),
+            )
+        } else {
+            (None, None)
+        };
+
+        HandshakeResponseDto {
+            compatible: true,
+            negotiated_version: Some(negotiated),
+            host_version: host_max,
+            min_supported_version: host_min,
+            warning_code,
+            warning,
+            error_code: None,
+            error: None,
+        }
+    } else if client_max < host_min {
+        HandshakeResponseDto {
+            compatible: false,
+            negotiated_version: None,
+            host_version: host_max,
+            min_supported_version: host_min,
+            warning_code: None,
+            warning: None,
+            error_code: Some(handshake_error_codes::UNSUPPORTED_CLIENT_VERSION_TOO_OLD.into()),
+            error: Some(format!(
+                "Client API version {client_max} is older than host minimum supported version {host_min}."
+            )),
+        }
+    } else {
+        HandshakeResponseDto {
+            compatible: false,
+            negotiated_version: None,
+            host_version: host_max,
+            min_supported_version: host_min,
+            warning_code: None,
+            warning: None,
+            error_code: Some(handshake_error_codes::UNSUPPORTED_CLIENT_VERSION_TOO_NEW.into()),
+            error: Some(format!(
+                "Client API version {client_min} is newer than host supported version {host_max}."
+            )),
+        }
+    }
+}
+
+/// Convenience function for single client version negotiation.
+pub fn negotiate_api_version(client_version: u32) -> HandshakeResponseDto {
+    negotiate_api_version_range(client_version, client_version)
+}
 
 /// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
@@ -128,6 +216,11 @@ pub enum Query {
     Interfaces,
     /// Fetch health, readiness, and liveness status of the backend.
     HealthCheck,
+    /// Perform API version handshake negotiation before invoking other endpoints.
+    Handshake {
+        client_min_version: u32,
+        client_max_version: u32,
+    },
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -203,6 +296,10 @@ pub enum QueryResponse {
     /// Backend health and liveness status.
     Health {
         status: HealthStatusDto,
+    },
+    /// API version negotiation result (docs/02 §7.2).
+    Handshake {
+        handshake: HandshakeResponseDto,
     },
 }
 
@@ -362,5 +459,73 @@ mod tests {
         // Internally tagged on `kind` — the exact wire shape the TS contract reads.
         assert!(json.contains("\"kind\":\"journey\""));
         assert!(json.contains("\"sentences\""));
+    }
+
+    #[test]
+    fn handshake_exact_match_succeeds() {
+        let res = negotiate_api_version(6);
+        assert!(res.compatible);
+        assert_eq!(res.negotiated_version, Some(6));
+        assert_eq!(res.warning_code, None);
+        assert_eq!(res.error_code, None);
+    }
+
+    #[test]
+    fn handshake_v_minus_1_compatibility_warns_and_succeeds() {
+        let res = negotiate_api_version(5);
+        assert!(res.compatible);
+        assert_eq!(res.negotiated_version, Some(5));
+        assert_eq!(
+            res.warning_code,
+            Some(handshake_codes::DEPRECATED_API_VERSION.into())
+        );
+        assert_eq!(res.error_code, None);
+    }
+
+    #[test]
+    fn handshake_range_negotiation_picks_highest_mutual() {
+        let res = negotiate_api_version_range(4, 6);
+        assert!(res.compatible);
+        assert_eq!(res.negotiated_version, Some(6));
+
+        let res_v5 = negotiate_api_version_range(4, 5);
+        assert!(res_v5.compatible);
+        assert_eq!(res_v5.negotiated_version, Some(5));
+        assert_eq!(
+            res_v5.warning_code,
+            Some(handshake_codes::DEPRECATED_API_VERSION.into())
+        );
+    }
+
+    #[test]
+    fn handshake_too_old_client_fails_with_code() {
+        let res = negotiate_api_version(4);
+        assert!(!res.compatible);
+        assert_eq!(res.negotiated_version, None);
+        assert_eq!(
+            res.error_code,
+            Some(handshake_error_codes::UNSUPPORTED_CLIENT_VERSION_TOO_OLD.into())
+        );
+    }
+
+    #[test]
+    fn handshake_too_new_client_fails_with_code() {
+        let res = negotiate_api_version(7);
+        assert!(!res.compatible);
+        assert_eq!(res.negotiated_version, None);
+        assert_eq!(
+            res.error_code,
+            Some(handshake_error_codes::UNSUPPORTED_CLIENT_VERSION_TOO_NEW.into())
+        );
+    }
+
+    #[test]
+    fn handshake_invalid_range_fails_with_code() {
+        let res = negotiate_api_version_range(6, 4);
+        assert!(!res.compatible);
+        assert_eq!(
+            res.error_code,
+            Some(handshake_error_codes::INVALID_VERSION_RANGE.into())
+        );
     }
 }

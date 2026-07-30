@@ -556,11 +556,8 @@ fn empty_replay_state() -> ReplayState {
     }
 }
 
-/// The single pull entry point (docs/02 §7.1). Every historical/aggregated read
-/// the UI performs comes through here and is answered from the committed store.
-#[tracing::instrument(level = "debug", skip(state))]
-#[tauri::command]
-fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
+/// Internal query execution helper.
+fn handle_query(state: &AppState, query: Query) -> Result<QueryResponse, String> {
     let store = state.store.lock().map_err(|_| "state poisoned")?;
     let stats = *state.stats.lock().map_err(|_| "state poisoned")?;
     match query {
@@ -771,8 +768,26 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
             };
             Ok(QueryResponse::Health { status })
         }
+        Query::Handshake {
+            client_min_version,
+            client_max_version,
+        } => {
+            let handshake = netpulse_api::negotiate_api_version_range(
+                client_min_version,
+                client_max_version,
+            );
+            Ok(QueryResponse::Handshake { handshake })
+        }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
+}
+
+/// The single pull entry point (docs/02 §7.1). Every historical/aggregated read
+/// the UI performs comes through here and is answered from the committed store.
+#[tracing::instrument(level = "debug", skip(state))]
+#[tauri::command]
+fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
+    handle_query(&state, query)
 }
 
 /// The single control entry point (docs/02 §7.1) — the only write path UI→engine.
@@ -1197,5 +1212,28 @@ mod tests {
         );
 
         assert!(!hint_in_flight.load(Ordering::Acquire), "Must not spawn background worker if stop flag set");
+    }
+
+    #[test]
+    fn test_handshake_query_integration() {
+        let state = AppState::default();
+
+        let res = handle_query(
+            &state,
+            Query::Handshake {
+                client_min_version: 5,
+                client_max_version: 6,
+            },
+        )
+        .expect("handshake query should succeed");
+
+        if let QueryResponse::Handshake { handshake } = res {
+            assert!(handshake.compatible);
+            assert_eq!(handshake.negotiated_version, Some(6));
+            assert_eq!(handshake.host_version, 6);
+            assert_eq!(handshake.min_supported_version, 5);
+        } else {
+            panic!("Expected Handshake variant in response");
+        }
     }
 }

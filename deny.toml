@@ -38,6 +38,32 @@ wildcards = "allow"
 highlight = "all"
 skip = []
 skip-tree = []
+deny = [
+    # Single Egress Boundary Enforcement (docs/02 §10, docs/04 §7).
+    # Outbound network client crates are banned everywhere except netpulse-ai.
+
+    # HTTP clients
+    { name = "reqwest", wrappers = ["netpulse-ai"] },
+    { name = "hyper", wrappers = ["netpulse-ai"] },
+    { name = "ureq", wrappers = ["netpulse-ai"] },
+    { name = "attohttpc", wrappers = ["netpulse-ai"] },
+    { name = "isahc", wrappers = ["netpulse-ai"] },
+    { name = "surf", wrappers = ["netpulse-ai"] },
+
+    # WebSockets
+    { name = "tokio-tungstenite", wrappers = ["netpulse-ai"] },
+    { name = "tungstenite", wrappers = ["netpulse-ai"] },
+
+    # reqwest ecosystem
+    { name = "reqwest-middleware", wrappers = ["netpulse-ai"] },
+    { name = "reqwest-eventsource", wrappers = ["netpulse-ai"] },
+
+    # WASM networking
+    { name = "gloo-net", wrappers = ["netpulse-ai"] },
+
+    # async HTTP
+    { name = "async-h1", wrappers = ["netpulse-ai"] },
+]
 
 [sources]
 unknown-registry = "deny"

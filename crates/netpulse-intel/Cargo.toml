@@ -12,6 +12,8 @@ authors.workspace = true
 netpulse-core = { path = "../netpulse-core" }
 netpulse-flow = { path = "../netpulse-flow" }
 netpulse-storage = { path = "../netpulse-storage" }
+serde.workspace = true
+serde_json.workspace = true
 
 [lints]
 workspace = true

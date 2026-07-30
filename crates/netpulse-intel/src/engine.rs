@@ -20,23 +20,42 @@ use std::net::IpAddr;
 use netpulse_core::{Confidence, EvidenceRef};
 
 use crate::anomaly;
+use crate::app_profile::AppProfileStore;
+use crate::behavioral_chain::BehavioralChainEngine;
+use crate::explainable_ml;
 use crate::finding::{FindingKind, SecurityFinding, MAX_INFERRED_CONFIDENCE};
 use crate::rules;
+use crate::stix::StixThreatFeed;
 use crate::view::TrafficView;
 
 /// Assess a window of committed traffic and return the corroborated, ranked
 /// findings (docs/17 §6). Most-confident first; an empty result is the honest
 /// "nothing looks unusual" (docs/17, never a fabricated alarm).
 pub fn assess(view: &TrafficView) -> Vec<SecurityFinding> {
-    // 1. Gather from both reasoning styles under one model (docs/17 §6).
+    // 1. Statistical detectors (rules)
     let mut findings = rules::detect_all(view);
+
+    // 2. Application profile evaluation
+    let app_store = AppProfileStore::new();
+    findings.extend(app_store.evaluate(view));
+
+    // 3. Threat intelligence offline matching
+    let feed = StixThreatFeed::new();
+    findings.extend(feed.match_traffic(view));
+
+    // 4. ML feature attribution & statistical bandwidth anomaly
     findings.extend(anomaly::bandwidth_anomaly(view));
+    findings.extend(explainable_ml::detect_ml_anomalies(view));
 
-    // 2. Corroborate signals that concern the same host (docs/18 §5).
-    let merged = corroborate(view, findings);
+    // 5. Corroborate signals concerning the same host (docs/18 §5)
+    let mut merged = corroborate(view, findings);
 
-    // 3. Rank most-confident first; stable so ties keep insertion order.
-    let mut merged = merged;
+    // 6. Behavioral chain detection (consumes corroborated findings)
+    let chain_engine = BehavioralChainEngine::new();
+    let chains = chain_engine.detect_chains(&merged);
+    merged.extend(chains);
+
+    // 7. Rank most-confident first; stable so ties keep insertion order.
     merged.sort_by(|a, b| {
         b.confidence
             .value()

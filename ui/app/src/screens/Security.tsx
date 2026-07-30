@@ -20,6 +20,10 @@ const KIND_LABEL: Record<SecurityFinding["kind"], string> = {
   dns_anomaly: "DNS burst",
   connection_storm: "Connection storm",
   bandwidth_anomaly: "Unusual volume",
+  ml_feature_anomaly: "ML Feature Anomaly",
+  threat_intel_match: "Threat Intel Match",
+  app_profile_breach: "Profile Breach",
+  behavioral_chain: "Multi-Stage Chain",
 };
 
 function FindingCard({

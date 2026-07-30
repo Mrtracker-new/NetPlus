@@ -364,6 +364,10 @@ pub enum FindingKindDto {
     DnsAnomaly,
     ConnectionStorm,
     BandwidthAnomaly,
+    MlFeatureAnomaly,
+    ThreatIntelMatch,
+    AppProfileBreach,
+    BehavioralChain,
 }
 
 /// A security/anomaly finding, ready to render as a calm, confidence-labeled card
@@ -387,6 +391,26 @@ pub struct SecurityFindingDto {
     pub suggested_action: String,
     pub evidence: Vec<EvidenceRefDto>,
     pub corroboration: Vec<FindingKindDto>,
+}
+
+/// A node within an incident narrative timeline DTO.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TimelineNodeDto {
+    pub finding: SecurityFindingDto,
+    pub timestamp_nanos: u64,
+    pub stage_label: String,
+}
+
+/// Stitched incident narrative timeline DTO.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct IncidentTimelineDto {
+    pub id: u64,
+    pub title: String,
+    pub narrative_summary: String,
+    pub severity: String,
+    pub nodes: Vec<TimelineNodeDto>,
+    pub aggregated_evidence: Vec<EvidenceRefDto>,
+    pub suggested_actions: Vec<String>,
 }
 
 /// A grounded AI answer (docs/19 §6). `citations` are validated to exist before

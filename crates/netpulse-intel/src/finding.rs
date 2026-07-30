@@ -45,18 +45,31 @@ pub enum FindingKind {
     /// A flow whose volume deviates sharply from this machine's learned normal
     /// (docs/20 §3). Statistical anomaly.
     BandwidthAnomaly,
+    /// Multi-dimensional anomaly flagged with explainable feature attribution (docs/20 §4.2).
+    MlFeatureAnomaly,
+    /// Match against local offline STIX 2.1 threat intelligence indicators (docs/18 §4.9).
+    ThreatIntelMatch,
+    /// An application's behavior breached its observed baseline or configured policy (docs/20 §3).
+    AppProfileBreach,
+    /// Multi-stage attack pattern detected across corroborated findings (docs/18 §11).
+    BehavioralChain,
 }
 
 impl FindingKind {
     /// The broad storage category this kind rolls up to (docs/17 §4).
     pub fn category(self) -> FindingCategory {
         match self {
-            FindingKind::BandwidthAnomaly => FindingCategory::Anomaly,
+            FindingKind::BandwidthAnomaly | FindingKind::MlFeatureAnomaly => {
+                FindingCategory::Anomaly
+            }
             FindingKind::UnexpectedEgress
             | FindingKind::Beaconing
             | FindingKind::PortScan
             | FindingKind::DnsAnomaly
-            | FindingKind::ConnectionStorm => FindingCategory::Suspicious,
+            | FindingKind::ConnectionStorm
+            | FindingKind::ThreatIntelMatch
+            | FindingKind::AppProfileBreach
+            | FindingKind::BehavioralChain => FindingCategory::Suspicious,
         }
     }
 
@@ -71,6 +84,16 @@ impl FindingKind {
             FindingKind::DnsAnomaly => "An unusual burst of DNS lookups",
             FindingKind::ConnectionStorm => "An unusually large number of connections to one host",
             FindingKind::BandwidthAnomaly => "Traffic volume outside this machine's usual range",
+            FindingKind::MlFeatureAnomaly => {
+                "Multi-dimensional anomaly detected with feature attribution"
+            }
+            FindingKind::ThreatIntelMatch => {
+                "Connection matched a local threat intelligence indicator"
+            }
+            FindingKind::AppProfileBreach => {
+                "An app's network activity breached its security profile"
+            }
+            FindingKind::BehavioralChain => "Multi-stage attack pattern detected across activities",
         }
     }
 
@@ -103,6 +126,22 @@ impl FindingKind {
                 "A large but legitimate upload — cloud backup, sync, or a video",
                 "A one-off download that simply differs from your norm",
             ],
+            FindingKind::MlFeatureAnomaly => &[
+                "A batch process or cloud sync operating under unusual network conditions",
+                "A newly updated app with altered traffic characteristics",
+            ],
+            FindingKind::ThreatIntelMatch => &[
+                "A shared infrastructure host or CDN IP listed in threat feeds",
+                "An old or overly broad threat intelligence rule match",
+            ],
+            FindingKind::AppProfileBreach => &[
+                "An app update adding new legitimate endpoints or features",
+                "A temporary manual change in application configuration or usage pattern",
+            ],
+            FindingKind::BehavioralChain => &[
+                "A sequence of legitimate automated administration or setup tasks",
+                "Coincidental overlap of separate routine application actions",
+            ],
         }
     }
 
@@ -127,6 +166,18 @@ impl FindingKind {
             }
             FindingKind::BandwidthAnomaly => {
                 "If you started a backup or upload, this is expected — you can mark it so."
+            }
+            FindingKind::MlFeatureAnomaly => {
+                "Review the feature attribution breakdown to understand which metric deviated most."
+            }
+            FindingKind::ThreatIntelMatch => {
+                "Check the matched indicator metadata and destination hostname before proceeding."
+            }
+            FindingKind::AppProfileBreach => {
+                "Review the application profile and update expected policies if this activity is legitimate."
+            }
+            FindingKind::BehavioralChain => {
+                "Examine the incident sequence across all stages to verify whether the pattern is expected."
             }
         }
     }

@@ -24,14 +24,24 @@
 pub use netpulse_core::traits::Detector;
 
 pub mod anomaly;
+pub mod app_profile;
+pub mod behavioral_chain;
 pub mod engine;
+pub mod explainable_ml;
 pub mod finding;
+pub mod incident_timeline;
 pub mod rules;
+pub mod stix;
 pub mod view;
 
 pub use anomaly::{Baseline, Maturity};
+pub use app_profile::{AppProfileStore, ConfiguredPolicy, ObservedProfile, ProfileViolation};
+pub use behavioral_chain::{BehavioralChainEngine, ChainRule, ChainStage};
 pub use engine::assess;
+pub use explainable_ml::{FeatureAttribution, FeatureKind, FeatureWeight, MlAnomalyDetector};
 pub use finding::{qualitative, FindingKind, SecurityFinding, MAX_INFERRED_CONFIDENCE};
+pub use incident_timeline::{IncidentSeverity, IncidentStitcher, IncidentTimeline, TimelineNode};
+pub use stix::{StixIndicator, StixThreatFeed, ThreatCategory};
 pub use view::TrafficView;
 
 #[cfg(test)]

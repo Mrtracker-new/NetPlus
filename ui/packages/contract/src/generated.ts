@@ -147,7 +147,7 @@ export interface AnimationModel {
 
 export type FindingCategory = "anomaly" | "suspicious" | "informational";
 
-export type FindingKind = "unexpected_egress" | "beaconing" | "port_scan" | "dns_anomaly" | "connection_storm" | "bandwidth_anomaly";
+export type FindingKind = "unexpected_egress" | "beaconing" | "port_scan" | "dns_anomaly" | "connection_storm" | "bandwidth_anomaly" | "ml_feature_anomaly" | "threat_intel_match" | "app_profile_breach" | "behavioral_chain";
 
 export interface SecurityFinding {
   kind: FindingKind;
@@ -161,6 +161,22 @@ export interface SecurityFinding {
   suggested_action: string;
   evidence: EvidenceRef[];
   corroboration: FindingKind[];
+}
+
+export interface TimelineNode {
+  finding: SecurityFinding;
+  timestamp_nanos: number;
+  stage_label: string;
+}
+
+export interface IncidentTimeline {
+  id: number;
+  title: string;
+  narrative_summary: string;
+  severity: string;
+  nodes: TimelineNode[];
+  aggregated_evidence: EvidenceRef[];
+  suggested_actions: string[];
 }
 
 export interface AssistantAnswer {

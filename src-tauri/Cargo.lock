@@ -2267,6 +2267,8 @@ dependencies = [
  "netpulse-core",
  "netpulse-flow",
  "netpulse-storage",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

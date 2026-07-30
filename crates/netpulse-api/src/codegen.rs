@@ -246,6 +246,10 @@ pub fn typescript_contract() -> String {
             "dns_anomaly",
             "connection_storm",
             "bandwidth_anomaly",
+            "ml_feature_anomaly",
+            "threat_intel_match",
+            "app_profile_breach",
+            "behavioral_chain",
         ],
     ));
 
@@ -264,6 +268,26 @@ pub fn typescript_contract() -> String {
             ("suggested_action", "string"),
             ("evidence", "EvidenceRef[]"),
             ("corroboration", "FindingKind[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "TimelineNode",
+        &[
+            ("finding", "SecurityFinding"),
+            ("timestamp_nanos", "number"),
+            ("stage_label", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "IncidentTimeline",
+        &[
+            ("id", "number"),
+            ("title", "string"),
+            ("narrative_summary", "string"),
+            ("severity", "string"),
+            ("nodes", "TimelineNode[]"),
+            ("aggregated_evidence", "EvidenceRef[]"),
+            ("suggested_actions", "string[]"),
         ],
     ));
     s.push_str(&iface(
@@ -465,6 +489,8 @@ mod tests {
             "FindingCategory",
             "FindingKind",
             "SecurityFinding",
+            "TimelineNode",
+            "IncidentTimeline",
             "AssistantAnswer",
             "PayloadLevel",
             "ExportFormat",

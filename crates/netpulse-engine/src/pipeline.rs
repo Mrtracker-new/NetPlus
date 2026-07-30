@@ -254,6 +254,79 @@ pub fn analyze_frames(
     Ok((store, report))
 }
 
+/// An incremental live capture pipeline that ingests raw frames as they arrive,
+/// updates flow & session state in [`FlowEngine`] O(1) per packet, and periodically
+/// commits dirty state snapshots to [`CaptureStore`] (O(K_dirty)).
+#[derive(Debug)]
+pub struct LivePipeline {
+    engine: FlowEngine,
+    link: LinkType,
+    last_mono: u64,
+}
+
+impl LivePipeline {
+    /// Create a new live pipeline for interface link type `dlt` (libpcap DLT).
+    pub fn new(dlt: u32, shards: u16) -> Self {
+        Self {
+            engine: FlowEngine::new(shards),
+            link: link_type_from_dlt(dlt),
+            last_mono: 0,
+        }
+    }
+
+    /// Ingest a batch of newly arrived raw frames into the incremental flow engine.
+    pub fn ingest_batch(&mut self, frames: &[RawFrame]) {
+        for frame in frames {
+            self.last_mono = self.last_mono.max(frame.mono_nanos);
+            let decoded = decode_frame(self.link, &frame.bytes);
+            let ts = Timestamp::new(frame.mono_nanos, frame.mono_nanos);
+            if let Some(pv) = PacketView::from_decoded(ts, &decoded) {
+                self.engine.ingest(&pv);
+            }
+        }
+    }
+
+    /// Commit dirty flow, session, and resolution updates to `store`.
+    pub fn commit_to_store(&mut self, store: &mut CaptureStore, now_mono: u64) {
+        let ts = Timestamp::new(now_mono, now_mono);
+        // 1. Tick engine to evict closed flows and get dirty sessions
+        let (closed_flows, dirty_sessions) = self.engine.tick(ts);
+        for ff in closed_flows {
+            store.insert_flow(ff.flow, ff.events);
+        }
+
+        // 2. Snapshot and commit all dirty active flows
+        let dirty_flows = self.engine.snapshot_dirty_flows();
+        for ff in dirty_flows {
+            store.insert_flow(ff.flow, ff.events);
+        }
+
+        // 3. Commit dirty sessions
+        for s in dirty_sessions {
+            store.insert_session(s);
+        }
+
+        // 4. Merge resolution table updates
+        for (ip, names) in self.engine.resolutions() {
+            store.set_resolution(ip, names);
+        }
+    }
+
+    /// Final flush on capture termination to commit all remaining flows and sessions.
+    pub fn finish(&mut self, store: &mut CaptureStore) {
+        let (flows, sessions) = self.engine.finish();
+        for ff in flows {
+            store.insert_flow(ff.flow, ff.events);
+        }
+        for s in sessions {
+            store.insert_session(s);
+        }
+        for (ip, names) in self.engine.resolutions() {
+            store.set_resolution(ip, names);
+        }
+    }
+}
+
 /// The Phase 2 presentation projection of a completed run (docs/09, docs/11):
 /// the narrative feed and the monitoring snapshot, already in the `netpulse-api`
 /// wire shapes at a chosen [`Depth`]. This is the bundle a UI receives; it is a
@@ -394,5 +467,33 @@ mod tests {
         let r1 = run_replay(&recording, 8, &mut s1).unwrap();
         let r2 = run_replay(&recording, 8, &mut s2).unwrap();
         assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn live_pipeline_incremental_commit_matches() {
+        let f1 = RawFrame {
+            mono_nanos: 1_000_000,
+            iface_id: 1,
+            bytes: vec![0xde, 0xad, 0xbe, 0xef],
+        };
+        let f2 = RawFrame {
+            mono_nanos: 2_000_000,
+            iface_id: 1,
+            bytes: vec![1, 2, 3, 4, 5, 6],
+        };
+
+        let mut pipeline = LivePipeline::new(1, 8);
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+
+        pipeline.ingest_batch(&[f1.clone()]);
+        pipeline.commit_to_store(&mut store, f1.mono_nanos);
+
+        pipeline.ingest_batch(&[f2.clone()]);
+        pipeline.commit_to_store(&mut store, f2.mono_nanos);
+        pipeline.finish(&mut store);
+
+        let (store_offline, _) = analyze_frames(1, &[f1, f2], 8).unwrap();
+        assert_eq!(store.flow_count(), store_offline.flow_count());
+        assert_eq!(store.session_count(), store_offline.session_count());
     }
 }

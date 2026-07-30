@@ -71,6 +71,30 @@ impl FlowEngine {
         shard_for(&repr, self.shard_count) as usize
     }
 
+    /// Snapshot dirty flows modified since last call without removing active flows.
+    pub fn snapshot_dirty_flows(&mut self) -> Vec<FinalizedFlow> {
+        let mut out = Vec::new();
+        for shard in &mut self.shards {
+            for (flow, events) in shard.snapshot_dirty_flows() {
+                out.push(FinalizedFlow { flow, events });
+            }
+        }
+        out
+    }
+
+    /// Snapshot dirty sessions modified since last call.
+    pub fn snapshot_dirty_sessions(&mut self) -> Vec<Session> {
+        self.sessions
+            .snapshot_dirty_sessions(&mut self.next_session_id)
+    }
+
+    /// Periodic tick: evicts closed flows and returns evicted closed flows plus dirty sessions.
+    pub fn tick(&mut self, now: Timestamp) -> (Vec<FinalizedFlow>, Vec<Session>) {
+        let closed_flows = self.evict_closed(now);
+        let dirty_sessions = self.snapshot_dirty_sessions();
+        (closed_flows, dirty_sessions)
+    }
+
     /// Finalize all flows that are closed as of `now`, returning them for
     /// storage (docs/06 §8). Called periodically to bound memory.
     pub fn evict_closed(&mut self, now: Timestamp) -> Vec<FinalizedFlow> {

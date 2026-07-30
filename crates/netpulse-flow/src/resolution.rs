@@ -23,6 +23,9 @@ use netpulse_core::{HostName, NameSource};
 
 use crate::decode_view::PacketView;
 
+/// Maximum IP entries stored in ResolutionTable before pruning old entries.
+pub const MAX_RESOLUTIONS: usize = 10_000;
+
 /// Accumulates the set of passively-observed hostnames per IP. Deterministic:
 /// output order does not depend on `HashMap` iteration — IPs come out sorted and
 /// names within an IP are ordered by `(source, name)`, so the same packet stream
@@ -57,6 +60,9 @@ impl ResolutionTable {
         if name.is_empty() {
             return;
         }
+        if !self.by_ip.contains_key(&ip) && self.by_ip.len() >= MAX_RESOLUTIONS {
+            self.prune();
+        }
         let names = self.by_ip.entry(ip).or_default();
         if names.iter().any(|h| h.name == name && h.source == source) {
             return;
@@ -65,6 +71,17 @@ impl ResolutionTable {
             name: name.to_string(),
             source,
         });
+    }
+
+    /// Prune oldest entries to maintain MAX_RESOLUTIONS bound.
+    pub fn prune(&mut self) {
+        while self.by_ip.len() >= MAX_RESOLUTIONS {
+            if let Some(key) = self.by_ip.keys().next().copied() {
+                self.by_ip.remove(&key);
+            } else {
+                break;
+            }
+        }
     }
 
     /// The full table as `(ip, names)` pairs, IPs ascending and names within each

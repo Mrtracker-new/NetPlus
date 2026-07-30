@@ -56,6 +56,10 @@ pub struct SessionReconstructor {
     groups: HashMap<String, Vec<u64>>,
     /// Session start time per name.
     starts: HashMap<String, Timestamp>,
+    /// Track groups modified since last dirty snapshot.
+    dirty_groups: std::collections::HashSet<String>,
+    /// Stable assigned session IDs by group name.
+    assigned_ids: HashMap<String, u64>,
 }
 
 impl SessionReconstructor {
@@ -95,6 +99,7 @@ impl SessionReconstructor {
                 });
                 self.groups.entry(r.name.clone()).or_default().push(flow_id);
                 self.starts.entry(r.name.clone()).or_insert(pv.ts);
+                self.dirty_groups.insert(r.name.clone());
             }
         }
     }
@@ -108,6 +113,37 @@ impl SessionReconstructor {
         &self.links
     }
 
+    /// Snapshot only dirty sessions modified since last call.
+    pub fn snapshot_dirty_sessions(&mut self, next_session_id: &mut u64) -> Vec<Session> {
+        let dirty_names: Vec<String> = self.dirty_groups.drain().collect();
+        let mut sessions = Vec::new();
+        for name in dirty_names {
+            let Some(flow_ids) = self.groups.get(&name) else {
+                continue;
+            };
+            if flow_ids.is_empty() {
+                continue;
+            }
+            let sid = *self.assigned_ids.entry(name.clone()).or_insert_with(|| {
+                *next_session_id += 1;
+                *next_session_id
+            });
+            sessions.push(Session {
+                id: sid,
+                process_id: 0,
+                start_ts: self
+                    .starts
+                    .get(&name)
+                    .copied()
+                    .unwrap_or(Timestamp::new(0, 0)),
+                trigger: format!("resolved and connected to {name}"),
+                flow_ids: flow_ids.clone(),
+            });
+        }
+        sessions.sort_by_key(|s| s.id);
+        sessions
+    }
+
     /// Finalize the discovered groups into [`Session`]s (docs/06 §8). Each
     /// session's trigger names the DNS lookup that seeded it, keeping the
     /// human-readable causal story attached (docs/06 §6.2).
@@ -117,9 +153,12 @@ impl SessionReconstructor {
             if flow_ids.is_empty() {
                 continue;
             }
-            *next_session_id += 1;
+            let sid = self.assigned_ids.get(name).copied().unwrap_or_else(|| {
+                *next_session_id += 1;
+                *next_session_id
+            });
             sessions.push(Session {
-                id: *next_session_id,
+                id: sid,
                 process_id: 0, // attribution is a Phase 2 signal (docs/12)
                 start_ts: self
                     .starts

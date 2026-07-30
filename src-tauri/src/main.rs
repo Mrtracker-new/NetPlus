@@ -195,26 +195,24 @@ fn stop_capture(state: &AppState) -> Result<(), String> {
 
 /// Helper function with narrow responsibility: rebuild flows from the frame buffer
 /// and commit the updated reconstruction store, stats, and name hints.
+/// Helper function with narrow responsibility: commit pipeline updates to the store
+/// and update atomic stats and name hints.
 fn rebuild_and_commit(
-    dlt: u32,
-    buffer: &mut VecDeque<RawFrame>,
+    pipeline: &mut netpulse_engine::pipeline::LivePipeline,
+    latest_mono: u64,
     capture_stats: (u64, u64),
     store: &Arc<Mutex<CaptureStore>>,
     stats: &Arc<Mutex<CaptureStats>>,
     hint_cache: &mut std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>>,
     last_hint_refresh: &mut Option<std::time::Instant>,
     shed_controller: &ShedController,
+    buffer_len: usize,
     buffer_drops: u64,
     max_frames: usize,
     hint_refresh_secs: u64,
 ) {
-    if buffer.is_empty() {
-        return;
-    }
-    let slice = buffer.make_contiguous();
-    if let Ok((mut new_store, _report)) =
-        netpulse_engine::pipeline::analyze_frames(dlt, slice, 16)
-    {
+    if let Ok(mut s) = store.lock() {
+        pipeline.commit_to_store(&mut s, latest_mono);
         if last_hint_refresh
             .map(|t: std::time::Instant| t.elapsed().as_secs() >= hint_refresh_secs)
             .unwrap_or(true)
@@ -223,29 +221,25 @@ fn rebuild_and_commit(
             *last_hint_refresh = Some(std::time::Instant::now());
         }
         for (ip, names) in hint_cache.iter() {
-            new_store.merge_resolution(*ip, names.clone());
+            s.merge_resolution(*ip, names.clone());
         }
+    }
 
-        let (received, kernel_dropped) = capture_stats;
-        if let Ok(mut s) = store.lock() {
-            *s = new_store;
-        }
-        if let Ok(mut st) = stats.lock() {
-            let total_dropped = kernel_dropped.saturating_add(buffer_drops);
-            st.received = st.received.max(received);
-            st.dropped = st.dropped.max(total_dropped);
-            st.shed_stage = shed_controller.current_stage();
-            st.buffer_frames = buffer.len();
-            st.buffer_capacity = max_frames;
-        }
+    let (received, kernel_dropped) = capture_stats;
+    if let Ok(mut st) = stats.lock() {
+        let total_dropped = kernel_dropped.saturating_add(buffer_drops);
+        st.received = st.received.max(received);
+        st.dropped = st.dropped.max(total_dropped);
+        st.shed_stage = shed_controller.current_stage();
+        st.buffer_frames = buffer_len;
+        st.buffer_capacity = max_frames;
     }
 }
 
 /// The background live-capture loop (docs/05 §4). Drains frames from the backend
-/// into a bounded buffer and, about once a second, rebuilds the committed store
-/// via the *same* offline pipeline (`analyze_frames`) so live reconstruction
-/// matches file/replay exactly (docs/21 §4). Runs until the stop flag is set or
-/// the source closes.
+/// into a bounded buffer and periodically commits incremental engine updates
+/// into the committed store via [`netpulse_engine::pipeline::LivePipeline`].
+/// Runs until the stop flag is set or the source closes.
 fn live_loop(
     mut capture: netpulse_platform::LiveCapture,
     dlt: u32,
@@ -260,6 +254,7 @@ fn live_loop(
     const MAX_FRAMES: usize = 50_000;
     const HINT_REFRESH_SECS: u64 = 30;
 
+    let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(dlt, 16);
     let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(MAX_FRAMES);
     let mut shed_controller = ShedController::new(MAX_FRAMES);
     let mut buffer_drops = 0u64;
@@ -289,6 +284,8 @@ fn live_loop(
                 buffer_drops = buffer_drops.saturating_add(overflow as u64);
             }
 
+            pipeline.ingest_batch(&batch);
+
             for mut frame in batch {
                 if current_stage >= ShedStage::PayloadsOff {
                     frame.bytes.truncate(ETH_IPV4_TCP_HEADERS);
@@ -303,14 +300,15 @@ fn live_loop(
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
             rebuild_and_commit(
-                dlt,
-                &mut buffer,
+                &mut pipeline,
+                latest_mono,
                 capture.stats(),
                 &store,
                 &stats,
                 &mut hint_cache,
                 &mut last_hint_refresh,
                 &shed_controller,
+                buffer.len(),
                 buffer_drops,
                 MAX_FRAMES,
                 HINT_REFRESH_SECS,
@@ -330,18 +328,22 @@ fn live_loop(
 
     // Final Flush on shutdown so in-flight frames are never lost
     rebuild_and_commit(
-        dlt,
-        &mut buffer,
+        &mut pipeline,
+        latest_mono,
         capture.stats(),
         &store,
         &stats,
         &mut hint_cache,
         &mut last_hint_refresh,
         &shed_controller,
+        buffer.len(),
         buffer_drops,
         MAX_FRAMES,
         HINT_REFRESH_SECS,
     );
+    if let Ok(mut s) = store.lock() {
+        pipeline.finish(&mut s);
+    }
     // _completion_guard drops here, signaling done_tx
 }
 
@@ -839,27 +841,29 @@ mod tests {
     fn test_rebuild_and_commit_flushes_buffered_frames() {
         let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
         let stats = Arc::new(Mutex::new(CaptureStats::default()));
-        let mut buffer: VecDeque<RawFrame> = VecDeque::new();
-
-        buffer.push_back(RawFrame {
+        let frame = RawFrame {
             mono_nanos: 1_000_000,
             iface_id: 1,
             bytes: vec![0u8; 54],
-        });
+        };
+
+        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
+        pipeline.ingest_batch(&[frame]);
 
         let mut hint_cache = std::collections::BTreeMap::new();
         let mut last_hint_refresh = None;
         let shed_controller = ShedController::new(1000);
 
         rebuild_and_commit(
-            1,
-            &mut buffer,
+            &mut pipeline,
+            1_000_000,
             (1, 0),
             &store,
             &stats,
             &mut hint_cache,
             &mut last_hint_refresh,
             &shed_controller,
+            1,
             0,
             1000,
             30,
@@ -939,12 +943,14 @@ mod tests {
             dropped: 10,
             ..Default::default()
         }));
-        let mut buffer: VecDeque<RawFrame> = VecDeque::new();
-        buffer.push_back(RawFrame {
+        let frame = RawFrame {
             mono_nanos: 1_000_000,
             iface_id: 1,
             bytes: vec![0u8; 54],
-        });
+        };
+
+        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
+        pipeline.ingest_batch(&[frame]);
 
         let mut hint_cache = std::collections::BTreeMap::new();
         let mut last_hint_refresh = None;
@@ -952,14 +958,15 @@ mod tests {
 
         // Attempt update with lower counters (e.g. out of order or transient drop)
         rebuild_and_commit(
-            1,
-            &mut buffer,
+            &mut pipeline,
+            1_000_000,
             (400, 5),
             &store,
             &stats,
             &mut hint_cache,
             &mut last_hint_refresh,
             &shed_controller,
+            1,
             0,
             1000,
             30,

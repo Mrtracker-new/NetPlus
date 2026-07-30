@@ -45,6 +45,8 @@ pub struct FlowRecord {
     pub session_id: Option<u64>,
     /// True once finalized and flushed; kept briefly for late packets.
     finalized: bool,
+    /// Indicates if the flow was updated since the last dirty snapshot.
+    pub dirty: bool,
 }
 
 impl FlowRecord {
@@ -70,9 +72,8 @@ impl FlowRecord {
         self.finalized
     }
 
-    /// Seal metrics and produce the immutable [`Flow`] for storage (docs/06 §8).
-    pub fn finalize(&mut self) -> Flow {
-        self.finalized = true;
+    /// Produce an immutable [`Flow`] snapshot of the flow's current metrics.
+    pub fn flow_snapshot(&self) -> Flow {
         Flow {
             id: self.id,
             key: self.metrics.representative_tuple(),
@@ -83,6 +84,12 @@ impl FlowRecord {
             stats: self.metrics.snapshot(),
             state: self.flow_state(),
         }
+    }
+
+    /// Seal metrics and produce the immutable [`Flow`] for storage (docs/06 §8).
+    pub fn finalize(&mut self) -> Flow {
+        self.finalized = true;
+        self.flow_snapshot()
     }
 }
 
@@ -139,6 +146,7 @@ impl Shard {
                 events: Vec::new(),
                 session_id: None,
                 finalized: false,
+                dirty: true,
             }
         });
 
@@ -154,6 +162,7 @@ impl Shard {
 
         entry.last_ts = pv.ts;
         entry.metrics.observe(pv, from_lo);
+        entry.dirty = true;
         for kind in &pv.events {
             entry.events.push(ProtoEvent {
                 flow_id: entry.id,
@@ -162,6 +171,21 @@ impl Shard {
             });
         }
         entry.id
+    }
+
+    /// Snapshot only dirty flows that were modified since last call.
+    /// Clears the dirty flag on returned flows and drains uncommitted proto events.
+    pub fn snapshot_dirty_flows(&mut self) -> Vec<(Flow, Vec<ProtoEvent>)> {
+        let mut out = Vec::new();
+        for f in self.flows.values_mut() {
+            if f.dirty {
+                f.dirty = false;
+                let snapshot = f.flow_snapshot();
+                let events = std::mem::take(&mut f.events);
+                out.push((snapshot, events));
+            }
+        }
+        out
     }
 
     /// Drain all flows that are closed as of `now`, finalizing each (docs/06 §8).

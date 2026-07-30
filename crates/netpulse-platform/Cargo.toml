@@ -27,7 +27,7 @@ pcap = { version = "2", optional = true }
 # this crate stays `#![forbid(unsafe_code)]` like the pcap path.
 netstat2 = { version = "0.11", optional = true }
 # PID → process name/exe, safely wrapped. Only pulled in with `live-capture`.
-sysinfo = { version = "0.33", optional = true }
+sysinfo = { version = "0.39", optional = true }
 
 [lints]
 workspace = true

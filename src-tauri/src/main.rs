@@ -231,13 +231,12 @@ fn rebuild_and_commit(
             *s = new_store;
         }
         if let Ok(mut st) = stats.lock() {
-            *st = CaptureStats {
-                received,
-                dropped: kernel_dropped.saturating_add(buffer_drops),
-                shed_stage: shed_controller.current_stage(),
-                buffer_frames: buffer.len(),
-                buffer_capacity: max_frames,
-            };
+            let total_dropped = kernel_dropped.saturating_add(buffer_drops);
+            st.received = st.received.max(received);
+            st.dropped = st.dropped.max(total_dropped);
+            st.shed_stage = shed_controller.current_stage();
+            st.buffer_frames = buffer.len();
+            st.buffer_capacity = max_frames;
         }
     }
 }
@@ -930,5 +929,45 @@ mod tests {
         let res = stop_capture(&state);
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), "capture thread panicked during shutdown");
+    }
+
+    #[test]
+    fn test_rebuild_and_commit_monotonic_stats_update() {
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats {
+            received: 500,
+            dropped: 10,
+            ..Default::default()
+        }));
+        let mut buffer: VecDeque<RawFrame> = VecDeque::new();
+        buffer.push_back(RawFrame {
+            mono_nanos: 1_000_000,
+            iface_id: 1,
+            bytes: vec![0u8; 54],
+        });
+
+        let mut hint_cache = std::collections::BTreeMap::new();
+        let mut last_hint_refresh = None;
+        let shed_controller = ShedController::new(1000);
+
+        // Attempt update with lower counters (e.g. out of order or transient drop)
+        rebuild_and_commit(
+            1,
+            &mut buffer,
+            (400, 5),
+            &store,
+            &stats,
+            &mut hint_cache,
+            &mut last_hint_refresh,
+            &shed_controller,
+            0,
+            1000,
+            30,
+        );
+
+        let st = stats.lock().unwrap();
+        // Assert counters remained monotonic at max values (500, 10)
+        assert_eq!(st.received, 500);
+        assert_eq!(st.dropped, 10);
     }
 }

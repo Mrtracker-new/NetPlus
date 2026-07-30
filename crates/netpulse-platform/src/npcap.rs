@@ -123,7 +123,14 @@ pub fn open_capture(iface_id: u16) -> Result<LiveCapture> {
         dlt,
         iface_id,
         base_wall_nanos: None,
+        last_stats: CachedStats::default(),
     })
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct CachedStats {
+    received: u64,
+    dropped: u64,
 }
 
 /// A live [`CaptureSource`] over an open Npcap handle. Yields [`RawFrame`]s in
@@ -137,6 +144,7 @@ pub struct LiveCapture {
     /// Wall-clock ns of the first frame, so monotonic readings start at 0 and
     /// durations are correct regardless of the absolute epoch (docs/05 §6).
     base_wall_nanos: Option<u64>,
+    last_stats: CachedStats,
 }
 
 impl std::fmt::Debug for LiveCapture {
@@ -144,6 +152,7 @@ impl std::fmt::Debug for LiveCapture {
         f.debug_struct("LiveCapture")
             .field("dlt", &self.dlt)
             .field("iface_id", &self.iface_id)
+            .field("last_stats", &self.last_stats)
             .finish_non_exhaustive()
     }
 }
@@ -157,11 +166,14 @@ impl LiveCapture {
 
     /// Honest capture accounting as `(received, dropped)` since the handle opened
     /// (docs/05 §3, §9): kernel-ring drops are truth loss and must be surfaced.
+    /// Retains cached stats monotonically so transient FFI failures or driver regressions
+    /// never reset reported values to zero.
     pub fn stats(&mut self) -> (u64, u64) {
-        match self.capture.stats() {
-            Ok(s) => (s.received as u64, s.dropped as u64),
-            Err(_) => (0, 0),
+        if let Ok(s) = self.capture.stats() {
+            self.last_stats.received = self.last_stats.received.max(s.received as u64);
+            self.last_stats.dropped = self.last_stats.dropped.max(s.dropped as u64);
         }
+        (self.last_stats.received, self.last_stats.dropped)
     }
 }
 

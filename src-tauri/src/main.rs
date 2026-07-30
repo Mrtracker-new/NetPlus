@@ -205,6 +205,7 @@ type HintMap = std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::H
 
 /// Helper function with narrow responsibility: commit pipeline updates to the store
 /// and update atomic stats and name hints.
+#[allow(clippy::too_many_arguments)]
 fn rebuild_and_commit(
     pipeline: &mut netpulse_engine::pipeline::LivePipeline,
     latest_mono: u64,
@@ -272,6 +273,7 @@ fn rebuild_and_commit(
 /// into a bounded buffer and periodically commits incremental engine updates
 /// into the committed store via [`netpulse_engine::pipeline::LivePipeline`].
 /// Runs until the stop flag is set or the source closes.
+#[allow(clippy::too_many_arguments)]
 fn live_loop(
     mut capture: netpulse_platform::LiveCapture,
     dlt: u32,

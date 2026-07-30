@@ -47,9 +47,10 @@ pub const ETH_IPV4_TCP_HEADERS: usize = 54;
 /// *detail* before *truth*. Encoded as a first-class, testable type: a missing
 /// payload costs depth, but a missing SYN/FIN corrupts a flow's state machine,
 /// so detail is sacrificed first and truth-loss is always disclosed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum ShedStage {
     /// Full fidelity — nothing shed.
+    #[default]
     None,
     /// Stop storing payloads; keep headers + flow metrics.
     PayloadsOff,
@@ -60,12 +61,6 @@ pub enum ShedStage {
     /// Last resort: drop at the kernel/ring boundary (Option A: sliding window evicting oldest),
     /// and *record* the drop.
     DropPackets,
-}
-
-impl Default for ShedStage {
-    fn default() -> Self {
-        ShedStage::None
-    }
 }
 
 impl ShedStage {
@@ -190,7 +185,7 @@ impl ShedController {
     /// Uses a persistent counter across batches to prevent burst bias.
     pub fn should_sample(&mut self) -> bool {
         self.packet_counter = self.packet_counter.wrapping_add(1);
-        self.packet_counter % 2 == 0
+        self.packet_counter.is_multiple_of(2)
     }
 }
 

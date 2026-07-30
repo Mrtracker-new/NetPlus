@@ -320,13 +320,13 @@ impl<R: CaptureRepository> CaptureStore<R> {
                         self.sessions.contains_key(id),
                     )?;
                 }
-                EvidenceRef::Packet(id) => {
-                    if *id == 0 {
-                        return Err(NpError::Invariant(format!(
-                            "Finding \"{}\" references invalid Packet ID 0",
-                            finding.id
-                        )));
-                    }
+                EvidenceRef::Packet(id) if *id == 0 => {
+                    return Err(NpError::Invariant(format!(
+                        "Finding \"{}\" references invalid Packet ID 0",
+                        finding.id
+                    )));
+                }
+                EvidenceRef::Packet(_) => {
                     // Packet IDs cannot currently be resolved to stored packet objects because
                     // CaptureStore operates in metadata-only mode (docs/08 §4). The runtime invariant
                     // therefore verifies only that the packet identifier is syntactically valid (non-zero).
@@ -611,7 +611,7 @@ mod tests {
     #[test]
     fn insert_finding_atomic_on_failure() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        assert_eq!(store.finding(303).is_none(), true);
+        assert!(store.finding(303).is_none());
         let res = store.insert_finding(Finding {
             id: 303,
             category: FindingCategory::Suspicious,

@@ -485,10 +485,10 @@ mod tests {
         let mut pipeline = LivePipeline::new(1, 8);
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
 
-        pipeline.ingest_batch(&[f1.clone()]);
+        pipeline.ingest_batch(std::slice::from_ref(&f1));
         pipeline.commit_to_store(&mut store, f1.mono_nanos);
 
-        pipeline.ingest_batch(&[f2.clone()]);
+        pipeline.ingest_batch(std::slice::from_ref(&f2));
         pipeline.commit_to_store(&mut store, f2.mono_nanos);
         pipeline.finish(&mut store);
 

@@ -102,7 +102,7 @@ mod tests {
         let mut manifests = Vec::new();
         for pattern in member_patterns {
             let glob_path = workspace_root.join(pattern);
-            if let Ok(entries) = std::fs::read_dir(glob_path.parent().unwrap_or(&workspace_root)) {
+            if let Ok(entries) = std::fs::read_dir(glob_path.parent().unwrap_or(workspace_root)) {
                 for entry in entries.flatten() {
                     let p = entry.path();
                     let rel = p.strip_prefix(workspace_root).unwrap_or(&p);

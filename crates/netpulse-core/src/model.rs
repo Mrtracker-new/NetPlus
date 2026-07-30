@@ -63,6 +63,7 @@ pub struct FlowMetrics {
 pub enum FlowState {
     SynSeen,
     Established,
+    /// Connection entering TCP FIN teardown (`FinWait`/`Closing`).
     Closing,
     Closed,
     /// Connectionless (UDP) or connection-migrating (QUIC) conversation.

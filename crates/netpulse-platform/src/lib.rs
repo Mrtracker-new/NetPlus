@@ -136,7 +136,8 @@ mod disabled {
 pub use disabled::{list_interfaces, open_capture};
 
 // Per-OS attribution/capture modules land here behind `#[cfg(target_os)]` so no
-// cfg leaks above this crate (docs/04 §7). macOS/Linux capture backends TODO.
+// cfg leaks above this crate (docs/04 §7). Linux (`AF_PACKET`/`/proc`) and macOS
+// (`BPF`/`libproc`) module declarations are cross-platform OS expansion scaffolding (docs/03 §13).
 #[cfg(target_os = "linux")]
 mod linux {}
 #[cfg(target_os = "macos")]

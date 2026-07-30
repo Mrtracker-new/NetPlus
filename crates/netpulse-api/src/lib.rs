@@ -141,7 +141,7 @@ pub enum StreamChannel {
     Metrics,
     /// `live.findings` — security/anomaly findings as they occur (docs/17).
     Findings,
-    /// `live.narratives` — new narrative feed cards (docs/09 §5).
+    /// `live.narratives` — new narrative feed cards (docs/09 §5). Protocol scaffolding for live push streaming.
     Narratives,
 }
 

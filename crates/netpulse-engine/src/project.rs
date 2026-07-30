@@ -509,6 +509,16 @@ fn disabled_reason_label(r: &DisabledReason) -> String {
         DisabledReason::IncompleteDissector => {
             "dissector missing its fuzz target and/or explanation content".to_string()
         }
+        DisabledReason::InvalidSignature => {
+            "cryptographic signature verification failed".to_string()
+        }
+        DisabledReason::SignatureMissing => "missing required cryptographic signature".to_string(),
+        DisabledReason::PayloadHashMismatch => {
+            "plugin binary hash does not match manifest".to_string()
+        }
+        DisabledReason::KeyRevoked => "signing key has been revoked".to_string(),
+        DisabledReason::KeyExpired => "signing key has expired".to_string(),
+        DisabledReason::ManifestTampered => "manifest payload has been tampered with".to_string(),
         DisabledReason::NotEnabled => "not enabled".to_string(),
         _ => "unavailable".to_string(),
     }

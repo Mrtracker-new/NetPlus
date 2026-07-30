@@ -8,7 +8,8 @@
 
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, ExportPlugin, PluginManifest, PluginType, TrustMetadata, TrustStatus,
+    ContractVersion, ExportPlugin, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
+    TrustStatus,
 };
 
 /// Emits a minimal newline-delimited representation of the structured export input.
@@ -38,14 +39,17 @@ impl ExportPlugin for FlatExport {
 /// The plugin's self-description (docs/24 §6): a first-party export reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
+        manifest_version: 1,
         name: "example-export".into(),
         plugin_type: PluginType::Export,
         target_contract: ContractVersion(4),
         trust: TrustMetadata {
             source: "in-tree:plugins/example-export".into(),
-            signature: None,
+            signatures: Vec::new(),
             status: TrustStatus::FirstParty,
         },
+        payload_hash: Sha256Digest([0u8; 32]),
+        signatures: Vec::new(),
         fuzzed: false,
         has_explanation: false,
     }

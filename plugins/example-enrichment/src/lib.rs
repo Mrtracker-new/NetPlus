@@ -11,7 +11,8 @@ use std::net::IpAddr;
 use netpulse_core::model::Host;
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Enrichment, PluginManifest, PluginType, TrustMetadata, TrustStatus,
+    ContractVersion, Enrichment, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
+    TrustStatus,
 };
 
 /// Resolves hosts to an org label from a local, in-memory table (stands in for an
@@ -55,14 +56,17 @@ impl Enrichment for LocalOrgEnrichment {
 /// The plugin's self-description (docs/24 §6): a first-party enrichment reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
+        manifest_version: 1,
         name: "example-enrichment".into(),
         plugin_type: PluginType::Enrichment,
         target_contract: ContractVersion(4),
         trust: TrustMetadata {
             source: "in-tree:plugins/example-enrichment".into(),
-            signature: None,
+            signatures: Vec::new(),
             status: TrustStatus::FirstParty,
         },
+        payload_hash: Sha256Digest([0u8; 32]),
+        signatures: Vec::new(),
         fuzzed: false,
         has_explanation: false,
     }

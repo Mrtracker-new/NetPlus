@@ -9,7 +9,7 @@
 use netpulse_core::model::{Confidence, EvidenceRef, Finding, FindingCategory, ProtoEvent};
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Detector, PluginManifest, PluginType, TrustMetadata, TrustStatus,
+    ContractVersion, Detector, PluginManifest, PluginType, Sha256Digest, TrustMetadata, TrustStatus,
 };
 
 /// Flags a flow with an unusually chatty stream of protocol landmarks.
@@ -50,14 +50,17 @@ impl Detector for ChattyFlowDetector {
 /// The plugin's self-description (docs/24 §6): a first-party detector reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
+        manifest_version: 1,
         name: "example-detector".into(),
         plugin_type: PluginType::Detector,
         target_contract: ContractVersion(4),
         trust: TrustMetadata {
             source: "in-tree:plugins/example-detector".into(),
-            signature: None,
+            signatures: Vec::new(),
             status: TrustStatus::FirstParty,
         },
+        payload_hash: Sha256Digest([0u8; 32]),
+        signatures: Vec::new(),
         // Not a dissector, so the fuzz/explanation obligations don't gate it; a
         // detector instead ships positive + benign fixtures (docs/18 §10), which
         // this crate's tests stand in for.
@@ -101,7 +104,16 @@ mod tests {
     #[test]
     fn first_party_detector_auto_enables() {
         let mut reg = PluginRegistry::new(4);
-        reg.register(manifest());
+        let m = manifest();
+        reg.register(netpulse_plugin::VerificationOutcome {
+            manifest: m,
+            claimed_trust: TrustStatus::FirstParty,
+            effective_trust: TrustStatus::FirstParty,
+            verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
+                "in-tree-key".into(),
+            )),
+            payload_hash_valid: true,
+        });
         assert!(reg.plugins()[0].enabled);
     }
 }

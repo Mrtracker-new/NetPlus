@@ -455,17 +455,31 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
 fn seed_registry() -> PluginRegistry {
     let mut reg = PluginRegistry::new(netpulse_api::API_VERSION);
     let first_party =
-        |name: &str, ty: PluginType, fuzzed: bool, has_explanation: bool| PluginManifest {
-            name: name.into(),
-            plugin_type: ty,
-            target_contract: ContractVersion(netpulse_api::API_VERSION),
-            trust: TrustMetadata {
-                source: format!("in-tree:plugins/{name}"),
-                signature: None,
-                status: TrustStatus::FirstParty,
-            },
-            fuzzed,
-            has_explanation,
+        |name: &str, ty: PluginType, fuzzed: bool, has_explanation: bool| {
+            let m = PluginManifest {
+                manifest_version: 1,
+                name: name.into(),
+                plugin_type: ty,
+                target_contract: ContractVersion(netpulse_api::API_VERSION),
+                trust: TrustMetadata {
+                    source: format!("in-tree:plugins/{name}"),
+                    signatures: Vec::new(),
+                    status: TrustStatus::FirstParty,
+                },
+                payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
+                signatures: Vec::new(),
+                fuzzed,
+                has_explanation,
+            };
+            netpulse_plugin::VerificationOutcome {
+                manifest: m,
+                claimed_trust: TrustStatus::FirstParty,
+                effective_trust: TrustStatus::FirstParty,
+                verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
+                    "in-tree-key".into(),
+                )),
+                payload_hash_valid: true,
+            }
         };
     reg.register(first_party(
         "example-dissector",

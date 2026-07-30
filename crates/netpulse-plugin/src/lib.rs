@@ -102,12 +102,20 @@ pub enum TrustStatus {
     FirstParty,
 }
 
+pub mod verifier;
+
+pub use verifier::{
+    canonical_manifest_bytes, sign_manifest, KeyMetadata, KeyRole, Keyring, PluginSignature,
+    PluginVerifier, ReviewerInfo, Sha256Digest, SignatureAlgorithm, SignatureBytes,
+    VerificationError, VerificationOutcome, VerificationSuccess, CANONICAL_VERSION,
+};
+
 /// Provenance/trust metadata (docs/24 §5): where a plugin came from and its review
 /// state, so enabling it is an informed, explicit act.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrustMetadata {
     pub source: String,
-    pub signature: Option<String>,
+    pub signatures: Vec<PluginSignature>,
     pub status: TrustStatus,
 }
 
@@ -122,10 +130,13 @@ pub struct ContractVersion(pub u32);
 /// (docs/24 §4.1, docs/07 §8, §7).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginManifest {
+    pub manifest_version: u32,
     pub name: String,
     pub plugin_type: PluginType,
     pub target_contract: ContractVersion,
     pub trust: TrustMetadata,
+    pub payload_hash: Sha256Digest,
+    pub signatures: Vec<PluginSignature>,
     /// Ships a fuzz target — mandatory for dissectors (docs/24 §4.1, §10).
     pub fuzzed: bool,
     /// Ships explanation content/keys — mandatory for dissectors (docs/24 §4.1).
@@ -198,6 +209,18 @@ pub enum DisabledReason {
     IncompatibleContract,
     /// A dissector missing its fuzz target and/or explanation content (docs/24 §4.1).
     IncompleteDissector,
+    /// Cryptographic signature verification failed or signature is invalid.
+    InvalidSignature,
+    /// Missing required signature for claimed FirstParty or Reviewed status.
+    SignatureMissing,
+    /// Plugin binary payload hash does not match manifest payload_hash.
+    PayloadHashMismatch,
+    /// Signing key has been revoked.
+    KeyRevoked,
+    /// Signing key has expired.
+    KeyExpired,
+    /// Manifest byte representation has been tampered with.
+    ManifestTampered,
     /// The user has not enabled it (default for unreviewed side-loads, docs/24 §5).
     NotEnabled,
 }
@@ -209,6 +232,8 @@ pub struct RegisteredPlugin {
     pub enabled: bool,
     /// Present when the plugin is not active, explaining why (docs/24 §8).
     pub disabled_reason: Option<DisabledReason>,
+    /// Cryptographically derived effective trust status.
+    pub effective_trust: TrustStatus,
 }
 
 /// The host-side registry (docs/24 §6). The core does not distinguish built-in
@@ -230,25 +255,46 @@ impl PluginRegistry {
         }
     }
 
-    /// Register a plugin, computing its activation eligibility (docs/24 §6, §8). A
-    /// plugin targeting an incompatible contract, or an incomplete dissector, is
-    /// registered but disabled *with a clear reason* — never silently misbehaving.
-    /// First-party reference plugins auto-enable; others default to not-enabled
-    /// until the user opts in (docs/24 §5).
-    pub fn register(&mut self, manifest: PluginManifest) {
+    /// Register a verified plugin outcome, computing its activation eligibility (docs/24 §6, §8).
+    ///
+    /// Accepts ONLY a [`VerificationOutcome`] produced by [`PluginVerifier::verify`].
+    /// First-party plugins with valid signature auto-enable; unreviewed or invalid plugins
+    /// default to disabled until explicit user consent or signature fix.
+    pub fn register(&mut self, outcome: VerificationOutcome) {
+        let mut manifest = outcome.manifest;
+        manifest.trust.status = outcome.effective_trust;
+
         let reason = if !manifest.is_compatible(ContractVersion(self.host_contract)) {
             Some(DisabledReason::IncompatibleContract)
         } else if !manifest.dissector_obligations_met() {
             Some(DisabledReason::IncompleteDissector)
-        } else if manifest.trust.status != TrustStatus::FirstParty {
+        } else if let Err(ref err) = outcome.verification_result {
+            match err {
+                VerificationError::PayloadHashMismatch => Some(DisabledReason::PayloadHashMismatch),
+                VerificationError::KeyRevoked => Some(DisabledReason::KeyRevoked),
+                VerificationError::KeyExpired => Some(DisabledReason::KeyExpired),
+                VerificationError::SignatureMissing => {
+                    if outcome.claimed_trust == TrustStatus::FirstParty
+                        || outcome.claimed_trust == TrustStatus::Reviewed
+                    {
+                        Some(DisabledReason::SignatureMissing)
+                    } else {
+                        Some(DisabledReason::NotEnabled)
+                    }
+                }
+                _ => Some(DisabledReason::InvalidSignature),
+            }
+        } else if outcome.effective_trust != TrustStatus::FirstParty {
             Some(DisabledReason::NotEnabled)
         } else {
             None
         };
+
         self.plugins.push(RegisteredPlugin {
             enabled: reason.is_none(),
             disabled_reason: reason,
             manifest,
+            effective_trust: outcome.effective_trust,
         });
     }
 
@@ -324,26 +370,48 @@ pub fn no_capability_grants_egress() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_compact::KeyPair;
 
-    fn manifest(name: &str, ty: PluginType, status: TrustStatus) -> PluginManifest {
+    fn manifest(
+        name: &str,
+        ty: PluginType,
+        status: TrustStatus,
+        payload_bytes: &[u8],
+    ) -> PluginManifest {
         PluginManifest {
+            manifest_version: 1,
             name: name.into(),
             plugin_type: ty,
             target_contract: ContractVersion(4),
             trust: TrustMetadata {
                 source: "in-tree".into(),
-                signature: None,
+                signatures: Vec::new(),
                 status,
             },
+            payload_hash: Sha256Digest::compute(payload_bytes),
+            signatures: Vec::new(),
             fuzzed: true,
             has_explanation: true,
+        }
+    }
+
+    fn outcome(
+        m: PluginManifest,
+        effective: TrustStatus,
+        res: std::result::Result<VerificationSuccess, VerificationError>,
+    ) -> VerificationOutcome {
+        VerificationOutcome {
+            manifest: m.clone(),
+            claimed_trust: m.trust.status,
+            effective_trust: effective,
+            verification_result: res,
+            payload_hash_valid: true,
         }
     }
 
     #[test]
     fn no_seam_gets_egress() {
         assert!(no_capability_grants_egress());
-        // Enrichment reads local data only — no network capability exists to grant.
         assert_eq!(
             capabilities_for(PluginType::Enrichment),
             &[Capability::ReadLocalData]
@@ -353,25 +421,42 @@ mod tests {
     #[test]
     fn incompatible_contract_is_disabled_with_reason() {
         let mut reg = PluginRegistry::new(4);
-        let mut m = manifest("old-diss", PluginType::Dissector, TrustStatus::FirstParty);
-        m.target_contract = ContractVersion(3); // host serves 4
-        reg.register(m);
+        let mut m = manifest(
+            "old-diss",
+            PluginType::Dissector,
+            TrustStatus::FirstParty,
+            b"wasm",
+        );
+        m.target_contract = ContractVersion(3);
+        reg.register(outcome(
+            m,
+            TrustStatus::FirstParty,
+            Ok(VerificationSuccess::FirstParty("key1".into())),
+        ));
         let p = &reg.plugins()[0];
         assert!(!p.enabled);
         assert_eq!(
             p.disabled_reason,
             Some(DisabledReason::IncompatibleContract)
         );
-        // Cannot be force-enabled — structural ineligibility, not a consent gate.
         assert!(!reg.clone().enable("old-diss"));
     }
 
     #[test]
     fn dissector_needs_fuzz_and_explanation() {
         let mut reg = PluginRegistry::new(4);
-        let mut m = manifest("bare-diss", PluginType::Dissector, TrustStatus::FirstParty);
-        m.fuzzed = false; // missing fuzz target
-        reg.register(m);
+        let mut m = manifest(
+            "bare-diss",
+            PluginType::Dissector,
+            TrustStatus::FirstParty,
+            b"wasm",
+        );
+        m.fuzzed = false;
+        reg.register(outcome(
+            m,
+            TrustStatus::FirstParty,
+            Ok(VerificationSuccess::FirstParty("key1".into())),
+        ));
         assert_eq!(
             reg.plugins()[0].disabled_reason,
             Some(DisabledReason::IncompleteDissector)
@@ -381,10 +466,16 @@ mod tests {
     #[test]
     fn unreviewed_plugin_defaults_disabled_until_enabled() {
         let mut reg = PluginRegistry::new(4);
-        reg.register(manifest(
+        let m = manifest(
             "community",
             PluginType::Detector,
             TrustStatus::Unreviewed,
+            b"wasm",
+        );
+        reg.register(outcome(
+            m,
+            TrustStatus::Unreviewed,
+            Ok(VerificationSuccess::Unreviewed),
         ));
         assert!(!reg.plugins()[0].enabled);
         assert_eq!(reg.enabled().count(), 0);
@@ -392,20 +483,155 @@ mod tests {
             reg.plugins()[0].disabled_reason,
             Some(DisabledReason::NotEnabled)
         );
-        // Explicit user consent activates it (docs/24 §5).
         assert!(reg.enable("community"));
         assert!(reg.plugins()[0].enabled);
     }
 
     #[test]
-    fn first_party_reference_auto_enables() {
+    fn first_party_verified_auto_enables() {
         let mut reg = PluginRegistry::new(4);
-        reg.register(manifest(
+        let m = manifest(
             "example-detector",
             PluginType::Detector,
             TrustStatus::FirstParty,
+            b"wasm",
+        );
+        reg.register(outcome(
+            m,
+            TrustStatus::FirstParty,
+            Ok(VerificationSuccess::FirstParty("key1".into())),
         ));
         assert!(reg.plugins()[0].enabled);
         assert_eq!(reg.enabled().count(), 1);
+    }
+
+    #[test]
+    fn forged_first_party_claim_demoted_and_disabled() {
+        let payload = b"hostile-plugin-bytes";
+        let m = manifest(
+            "fake-official",
+            PluginType::Detector,
+            TrustStatus::FirstParty,
+            payload,
+        );
+        let keyring = Keyring::new();
+        let verifier = PluginVerifier::new(keyring);
+        let outcome = verifier.verify(m.clone(), payload, 1000);
+
+        assert_eq!(outcome.effective_trust, TrustStatus::Unreviewed);
+        assert_eq!(
+            outcome.verification_result,
+            Err(VerificationError::SignatureMissing)
+        );
+
+        let mut reg = PluginRegistry::new(4);
+        reg.register(outcome);
+        let p = &reg.plugins()[0];
+        assert!(!p.enabled);
+        assert_eq!(p.effective_trust, TrustStatus::Unreviewed);
+        assert_eq!(p.disabled_reason, Some(DisabledReason::SignatureMissing));
+    }
+
+    #[test]
+    fn valid_ed25519_first_party_signature_derives_first_party_trust() {
+        let kp = KeyPair::generate();
+        let mut keyring = Keyring::new();
+        let key_id = keyring.add_key(*kp.pk, KeyRole::FirstParty, 100, None);
+
+        let payload = b"valid-first-party-wasm";
+        let mut m = manifest(
+            "official-plugin",
+            PluginType::Detector,
+            TrustStatus::Unreviewed,
+            payload,
+        );
+        let sig_bytes = sign_manifest(&m, &kp);
+        m.signatures.push(PluginSignature {
+            algorithm: SignatureAlgorithm::Ed25519,
+            key_id,
+            signature: sig_bytes,
+            reviewer_info: None,
+        });
+
+        let verifier = PluginVerifier::new(keyring);
+        let outcome = verifier.verify(m, payload, 200);
+
+        assert_eq!(outcome.effective_trust, TrustStatus::FirstParty);
+        assert!(outcome.verification_result.is_ok());
+
+        let mut reg = PluginRegistry::new(4);
+        reg.register(outcome);
+        assert!(reg.plugins()[0].enabled);
+    }
+
+    #[test]
+    fn payload_hash_mismatch_fails_verification() {
+        let kp = KeyPair::generate();
+        let mut keyring = Keyring::new();
+        let key_id = keyring.add_key(*kp.pk, KeyRole::FirstParty, 100, None);
+
+        let payload = b"original-payload";
+        let mut m = manifest(
+            "tampered-plugin",
+            PluginType::Detector,
+            TrustStatus::Unreviewed,
+            payload,
+        );
+        let sig_bytes = sign_manifest(&m, &kp);
+        m.signatures.push(PluginSignature {
+            algorithm: SignatureAlgorithm::Ed25519,
+            key_id,
+            signature: sig_bytes,
+            reviewer_info: None,
+        });
+
+        let verifier = PluginVerifier::new(keyring);
+        // Tampered payload passed to verify()
+        let outcome = verifier.verify(m, b"tampered-payload", 200);
+
+        assert_eq!(
+            outcome.verification_result,
+            Err(VerificationError::PayloadHashMismatch)
+        );
+        assert!(!outcome.payload_hash_valid);
+
+        let mut reg = PluginRegistry::new(4);
+        reg.register(outcome);
+        assert!(!reg.plugins()[0].enabled);
+        assert_eq!(
+            reg.plugins()[0].disabled_reason,
+            Some(DisabledReason::PayloadHashMismatch)
+        );
+    }
+
+    #[test]
+    fn revoked_key_rejects_verification() {
+        let kp = KeyPair::generate();
+        let mut keyring = Keyring::new();
+        let key_id = keyring.add_key(*kp.pk, KeyRole::FirstParty, 100, None);
+        keyring.revoke_key(&key_id);
+
+        let payload = b"payload";
+        let mut m = manifest(
+            "revoked-plugin",
+            PluginType::Detector,
+            TrustStatus::Unreviewed,
+            payload,
+        );
+        let sig_bytes = sign_manifest(&m, &kp);
+        m.signatures.push(PluginSignature {
+            algorithm: SignatureAlgorithm::Ed25519,
+            key_id,
+            signature: sig_bytes,
+            reviewer_info: None,
+        });
+
+        let verifier = PluginVerifier::new(keyring);
+        let outcome = verifier.verify(m, payload, 200);
+
+        assert_eq!(
+            outcome.verification_result,
+            Err(VerificationError::KeyRevoked)
+        );
     }
 }

@@ -11,7 +11,8 @@ use netpulse_core::model::{ProtoEvent, ProtoEventKind};
 use netpulse_core::time::Timestamp;
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Dissector, PluginManifest, PluginType, TrustMetadata, TrustStatus,
+    ContractVersion, Dissector, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
+    TrustStatus,
 };
 
 /// The reference dissector for the toy `PING`/`PONG` line protocol.
@@ -49,14 +50,17 @@ impl Dissector for PingDissector {
 /// example it is trusted and auto-enabled by the registry.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
+        manifest_version: 1,
         name: "example-dissector".into(),
         plugin_type: PluginType::Dissector,
         target_contract: ContractVersion(netpulse_api_version()),
         trust: TrustMetadata {
             source: "in-tree:plugins/example-dissector".into(),
-            signature: None,
+            signatures: Vec::new(),
             status: TrustStatus::FirstParty,
         },
+        payload_hash: Sha256Digest([0u8; 32]),
+        signatures: Vec::new(),
         fuzzed: true,
         has_explanation: true,
     }
@@ -95,7 +99,16 @@ mod tests {
         // Conformance (docs/24 §10): a first-party dissector auto-enables and meets
         // its fuzz + explanation obligations (docs/24 §4.1).
         let mut reg = PluginRegistry::new(4);
-        reg.register(manifest());
+        let m = manifest();
+        reg.register(netpulse_plugin::VerificationOutcome {
+            manifest: m,
+            claimed_trust: TrustStatus::FirstParty,
+            effective_trust: TrustStatus::FirstParty,
+            verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
+                "in-tree-key".into(),
+            )),
+            payload_hash_valid: true,
+        });
         let p = &reg.plugins()[0];
         assert!(p.enabled);
         assert!(p.manifest.dissector_obligations_met());

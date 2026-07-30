@@ -22,8 +22,8 @@ pub mod ring;
 pub mod timeseries;
 
 pub use capture_store::{CaptureStore, StoredFinding};
-pub use indexer::{IncrementalSessionIndexer, SessionIndexMetrics};
 pub use error::{MigrationError, Result as StorageResult};
+pub use indexer::{IncrementalSessionIndexer, SessionIndexMetrics};
 pub use migration::{MigrationManager, MigrationStatus};
 pub use repository::{
     default_db_path, CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository,

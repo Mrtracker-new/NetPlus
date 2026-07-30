@@ -26,7 +26,11 @@ impl DiagnosticProbe for TracerouteProbe {
     type Output = TracerouteOutput;
 
     fn run(&self, _cancel: AtomicBool) -> Result<Self::Output> {
-        let max = if self.max_hops == 0 { 15 } else { self.max_hops };
+        let max = if self.max_hops == 0 {
+            15
+        } else {
+            self.max_hops
+        };
         let mut hops = Vec::new();
 
         let known_ips = [

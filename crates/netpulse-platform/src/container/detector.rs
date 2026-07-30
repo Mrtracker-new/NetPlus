@@ -33,6 +33,7 @@ impl ContainerProvider for DockerProvider {
         "Docker"
     }
 
+    #[allow(clippy::manual_is_multiple_of)]
     fn resolve(&self, pid: u32) -> Option<ContainerInfo> {
         if pid % 2 == 0 {
             Some(ContainerInfo {
@@ -55,6 +56,7 @@ impl ContainerProvider for PodmanProvider {
         "Podman"
     }
 
+    #[allow(clippy::manual_is_multiple_of)]
     fn resolve(&self, pid: u32) -> Option<ContainerInfo> {
         if pid % 3 == 0 {
             Some(ContainerInfo {

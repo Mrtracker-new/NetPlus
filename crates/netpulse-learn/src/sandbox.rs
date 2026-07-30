@@ -31,15 +31,26 @@ impl PacketBuilderEngine {
 
         for layer in layer_stack {
             match layer.to_lowercase().as_str() {
-                "ethernet" => layers.push("Ethernet II (Dst: 00:11:22:33:44:55, Src: 66:77:88:99:AA:BB)".to_string()),
+                "ethernet" => layers.push(
+                    "Ethernet II (Dst: 00:11:22:33:44:55, Src: 66:77:88:99:AA:BB)".to_string(),
+                ),
                 "ipv4" => {
-                    layers.push("IPv4 (Src: 192.168.1.1, Dst: 192.168.1.2, TTL: 64, Proto: TCP)".to_string());
+                    layers.push(
+                        "IPv4 (Src: 192.168.1.1, Dst: 192.168.1.2, TTL: 64, Proto: TCP)"
+                            .to_string(),
+                    );
                 }
                 "ipv6" => {
-                    layers.push("IPv6 (Src: fe80::1, Dst: fe80::2, HopLimit: 64, NextHeader: TCP)".to_string());
+                    layers.push(
+                        "IPv6 (Src: fe80::1, Dst: fe80::2, HopLimit: 64, NextHeader: TCP)"
+                            .to_string(),
+                    );
                 }
                 "tcp" => {
-                    layers.push("TCP (SrcPort: 443, DstPort: 51234, Flags: [SYN, ACK], Seq: 1000, Ack: 1)".to_string());
+                    layers.push(
+                        "TCP (SrcPort: 443, DstPort: 51234, Flags: [SYN, ACK], Seq: 1000, Ack: 1)"
+                            .to_string(),
+                    );
                     hex.push_str("01bb0050000003e80000000150180200");
                 }
                 "udp" => {
@@ -63,7 +74,8 @@ impl PacketBuilderEngine {
             severity: "Info".to_string(),
             field: "IPv4.TTL".to_string(),
             rfc_reference: "RFC 791 §3.1".to_string(),
-            explanation: "TTL set to 64. Default initial value for modern operating systems.".to_string(),
+            explanation: "TTL set to 64. Default initial value for modern operating systems."
+                .to_string(),
         });
 
         if layer_stack.iter().any(|l| l.to_lowercase() == "tcp") {

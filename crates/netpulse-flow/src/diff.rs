@@ -64,6 +64,10 @@ mod tests {
         }
         let elapsed = start.elapsed();
         // Ensure 10,000 comparisons complete in under 100ms (< 10µs per comparison)
-        assert!(elapsed.as_millis() < 100, "Diff engine benchmark too slow: {:?}", elapsed);
+        assert!(
+            elapsed.as_millis() < 100,
+            "Diff engine benchmark too slow: {:?}",
+            elapsed
+        );
     }
 }

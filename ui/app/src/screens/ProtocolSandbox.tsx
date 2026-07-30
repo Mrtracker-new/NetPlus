@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { query } from "../ipc";
 
 export function ProtocolSandboxScreen() {
@@ -21,9 +21,15 @@ export function ProtocolSandboxScreen() {
         Safe offline packet construction & RFC diagnostic field validation (Observe-Only; Zero Transmit path).
       </p>
 
-      <div style={{ marginBottom: "16px" }}>
+      <div style={{ marginBottom: "16px", display: "flex", gap: "8px" }}>
         <button onClick={inspectPacket} style={{ padding: "8px 16px", background: "#2fe0d6", color: "#0b0e14", fontWeight: "bold", borderRadius: "6px", border: "none" }}>
           Build & Inspect Packet
+        </button>
+        <button onClick={() => setLayers(["Ethernet", "IPv4", "TCP", "HTTP/1.1"])} style={{ padding: "8px 12px", background: "#1a2130", color: "#fff", borderRadius: "6px", border: "1px solid #334155" }}>
+          HTTP/1.1 Stack
+        </button>
+        <button onClick={() => setLayers(["Ethernet", "IPv6", "UDP", "QUIC", "HTTP/3"])} style={{ padding: "8px 12px", background: "#1a2130", color: "#fff", borderRadius: "6px", border: "1px solid #334155" }}>
+          HTTP/3 Stack
         </button>
       </div>
 

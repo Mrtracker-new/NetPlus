@@ -23,7 +23,8 @@ impl RfcRegistry {
                 rfc_number: 791,
                 title: "Internet Protocol".into(),
                 section: "§3.1 IPv4 Header Format".into(),
-                description: "Defines TTL, Header Checksum, Flags, and Fragmentation fields.".into(),
+                description: "Defines TTL, Header Checksum, Flags, and Fragmentation fields."
+                    .into(),
                 updated_by: vec![2474, 6864],
                 obsoleted_by: vec![],
                 see_also: vec![8200],
@@ -32,7 +33,8 @@ impl RfcRegistry {
                 rfc_number: 8200,
                 title: "Internet Protocol, Version 6 (IPv6) Specification".into(),
                 section: "§3 IPv6 Header Format".into(),
-                description: "Replaces TTL with Hop Limit and replaces TOS with Traffic Class.".into(),
+                description: "Replaces TTL with Hop Limit and replaces TOS with Traffic Class."
+                    .into(),
                 updated_by: vec![],
                 obsoleted_by: vec![],
                 see_also: vec![791],
@@ -41,7 +43,8 @@ impl RfcRegistry {
                 rfc_number: 9000,
                 title: "QUIC: A UDP-Based Multiplexed and Secure Transport".into(),
                 section: "§17 Packet Formats".into(),
-                description: "Defines Long/Short Header formats, Connection IDs, and Packet Numbers.".into(),
+                description:
+                    "Defines Long/Short Header formats, Connection IDs, and Packet Numbers.".into(),
                 updated_by: vec![],
                 obsoleted_by: vec![],
                 see_also: vec![8999, 9001],

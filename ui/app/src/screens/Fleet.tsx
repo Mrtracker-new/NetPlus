@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { query } from "../ipc";
 
 export function FleetScreen() {

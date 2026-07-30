@@ -8,14 +8,9 @@ pub trait Codec: Send + Sync {
     fn decode(&self, buf: &[u8]) -> Result<serde_json::Value, String>;
 }
 
+#[derive(Default)]
 pub struct ProviderRegistry {
     pub codecs: Vec<Arc<dyn Codec>>,
-}
-
-impl Default for ProviderRegistry {
-    fn default() -> Self {
-        Self { codecs: Vec::new() }
-    }
 }
 impl std::fmt::Debug for ProviderRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

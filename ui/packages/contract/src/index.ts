@@ -60,7 +60,14 @@ export type Query =
   | { kind: "replayState" }
   | { kind: "exportPreview"; selection: ExportSelection; format: ExportFormat }
   | { kind: "listPlugins" }
-  | { kind: "interfaces" };
+  | { kind: "interfaces" }
+  | { kind: "getCapabilityRegistry" }
+  | { kind: "runPing"; target: string; count: number }
+  | { kind: "runTraceroute"; target: string; transport: string; maxHops: number }
+  | { kind: "runBufferbloatTest"; target?: string }
+  | { kind: "buildAndDecodePacket"; layers: string[] }
+  | { kind: "compareSessions"; sessionIdA: number; sessionIdB: number }
+  | { kind: "listFleetHosts" };
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
@@ -82,7 +89,14 @@ export type QueryResponse =
   | { kind: "replayState"; state: ReplayState }
   | { kind: "exportPreview"; preview: ExportPreview }
   | { kind: "plugins"; plugins: PluginDescriptor[] }
-  | { kind: "interfaces"; interfaces: Interface[] };
+  | { kind: "interfaces"; interfaces: Interface[] }
+  | { kind: "capabilityRegistry"; registry: any }
+  | { kind: "pingResult"; result: any }
+  | { kind: "tracerouteResult"; hops: any[] }
+  | { kind: "bufferbloatResult"; result: any }
+  | { kind: "decodedPacketInspection"; inspection: any }
+  | { kind: "sessionDiff"; diff: any }
+  | { kind: "fleetHosts"; hosts: any[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic (docs/02 §10). */

@@ -37,7 +37,10 @@ impl JsonCodec {
             return Err("Invalid magic bytes in frame header".to_string());
         }
         if header.version > CURRENT_VERSION {
-            return Err(format!("Unsupported future transport version: {}", header.version));
+            return Err(format!(
+                "Unsupported future transport version: {}",
+                header.version
+            ));
         }
         if header.payload_len > 10 * 1024 * 1024 {
             return Err("Frame payload exceeds 10MB safety limit".to_string());

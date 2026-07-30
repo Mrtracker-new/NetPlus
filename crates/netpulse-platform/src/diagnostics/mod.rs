@@ -14,10 +14,7 @@ use netpulse_core::Result;
 
 pub trait DiagnosticProbe: Send + Sync {
     type Output;
-    fn run(
-        &self,
-        cancel: std::sync::atomic::AtomicBool,
-    ) -> Result<Self::Output>;
+    fn run(&self, cancel: std::sync::atomic::AtomicBool) -> Result<Self::Output>;
 }
 
 #[cfg(test)]

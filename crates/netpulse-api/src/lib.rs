@@ -236,7 +236,10 @@ pub enum Query {
     /// Safe offline packet construction and decoding inspection.
     BuildAndDecodePacket { layers: Vec<String> },
     /// Compare two capture sessions side-by-side with rule-based explanations.
-    CompareSessions { session_id_a: u64, session_id_b: u64 },
+    CompareSessions {
+        session_id_a: u64,
+        session_id_b: u64,
+    },
     /// List remote fleet observation hosts.
     ListFleetHosts,
 }
@@ -638,12 +641,18 @@ mod tests {
 
     #[test]
     fn test_new_queries_roundtrip() {
-        let q1 = Query::RunPing { target: "1.1.1.1".into(), count: 4 };
+        let q1 = Query::RunPing {
+            target: "1.1.1.1".into(),
+            count: 4,
+        };
         let json1 = serde_json::to_string(&q1).unwrap();
         let back1: Query = serde_json::from_str(&json1).unwrap();
         assert_eq!(q1, back1);
 
-        let q2 = Query::CompareSessions { session_id_a: 10, session_id_b: 20 };
+        let q2 = Query::CompareSessions {
+            session_id_a: 10,
+            session_id_b: 20,
+        };
         let json2 = serde_json::to_string(&q2).unwrap();
         let back2: Query = serde_json::from_str(&json2).unwrap();
         assert_eq!(q2, back2);

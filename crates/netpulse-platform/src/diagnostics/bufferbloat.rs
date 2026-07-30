@@ -20,10 +20,7 @@ impl DiagnosticProbe for BufferbloatProbe {
     type Output = BufferbloatOutput;
 
     fn run(&self, _cancel: AtomicBool) -> Result<Self::Output> {
-        let target_host = self
-            .target
-            .clone()
-            .unwrap_or_else(|| "1.1.1.1".to_string());
+        let target_host = self.target.clone().unwrap_or_else(|| "1.1.1.1".to_string());
 
         let idle_rtt_ms = 14.2;
         let loaded_rtt_ms = 19.8;

@@ -42,4 +42,3 @@ pub use net::{FiveTuple, L4Proto, L7Proto};
 pub use providers::ProviderRegistry;
 pub use time::Timestamp;
 pub use traits::{AttributionSource, CaptureSource, Detector, Dissector, SocketTableSource};
-

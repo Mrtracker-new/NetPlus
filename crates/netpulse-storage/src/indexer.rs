@@ -24,7 +24,14 @@ impl IncrementalSessionIndexer {
         }
     }
 
-    pub fn index_chunk(&mut self, session_id: u64, flow_count_delta: u32, bytes_delta: u64, rtt_ms: f32, protocol: &str) {
+    pub fn index_chunk(
+        &mut self,
+        session_id: u64,
+        flow_count_delta: u32,
+        bytes_delta: u64,
+        rtt_ms: f32,
+        protocol: &str,
+    ) {
         let entry = self.cached_indexes.entry(session_id).or_default();
         entry.flow_count += flow_count_delta;
         entry.total_bytes += bytes_delta;

@@ -27,6 +27,7 @@ import { Assistant } from "./screens/Assistant";
 import { Recordings } from "./screens/Recordings";
 import { Replay } from "./screens/Replay";
 import { Export } from "./screens/Export";
+import { Plugins } from "./screens/Plugins";
 import { DiagnosticsScreen } from "./screens/Diagnostics";
 import { ProtocolSandboxScreen } from "./screens/ProtocolSandbox";
 import { FleetScreen } from "./screens/Fleet";

@@ -36,3 +36,11 @@ netpulse-platform = { path = "../crates/netpulse-platform", features = ["live-ca
 [features]
 # Tauri's default custom-protocol feature for production builds.
 custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+opt-level = "z"
+

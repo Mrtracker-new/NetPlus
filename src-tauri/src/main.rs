@@ -63,11 +63,24 @@ struct AppState {
     sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
 }
 
+/// Scope guard that guarantees a completion signal is sent when live_loop exits
+/// (even on panic or early return).
+struct CompletionGuard(Option<std::sync::mpsc::Sender<()>>);
+
+impl Drop for CompletionGuard {
+    fn drop(&mut self) {
+        if let Some(tx) = self.0.take() {
+            let _ = tx.send(());
+        }
+    }
+}
+
 /// Control handle for the background live-capture thread: a stop flag it polls
-/// between batches, and its join handle so [`stop_capture`] can wait for a clean
-/// shutdown (docs/05 §4).
+/// between batches, a completion receiver, and its join handle so [`stop_capture`]
+/// can wait deterministically without indefinite blocking (docs/05 §4).
 struct CaptureControl {
     stop: Arc<AtomicBool>,
+    done_rx: std::sync::mpsc::Receiver<()>,
     handle: std::thread::JoinHandle<()>,
 }
 
@@ -111,12 +124,22 @@ fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
     let stop = Arc::new(AtomicBool::new(false));
     let stop_thread = Arc::clone(&stop);
     let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
 
     let handle = std::thread::spawn(move || match netpulse_platform::open_capture(iface_id) {
         Ok(capture) => {
             let dlt = capture.link_dlt();
             let _ = tx.send(Ok(()));
-            live_loop(capture, dlt, store, stats, correlator, sockets, stop_thread);
+            live_loop(
+                capture,
+                dlt,
+                store,
+                stats,
+                correlator,
+                sockets,
+                stop_thread,
+                done_tx,
+            );
         }
         Err(e) => {
             let _ = tx.send(Err(e.to_string()));
@@ -125,28 +148,97 @@ fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
 
     match rx.recv() {
         Ok(Ok(())) => {
-            *guard = Some(CaptureControl { stop, handle });
+            *guard = Some(CaptureControl {
+                stop,
+                done_rx,
+                handle,
+            });
             Ok(())
         }
         Ok(Err(e)) => {
             let _ = handle.join();
             Err(e)
         }
-        Err(_) => Err("capture thread failed to start".into()),
+        Err(_) => {
+            let _ = handle.join();
+            Err("capture thread failed to start".into())
+        }
     }
 }
 
-/// Stop the running live capture and wait for the thread to finish; the last
-/// reconstruction stays in the store so the screens keep showing what was seen.
+/// Stop the running live capture gracefully: signal the thread, wait for a completion
+/// signal (up to 3s), join cleanly, and commit the final reconstruction store.
 fn stop_capture(state: &AppState) -> Result<(), String> {
     let ctrl = state.capture.lock().map_err(|_| "state poisoned")?.take();
     match ctrl {
         Some(ctrl) => {
             ctrl.stop.store(true, Ordering::Relaxed);
-            let _ = ctrl.handle.join();
-            Ok(())
+            match ctrl.done_rx.recv_timeout(std::time::Duration::from_secs(3)) {
+                Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    match ctrl.handle.join() {
+                        Ok(()) => Ok(()),
+                        Err(_) => Err("capture thread panicked during shutdown".into()),
+                    }
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    // Put control handle back so UI state honestly reflects thread is still running
+                    if let Ok(mut guard) = state.capture.lock() {
+                        *guard = Some(ctrl);
+                    }
+                    Err("capture thread did not terminate within 3 seconds".into())
+                }
+            }
         }
         None => Err("no capture is running".into()),
+    }
+}
+
+/// Helper function with narrow responsibility: rebuild flows from the frame buffer
+/// and commit the updated reconstruction store, stats, and name hints.
+fn rebuild_and_commit(
+    dlt: u32,
+    buffer: &mut VecDeque<RawFrame>,
+    capture_stats: (u64, u64),
+    store: &Arc<Mutex<CaptureStore>>,
+    stats: &Arc<Mutex<CaptureStats>>,
+    hint_cache: &mut std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>>,
+    last_hint_refresh: &mut Option<std::time::Instant>,
+    shed_controller: &ShedController,
+    buffer_drops: u64,
+    max_frames: usize,
+    hint_refresh_secs: u64,
+) {
+    if buffer.is_empty() {
+        return;
+    }
+    let slice = buffer.make_contiguous();
+    if let Ok((mut new_store, _report)) =
+        netpulse_engine::pipeline::analyze_frames(dlt, slice, 16)
+    {
+        if last_hint_refresh
+            .map(|t: std::time::Instant| t.elapsed().as_secs() >= hint_refresh_secs)
+            .unwrap_or(true)
+        {
+            *hint_cache = netpulse_platform::host_name_hints();
+            *last_hint_refresh = Some(std::time::Instant::now());
+        }
+        for (ip, names) in hint_cache.iter() {
+            new_store.merge_resolution(*ip, names.clone());
+        }
+
+        let (received, kernel_dropped) = capture_stats;
+        if let Ok(mut s) = store.lock() {
+            *s = new_store;
+        }
+        if let Ok(mut st) = stats.lock() {
+            *st = CaptureStats {
+                received,
+                dropped: kernel_dropped.saturating_add(buffer_drops),
+                shed_stage: shed_controller.current_stage(),
+                buffer_frames: buffer.len(),
+                buffer_capacity: max_frames,
+            };
+        }
     }
 }
 
@@ -163,13 +255,10 @@ fn live_loop(
     correlator: Arc<Mutex<Correlator>>,
     sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
     stop: Arc<AtomicBool>,
+    done_tx: std::sync::mpsc::Sender<()>,
 ) {
-    // Bound memory and rebuild cost: keep only the most recent frames (docs/08
-    // §4 bounded/private). Option A (sliding window) preserves the newest frames.
+    let _completion_guard = CompletionGuard(Some(done_tx));
     const MAX_FRAMES: usize = 50_000;
-    // How often to re-read the OS name hints (hosts file + DNS resolver cache).
-    // The read spawns a helper process, so we cache it between refreshes rather
-    // than paying that cost on every ~1s rebuild.
     const HINT_REFRESH_SECS: u64 = 30;
 
     let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(MAX_FRAMES);
@@ -177,8 +266,6 @@ fn live_loop(
     let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
-    // Cached host-environment name overlay and when it was last refreshed
-    // (`None` = not yet read; forces a read on the first rebuild).
     let mut hint_cache: std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>> =
         std::collections::BTreeMap::new();
     let mut last_hint_refresh: Option<std::time::Instant> = None;
@@ -216,42 +303,19 @@ fn live_loop(
 
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
-            let slice = buffer.make_contiguous();
-            if let Ok((mut new_store, _report)) =
-                netpulse_engine::pipeline::analyze_frames(dlt, slice, 16)
-            {
-                // Overlay host-environment name hints (OS DNS cache, hosts file,
-                // cached mDNS) onto the wire-only resolutions, so IPs whose lookup
-                // predated capture still get a name (docs/08 §5.1). The engine's
-                // rebuild is authoritative and deterministic; this overlay is a
-                // live-only, machine-local complement layered on top of it, and is
-                // merged (never clobbers a name seen on the wire). Refreshed
-                // periodically since reading the OS cache spawns a helper process.
-                if last_hint_refresh
-                    .map(|t: std::time::Instant| t.elapsed().as_secs() >= HINT_REFRESH_SECS)
-                    .unwrap_or(true)
-                {
-                    hint_cache = netpulse_platform::host_name_hints();
-                    last_hint_refresh = Some(std::time::Instant::now());
-                }
-                for (ip, names) in &hint_cache {
-                    new_store.merge_resolution(*ip, names.clone());
-                }
-
-                let (received, kernel_dropped) = capture.stats();
-                if let Ok(mut s) = store.lock() {
-                    *s = new_store;
-                }
-                if let Ok(mut st) = stats.lock() {
-                    *st = CaptureStats {
-                        received,
-                        dropped: kernel_dropped.saturating_add(buffer_drops),
-                        shed_stage: shed_controller.current_stage(),
-                        buffer_frames: buffer.len(),
-                        buffer_capacity: MAX_FRAMES,
-                    };
-                }
-            }
+            rebuild_and_commit(
+                dlt,
+                &mut buffer,
+                capture.stats(),
+                &store,
+                &stats,
+                &mut hint_cache,
+                &mut last_hint_refresh,
+                &shed_controller,
+                buffer_drops,
+                MAX_FRAMES,
+                HINT_REFRESH_SECS,
+            );
 
             // Poll the OS socket tables and feed the correlator, timestamped in the
             // same capture-relative monotonic clock the flows use (docs/12 §5).
@@ -264,6 +328,22 @@ fn live_loop(
             }
         }
     }
+
+    // Final Flush on shutdown so in-flight frames are never lost
+    rebuild_and_commit(
+        dlt,
+        &mut buffer,
+        capture.stats(),
+        &store,
+        &stats,
+        &mut hint_cache,
+        &mut last_hint_refresh,
+        &shed_controller,
+        buffer_drops,
+        MAX_FRAMES,
+        HINT_REFRESH_SECS,
+    );
+    // _completion_guard drops here, signaling done_tx
 }
 
 /// Optionally seed the committed store from a pcap named by `NETPULSE_PCAP`,
@@ -301,6 +381,7 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
             let stats = CaptureStats {
                 received: report.frames_read as u64,
                 dropped: 0,
+                ..Default::default()
             };
             eprintln!(
                 "NetPulse: loaded {} — {} frames, {} decoded, {} flows, {} sessions, {} causal links.",
@@ -740,4 +821,114 @@ fn main() {
         .invoke_handler(tauri::generate_handler![query, command])
         .run(tauri::generate_context!())
         .expect("error while running the NetPulse shell");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_completion_guard_sends_signal_on_drop() {
+        let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+        {
+            let _guard = CompletionGuard(Some(done_tx));
+        }
+        assert_eq!(done_rx.try_recv(), Ok(()));
+    }
+
+    #[test]
+    fn test_rebuild_and_commit_flushes_buffered_frames() {
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let mut buffer: VecDeque<RawFrame> = VecDeque::new();
+
+        buffer.push_back(RawFrame {
+            mono_nanos: 1_000_000,
+            iface_id: 1,
+            bytes: vec![0u8; 54],
+        });
+
+        let mut hint_cache = std::collections::BTreeMap::new();
+        let mut last_hint_refresh = None;
+        let shed_controller = ShedController::new(1000);
+
+        rebuild_and_commit(
+            1,
+            &mut buffer,
+            (1, 0),
+            &store,
+            &stats,
+            &mut hint_cache,
+            &mut last_hint_refresh,
+            &shed_controller,
+            0,
+            1000,
+            30,
+        );
+
+        let st = stats.lock().unwrap();
+        assert_eq!(st.buffer_frames, 1);
+        assert_eq!(st.buffer_capacity, 1000);
+        assert_eq!(st.received, 1);
+    }
+
+    #[test]
+    fn test_stop_capture_on_idle_state_fails_honestly() {
+        let state = AppState::default();
+        let res = stop_capture(&state);
+        assert_eq!(res.unwrap_err(), "no capture is running");
+    }
+
+    #[test]
+    fn test_worker_timeout_path_preserves_capture_control() {
+        let state = AppState::default();
+        let stop = Arc::new(AtomicBool::new(false));
+        let (_done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+        // Spawn a thread that ignores the stop flag and sleeps longer than the 3s timeout
+        let handle = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(5));
+        });
+
+        {
+            let mut guard = state.capture.lock().unwrap();
+            *guard = Some(CaptureControl {
+                stop,
+                done_rx,
+                handle,
+            });
+        }
+
+        let res = stop_capture(&state);
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("did not terminate within 3 seconds"));
+
+        // Verify CaptureControl handle was restored so system honestly reports running
+        let guard = state.capture.lock().unwrap();
+        assert!(guard.is_some());
+    }
+
+    #[test]
+    fn test_panicked_worker_returns_error() {
+        let state = AppState::default();
+        let stop = Arc::new(AtomicBool::new(false));
+        let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+
+        let handle = std::thread::spawn(move || {
+            let _guard = CompletionGuard(Some(done_tx));
+            panic!("simulated worker panic");
+        });
+
+        {
+            let mut guard = state.capture.lock().unwrap();
+            *guard = Some(CaptureControl {
+                stop,
+                done_rx,
+                handle,
+            });
+        }
+
+        let res = stop_capture(&state);
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), "capture thread panicked during shutdown");
+    }
 }

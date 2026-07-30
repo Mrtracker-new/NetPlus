@@ -221,6 +221,24 @@ pub enum Query {
         client_min_version: u32,
         client_max_version: u32,
     },
+    /// Fetch the capability registry and dependency nodes.
+    GetCapabilityRegistry,
+    /// Run an active ping diagnostic probe.
+    RunPing { target: String, count: u32 },
+    /// Run an active traceroute diagnostic probe.
+    RunTraceroute {
+        target: String,
+        transport: String,
+        max_hops: u8,
+    },
+    /// Run a dual-phase bufferbloat latency probe.
+    RunBufferbloatTest { target: Option<String> },
+    /// Safe offline packet construction and decoding inspection.
+    BuildAndDecodePacket { layers: Vec<String> },
+    /// Compare two capture sessions side-by-side with rule-based explanations.
+    CompareSessions { session_id_a: u64, session_id_b: u64 },
+    /// List remote fleet observation hosts.
+    ListFleetHosts,
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -301,6 +319,95 @@ pub enum QueryResponse {
     Handshake {
         handshake: HandshakeResponseDto,
     },
+    CapabilityRegistry {
+        registry: serde_json::Value,
+    },
+    PingResult {
+        result: PingResultDto,
+    },
+    TracerouteResult {
+        hops: Vec<TracerouteHopDto>,
+    },
+    BufferbloatResult {
+        result: BufferbloatResultDto,
+    },
+    DecodedPacketInspection {
+        inspection: PacketInspectionDto,
+    },
+    SessionDiff {
+        diff: SessionDiffDto,
+    },
+    FleetHosts {
+        hosts: Vec<HostIdentityDto>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PingResultDto {
+    pub target: String,
+    pub sent: u32,
+    pub received: u32,
+    pub loss_pct: f32,
+    pub min_rtt_ms: f32,
+    pub avg_rtt_ms: f32,
+    pub max_rtt_ms: f32,
+    pub stddev_rtt_ms: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TracerouteHopDto {
+    pub ttl: u8,
+    pub ip: String,
+    pub hostname: Option<String>,
+    pub rtt_ms: f32,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BufferbloatResultDto {
+    pub target: String,
+    pub idle_rtt_ms: f32,
+    pub loaded_rtt_ms: f32,
+    pub delta_rtt_ms: f32,
+    pub grade: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FieldDiagnosticDto {
+    pub severity: String,
+    pub field: String,
+    pub rfc_reference: String,
+    pub explanation: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PacketInspectionDto {
+    pub raw_hex: String,
+    pub layers: Vec<String>,
+    pub diagnostics: Vec<FieldDiagnosticDto>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SessionDiffDto {
+    pub session_id_a: u64,
+    pub session_id_b: u64,
+    pub rtt_delta_ms: f32,
+    pub ttfb_delta_ms: f32,
+    pub protocol_shift: String,
+    pub semantic_explanation: String,
+    pub confidence: String,
+    pub evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HostIdentityDto {
+    pub host_id: String,
+    pub hostname: String,
+    pub friendly_name: Option<String>,
+    pub os: String,
+    pub platform: String,
+    pub agent_version: String,
+    pub status: String,
 }
 
 /// A user-initiated control write — the only write path UI→engine (docs/02 §7.1).
@@ -527,5 +634,38 @@ mod tests {
             res.error_code,
             Some(handshake_error_codes::INVALID_VERSION_RANGE.into())
         );
+    }
+
+    #[test]
+    fn test_new_queries_roundtrip() {
+        let q1 = Query::RunPing { target: "1.1.1.1".into(), count: 4 };
+        let json1 = serde_json::to_string(&q1).unwrap();
+        let back1: Query = serde_json::from_str(&json1).unwrap();
+        assert_eq!(q1, back1);
+
+        let q2 = Query::CompareSessions { session_id_a: 10, session_id_b: 20 };
+        let json2 = serde_json::to_string(&q2).unwrap();
+        let back2: Query = serde_json::from_str(&json2).unwrap();
+        assert_eq!(q2, back2);
+    }
+
+    #[test]
+    fn test_new_responses_roundtrip() {
+        let r1 = QueryResponse::PingResult {
+            result: PingResultDto {
+                target: "1.1.1.1".into(),
+                sent: 4,
+                received: 4,
+                loss_pct: 0.0,
+                min_rtt_ms: 12.0,
+                avg_rtt_ms: 14.5,
+                max_rtt_ms: 18.0,
+                stddev_rtt_ms: 0.5,
+            },
+        };
+        let json1 = serde_json::to_string(&r1).unwrap();
+        let back1: QueryResponse = serde_json::from_str(&json1).unwrap();
+        assert_eq!(r1, back1);
+        assert!(json1.contains("\"kind\":\"pingResult\""));
     }
 }

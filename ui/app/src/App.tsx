@@ -27,7 +27,10 @@ import { Assistant } from "./screens/Assistant";
 import { Recordings } from "./screens/Recordings";
 import { Replay } from "./screens/Replay";
 import { Export } from "./screens/Export";
-import { Plugins } from "./screens/Plugins";
+import { DiagnosticsScreen } from "./screens/Diagnostics";
+import { ProtocolSandboxScreen } from "./screens/ProtocolSandbox";
+import { FleetScreen } from "./screens/Fleet";
+import { SessionDiffScreen } from "./screens/SessionDiff";
 
 type Screen =
   | "dashboard"
@@ -42,7 +45,11 @@ type Screen =
   | "recordings"
   | "replay"
   | "export"
-  | "plugins";
+  | "plugins"
+  | "diagnostics"
+  | "sandbox"
+  | "fleet"
+  | "compare";
 
 const NAV: Array<{ id: Screen; label: string; icon: IconName }> = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -50,6 +57,10 @@ const NAV: Array<{ id: Screen; label: string; icon: IconName }> = [
   { id: "timeline", label: "Timeline", icon: "timeline" },
   { id: "monitoring", label: "Monitor", icon: "monitoring" },
   { id: "apps", label: "Apps", icon: "apps" },
+  { id: "diagnostics", label: "Diagnostics", icon: "security" },
+  { id: "sandbox", label: "Sandbox", icon: "explorer" },
+  { id: "fleet", label: "Fleet", icon: "apps" },
+  { id: "compare", label: "Compare", icon: "timeline" },
   { id: "security", label: "Security", icon: "security" },
   { id: "assistant", label: "Assistant", icon: "assistant" },
   { id: "learn", label: "Learn", icon: "learn" },
@@ -75,6 +86,10 @@ const SCREEN_TITLE: Record<Screen, string> = {
   replay: "Replay",
   export: "Export",
   plugins: "Plugins",
+  diagnostics: "Diagnostics",
+  sandbox: "Protocol Sandbox",
+  fleet: "Fleet",
+  compare: "Session Compare",
 };
 
 function ModeSwitch() {
@@ -329,6 +344,10 @@ function Shell() {
           {screen === "timeline" && <Timeline />}
           {screen === "monitoring" && <Monitoring />}
           {screen === "apps" && <Apps />}
+          {screen === "diagnostics" && <DiagnosticsScreen />}
+          {screen === "sandbox" && <ProtocolSandboxScreen />}
+          {screen === "fleet" && <FleetScreen />}
+          {screen === "compare" && <SessionDiffScreen />}
           {screen === "security" && <Security />}
           {screen === "assistant" && <Assistant />}
           {screen === "learn" && <Learn />}

@@ -29,6 +29,11 @@ pub mod content;
 pub mod engine;
 pub mod explorer;
 pub mod progress;
+pub mod rfc;
+pub mod sandbox;
+
+pub use rfc::{RfcMetadata, RfcRegistry};
+pub use sandbox::{DecodedPacketInspection, FieldDiagnostic, PacketBuilderEngine};
 
 pub use anim::{fan_out, tcp_handshake, AnimationKind, AnimationModel, Direction, VisualEvent};
 pub use content::{

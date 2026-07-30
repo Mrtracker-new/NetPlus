@@ -14,6 +14,7 @@
 
 pub mod capture_store;
 pub mod error;
+pub mod indexer;
 pub mod migration;
 pub mod models;
 pub mod repository;
@@ -21,6 +22,7 @@ pub mod ring;
 pub mod timeseries;
 
 pub use capture_store::{CaptureStore, StoredFinding};
+pub use indexer::{IncrementalSessionIndexer, SessionIndexMetrics};
 pub use error::{MigrationError, Result as StorageResult};
 pub use migration::{MigrationManager, MigrationStatus};
 pub use repository::{

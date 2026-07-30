@@ -1250,6 +1250,8 @@ dependencies = [
  "netpulse-capture",
  "netpulse-core",
  "netpulse-platform",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -1302,6 +1304,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-decode",
+ "serde",
 ]
 
 [[package]]
@@ -1340,6 +1343,7 @@ dependencies = [
  "netpulse-core",
  "netstat2",
  "pcap",
+ "serde",
  "sysinfo",
  "tracing",
 ]

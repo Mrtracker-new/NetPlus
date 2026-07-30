@@ -204,6 +204,117 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             );
             Ok(QueryResponse::Handshake { handshake })
         }
+        Query::GetCapabilityRegistry => {
+            let reg = netpulse_core::capabilities::CapabilityRegistry::default();
+            let json = serde_json::to_value(reg).unwrap_or(serde_json::Value::Null);
+            Ok(QueryResponse::CapabilityRegistry { registry: json })
+        }
+        Query::RunPing { target, count } => {
+            use netpulse_platform::diagnostics::{DiagnosticProbe, PingProbe};
+            let probe = PingProbe::new(target, count);
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            Ok(QueryResponse::PingResult {
+                result: netpulse_api::PingResultDto {
+                    target: out.target,
+                    sent: out.sent,
+                    received: out.received,
+                    loss_pct: out.loss_pct,
+                    min_rtt_ms: out.min_rtt_ms,
+                    avg_rtt_ms: out.avg_rtt_ms,
+                    max_rtt_ms: out.max_rtt_ms,
+                    stddev_rtt_ms: out.stddev_rtt_ms,
+                },
+            })
+        }
+        Query::RunTraceroute {
+            target,
+            transport,
+            max_hops,
+        } => {
+            use netpulse_platform::diagnostics::{DiagnosticProbe, TracerouteProbe};
+            let probe = TracerouteProbe::new(target, transport, max_hops);
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            let hops = out
+                .hops
+                .into_iter()
+                .map(|h| netpulse_api::TracerouteHopDto {
+                    ttl: h.ttl,
+                    ip: h.ip,
+                    hostname: h.hostname,
+                    rtt_ms: h.rtt_ms,
+                    status: h.status,
+                })
+                .collect();
+            Ok(QueryResponse::TracerouteResult { hops })
+        }
+        Query::RunBufferbloatTest { target } => {
+            use netpulse_platform::diagnostics::{BufferbloatProbe, DiagnosticProbe};
+            let probe = BufferbloatProbe::new(target);
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            Ok(QueryResponse::BufferbloatResult {
+                result: netpulse_api::BufferbloatResultDto {
+                    target: out.target,
+                    idle_rtt_ms: out.idle_rtt_ms,
+                    loaded_rtt_ms: out.loaded_rtt_ms,
+                    delta_rtt_ms: out.delta_rtt_ms,
+                    grade: out.grade,
+                },
+            })
+        }
+        Query::BuildAndDecodePacket { layers } => {
+            let inspection = netpulse_learn::sandbox::PacketBuilderEngine::build_and_inspect(&layers);
+            Ok(QueryResponse::DecodedPacketInspection {
+                inspection: netpulse_api::PacketInspectionDto {
+                    raw_hex: inspection.raw_hex,
+                    layers: inspection.layers,
+                    diagnostics: inspection
+                        .diagnostics
+                        .into_iter()
+                        .map(|d| netpulse_api::FieldDiagnosticDto {
+                            severity: d.severity,
+                            field: d.field,
+                            rfc_reference: d.rfc_reference,
+                            explanation: d.explanation,
+                        })
+                        .collect(),
+                },
+            })
+        }
+        Query::CompareSessions {
+            session_id_a,
+            session_id_b,
+        } => {
+            let report = netpulse_flow::diff::SessionDiffEngine::compare(session_id_a, session_id_b);
+            Ok(QueryResponse::SessionDiff {
+                diff: netpulse_api::SessionDiffDto {
+                    session_id_a: report.session_id_a,
+                    session_id_b: report.session_id_b,
+                    rtt_delta_ms: report.rtt_delta_ms,
+                    ttfb_delta_ms: report.ttfb_delta_ms,
+                    protocol_shift: report.protocol_shift,
+                    semantic_explanation: report.semantic_explanation,
+                    confidence: report.confidence,
+                    evidence: report.evidence,
+                },
+            })
+        }
+        Query::ListFleetHosts => {
+            let agent = netpulse_capture_svc::agent::FleetAgent::new("server-east-01".into(), "Linux".into());
+            Ok(QueryResponse::FleetHosts {
+                hosts: vec![netpulse_api::HostIdentityDto {
+                    host_id: agent.identity.host_id,
+                    hostname: agent.identity.hostname,
+                    friendly_name: agent.identity.friendly_name,
+                    os: agent.identity.os,
+                    platform: agent.identity.platform,
+                    agent_version: agent.identity.agent_version,
+                    status: agent.health.status,
+                }],
+            })
+        }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
 }

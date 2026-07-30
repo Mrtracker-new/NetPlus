@@ -25,6 +25,9 @@ pub mod monitor;
 pub mod pipeline;
 pub mod project;
 pub mod security;
+pub mod supervisor;
+
+pub use supervisor::{TaskStatus, TaskSupervisor};
 
 pub use education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,

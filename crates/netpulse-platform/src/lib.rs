@@ -44,6 +44,8 @@ use netpulse_core::traits::SocketTableSource;
 // egress-free, so it is always available — no `live-capture` gate — and portable
 // across OSes (the resolver-cache reader is Windows-only inside; other platforms
 // contribute only hosts-file entries).
+pub mod container;
+pub mod diagnostics;
 pub mod names;
 pub use names::host_name_hints;
 

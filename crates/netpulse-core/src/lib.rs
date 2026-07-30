@@ -13,22 +13,33 @@
 //! *shapes* and *contracts*.
 #![forbid(unsafe_code)]
 
+pub mod capabilities;
+pub mod config;
 pub mod disclosure;
 pub mod error;
+pub mod events;
+pub mod fleet;
 pub mod health;
 pub mod model;
 pub mod net;
+pub mod providers;
 pub mod telemetry;
 pub mod time;
 pub mod traits;
 
+pub use capabilities::CapabilityRegistry;
+pub use config::AppConfig;
 pub use disclosure::Depth;
 pub use error::{NpError, Result};
+pub use events::SystemEventEnvelope;
+pub use fleet::{HostHealthMetrics, HostIdentity};
 pub use model::{
     AttributionConfidence, Confidence, EvidenceRef, Finding, FindingCategory, Flow, FlowMetrics,
     FlowState, Host, HostName, Journey, NameSource, Packet, Process, ProtoEvent, ProtoEventKind,
     Session, SocketOwner,
 };
 pub use net::{FiveTuple, L4Proto, L7Proto};
+pub use providers::ProviderRegistry;
 pub use time::Timestamp;
 pub use traits::{AttributionSource, CaptureSource, Detector, Dissector, SocketTableSource};
+

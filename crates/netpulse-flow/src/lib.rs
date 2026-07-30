@@ -16,6 +16,7 @@
 #![forbid(unsafe_code)]
 
 pub mod decode_view;
+pub mod diff;
 pub mod engine;
 pub mod identity;
 pub mod metrics;
@@ -25,6 +26,7 @@ pub mod state;
 pub mod table;
 
 pub use decode_view::{DnsResolution, PacketView, TcpSignals};
+pub use diff::{SessionDiffEngine, SessionDiffReport};
 pub use engine::{FinalizedFlow, FlowEngine};
 pub use identity::{CanonicalKey, Direction};
 pub use resolution::ResolutionTable;

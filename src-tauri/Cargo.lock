@@ -2185,6 +2185,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2196,6 +2197,18 @@ dependencies = [
  "netpulse-platform",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "netpulse-capture-svc"
+version = "0.1.0"
+dependencies = [
+ "netpulse-capture",
+ "netpulse-core",
+ "netpulse-platform",
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -2244,6 +2257,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-decode",
+ "serde",
 ]
 
 [[package]]
@@ -2281,6 +2295,7 @@ dependencies = [
  "netpulse-core",
  "netstat2",
  "pcap",
+ "serde",
  "sysinfo",
  "tracing",
 ]
@@ -2301,8 +2316,11 @@ version = "0.1.0"
 dependencies = [
  "netpulse-api",
  "netpulse-capture",
+ "netpulse-capture-svc",
  "netpulse-core",
  "netpulse-engine",
+ "netpulse-flow",
+ "netpulse-learn",
  "netpulse-platform",
  "netpulse-plugin",
  "netpulse-storage",

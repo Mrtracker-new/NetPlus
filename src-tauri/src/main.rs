@@ -19,7 +19,7 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto, InterfaceDto};
+use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto};
 use netpulse_api::{Command, ProjectionDepth, Query, QueryResponse};
 use netpulse_capture::{
     CaptureStats, Recording, ReplayController, ReplayState, ShedController, ShedStage,
@@ -27,40 +27,36 @@ use netpulse_capture::{
 };
 use netpulse_core::traits::{CaptureSource, RawFrame, SocketTableSource};
 use netpulse_core::Depth;
-use netpulse_engine::attribution::{Attribution, Correlator};
-use netpulse_engine::education::{
-    explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
-};
-use netpulse_engine::export::{preview as export_preview, ExportFormat, Sanitizer, Selection};
-use netpulse_engine::pipeline::present;
-use netpulse_engine::project;
-use netpulse_engine::security::{ask_assistant, present_security};
+use netpulse_engine::attribution::Correlator;
+use netpulse_engine::export::{ExportFormat, Selection};
 use netpulse_plugin::{
     ContractVersion, PluginManifest, PluginRegistry, PluginType, TrustMetadata, TrustStatus,
 };
 use netpulse_storage::{CaptureStore, PayloadPolicy};
 
+pub(crate) mod ipc;
+
 /// Shell state: the committed reconstruction store, the current disclosure depth,
 /// and the Phase 5 lifecycle state — recordings, an optional replay controller,
 /// and the plugin registry (seeded with the first-party reference plugins). Behind
 /// `Mutex`es so Tauri can share it across command invocations.
-struct AppState {
+pub(crate) struct AppState {
     // `Arc` so the background live-capture thread can share the same store/stats
     // the query handler reads (the thread swaps in fresh reconstructions).
-    store: Arc<Mutex<CaptureStore>>,
-    depth: Mutex<Depth>,
-    stats: Arc<Mutex<CaptureStats>>,
-    recordings: Mutex<Vec<Recording>>,
-    replay: Mutex<Option<ReplayController>>,
-    registry: Mutex<PluginRegistry>,
+    pub(crate) store: Arc<Mutex<CaptureStore>>,
+    pub(crate) depth: Mutex<Depth>,
+    pub(crate) stats: Arc<Mutex<CaptureStats>>,
+    pub(crate) recordings: Mutex<Vec<Recording>>,
+    pub(crate) replay: Mutex<Option<ReplayController>>,
+    pub(crate) registry: Mutex<PluginRegistry>,
     /// Handle to the running live capture, if any (docs/05). `None` when idle.
-    capture: Mutex<Option<CaptureControl>>,
+    pub(crate) capture: Mutex<Option<CaptureControl>>,
     /// The time-indexed flow→process correlator (docs/12), fed socket-table
     /// snapshots by the capture loop and queried by `AttributionOfFlow`.
-    correlator: Arc<Mutex<Correlator>>,
+    pub(crate) correlator: Arc<Mutex<Correlator>>,
     /// The live socket→PID source, or `None` where no backend exists (attribution
     /// then stays honestly Unknown, docs/12 §8).
-    sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
+    pub(crate) sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
 }
 
 /// Scope guard that guarantees a completion signal is sent when live_loop exits
@@ -111,7 +107,7 @@ impl Default for AppState {
 /// non-`Send`) backend never crosses a thread boundary; the open result is
 /// reported back so the UI gets an immediate, honest error if Npcap is missing or
 /// privileges are insufficient (docs/02 §11).
-fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
+pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
     let mut guard = state.capture.lock().map_err(|_| "state poisoned")?;
     if guard.is_some() {
         return Err("capture is already running".into());
@@ -168,7 +164,7 @@ fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
 
 /// Stop the running live capture gracefully: signal the thread, wait for a completion
 /// signal (up to 3s), join cleanly, and commit the final reconstruction store.
-fn stop_capture(state: &AppState) -> Result<(), String> {
+pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
     let ctrl = state.capture.lock().map_err(|_| "state poisoned")?.take();
     match ctrl {
         Some(ctrl) => {
@@ -508,7 +504,7 @@ fn seed_registry() -> PluginRegistry {
     reg
 }
 
-fn to_depth(d: ProjectionDepth) -> Depth {
+pub(crate) fn to_depth(d: ProjectionDepth) -> Depth {
     match d {
         ProjectionDepth::Beginner => Depth::Beginner,
         ProjectionDepth::Intermediate => Depth::Intermediate,
@@ -518,7 +514,7 @@ fn to_depth(d: ProjectionDepth) -> Depth {
 }
 
 /// Map a wire export selection to the engine's domain selection (docs/23 §8).
-fn to_selection(sel: ExportSelectionDto) -> Selection {
+pub(crate) fn to_selection(sel: ExportSelectionDto) -> Selection {
     match sel {
         ExportSelectionDto::Window {
             from_mono_nanos,
@@ -533,7 +529,7 @@ fn to_selection(sel: ExportSelectionDto) -> Selection {
     }
 }
 
-fn to_format(f: ExportFormatDto) -> ExportFormat {
+pub(crate) fn to_format(f: ExportFormatDto) -> ExportFormat {
     match f {
         ExportFormatDto::Pcapng => ExportFormat::Pcapng,
         ExportFormatDto::Json => ExportFormat::Json,
@@ -545,7 +541,7 @@ fn to_format(f: ExportFormatDto) -> ExportFormat {
 
 /// An honest zero replay state when no recording is loaded (docs/21 §8; docs/02
 /// §11 fail-closed rather than pretend).
-fn empty_replay_state() -> ReplayState {
+pub(crate) fn empty_replay_state() -> ReplayState {
     ReplayState {
         position_nanos: 0,
         total_nanos: 0,
@@ -556,238 +552,12 @@ fn empty_replay_state() -> ReplayState {
     }
 }
 
-/// Internal query execution helper.
-fn handle_query(state: &AppState, query: Query) -> Result<QueryResponse, String> {
-    let store = state.store.lock().map_err(|_| "state poisoned")?;
-    let stats = *state.stats.lock().map_err(|_| "state poisoned")?;
-    match query {
-        Query::NarrativeFeed { depth, .. } => {
-            let view = present(&store, to_depth(depth), stats);
-            Ok(QueryResponse::NarrativeFeed {
-                cards: view.narratives,
-            })
-        }
-        Query::MonitorSnapshot { .. } => {
-            let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
-            let view = present(&store, depth, stats);
-            Ok(QueryResponse::MonitorSnapshot {
-                snapshot: view.monitor,
-            })
-        }
-        Query::JourneyOfSession { session_id, depth } => {
-            let view = present(&store, to_depth(depth), stats);
-            // The journey is the sentences of the card summarizing that session.
-            let sentences = view
-                .narratives
-                .into_iter()
-                .find(|c| {
-                    c.evidence
-                        .iter()
-                        .any(|e| matches!(e, netpulse_api::EvidenceRefDto::Session(id) if *id == session_id))
-                })
-                .map(|c| {
-                    let mut s = vec![c.headline];
-                    s.extend(c.lines);
-                    s
-                })
-                .unwrap_or_default();
-            Ok(QueryResponse::Journey { sentences })
-        }
-        Query::AttributionOfFlow { flow_id } => {
-            // Correlate the flow's 5-tuple against the polled socket-table history
-            // (docs/12 §5). Unknown when there is no match or no backend — never a
-            // guessed PID (docs/12 §8).
-            let attribution = match store.flow(flow_id) {
-                Some(flow) => {
-                    let corr = state.correlator.lock().map_err(|_| "state poisoned")?;
-                    corr.attribute(&flow.key, flow.first_ts.mono_nanos)
-                }
-                None => Attribution::unknown(),
-            };
-            // Resolve the process name lazily, only for a matched PID (docs/12 §6).
-            let name = match (attribution.pid, state.sockets.as_ref()) {
-                (Some(pid), Some(source)) => {
-                    source.process_info(pid).ok().flatten().map(|p| p.name)
-                }
-                _ => None,
-            };
-            Ok(QueryResponse::Attribution {
-                attribution: project::attribution_dto(&attribution, name),
-            })
-        }
-        Query::PacketsOfFlow { .. } => {
-            // Metadata-only store: raw bytes were never retained (docs/09 §8).
-            Ok(QueryResponse::PayloadsUnavailable)
-        }
-        // ---- Phase 3 education queries (docs/13–16) ----
-        Query::LessonOffers { session_id, depth } => {
-            // Grounded offers for this session's teachable moments (docs/13 §4):
-            // filter the education view to offers that cite this session.
-            let view = present_education(&store, to_depth(depth));
-            let offers = view
-                .offers
-                .into_iter()
-                .filter(|o| {
-                    o.evidence.iter().any(|e| {
-                        matches!(e, netpulse_api::EvidenceRefDto::Session(id) if *id == session_id)
-                    })
-                })
-                .collect();
-            Ok(QueryResponse::LessonOffers { offers })
-        }
-        Query::JourneyStagesOfSession { session_id, depth } => {
-            let view = present_education(&store, to_depth(depth));
-            let journey = view
-                .journeys
-                .into_iter()
-                .find(|j| j.session_id == session_id)
-                .unwrap_or(netpulse_api::PageJourneyDto {
-                    session_id,
-                    stages: Vec::new(),
-                    fanout: Vec::new(),
-                });
-            Ok(QueryResponse::PageJourney { journey })
-        }
-        Query::ExplorerBrowse => Ok(QueryResponse::ExplorerEntries {
-            entries: explorer_browse(&store),
-        }),
-        Query::ExplorerSearch { term } => Ok(QueryResponse::ExplorerEntries {
-            entries: explorer_search(&store, &term),
-        }),
-        Query::HandshakeAnimationForFlow { flow_id } => {
-            match handshake_animation_for_flow(&store, flow_id) {
-                Some(animation) => Ok(QueryResponse::Animation { animation }),
-                // No observable RTT: we never fabricate a timing (docs/16 §11).
-                None => Ok(QueryResponse::PayloadsUnavailable),
-            }
-        }
-        // ---- Phase 4 intelligence queries (docs/17–20) ----
-        Query::SecurityFindings {
-            from_mono_nanos,
-            to_mono_nanos,
-        } => {
-            let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
-            Ok(QueryResponse::Findings {
-                findings: present_security(&store, from_mono_nanos, to_mono_nanos, depth),
-            })
-        }
-        Query::AskAssistant { question } => {
-            // Grounded in the committed store, local-default backend (docs/19 §4.1).
-            Ok(QueryResponse::AssistantAnswer {
-                answer: ask_assistant(&store, &question),
-            })
-        }
-        // ---- Phase 5 lifecycle queries (docs/21–24) ----
-        Query::ListRecordings => {
-            let recordings = state.recordings.lock().map_err(|_| "state poisoned")?;
-            let summaries = recordings
-                .iter()
-                .enumerate()
-                .map(|(i, r)| {
-                    // A recording is incomplete only if its pcapng truncated; the
-                    // sealed recordings held here are whole (docs/22 §8).
-                    project::recording_summary_dto(i as u64, r, false)
-                })
-                .collect();
-            Ok(QueryResponse::Recordings {
-                recordings: summaries,
-            })
-        }
-        Query::ReplayState => {
-            let replay = state.replay.lock().map_err(|_| "state poisoned")?;
-            let s = replay
-                .as_ref()
-                .map(|c| c.state())
-                .unwrap_or_else(empty_replay_state);
-            Ok(QueryResponse::ReplayState {
-                state: project::replay_state_dto(&s),
-            })
-        }
-        Query::ExportPreview { selection, format } => {
-            // Preview exactly what an export would contain before any byte is
-            // written (docs/23 §6), least-revealing default sanitizer (docs/23 §3).
-            let preview = export_preview(
-                &store,
-                &to_selection(selection),
-                to_format(format),
-                &Sanitizer::default(),
-            );
-            Ok(QueryResponse::ExportPreview {
-                preview: project::export_preview_dto(&preview),
-            })
-        }
-        Query::ListPlugins => {
-            let registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            let descriptors = registry
-                .plugins()
-                .iter()
-                .map(|p| project::plugin_descriptor_dto(p, netpulse_api::API_VERSION))
-                .collect();
-            Ok(QueryResponse::Plugins {
-                plugins: descriptors,
-            })
-        }
-        Query::Interfaces => {
-            // Enumerate capture adapters for the picker (docs/05). Where no backend
-            // exists (feature off / Npcap absent), return an empty list — the UI
-            // still offers the implicit "Default adapter" (id 0), which the
-            // platform resolves, and reports the real error only on Start.
-            let interfaces = netpulse_platform::list_interfaces()
-                .map(|list| {
-                    list.into_iter()
-                        .map(|i| InterfaceDto {
-                            id: i.id,
-                            name: i.name,
-                            description: i.description,
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-            Ok(QueryResponse::Interfaces { interfaces })
-        }
-        Query::HealthCheck => {
-            let capture_running = state.capture.lock().map_err(|_| "state poisoned")?.is_some();
-            let flow_count = store.flow_count();
-            let session_count = store.session_count();
-            let check = netpulse_api::ComponentCheckDto {
-                component: "storage".into(),
-                status: "healthy".into(),
-                message: None,
-            };
-            let status = netpulse_api::HealthStatusDto {
-                schema_version: 1,
-                status: "healthy".into(),
-                uptime_secs: 0,
-                capture_running,
-                active_flows: flow_count,
-                active_sessions: session_count,
-                store_records: (flow_count + session_count) as u64,
-                checks: vec![check],
-                version: "0.1.0".into(),
-                api_version: netpulse_api::API_VERSION,
-            };
-            Ok(QueryResponse::Health { status })
-        }
-        Query::Handshake {
-            client_min_version,
-            client_max_version,
-        } => {
-            let handshake = netpulse_api::negotiate_api_version_range(
-                client_min_version,
-                client_max_version,
-            );
-            Ok(QueryResponse::Handshake { handshake })
-        }
-        _ => Ok(QueryResponse::PayloadsUnavailable),
-    }
-}
-
 /// The single pull entry point (docs/02 §7.1). Every historical/aggregated read
 /// the UI performs comes through here and is answered from the committed store.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
 fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
-    handle_query(&state, query)
+    ipc::execute_query(&state, query)
 }
 
 /// The single control entry point (docs/02 §7.1) — the only write path UI→engine.
@@ -795,68 +565,7 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
 fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), String> {
-    match command {
-        Command::SetDepth { depth } => {
-            *state.depth.lock().map_err(|_| "state poisoned")? = to_depth(depth);
-            Ok(())
-        }
-        Command::StartCapture { iface_id } => start_capture(&state, iface_id),
-        Command::StopCapture { .. } => stop_capture(&state),
-        Command::StartRecording | Command::StopRecording => {
-            // Recording captures a live stream; with the platform backend stubbed
-            // there is nothing to record. Fail closed honestly (docs/02 §11) rather
-            // than seal an empty artifact and pretend (docs/22 §4).
-            Err("recording requires a live capture source (platform backend is a stub)".into())
-        }
-        // ---- Phase 5 replay transport (docs/21 §5) ----
-        Command::ReplayPlay
-        | Command::ReplayPause
-        | Command::ReplayStep
-        | Command::ReplaySeek { .. }
-        | Command::ReplaySetSpeed { .. } => {
-            let mut replay = state.replay.lock().map_err(|_| "state poisoned")?;
-            let Some(ctrl) = replay.as_mut() else {
-                // Honest: no recording loaded to replay (docs/02 §11).
-                return Err("no recording is loaded to replay".into());
-            };
-            match command {
-                Command::ReplayPlay => ctrl.play(),
-                Command::ReplayPause => ctrl.pause(),
-                Command::ReplayStep => ctrl.step(),
-                Command::ReplaySeek { mono_nanos } => ctrl.seek(mono_nanos),
-                Command::ReplaySetSpeed { percent } => ctrl.set_speed(percent),
-                _ => unreachable!("outer match restricts to replay commands"),
-            }
-            Ok(())
-        }
-        Command::StartExport { .. } => {
-            // Export writes a *file*; sharing it is a further, separate user action.
-            // The shell never auto-transmits — the single egress boundary stays
-            // `netpulse-ai` (docs/23 §6, docs/02 §10). Bytes are produced on demand
-            // via the preview/export functions; acknowledging here keeps the shell
-            // free of an implicit-egress path.
-            Ok(())
-        }
-        Command::EnablePlugin { name } => {
-            let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            if registry.enable(&name) {
-                Ok(())
-            } else {
-                // Structurally ineligible (incompatible/incomplete) or unknown —
-                // honest refusal, never a silent no-op (docs/24 §8).
-                Err(format!("cannot enable plugin '{name}'"))
-            }
-        }
-        Command::DisablePlugin { name } => {
-            let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            if registry.disable(&name) {
-                Ok(())
-            } else {
-                Err(format!("unknown plugin '{name}'"))
-            }
-        }
-        _ => Err("unknown command".into()),
-    }
+    ipc::execute_command(&state, command)
 }
 
 fn main() {
@@ -1218,7 +927,7 @@ mod tests {
     fn test_handshake_query_integration() {
         let state = AppState::default();
 
-        let res = handle_query(
+        let res = ipc::execute_query(
             &state,
             Query::Handshake {
                 client_min_version: 5,

@@ -13,10 +13,17 @@
 #![forbid(unsafe_code)]
 
 pub mod capture_store;
+pub mod error;
+pub mod migration;
+pub mod models;
+pub mod repository;
 pub mod ring;
 pub mod timeseries;
 
 pub use capture_store::{CaptureStore, StoredFinding};
+pub use error::{MigrationError, Result as StorageResult};
+pub use migration::{MigrationManager, MigrationStatus};
+pub use repository::{default_db_path, CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository};
 pub use ring::RingBuffer;
 pub use timeseries::{Point, SeriesId, TimeSeriesStore};
 
@@ -45,7 +52,7 @@ pub trait Store {
     fn flush(&mut self) -> Result<()>;
 }
 
-impl Store for CaptureStore {
+impl<R: CaptureRepository> Store for CaptureStore<R> {
     fn payload_policy(&self) -> PayloadPolicy {
         self.policy()
     }

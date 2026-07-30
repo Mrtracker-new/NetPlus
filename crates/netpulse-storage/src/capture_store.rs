@@ -4,39 +4,14 @@
 //! (SQLite) from bulk columnar files; this Phase 1 slice keeps the *same logical
 //! model and query surface* over an in-memory backing, so the SQLite backend can
 //! drop in behind the identical API later (docs/08 §13).
-//!
-//! Two invariants are enforced structurally, not by convention:
-//! - **Payload policy** (docs/08 §4): under the default `MetadataOnly`, no packet
-//!   bytes are ever written — attempts are rejected, guarded by tests.
-//! - **Evidence-reference invariant** (docs/08 §6): retention will not evict a
-//!   flow/session a still-live finding references; instead the finding is marked
-//!   "evidence aged out", so the UI never dangles a link to nowhere.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
 
 use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, Session};
 
+use crate::repository::{CaptureRepository, MemoryCaptureStore};
 use crate::PayloadPolicy;
-
-/// The indexed capture store. Indexes mirror the UI's drill-down queries
-/// (docs/08 §8): by session, by host, by time.
-#[derive(Debug)]
-pub struct CaptureStore {
-    policy: PayloadPolicy,
-    flows: HashMap<u64, Flow>,
-    sessions: HashMap<u64, Session>,
-    hosts: HashMap<u64, Host>,
-    /// Passively-observed names per IP (docs/08 §5.1). Distinct from `hosts`
-    /// (which is full geo/ASN/org enrichment): this is only what we saw on the
-    /// wire — DNS answers and TLS SNI — so the UI can label a raw IP.
-    resolutions: HashMap<IpAddr, Vec<HostName>>,
-    findings: HashMap<u64, StoredFinding>,
-    /// PROTO_EVENTS by flow id (docs/08 §5.1).
-    events_by_flow: HashMap<u64, Vec<ProtoEvent>>,
-    /// Count of packet payload records written — must stay 0 under MetadataOnly.
-    payload_records: u64,
-}
 
 /// A finding plus the retention annotation from docs/08 §6.
 #[derive(Debug, Clone)]
@@ -47,11 +22,28 @@ pub struct StoredFinding {
     pub evidence_expired: bool,
 }
 
-impl CaptureStore {
-    /// Create an empty store under the given payload policy.
+/// The indexed capture store generic over `R: CaptureRepository`.
+/// Defaults to [`MemoryCaptureStore`] for fast in-memory operations.
+#[derive(Debug)]
+pub struct CaptureStore<R: CaptureRepository = MemoryCaptureStore> {
+    policy: PayloadPolicy,
+    repository: R,
+    flows: HashMap<u64, Flow>,
+    sessions: HashMap<u64, Session>,
+    hosts: HashMap<u64, Host>,
+    resolutions: HashMap<IpAddr, Vec<HostName>>,
+    findings: HashMap<u64, StoredFinding>,
+    events_by_flow: HashMap<u64, Vec<ProtoEvent>>,
+    /// Count of packet payload records written — must stay 0 under MetadataOnly.
+    payload_records: u64,
+}
+
+impl CaptureStore<MemoryCaptureStore> {
+    /// Create an empty store backed by [`MemoryCaptureStore`] under the given payload policy.
     pub fn new(policy: PayloadPolicy) -> Self {
         Self {
             policy,
+            repository: MemoryCaptureStore::new(),
             flows: HashMap::new(),
             sessions: HashMap::new(),
             hosts: HashMap::new(),
@@ -62,90 +54,212 @@ impl CaptureStore {
         }
     }
 
-    /// The payload policy in force.
-    pub fn policy(&self) -> PayloadPolicy {
-        self.policy
-    }
-
-    /// Persist a finalized flow and its protocol events (docs/06 §8 → docs/08).
-    #[tracing::instrument(level = "debug", skip(self, flow, events), fields(flow_id = flow.id, events_count = events.len()))]
+    /// Synchronous insert flow.
     pub fn insert_flow(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
         if !events.is_empty() {
             self.events_by_flow
                 .entry(flow.id)
                 .or_default()
-                .extend(events);
+                .extend(events.clone());
         }
-        self.flows.insert(flow.id, flow);
+        self.flows.insert(flow.id, flow.clone());
+        let _ = self.repository.insert_flow_sync(flow, events);
     }
 
-    /// Persist a reconstructed session (docs/06 §6 → docs/08).
-    #[tracing::instrument(level = "debug", skip(self, session), fields(session_id = session.id))]
+    /// Synchronous insert session.
     pub fn insert_session(&mut self, session: Session) {
-        self.sessions.insert(session.id, session);
+        self.sessions.insert(session.id, session.clone());
+        let _ = self.repository.insert_session_sync(session);
     }
 
-    /// Persist an enriched host record (docs/08 §5.1 HOSTS).
+    /// Synchronous insert host.
     pub fn insert_host(&mut self, id: u64, host: Host) {
-        self.hosts.insert(id, host);
+        self.hosts.insert(id, host.clone());
+        let _ = self.repository.insert_host_sync(id, host);
     }
 
-    /// Record the passively-observed names for one IP (docs/08 §5.1), replacing
-    /// any prior set for that IP. The reconstruction engine hands over the full
-    /// deterministic table each projection; this is the authoritative store copy
-    /// the monitor breakdown joins against.
+    /// Synchronous set resolution.
     pub fn set_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
         if names.is_empty() {
             self.resolutions.remove(&ip);
         } else {
-            self.resolutions.insert(ip, names);
+            self.resolutions.insert(ip, names.clone());
         }
+        let _ = self.repository.set_resolution_sync(ip, names);
     }
 
-    /// Merge additional names for one IP into the existing set, de-duplicating on
-    /// the exact `(name, source)` pair — never replacing what is already there.
-    ///
-    /// This is the seam for *host-environment* enrichment (OS DNS cache, hosts
-    /// file, cached mDNS) that the shell layers on top of the engine's wire-only
-    /// resolutions after each rebuild: [`set_resolution`](Self::set_resolution)
-    /// installs the authoritative on-the-wire names, then this unions in the local
-    /// hints without clobbering them, so a lower-trust `OsResolver` guess can never
-    /// overwrite a DNS answer we actually saw (docs/08 §5.1, docs/02 §10.3).
+    /// Synchronous merge resolution.
     pub fn merge_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
-        if names.is_empty() {
-            return;
-        }
-        let existing = self.resolutions.entry(ip).or_default();
-        for n in names {
-            if !existing
-                .iter()
-                .any(|h| h.name == n.name && h.source == n.source)
-            {
-                existing.push(n);
+        if !names.is_empty() {
+            let existing = self.resolutions.entry(ip).or_default();
+            for n in &names {
+                if !existing
+                    .iter()
+                    .any(|h| h.name == n.name && h.source == n.source)
+                {
+                    existing.push(n.clone());
+                }
             }
+            let _ = self.repository.merge_resolution_sync(ip, names);
         }
     }
 
-    /// The names observed for one IP, empty if none — the lookup the host
-    /// breakdown uses to label a raw address.
-    pub fn names_for(&self, ip: &IpAddr) -> &[HostName] {
-        self.resolutions.get(ip).map_or(&[], |v| v.as_slice())
-    }
-
-    /// The whole `IP → names` map, for bulk joins (e.g. the monitor snapshot).
-    pub fn resolutions(&self) -> &HashMap<IpAddr, Vec<HostName>> {
-        &self.resolutions
-    }
-
-    /// Persist a finding with its evidence references (docs/08 §6).
+    /// Synchronous insert finding.
     pub fn insert_finding(&mut self, finding: Finding) {
         self.findings.insert(
             finding.id,
             StoredFinding {
-                finding,
+                finding: finding.clone(),
                 evidence_expired: false,
             },
         );
+        let _ = self.repository.insert_finding_sync(finding);
+    }
+
+    /// The names observed for one IP, empty if none.
+    pub fn names_for(&self, ip: &IpAddr) -> &[HostName] {
+        self.resolutions.get(ip).map_or(&[], |v| v.as_slice())
+    }
+
+    /// The whole `IP → names` map, for bulk joins.
+    pub fn resolutions(&self) -> &HashMap<IpAddr, Vec<HostName>> {
+        &self.resolutions
+    }
+
+    /// All flows belonging to a session.
+    pub fn flows_for_session(&self, session_id: u64) -> Vec<&Flow> {
+        match self.sessions.get(&session_id) {
+            Some(s) => s
+                .flow_ids
+                .iter()
+                .filter_map(|id| self.flows.get(id))
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Protocol events of a flow.
+    pub fn events_for_flow(&self, flow_id: u64) -> &[ProtoEvent] {
+        self.events_by_flow
+            .get(&flow_id)
+            .map_or(&[], |v| v.as_slice())
+    }
+
+    /// Flows in time window.
+    pub fn flows_in_window(&self, from: u64, to: u64) -> Vec<&Flow> {
+        let mut v: Vec<&Flow> = self
+            .flows
+            .values()
+            .filter(|f| {
+                let t = f.first_ts.mono_nanos;
+                t >= from && t < to
+            })
+            .collect();
+        v.sort_by_key(|f| (f.first_ts.mono_nanos, f.id));
+        v
+    }
+
+    /// A session by id.
+    pub fn session(&self, id: u64) -> Option<&Session> {
+        self.sessions.get(&id)
+    }
+
+    /// All retained session ids.
+    pub fn session_ids(&self) -> Vec<u64> {
+        let mut ids: Vec<u64> = self.sessions.keys().copied().collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// A flow by id.
+    pub fn flow(&self, id: u64) -> Option<&Flow> {
+        self.flows.get(&id)
+    }
+
+    /// A finding by id.
+    pub fn finding(&self, id: u64) -> Option<&StoredFinding> {
+        self.findings.get(&id)
+    }
+
+    /// Number of flows / sessions currently retained.
+    pub fn flow_count(&self) -> usize {
+        self.flows.len()
+    }
+
+    pub fn session_count(&self) -> usize {
+        self.sessions.len()
+    }
+
+    /// Evict oldest flows down to target count.
+    pub fn evict_oldest_flows(&mut self, target_max: usize) -> usize {
+        if self.flows.len() <= target_max {
+            return 0;
+        }
+        let mut order: Vec<(u64, u64)> = self
+            .flows
+            .values()
+            .map(|f| (f.first_ts.mono_nanos, f.id))
+            .collect();
+        order.sort_unstable();
+
+        let to_remove = self.flows.len() - target_max;
+        let mut evicted = 0;
+        for (_, flow_id) in order {
+            if evicted >= to_remove {
+                break;
+            }
+            let is_ref = self.findings.values().any(|sf| {
+                sf.finding
+                    .evidence_refs
+                    .iter()
+                    .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
+            });
+            if is_ref {
+                for sf in self.findings.values_mut() {
+                    if sf
+                        .finding
+                        .evidence_refs
+                        .iter()
+                        .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
+                    {
+                        sf.evidence_expired = true;
+                    }
+                }
+                continue;
+            }
+            self.flows.remove(&flow_id);
+            self.events_by_flow.remove(&flow_id);
+            evicted += 1;
+        }
+        let _ = self.repository.evict_oldest_flows_sync(target_max);
+        evicted
+    }
+}
+
+impl<R: CaptureRepository> CaptureStore<R> {
+    /// Create a store with a custom repository implementation.
+    pub fn with_repository(policy: PayloadPolicy, repository: R) -> Self {
+        Self {
+            policy,
+            repository,
+            flows: HashMap::new(),
+            sessions: HashMap::new(),
+            hosts: HashMap::new(),
+            resolutions: HashMap::new(),
+            findings: HashMap::new(),
+            events_by_flow: HashMap::new(),
+            payload_records: 0,
+        }
+    }
+
+    /// Access the underlying repository handle.
+    pub fn repository(&self) -> &R {
+        &self.repository
+    }
+
+    /// The payload policy in force.
+    pub fn policy(&self) -> PayloadPolicy {
+        self.policy
     }
 
     /// Attempt to write packet payload bytes. Honors the payload policy
@@ -167,129 +281,62 @@ impl CaptureStore {
         self.payload_records
     }
 
-    // ---- Query surface (docs/08 §8) ----
+    // ---- Async Query and Mutation surface ----
 
-    /// All flows belonging to a session (docs/08 §8, index on session_id).
-    pub fn flows_for_session(&self, session_id: u64) -> Vec<&Flow> {
-        match self.sessions.get(&session_id) {
-            Some(s) => s
-                .flow_ids
-                .iter()
-                .filter_map(|id| self.flows.get(id))
-                .collect(),
-            None => Vec::new(),
+    pub async fn insert_flow_async(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
+        if !events.is_empty() {
+            self.events_by_flow
+                .entry(flow.id)
+                .or_default()
+                .extend(events.clone());
         }
+        self.flows.insert(flow.id, flow.clone());
+        let _ = self.repository.insert_flow(flow, events).await;
     }
 
-    /// Protocol events of a flow (docs/08 §8, index on PROTO_EVENTS.flow_id).
-    pub fn events_for_flow(&self, flow_id: u64) -> &[ProtoEvent] {
-        self.events_by_flow
-            .get(&flow_id)
-            .map_or(&[], |v| v.as_slice())
+    pub async fn insert_session_async(&mut self, session: Session) {
+        self.sessions.insert(session.id, session.clone());
+        let _ = self.repository.insert_session(session).await;
     }
 
-    /// Flows whose start falls in `[from, to)` monotonic ns (docs/08 §8, timeline
-    /// scrub). Returned in ascending start order for deterministic paging.
-    pub fn flows_in_window(&self, from: u64, to: u64) -> Vec<&Flow> {
-        let mut v: Vec<&Flow> = self
-            .flows
-            .values()
-            .filter(|f| {
-                let t = f.first_ts.mono_nanos;
-                t >= from && t < to
-            })
-            .collect();
-        v.sort_by_key(|f| (f.first_ts.mono_nanos, f.id));
-        v
+    pub async fn insert_host_async(&mut self, id: u64, host: Host) {
+        self.hosts.insert(id, host.clone());
+        let _ = self.repository.insert_host(id, host).await;
     }
 
-    /// A session by id (docs/08 §8, index on session_id).
-    pub fn session(&self, id: u64) -> Option<&Session> {
-        self.sessions.get(&id)
-    }
-
-    /// All retained session ids, ascending for deterministic iteration
-    /// (docs/08 §8). The narrative feed and journey queries page over these.
-    pub fn session_ids(&self) -> Vec<u64> {
-        let mut ids: Vec<u64> = self.sessions.keys().copied().collect();
-        ids.sort_unstable();
-        ids
-    }
-
-    /// A flow by id (docs/08 §8), for drill-down and projection.
-    pub fn flow(&self, id: u64) -> Option<&Flow> {
-        self.flows.get(&id)
-    }
-
-    /// A finding by id, including its retention annotation.
-    pub fn finding(&self, id: u64) -> Option<&StoredFinding> {
-        self.findings.get(&id)
-    }
-
-    /// Number of flows / sessions currently retained.
-    pub fn flow_count(&self) -> usize {
-        self.flows.len()
-    }
-    pub fn session_count(&self) -> usize {
-        self.sessions.len()
-    }
-
-    // ---- Retention (docs/08 §7.3) honoring the evidence invariant (§6) ----
-
-    /// Evict the oldest flows down to a target count, honoring the evidence
-    /// invariant (docs/08 §6): a flow referenced by a live finding is *not*
-    /// evicted; instead the finding is annotated `evidence_expired` only if it is
-    /// actually removed. Returns the number of flows evicted.
-    pub fn evict_oldest_flows(&mut self, target_max: usize) -> usize {
-        if self.flows.len() <= target_max {
-            return 0;
+    pub async fn set_resolution_async(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if names.is_empty() {
+            self.resolutions.remove(&ip);
+        } else {
+            self.resolutions.insert(ip, names.clone());
         }
-        let mut order: Vec<(u64, u64)> = self
-            .flows
-            .values()
-            .map(|f| (f.first_ts.mono_nanos, f.id))
-            .collect();
-        order.sort_unstable();
+        let _ = self.repository.set_resolution(ip, names).await;
+    }
 
-        let to_remove = self.flows.len() - target_max;
-        let mut evicted = 0;
-        for (_, flow_id) in order {
-            if evicted >= to_remove {
-                break;
+    pub async fn merge_resolution_async(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if !names.is_empty() {
+            let existing = self.resolutions.entry(ip).or_default();
+            for n in &names {
+                if !existing
+                    .iter()
+                    .any(|h| h.name == n.name && h.source == n.source)
+                {
+                    existing.push(n.clone());
+                }
             }
-            if self.flow_is_referenced(flow_id) {
-                // Protected by the evidence invariant: skip, mark referencing
-                // findings so the UI stays honest if we later must drop it.
-                self.expire_evidence_for_flow(flow_id);
-                continue;
-            }
-            self.flows.remove(&flow_id);
-            self.events_by_flow.remove(&flow_id);
-            evicted += 1;
+            let _ = self.repository.merge_resolution(ip, names).await;
         }
-        evicted
     }
 
-    fn flow_is_referenced(&self, flow_id: u64) -> bool {
-        self.findings.values().any(|sf| {
-            sf.finding
-                .evidence_refs
-                .iter()
-                .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
-        })
-    }
-
-    fn expire_evidence_for_flow(&mut self, flow_id: u64) {
-        for sf in self.findings.values_mut() {
-            if sf
-                .finding
-                .evidence_refs
-                .iter()
-                .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
-            {
-                sf.evidence_expired = true;
-            }
-        }
+    pub async fn insert_finding_async(&mut self, finding: Finding) {
+        self.findings.insert(
+            finding.id,
+            StoredFinding {
+                finding: finding.clone(),
+                evidence_expired: false,
+            },
+        );
+        let _ = self.repository.insert_finding(finding).await;
     }
 }
 
@@ -297,7 +344,7 @@ impl CaptureStore {
 mod tests {
     use super::*;
     use netpulse_core::net::{FiveTuple, L4Proto, L7Proto};
-    use netpulse_core::{Confidence, FindingCategory, FlowMetrics, FlowState, Timestamp};
+    use netpulse_core::{Confidence, EvidenceRef, FindingCategory, FlowMetrics, FlowState, Timestamp};
     use std::net::{IpAddr, Ipv4Addr};
 
     fn flow(id: u64, ts: u64) -> Flow {
@@ -368,7 +415,7 @@ mod tests {
         });
         // Ask to shrink to 1 flow: it must not silently drop referenced flow 1.
         store.evict_oldest_flows(1);
-        assert!(store.flows.contains_key(&1), "referenced flow must survive");
+        assert!(store.flow(1).is_some(), "referenced flow must survive");
         assert!(store.finding(42).unwrap().evidence_expired);
     }
 }

@@ -11,6 +11,15 @@ authors.workspace = true
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
 tracing = { workspace = true }
+thiserror = { workspace = true }
+sqlx = { workspace = true }
+directories = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3"
 
 [lints]
 workspace = true

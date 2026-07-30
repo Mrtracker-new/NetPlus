@@ -63,10 +63,16 @@ fn main() -> ExitCode {
     );
 
     let mut args = std::env::args().skip(1);
-    let Some(path) = args.next() else {
-        tracing::info!("usage: netpulse-engine <capture.pcap>   (analyzes a pcap offline)");
+    let Some(first_arg) = args.next() else {
+        tracing::info!("usage: netpulse-engine <capture.pcap> | migrate <status|run|validate> [--db <path>]");
         return ExitCode::SUCCESS;
     };
+
+    if first_arg == "migrate" {
+        return handle_migrate(args);
+    }
+
+    let path = first_arg;
 
     let bytes = match std::fs::read(&path) {
         Ok(b) => b,
@@ -108,4 +114,104 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn handle_migrate(mut args: impl Iterator<Item = String>) -> ExitCode {
+    let subcmd = args.next().unwrap_or_else(|| "status".to_string());
+    let mut db_path = netpulse_storage::default_db_path();
+
+    while let Some(arg) = args.next() {
+        if arg == "--db" {
+            if let Some(custom) = args.next() {
+                db_path = std::path::PathBuf::from(custom);
+            }
+        }
+    }
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error initializing tokio runtime: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    rt.block_on(async move {
+        match subcmd.as_str() {
+            "status" => {
+                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("Error connecting to database at {}: {e}", db_path.display());
+                        return ExitCode::FAILURE;
+                    }
+                };
+                match netpulse_storage::MigrationManager::status(repo.pool()).await {
+                    Ok(status) => {
+                        println!("Database: {}", db_path.display());
+                        println!(
+                            "Schema Version : {}",
+                            status
+                                .current_version
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "None".to_string())
+                        );
+                        println!("Latest Version : {}", status.latest_version);
+                        if status.pending.is_empty() {
+                            println!("Status         : Up-to-date");
+                        } else {
+                            println!("Status         : Pending");
+                            println!("\nPending migrations:");
+                            for p in &status.pending {
+                                println!("  - {p}");
+                            }
+                        }
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => {
+                        eprintln!("Error fetching migration status: {e}");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            "run" => {
+                println!("Running migrations on database: {}", db_path.display());
+                match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await {
+                    Ok(_) => {
+                        println!("Successfully applied all pending migrations.");
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to apply migrations: {e}");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            "validate" => {
+                println!("Validating schema on database: {}", db_path.display());
+                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        eprintln!("Error connecting to database: {e}");
+                        return ExitCode::FAILURE;
+                    }
+                };
+                match netpulse_storage::MigrationManager::validate(repo.pool()).await {
+                    Ok(()) => {
+                        println!("Schema validation and PRAGMA integrity check passed cleanly.");
+                        ExitCode::SUCCESS
+                    }
+                    Err(e) => {
+                        eprintln!("Schema validation failed: {e}");
+                        ExitCode::FAILURE
+                    }
+                }
+            }
+            other => {
+                eprintln!("Unknown migrate subcommand: {other}");
+                eprintln!("Usage: netpulse-engine migrate <status|run|validate> [--db <path>]");
+                ExitCode::FAILURE
+            }
+        }
+    })
 }

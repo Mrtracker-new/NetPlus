@@ -34,6 +34,7 @@ netpulse-plugin = { path = "../netpulse-plugin" }
 # Structured JSON export (docs/23 §4). serde_json is an existing workspace dep.
 serde_json = { workspace = true }
 tracing = { workspace = true }
+tokio = { workspace = true }
 
 [lints]
 workspace = true

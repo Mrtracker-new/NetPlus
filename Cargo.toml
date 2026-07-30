@@ -44,7 +44,7 @@ httparse = "1.8"
 sentry = "0.34"
 sentry-tracing = "0.34"
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
-directories = "5"
+directories = "6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # Workspace-wide lints. Memory safety on hostile input is the defining

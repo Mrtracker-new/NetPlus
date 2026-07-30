@@ -1,7 +1,10 @@
 //! Tests for netpulse-storage SQLite migrations, schema validation, and repository persistence.
 
 use netpulse_core::net::{FiveTuple, L4Proto, L7Proto};
-use netpulse_core::{Confidence, Finding, FindingCategory, Flow, FlowMetrics, FlowState, HostName, NameSource, Session, Timestamp};
+use netpulse_core::{
+    Confidence, Finding, FindingCategory, Flow, FlowMetrics, FlowState, HostName, NameSource,
+    Session, Timestamp,
+};
 use netpulse_storage::{
     default_db_path, CaptureRepository, MigrationManager, SqliteCaptureRepository,
 };
@@ -106,17 +109,11 @@ async fn test_sqlite_repository_data_roundtrip() {
         .expect("found finding");
     assert_eq!(queried_finding.finding.id, 303);
 
-    let names_back = repo
-        .names_for(&ip)
-        .await
-        .expect("names_for");
+    let names_back = repo.names_for(&ip).await.expect("names_for");
     assert_eq!(names_back.len(), 1);
     assert_eq!(names_back[0].name, "example.com");
 
-    let session_count = repo
-        .session_count()
-        .await
-        .expect("session_count");
+    let session_count = repo.session_count().await.expect("session_count");
     assert_eq!(session_count, 1);
 }
 
@@ -136,9 +133,7 @@ async fn test_multi_migration_and_data_preservation() {
         trigger: "preservation_test".into(),
         flow_ids: vec![],
     };
-    repo.insert_session(s)
-        .await
-        .expect("insert_session");
+    repo.insert_session(s).await.expect("insert_session");
 
     // 2. Re-connect, validate schema and ensure data preserved
     let repo2 = SqliteCaptureRepository::connect(&db_path)

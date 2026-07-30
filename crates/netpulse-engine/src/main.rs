@@ -64,7 +64,9 @@ fn main() -> ExitCode {
 
     let mut args = std::env::args().skip(1);
     let Some(first_arg) = args.next() else {
-        tracing::info!("usage: netpulse-engine <capture.pcap> | migrate <status|run|validate> [--db <path>]");
+        tracing::info!(
+            "usage: netpulse-engine <capture.pcap> | migrate <status|run|validate> [--db <path>]"
+        );
         return ExitCode::SUCCESS;
     };
 
@@ -139,7 +141,8 @@ fn handle_migrate(mut args: impl Iterator<Item = String>) -> ExitCode {
     rt.block_on(async move {
         match subcmd.as_str() {
             "status" => {
-                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await {
+                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await
+                {
                     Ok(r) => r,
                     Err(e) => {
                         eprintln!("Error connecting to database at {}: {e}", db_path.display());
@@ -189,7 +192,8 @@ fn handle_migrate(mut args: impl Iterator<Item = String>) -> ExitCode {
             }
             "validate" => {
                 println!("Validating schema on database: {}", db_path.display());
-                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await {
+                let repo = match netpulse_storage::SqliteCaptureRepository::connect(&db_path).await
+                {
                     Ok(r) => r,
                     Err(e) => {
                         eprintln!("Error connecting to database: {e}");

@@ -68,10 +68,10 @@ mod tests {
 
         // 1. Read root Cargo.toml to discover workspace member manifests dynamically
         let root_manifest_path = workspace_root.join("Cargo.toml");
-        let root_text = std::fs::read_to_string(&root_manifest_path)
-            .expect("Failed to read root Cargo.toml");
-        let root_parsed: toml::Value = toml::from_str(&root_text)
-            .expect("Failed to parse root Cargo.toml");
+        let root_text =
+            std::fs::read_to_string(&root_manifest_path).expect("Failed to read root Cargo.toml");
+        let root_parsed: toml::Value =
+            toml::from_str(&root_text).expect("Failed to parse root Cargo.toml");
 
         let mut member_patterns = Vec::new();
         if let Some(members) = root_parsed

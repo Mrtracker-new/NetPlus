@@ -294,7 +294,9 @@ mod tests {
         // Deterministic pseudo-random sequence
         let mut seed = 123456789u64;
         let lcg = |s: &mut u64| -> u64 {
-            *s = s.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            *s = s
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             *s
         };
 

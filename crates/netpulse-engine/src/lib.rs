@@ -35,6 +35,7 @@ pub use export::{
     preview as export_preview, ExportFormat, ExportPreview, Sanitizer, Selection,
 };
 pub use pipeline::{
-    analyze_file, analyze_pcap, run_offline, run_replay, LivePipeline, OfflineReport, PresentationView,
+    analyze_file, analyze_pcap, run_offline, run_replay, LivePipeline, OfflineReport,
+    PresentationView,
 };
 pub use security::{ask_assistant, present_security};

@@ -8,9 +8,7 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use netpulse_core::{
-    EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session,
-};
+use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session};
 
 use crate::repository::{CaptureRepository, MemoryCaptureStore};
 use crate::PayloadPolicy;
@@ -315,7 +313,12 @@ impl<R: CaptureRepository> CaptureStore<R> {
                     check_evidence_exists(finding.id, "Flow", *id, self.flows.contains_key(id))?;
                 }
                 EvidenceRef::Session(id) => {
-                    check_evidence_exists(finding.id, "Session", *id, self.sessions.contains_key(id))?;
+                    check_evidence_exists(
+                        finding.id,
+                        "Session",
+                        *id,
+                        self.sessions.contains_key(id),
+                    )?;
                 }
                 EvidenceRef::Packet(id) => {
                     if *id == 0 {

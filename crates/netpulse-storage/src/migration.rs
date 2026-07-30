@@ -22,11 +22,7 @@ pub struct MigrationManager;
 impl MigrationManager {
     /// Return the compiled latest migration schema version number.
     pub fn latest_schema() -> i64 {
-        MIGRATOR
-            .migrations
-            .last()
-            .map(|m| m.version)
-            .unwrap_or(0)
+        MIGRATOR.migrations.last().map(|m| m.version).unwrap_or(0)
     }
 
     /// Run all pending embedded migrations against the SQLite database pool.
@@ -46,7 +42,10 @@ impl MigrationManager {
         .fetch_all(pool)
         .await
         {
-            Ok(rows) => rows.into_iter().map(|r| r.get::<i64, _>("version")).collect(),
+            Ok(rows) => rows
+                .into_iter()
+                .map(|r| r.get::<i64, _>("version"))
+                .collect(),
             Err(_) => HashSet::new(),
         };
 

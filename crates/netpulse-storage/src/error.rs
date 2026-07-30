@@ -6,10 +6,16 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum MigrationError {
     #[error("Database schema version {db_version} is newer than maximum supported version {app_max_version}")]
-    DatabaseTooNew { db_version: i64, app_max_version: i64 },
+    DatabaseTooNew {
+        db_version: i64,
+        app_max_version: i64,
+    },
 
     #[error("Database schema version {db_version} is older than minimum supported version {app_min_version}")]
-    DatabaseTooOld { db_version: i64, app_min_version: i64 },
+    DatabaseTooOld {
+        db_version: i64,
+        app_min_version: i64,
+    },
 
     #[error("Database migration is corrupt: {description}")]
     CorruptMigration { description: String },

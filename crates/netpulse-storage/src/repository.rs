@@ -6,7 +6,9 @@ use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 use std::sync::RwLock;
 
-use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, ProtoEventKind, Session, Timestamp};
+use netpulse_core::{
+    EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, ProtoEventKind, Session, Timestamp,
+};
 use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
 
@@ -456,7 +458,10 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn insert_host(&self, id: u64, host: Host) -> Result<()> {
-        let geo_json = host.geo.as_ref().map(|g| serde_json::to_string(g).unwrap_or_default());
+        let geo_json = host
+            .geo
+            .as_ref()
+            .map(|g| serde_json::to_string(g).unwrap_or_default());
         let rdns = serde_json::to_string(&host.names).ok();
         let asn_org = host.asn.map(|a| a.to_string());
         sqlx::query(
@@ -491,12 +496,14 @@ impl CaptureRepository for SqliteCaptureRepository {
 
         for n in names {
             let source_str = format!("{:?}", n.source);
-            sqlx::query("INSERT OR REPLACE INTO host_resolutions (ip, name, source) VALUES (?1, ?2, ?3)")
-                .bind(&ip_str)
-                .bind(&n.name)
-                .bind(&source_str)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query(
+                "INSERT OR REPLACE INTO host_resolutions (ip, name, source) VALUES (?1, ?2, ?3)",
+            )
+            .bind(&ip_str)
+            .bind(&n.name)
+            .bind(&source_str)
+            .execute(&self.pool)
+            .await?;
         }
         Ok(())
     }
@@ -505,12 +512,14 @@ impl CaptureRepository for SqliteCaptureRepository {
         let ip_str = ip.to_string();
         for n in names {
             let source_str = format!("{:?}", n.source);
-            sqlx::query("INSERT OR IGNORE INTO host_resolutions (ip, name, source) VALUES (?1, ?2, ?3)")
-                .bind(&ip_str)
-                .bind(&n.name)
-                .bind(&source_str)
-                .execute(&self.pool)
-                .await?;
+            sqlx::query(
+                "INSERT OR IGNORE INTO host_resolutions (ip, name, source) VALUES (?1, ?2, ?3)",
+            )
+            .bind(&ip_str)
+            .bind(&n.name)
+            .bind(&source_str)
+            .execute(&self.pool)
+            .await?;
         }
         Ok(())
     }
@@ -574,7 +583,8 @@ impl CaptureRepository for SqliteCaptureRepository {
 
         match row {
             Some(r) => {
-                let refs: Vec<EvidenceRef> = serde_json::from_str(&r.evidence_refs).unwrap_or_default();
+                let refs: Vec<EvidenceRef> =
+                    serde_json::from_str(&r.evidence_refs).unwrap_or_default();
                 Ok(Some(StoredFinding {
                     finding: Finding {
                         id: r.finding_id as u64,
@@ -594,10 +604,11 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn events_for_flow(&self, flow_id: u64) -> Result<Vec<ProtoEvent>> {
-        let rows = sqlx::query_as::<_, ProtoEventRow>("SELECT * FROM proto_events WHERE flow_id = ?1")
-            .bind(flow_id as i64)
-            .fetch_all(&self.pool)
-            .await?;
+        let rows =
+            sqlx::query_as::<_, ProtoEventRow>("SELECT * FROM proto_events WHERE flow_id = ?1")
+                .bind(flow_id as i64)
+                .fetch_all(&self.pool)
+                .await?;
 
         let mut events = Vec::new();
         for r in rows {
@@ -618,10 +629,11 @@ impl CaptureRepository for SqliteCaptureRepository {
 
     async fn names_for(&self, ip: &IpAddr) -> Result<Vec<HostName>> {
         let ip_str = ip.to_string();
-        let rows = sqlx::query_as::<_, HostResolutionRow>("SELECT * FROM host_resolutions WHERE ip = ?1")
-            .bind(ip_str)
-            .fetch_all(&self.pool)
-            .await?;
+        let rows =
+            sqlx::query_as::<_, HostResolutionRow>("SELECT * FROM host_resolutions WHERE ip = ?1")
+                .bind(ip_str)
+                .fetch_all(&self.pool)
+                .await?;
 
         let mut names = Vec::new();
         for r in rows {
@@ -680,7 +692,10 @@ impl CaptureRepository for SqliteCaptureRepository {
         let rows = sqlx::query("SELECT session_id FROM sessions ORDER BY session_id ASC")
             .fetch_all(&self.pool)
             .await?;
-        Ok(rows.into_iter().map(|r| r.get::<i64, _>(0) as u64).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| r.get::<i64, _>(0) as u64)
+            .collect())
     }
 
     async fn evict_oldest_flows(&self, _target_max: usize) -> Result<usize> {

@@ -12,8 +12,8 @@ targets = [
 yanked = "deny"
 unmaintained = "workspace"
 # paste v1.0.15 unmaintained — transitive dep via netstat2 -> netlink-packet-utils (Linux only).
-# No upstream replacement available; netstat2 has not migrated off paste.
-ignore = ["RUSTSEC-2024-0436"]
+# rsa v0.9.10 timing sidechannel — transitive dep, no fixed upgrade available upstream.
+ignore = ["RUSTSEC-2024-0436", "RUSTSEC-2023-0071"]
 
 [licenses]
 confidence-threshold = 0.8

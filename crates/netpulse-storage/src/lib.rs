@@ -23,7 +23,9 @@ pub mod timeseries;
 pub use capture_store::{CaptureStore, StoredFinding};
 pub use error::{MigrationError, Result as StorageResult};
 pub use migration::{MigrationManager, MigrationStatus};
-pub use repository::{default_db_path, CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository};
+pub use repository::{
+    default_db_path, CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository,
+};
 pub use ring::RingBuffer;
 pub use timeseries::{Point, SeriesId, TimeSeriesStore};
 

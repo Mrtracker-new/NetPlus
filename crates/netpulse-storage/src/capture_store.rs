@@ -8,10 +8,31 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, Session};
+use netpulse_core::{
+    EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session,
+};
 
 use crate::repository::{CaptureRepository, MemoryCaptureStore};
 use crate::PayloadPolicy;
+
+// NOTE:
+// CaptureStore is the authoritative runtime validator for EvidenceRef invariants (docs/02 §6.3, docs/08 §6).
+// Repository implementations assume pre-validated input and MUST NOT duplicate invariant validation.
+
+fn check_evidence_exists(
+    finding_id: u64,
+    entity: &str,
+    entity_id: u64,
+    exists: bool,
+) -> netpulse_core::Result<()> {
+    if !exists {
+        Err(NpError::Invariant(format!(
+            "Finding \"{finding_id}\" references missing {entity}Id({entity_id})"
+        )))
+    } else {
+        Ok(())
+    }
+}
 
 /// A finding plus the retention annotation from docs/08 §6.
 #[derive(Debug, Clone)]
@@ -104,16 +125,20 @@ impl CaptureStore<MemoryCaptureStore> {
         }
     }
 
-    /// Synchronous insert finding.
-    pub fn insert_finding(&mut self, finding: Finding) {
+    /// Synchronous insert finding. Validates that all evidence references exist.
+    pub fn insert_finding(&mut self, finding: Finding) -> netpulse_core::Result<()> {
+        self.validate_evidence_refs(&finding)?;
+        self.repository
+            .insert_finding_sync(finding.clone())
+            .map_err(|e| NpError::Storage(e.to_string()))?;
         self.findings.insert(
             finding.id,
             StoredFinding {
-                finding: finding.clone(),
+                finding,
                 evidence_expired: false,
             },
         );
-        let _ = self.repository.insert_finding_sync(finding);
+        Ok(())
     }
 
     /// The names observed for one IP, empty if none.
@@ -281,6 +306,34 @@ impl<R: CaptureRepository> CaptureStore<R> {
         self.payload_records
     }
 
+    /// Validate that all evidence references in `finding` exist in `CaptureStore`.
+    fn validate_evidence_refs(&self, finding: &Finding) -> netpulse_core::Result<()> {
+        // Duplicate evidence references are permitted and represent multiple logical references to the same evidence.
+        for r in &finding.evidence_refs {
+            match r {
+                EvidenceRef::Flow(id) => {
+                    check_evidence_exists(finding.id, "Flow", *id, self.flows.contains_key(id))?;
+                }
+                EvidenceRef::Session(id) => {
+                    check_evidence_exists(finding.id, "Session", *id, self.sessions.contains_key(id))?;
+                }
+                EvidenceRef::Packet(id) => {
+                    if *id == 0 {
+                        return Err(NpError::Invariant(format!(
+                            "Finding \"{}\" references invalid Packet ID 0",
+                            finding.id
+                        )));
+                    }
+                    // Packet IDs cannot currently be resolved to stored packet objects because
+                    // CaptureStore operates in metadata-only mode (docs/08 §4). The runtime invariant
+                    // therefore verifies only that the packet identifier is syntactically valid (non-zero).
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
     // ---- Async Query and Mutation surface ----
 
     pub async fn insert_flow_async(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
@@ -328,15 +381,20 @@ impl<R: CaptureRepository> CaptureStore<R> {
         }
     }
 
-    pub async fn insert_finding_async(&mut self, finding: Finding) {
+    pub async fn insert_finding_async(&mut self, finding: Finding) -> netpulse_core::Result<()> {
+        self.validate_evidence_refs(&finding)?;
+        self.repository
+            .insert_finding(finding.clone())
+            .await
+            .map_err(|e| NpError::Storage(e.to_string()))?;
         self.findings.insert(
             finding.id,
             StoredFinding {
-                finding: finding.clone(),
+                finding,
                 evidence_expired: false,
             },
         );
-        let _ = self.repository.insert_finding(finding).await;
+        Ok(())
     }
 }
 
@@ -344,7 +402,9 @@ impl<R: CaptureRepository> CaptureStore<R> {
 mod tests {
     use super::*;
     use netpulse_core::net::{FiveTuple, L4Proto, L7Proto};
-    use netpulse_core::{Confidence, EvidenceRef, FindingCategory, FlowMetrics, FlowState, Timestamp};
+    use netpulse_core::{
+        Confidence, EvidenceRef, FindingCategory, FlowMetrics, FlowState, Timestamp,
+    };
     use std::net::{IpAddr, Ipv4Addr};
 
     fn flow(id: u64, ts: u64) -> Flow {
@@ -407,15 +467,155 @@ mod tests {
         store.insert_flow(flow(2, 200), vec![]);
         store.insert_flow(flow(3, 300), vec![]);
         // A finding references the oldest flow (id 1).
-        store.insert_finding(Finding {
-            id: 42,
-            category: FindingCategory::Suspicious,
-            confidence: Confidence::new(0.9),
-            evidence_refs: vec![EvidenceRef::Flow(1)],
-        });
+        store
+            .insert_finding(Finding {
+                id: 42,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.9),
+                evidence_refs: vec![EvidenceRef::Flow(1)],
+            })
+            .expect("insert_finding");
         // Ask to shrink to 1 flow: it must not silently drop referenced flow 1.
         store.evict_oldest_flows(1);
         assert!(store.flow(1).is_some(), "referenced flow must survive");
         assert!(store.finding(42).unwrap().evidence_expired);
+    }
+
+    #[test]
+    fn insert_finding_rejects_missing_flow_ref() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let err = store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.8),
+                evidence_refs: vec![EvidenceRef::Flow(101)],
+            })
+            .expect_err("should fail");
+        assert_eq!(
+            err.to_string(),
+            "invariant violated: Finding \"303\" references missing FlowId(101)"
+        );
+    }
+
+    #[test]
+    fn insert_finding_rejects_missing_session_ref() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let err = store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.8),
+                evidence_refs: vec![EvidenceRef::Session(202)],
+            })
+            .expect_err("should fail");
+        assert_eq!(
+            err.to_string(),
+            "invariant violated: Finding \"303\" references missing SessionId(202)"
+        );
+    }
+
+    #[test]
+    fn insert_finding_rejects_zero_packet_id() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let err = store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.8),
+                evidence_refs: vec![EvidenceRef::Packet(0)],
+            })
+            .expect_err("should fail");
+        assert_eq!(
+            err.to_string(),
+            "invariant violated: Finding \"303\" references invalid Packet ID 0"
+        );
+    }
+
+    #[test]
+    fn insert_finding_accepts_empty_evidence_list() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Informational,
+                confidence: Confidence::new(1.0),
+                evidence_refs: vec![],
+            })
+            .expect("empty evidence_refs is allowed");
+        assert!(store.finding(303).is_some());
+    }
+
+    #[test]
+    fn insert_finding_rejects_partially_invalid_refs() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        store.insert_flow(flow(101, 100), vec![]);
+        let err = store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.85),
+                evidence_refs: vec![EvidenceRef::Flow(101), EvidenceRef::Session(999)],
+            })
+            .expect_err("partially invalid should fail");
+        assert_eq!(
+            err.to_string(),
+            "invariant violated: Finding \"303\" references missing SessionId(999)"
+        );
+    }
+
+    #[test]
+    fn insert_finding_accepts_multiple_valid_refs() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        store.insert_flow(flow(101, 100), vec![]);
+        store.insert_session(Session {
+            id: 202,
+            process_id: 1,
+            start_ts: Timestamp::new(100, 100),
+            trigger: "test".into(),
+            flow_ids: vec![101],
+        });
+        store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.9),
+                evidence_refs: vec![
+                    EvidenceRef::Flow(101),
+                    EvidenceRef::Session(202),
+                    EvidenceRef::Packet(5),
+                ],
+            })
+            .expect("valid refs succeed");
+        assert!(store.finding(303).is_some());
+    }
+
+    #[test]
+    fn insert_finding_accepts_duplicate_valid_refs() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        store.insert_flow(flow(101, 100), vec![]);
+        store
+            .insert_finding(Finding {
+                id: 303,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.9),
+                evidence_refs: vec![EvidenceRef::Flow(101), EvidenceRef::Flow(101)],
+            })
+            .expect("duplicate valid refs succeed");
+        assert!(store.finding(303).is_some());
+    }
+
+    #[test]
+    fn insert_finding_atomic_on_failure() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        assert_eq!(store.finding(303).is_none(), true);
+        let res = store.insert_finding(Finding {
+            id: 303,
+            category: FindingCategory::Suspicious,
+            confidence: Confidence::new(0.8),
+            evidence_refs: vec![EvidenceRef::Flow(999)],
+        });
+        assert!(res.is_err());
+        assert!(store.finding(303).is_none());
     }
 }

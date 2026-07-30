@@ -1,0 +1,5 @@
+{
+  "connection_failed": "Error al conectar con el motor secundario.",
+  "ipc_error": "Comando IPC fallido: {{message}}",
+  "unknown_error": "Ocurrió un error inesperado."
+}

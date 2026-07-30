@@ -1,0 +1,7 @@
+{
+  "title": "Asistente IA",
+  "placeholder": "Haga una pregunta sobre flujos o protocolos activos...",
+  "ask_button": "Preguntar",
+  "thinking": "Analizando almacenamiento local...",
+  "empty_prompt": "Por favor ingrese una pregunta."
+}

@@ -1,0 +1,10 @@
+{
+  "title": "Security Findings",
+  "findings_one": "{{count}} security finding detected",
+  "findings_other": "{{count}} security findings detected",
+  "no_findings": "No security anomalies detected in selected window.",
+  "severity_high": "High",
+  "severity_medium": "Medium",
+  "severity_low": "Low",
+  "severity_info": "Info"
+}

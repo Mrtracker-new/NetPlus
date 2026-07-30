@@ -1,0 +1,7 @@
+{
+  "title": "AI Assistant",
+  "placeholder": "Ask a question about active flows or protocols...",
+  "ask_button": "Ask",
+  "thinking": "Analyzing local store...",
+  "empty_prompt": "Please enter a question."
+}

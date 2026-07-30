@@ -1,0 +1,10 @@
+{
+  "title": "Network Dashboard",
+  "live_traffic": "Live Traffic Stream",
+  "active_flows": "Active Flows",
+  "active_sessions": "Active Sessions",
+  "total_bytes": "Total Bytes Processed",
+  "packets_captured": "Packets Captured",
+  "capture_drops": "Capture Drops",
+  "no_traffic": "No traffic captured yet. Click Start Capture to begin."
+}

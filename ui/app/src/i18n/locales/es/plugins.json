@@ -1,0 +1,12 @@
+{
+  "title": "Registro de Complementos",
+  "installed_one": "{{count}} complemento instalado",
+  "installed_other": "{{count}} complementos instalados",
+  "first_party": "Oficial",
+  "reviewed": "Revisado",
+  "unreviewed": "No Revisado",
+  "status_enabled": "Habilitado",
+  "status_disabled": "Deshabilitado",
+  "enable_action": "Habilitar Complemento",
+  "disable_action": "Deshabilitar Complemento"
+}

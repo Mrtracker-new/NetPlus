@@ -1,0 +1,50 @@
+{
+  "app_name": "NetPulse",
+  "tagline": "Análisis e Inteligencia de Red en Tiempo Real",
+  "navigation": {
+    "dashboard": "Panel Principal",
+    "timeline": "Línea de Tiempo",
+    "journey": "Trayectoria",
+    "apps": "Aplicaciones y Atribución",
+    "learn": "Aprender",
+    "monitoring": "Monitoreo",
+    "explorer": "Explorador",
+    "security": "Seguridad",
+    "assistant": "Asistente IA",
+    "recordings": "Grabaciones",
+    "replay": "Reproducción",
+    "export": "Exportar",
+    "plugins": "Complementos",
+    "settings": "Configuración"
+  },
+  "actions": {
+    "start_capture": "Iniciar Captura",
+    "stop_capture": "Detener Captura",
+    "export_data": "Exportar Datos",
+    "refresh": "Actualizar",
+    "enable": "Habilitar",
+    "disable": "Deshabilitar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "search": "Buscar"
+  },
+  "status": {
+    "healthy": "Saludable",
+    "degraded": "Degradado",
+    "unhealthy": "No Saludable",
+    "capturing": "Capturando",
+    "idle": "Inactivo",
+    "unknown": "Desconocido"
+  },
+  "depth": {
+    "beginner": "Principiante",
+    "intermediate": "Intermedio",
+    "expert": "Experto"
+  },
+  "language": {
+    "english": "English",
+    "spanish": "Español",
+    "switch_language": "Idioma"
+  }
+}

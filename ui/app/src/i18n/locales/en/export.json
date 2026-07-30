@@ -1,0 +1,8 @@
+{
+  "title": "Export Artifacts",
+  "selection_label": "Selection Range",
+  "format_label": "Export Format",
+  "preview_title": "Export Preview",
+  "start_export": "Start Export",
+  "sanitized_notice": "Personal data will be sanitized according to default privacy policy."
+}

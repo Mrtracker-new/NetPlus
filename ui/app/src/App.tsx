@@ -5,7 +5,9 @@
 // the original deep-observatory dark (tokens.css [data-theme="dark"]).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ProjectionDepth, Interface as InterfaceDto } from "@netpulse/contract";
+import { changeLanguage, type Language } from "./i18n";
 import { DisclosureProvider, useDisclosure, DEPTHS } from "./modes/DisclosureContext";
 import { useTheme } from "./modes/useTheme";
 import { useLiveData } from "./state/useLiveData";
@@ -187,6 +189,29 @@ function ThemeToggle() {
   );
 }
 
+function LanguageToggle() {
+  const { i18n } = useTranslation();
+  const rawLang = (i18n.language || "en").split("-")[0] || "en";
+  const currentLang: Language = rawLang === "es" ? "es" : "en";
+
+  function toggleLanguage() {
+    const nextLang: Language = currentLang === "en" ? "es" : "en";
+    void changeLanguage(i18n, nextLang);
+  }
+
+  return (
+    <button
+      className="np-iconbtn"
+      onClick={toggleLanguage}
+      aria-label="Switch Language"
+      title={`Language: ${currentLang.toUpperCase()}`}
+      style={{ fontWeight: 600, fontSize: "0.85rem", width: "auto", padding: "0 6px" }}
+    >
+      {currentLang.toUpperCase()}
+    </button>
+  );
+}
+
 // The right context rail — real NetPulse content only (docs honesty: no invented
 // users/resources). Capture status, the top observed hosts, and quick controls.
 function RightRail() {
@@ -296,6 +321,7 @@ function Shell() {
           <span className="np-header__spacer" />
           <CaptureControl />
           <ThemeToggle />
+          <LanguageToggle />
         </header>
         <main>
           {screen === "dashboard" && <Dashboard />}

@@ -1,0 +1,10 @@
+{
+  "title": "Panel Principal de Red",
+  "live_traffic": "Flujo de Tráfico en Vivo",
+  "active_flows": "Flujos Activos",
+  "active_sessions": "Sesiones Activas",
+  "total_bytes": "Bytes Totales Procesados",
+  "packets_captured": "Paquetes Capturados",
+  "capture_drops": "Paquetes Descartados",
+  "no_traffic": "Aún no hay tráfico capturado. Haga clic en Iniciar Captura para comenzar."
+}

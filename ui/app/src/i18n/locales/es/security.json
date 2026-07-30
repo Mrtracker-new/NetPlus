@@ -1,0 +1,10 @@
+{
+  "title": "Hallazgos de Seguridad",
+  "findings_one": "{{count}} hallazgo de seguridad detectado",
+  "findings_other": "{{count}} hallazgos de seguridad detectados",
+  "no_findings": "No se detectaron anomalías de seguridad en la ventana seleccionada.",
+  "severity_high": "Alta",
+  "severity_medium": "Media",
+  "severity_low": "Baja",
+  "severity_info": "Información"
+}

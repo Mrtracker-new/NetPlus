@@ -1,0 +1,8 @@
+{
+  "title": "Exportar Artefactos",
+  "selection_label": "Rango de Selección",
+  "format_label": "Formato de Exportación",
+  "preview_title": "Vista Previa de Exportación",
+  "start_export": "Iniciar Exportación",
+  "sanitized_notice": "Los datos personales se desinfectarán según la política de privacidad predeterminada."
+}

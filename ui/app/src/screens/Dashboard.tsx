@@ -4,6 +4,7 @@
 // toward raw data (docs/09 §8). Every number here is real — sourced from the
 // monitor snapshot / store, never fabricated. Density scales with disclosure mode.
 
+import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity } from "@netpulse/contract";
 import { useStore } from "../state/store";
 import { useDisclosure } from "../modes/DisclosureContext";
@@ -55,14 +56,15 @@ function Card({ card }: { card: NarrativeCard }) {
 // The KPI row (ref "You have been online / visited"). Real figures from the
 // monitor snapshot; shows zeros honestly before the first snapshot arrives.
 function Kpis() {
+  const { t } = useTranslation("dashboard");
   const { monitor, feed } = useStore();
   const hosts = monitor?.by_host.rows.length ?? 0;
   const flows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
   const bytes = monitor?.by_protocol.rows.reduce((s, r) => s + r.bytes, 0) ?? 0;
   const tiles: Array<{ label: string; value: string; sub?: string }> = [
     { label: "Hosts observed", value: String(hosts) },
-    { label: "Active flows", value: String(flows) },
-    { label: "Traffic seen", value: humanBytes(bytes) },
+    { label: t("active_flows"), value: String(flows) },
+    { label: t("total_bytes"), value: humanBytes(bytes) },
     { label: "Narrative cards", value: String(feed.length) },
   ];
   return (
@@ -78,13 +80,14 @@ function Kpis() {
 }
 
 export function Dashboard() {
+  const { t } = useTranslation("dashboard");
   const { feed, monitor } = useStore();
   const hostRows = monitor?.by_host.rows ?? [];
 
   return (
     <section className="np-dash" aria-label="Dashboard">
       <header>
-        <h1 className="np-hero__title">Network at a glance</h1>
+        <h1 className="np-hero__title">{t("title")}</h1>
         <p className="np-hero__sub">
           A live, honest picture of what this device is talking to — nothing invented.
         </p>
@@ -93,7 +96,7 @@ export function Dashboard() {
       <Kpis />
 
       <section aria-label="Network constellation">
-        <h2 className="np-dash__section-title">Live constellation</h2>
+        <h2 className="np-dash__section-title">{t("live_traffic")}</h2>
         <Constellation hosts={hostRows} lossIndicators={monitor?.network_loss_indicators ?? 0} />
       </section>
 
@@ -102,7 +105,7 @@ export function Dashboard() {
         {feed.length === 0 ? (
           // Calm empty state — a quiet network shows "nothing notable", not a void
           // (docs/09 §11).
-          <div className="np-empty np-empty--compact">Quiet — nothing notable right now.</div>
+          <div className="np-empty np-empty--compact">{t("no_traffic")}</div>
         ) : (
           <div className="np-feed">
             {feed.map((card) => (

@@ -1,0 +1,5 @@
+{
+  "connection_failed": "Failed to connect to backend engine.",
+  "ipc_error": "IPC command failed: {{message}}",
+  "unknown_error": "An unexpected error occurred."
+}

@@ -15,12 +15,16 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto, InterfaceDto};
 use netpulse_api::{Command, ProjectionDepth, Query, QueryResponse};
-use netpulse_capture::{CaptureStats, Recording, ReplayController, ReplayState};
+use netpulse_capture::{
+    CaptureStats, Recording, ReplayController, ReplayState, ShedController, ShedStage,
+    ETH_IPV4_TCP_HEADERS,
+};
 use netpulse_core::traits::{CaptureSource, RawFrame, SocketTableSource};
 use netpulse_core::Depth;
 use netpulse_engine::attribution::{Attribution, Correlator};
@@ -161,14 +165,16 @@ fn live_loop(
     stop: Arc<AtomicBool>,
 ) {
     // Bound memory and rebuild cost: keep only the most recent frames (docs/08
-    // §4 bounded/private). A first-slice reprocess-the-window model; an
-    // incremental flow engine is the follow-up optimization.
-    const MAX_FRAMES: usize = 200_000;
+    // §4 bounded/private). Option A (sliding window) preserves the newest frames.
+    const MAX_FRAMES: usize = 50_000;
     // How often to re-read the OS name hints (hosts file + DNS resolver cache).
     // The read spawns a helper process, so we cache it between refreshes rather
     // than paying that cost on every ~1s rebuild.
     const HINT_REFRESH_SECS: u64 = 30;
-    let mut buffer: Vec<RawFrame> = Vec::new();
+
+    let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(MAX_FRAMES);
+    let mut shed_controller = ShedController::new(MAX_FRAMES);
+    let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
     // Cached host-environment name overlay and when it was last refreshed
@@ -186,17 +192,33 @@ fn live_loop(
             if let Some(f) = batch.last() {
                 latest_mono = latest_mono.max(f.mono_nanos);
             }
-            buffer.extend(batch);
-            if buffer.len() > MAX_FRAMES {
-                let overflow = buffer.len() - MAX_FRAMES;
-                buffer.drain(0..overflow);
+            let fill_len = buffer.len() + batch.len();
+            let current_stage = shed_controller.update(fill_len);
+
+            // Pre-insertion eviction (Option A sliding window): drain overflow from head of ring buffer
+            if fill_len > MAX_FRAMES {
+                let overflow = fill_len - MAX_FRAMES;
+                let to_drop = overflow.min(buffer.len());
+                buffer.drain(0..to_drop);
+                buffer_drops = buffer_drops.saturating_add(overflow as u64);
+            }
+
+            for mut frame in batch {
+                if current_stage >= ShedStage::PayloadsOff {
+                    frame.bytes.truncate(ETH_IPV4_TCP_HEADERS);
+                }
+                if current_stage == ShedStage::SampleDissection && !shed_controller.should_sample() {
+                    continue;
+                }
+                buffer.push_back(frame);
             }
         }
 
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
+            let slice = buffer.make_contiguous();
             if let Ok((mut new_store, _report)) =
-                netpulse_engine::pipeline::analyze_frames(dlt, &buffer, 16)
+                netpulse_engine::pipeline::analyze_frames(dlt, slice, 16)
             {
                 // Overlay host-environment name hints (OS DNS cache, hosts file,
                 // cached mDNS) onto the wire-only resolutions, so IPs whose lookup
@@ -216,12 +238,18 @@ fn live_loop(
                     new_store.merge_resolution(*ip, names.clone());
                 }
 
-                let (received, dropped) = capture.stats();
+                let (received, kernel_dropped) = capture.stats();
                 if let Ok(mut s) = store.lock() {
                     *s = new_store;
                 }
                 if let Ok(mut st) = stats.lock() {
-                    *st = CaptureStats { received, dropped };
+                    *st = CaptureStats {
+                        received,
+                        dropped: kernel_dropped.saturating_add(buffer_drops),
+                        shed_stage: shed_controller.current_stage(),
+                        buffer_frames: buffer.len(),
+                        buffer_capacity: MAX_FRAMES,
+                    };
                 }
             }
 

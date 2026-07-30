@@ -193,6 +193,7 @@ fn monitor_snapshot_breaks_down_usage_and_separates_loss() {
     let stats = CaptureStats {
         received: 100,
         dropped: 5,
+        ..Default::default()
     };
     let view = present(&store, Depth::Intermediate, stats);
 

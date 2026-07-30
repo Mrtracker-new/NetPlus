@@ -393,12 +393,14 @@ mod tests {
         // Privacy minimization (docs/23 §8): a finding-scoped export includes
         // exactly the finding's evidence flows, nothing more.
         let mut store = seeded();
-        store.insert_finding(Finding {
-            id: 9,
-            category: FindingCategory::Suspicious,
-            confidence: Confidence::new(0.7),
-            evidence_refs: vec![EvidenceRef::Flow(1)],
-        });
+        store
+            .insert_finding(Finding {
+                id: 9,
+                category: FindingCategory::Suspicious,
+                confidence: Confidence::new(0.7),
+                evidence_refs: vec![EvidenceRef::Flow(1)],
+            })
+            .expect("insert_finding");
         let json = export_json(&store, &Selection::Finding(9), &Sanitizer::default());
         assert!(json.contains("\"id\": 1"));
         assert!(

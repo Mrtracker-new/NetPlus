@@ -163,11 +163,6 @@ button {
   transform: translateY(-50%) scale(0.96);
   padding: var(--np-1) var(--np-3);
   border-radius: var(--np-radius-pill);
-  background: var(--np-glass-bg);
-  -webkit-backdrop-filter: var(--np-glass-blur);
-  backdrop-filter: var(--np-glass-blur);
-  border: 1px solid var(--np-glass-border);
-  box-shadow: var(--np-neu-sm);
   color: var(--np-text);
   font-size: var(--np-fs-sm);
   white-space: nowrap;
@@ -197,11 +192,6 @@ button {
   gap: var(--np-3);
   padding: var(--np-2) var(--np-3) var(--np-2) var(--np-5);
   border-radius: var(--np-radius-pill);
-  background: var(--np-glass-bg);
-  -webkit-backdrop-filter: var(--np-glass-blur);
-  backdrop-filter: var(--np-glass-blur);
-  border: 1px solid var(--np-glass-border);
-  box-shadow: var(--np-neu-sm);
   flex: none;
   min-width: 0;
   max-width: 100%;
@@ -706,6 +696,18 @@ button {
 .np-evidence:hover {
   color: var(--np-accent-strong);
   box-shadow: var(--np-neu-inset);
+}
+
+/* ---- Glass utility ---- */
+.np-glass,
+.np-header,
+.np-nav__item::after,
+.np-cons__tip {
+  background: var(--np-glass-bg);
+  -webkit-backdrop-filter: var(--np-glass-blur);
+  backdrop-filter: var(--np-glass-blur);
+  border: 1px solid var(--np-glass-border);
+  box-shadow: var(--np-neu-sm);
 }
 
 /* Generic tables (Apps, Monitor breakdowns). Wrappers support smooth touch scrolling. */
@@ -1978,10 +1980,6 @@ button {
   padding: var(--np-3) var(--np-4);
   min-width: 150px;
   border-radius: var(--np-radius);
-  background: var(--np-glass-bg);
-  -webkit-backdrop-filter: var(--np-glass-blur);
-  backdrop-filter: var(--np-glass-blur);
-  border: 1px solid var(--np-glass-border);
   box-shadow: var(--np-neu);
   pointer-events: none;
   z-index: var(--np-z-sticky);

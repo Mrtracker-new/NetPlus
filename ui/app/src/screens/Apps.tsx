@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import type { Attribution, AttributionConfidence } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useStore } from "../state/store";
 
@@ -49,7 +50,7 @@ export function Apps() {
   }, [feed]);
 
   if (rows.length === 0) {
-    return <div className="np-empty">No attributed flows yet.</div>;
+    return <EmptyState>No attributed flows yet.</EmptyState>;
   }
 
   return (

@@ -4,6 +4,7 @@
 // are shown as distinct figures — conflating them would be a lie (docs/11 §6.4).
 
 import type { Breakdown, Diagnosis } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "../viz";
 
@@ -46,7 +47,7 @@ function HostBars({ breakdown }: { breakdown: Breakdown }) {
 export function Monitoring() {
   const { monitor, throughput } = useStore();
   if (!monitor) {
-    return <div className="np-empty">Idle — no traffic to measure.</div>;
+    return <EmptyState>Idle — no traffic to measure.</EmptyState>;
   }
 
   const protocolSlices = monitor.by_protocol.rows.map((r) => ({ label: r.label, value: r.bytes }));

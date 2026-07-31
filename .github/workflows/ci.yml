@@ -77,6 +77,12 @@ jobs:
       - name: Typecheck contract
         run: pnpm --filter @netpulse/contract typecheck
 
+      - name: Build components
+        run: pnpm --filter @netpulse/components build
+
+      - name: Typecheck components
+        run: pnpm --filter @netpulse/components typecheck
+
       - name: Typecheck app
         run: pnpm --filter @netpulse/app typecheck
 

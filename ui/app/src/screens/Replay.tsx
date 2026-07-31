@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { ReplayState } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const SPEEDS: Array<{ label: string; percent: number }> = [
@@ -105,10 +106,10 @@ export function Replay() {
 
       {notice && <p className="np-replay__notice">{notice}</p>}
       {!loaded && (
-        <div className="np-empty">
+        <EmptyState>
           No recording loaded to replay. Make a recording, then step through it —
           the same session, every time.
-        </div>
+        </EmptyState>
       )}
     </section>
   );

@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { PageJourney } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
@@ -50,7 +51,7 @@ export function Journey() {
   }, [feed, depth]);
 
   if (!journey) {
-    return <div className="np-empty">Visit a website and its journey will appear here.</div>;
+    return <EmptyState>Visit a website and its journey will appear here.</EmptyState>;
   }
 
   return (

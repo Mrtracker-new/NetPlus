@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { ExplorerEntry, ProjectionDepth } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 
@@ -77,7 +78,7 @@ export function Explorer() {
         aria-label="Search the protocol reference"
       />
       {entries.length === 0 ? (
-        <div className="np-empty">No matching entry — try another word.</div>
+        <EmptyState>No matching entry — try another word.</EmptyState>
       ) : (
         entries.map((entry) => <Entry key={entry.key} entry={entry} depth={depth} />)
       )}

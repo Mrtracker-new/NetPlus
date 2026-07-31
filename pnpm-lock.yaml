@@ -62,6 +62,16 @@ importers:
       '@netpulse/design-system':
         specifier: workspace:*
         version: link:../design-system
+      react:
+        specifier: ^18
+        version: 18.3.1
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.31
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
   ui/packages/contract:
     devDependencies:

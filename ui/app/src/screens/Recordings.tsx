@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { RecordingSummary } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const LEVEL_LABEL: Record<RecordingSummary["privacy"]["level"], string> = {
@@ -105,10 +106,10 @@ export function Recordings() {
       {notice && <p className="np-recordings__notice">{notice}</p>}
 
       {loaded && recordings.length === 0 ? (
-        <div className="np-empty">
+        <EmptyState>
           No recordings yet. A recording is a self-contained, replayable capture you
           choose to make — with a privacy manifest stating exactly what's inside.
-        </div>
+        </EmptyState>
       ) : (
         recordings.map((r) => <RecordingCard key={r.id} rec={r} />)
       )}

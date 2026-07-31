@@ -4,6 +4,7 @@
 // second entry point into the one model, from the time axis rather than the feed
 // (docs/10 §6). Dense GPU rendering (docs/10 §8) is a later optimization.
 
+import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { TimeRibbon } from "../viz";
 
@@ -16,7 +17,7 @@ export function Timeline() {
   }));
 
   if (events.length === 0) {
-    return <div className="np-empty">Nothing on the timeline yet — it fills as traffic is reconstructed.</div>;
+    return <EmptyState>Nothing on the timeline yet — it fills as traffic is reconstructed.</EmptyState>;
   }
 
   return (

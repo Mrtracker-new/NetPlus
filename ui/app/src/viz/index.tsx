@@ -10,6 +10,7 @@
 
 import { Fragment } from "react";
 import type { ReactElement } from "react";
+import { EmptyState } from "@netpulse/components";
 import type {
   BreakdownRow,
   FanoutNode,
@@ -375,7 +376,7 @@ const RIBBON_LANES: Array<{ severity: Severity; label: string }> = [
  *  themselves on hover — the drill-down entry point from the time axis (docs/10 §6). */
 export function TimeRibbon({ events }: { events: RibbonEvent[] }): ReactElement {
   if (events.length === 0) {
-    return <div className="np-empty">No events yet — the timeline fills as traffic is reconstructed.</div>;
+    return <EmptyState>No events yet — the timeline fills as traffic is reconstructed.</EmptyState>;
   }
   const times = events.map((e) => e.at);
   const min = Math.min(...times);

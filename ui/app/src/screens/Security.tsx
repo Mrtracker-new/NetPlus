@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { SecurityFinding } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { ConfidenceMeter } from "../viz";
@@ -126,9 +127,9 @@ export function Security() {
   if (loaded && findings.length === 0) {
     // Calm idle: nothing unusual is the honest, quiet default (docs/17).
     return (
-      <div className="np-empty">
+      <EmptyState>
         Nothing looks unusual. Findings appear here — calmly, with their reasons — if they do.
-      </div>
+      </EmptyState>
     );
   }
 

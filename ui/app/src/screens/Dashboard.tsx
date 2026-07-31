@@ -6,6 +6,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { Constellation } from "../viz/Constellation";
@@ -105,7 +106,7 @@ export function Dashboard() {
         {feed.length === 0 ? (
           // Calm empty state — a quiet network shows "nothing notable", not a void
           // (docs/09 §11).
-          <div className="np-empty np-empty--compact">{t("no_traffic")}</div>
+          <EmptyState compact>{t("no_traffic")}</EmptyState>
         ) : (
           <div className="np-feed">
             {feed.map((card) => (

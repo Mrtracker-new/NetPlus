@@ -4,8 +4,29 @@
   "private": true,
   "description": "Disclosure-aware React components over the shared data model.",
   "license": "MIT OR Apache-2.0",
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "@netpulse/contract": "workspace:*",
     "@netpulse/design-system": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "typescript": "^5.4.0"
   }
 }

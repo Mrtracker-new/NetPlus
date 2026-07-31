@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { LessonOffer } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
@@ -96,7 +97,7 @@ export function Learn() {
 
   if (offers.length === 0) {
     // Calm: nothing to teach yet is a fine, quiet state — never a nag.
-    return <div className="np-empty">No lessons yet — browse a few sites and they'll appear here.</div>;
+    return <EmptyState>No lessons yet — browse a few sites and they'll appear here.</EmptyState>;
   }
 
   return (

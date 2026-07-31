@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { PluginDescriptor } from "@netpulse/contract";
+import { EmptyState } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const TYPE_LABEL: Record<PluginDescriptor["plugin_type"], string> = {
@@ -103,7 +104,7 @@ export function Plugins() {
       {notice && <p className="np-plugins__notice">{notice}</p>}
 
       {loaded && plugins.length === 0 ? (
-        <div className="np-empty">No plugins registered.</div>
+        <EmptyState>No plugins registered.</EmptyState>
       ) : (
         plugins.map((p) => (
           <PluginRow key={p.name} p={p} onToggle={(enable) => void toggle(p.name, enable)} />

@@ -108,6 +108,21 @@ export interface FleetHost {
   status: FleetHostStatus;
 }
 
+export type DiagnosticSeverity = "info" | "warning" | "error";
+
+export interface FieldDiagnostic {
+  severity: DiagnosticSeverity;
+  field: string;
+  rfcReference: string;
+  explanation: string;
+}
+
+export interface PacketInspection {
+  rawHex: string;
+  layers: readonly string[];
+  diagnostics: readonly FieldDiagnostic[];
+}
+
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
   | { kind: "narrativeFeed"; cards: NarrativeCard[] }
@@ -133,7 +148,7 @@ export type QueryResponse =
   | { kind: "pingResult"; result: PingResult }
   | { kind: "tracerouteResult"; hops: TracerouteHop[] }
   | { kind: "bufferbloatResult"; result: BufferbloatResult }
-  | { kind: "decodedPacketInspection"; inspection: any }
+  | { kind: "decodedPacketInspection"; inspection: PacketInspection }
   | { kind: "sessionDiff"; diff: any }
   | { kind: "fleetHosts"; hosts: FleetHost[] };
 

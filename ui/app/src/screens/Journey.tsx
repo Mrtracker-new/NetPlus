@@ -8,11 +8,15 @@
 
 import { useEffect, useState } from "react";
 import type { PageJourney } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
 import { JourneyFlow } from "@netpulse/viz";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 // The most recent session in the feed — the journey we open by default.
 function latestSessionId(feed: ReturnType<typeof useStore>["feed"]): number | null {
@@ -34,30 +38,45 @@ export function Journey() {
   const { feed } = useStore();
   const { depth } = useDisclosure();
   const [journey, setJourney] = useState<PageJourney | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const sessionId = latestSessionId(feed);
     if (sessionId === null) {
       setJourney(null);
+      setLoaded(true);
       return;
     }
-    query({ kind: "journeyStagesOfSession", session_id: sessionId, depth }).then((res) => {
-      if (!cancelled && res.kind === "pageJourney") setJourney(res.journey);
-    });
+    query({ kind: "journeyStagesOfSession", session_id: sessionId, depth })
+      .then((res) => {
+        if (!cancelled && res.kind === "pageJourney") setJourney(res.journey);
+      })
+      .catch((e) => {
+        if (!cancelled) setNotice(toErrorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [feed, depth]);
 
-  if (!journey) {
-    return <EmptyState>Visit a website and its journey will appear here.</EmptyState>;
+  if (!loaded) {
+    return <Spinner />;
   }
 
   return (
     <section className="np-journey" aria-label="Website journey">
-      {/* The signature flow diagram: stages with traveling packets + fan-out. */}
-      <JourneyFlow stages={journey.stages} fanout={journey.fanout} />
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
+      {!journey ? (
+        <EmptyState>Visit a website and its journey will appear here.</EmptyState>
+      ) : (
+        <>
+          {/* The signature flow diagram: stages with traveling packets + fan-out. */}
+          <JourneyFlow stages={journey.stages} fanout={journey.fanout} />
 
       <ol className="np-journey__stages">
         {journey.stages.map((stage, i) => (
@@ -87,6 +106,8 @@ export function Journey() {
             ))}
           </ul>
         </aside>
+      )}
+        </>
       )}
     </section>
   );

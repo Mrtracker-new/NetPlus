@@ -9,6 +9,11 @@ import { useEffect, useState } from "react";
 import type { ExportFormat, ExportPreview, PayloadLevel } from "@netpulse/contract";
 import { Notice } from "@netpulse/components";
 import { query, command } from "../ipc";
+import { useBusy } from "../hooks/useBusy";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 const FORMATS: Array<{ id: ExportFormat; label: string; blurb: string }> = [
   { id: "pcapng", label: "pcapng", blurb: "Raw frames for Wireshark/tcpdump" },
@@ -24,33 +29,35 @@ export function Export() {
 
   useEffect(() => {
     let cancelled = false;
-    // Preview the whole capture at the chosen format (docs/23 §6). Selection
-    // scoping (window/session/finding) plugs in from the other surfaces (docs/23 §8).
     query({ kind: "exportPreview", selection: { kind: "all" }, format })
       .then((res) => {
         if (!cancelled) setPreview(res.kind === "exportPreview" ? res.preview : null);
       })
-      .catch(() => {
-        if (!cancelled) setPreview(null);
+      .catch((e) => {
+        if (!cancelled) {
+          setPreview(null);
+          setNotice(toErrorMessage(e));
+        }
       });
     return () => {
       cancelled = true;
     };
   }, [format]);
 
-  async function doExport() {
+  const [busy, doExport] = useBusy(async () => {
     setNotice(null);
     const level: PayloadLevel = preview?.level ?? "metadata_only";
     try {
       await command({ kind: "startExport", selection: { kind: "all" }, format, level });
       setNotice("Export written locally. Sharing it is a separate, explicit action.");
     } catch (e) {
-      setNotice(String(e));
+      setNotice(toErrorMessage(e));
     }
-  }
+  });
 
   return (
     <section className="np-export" aria-label="Export">
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
       <div className="np-export__formats" role="radiogroup" aria-label="Export format">
         {FORMATS.map((f) => (
           <button
@@ -66,8 +73,6 @@ export function Export() {
         ))}
       </div>
 
-      {/* The preview: exactly what the export will contain, before any byte is
-          written (docs/23 §6). The preview matches the output — a tested invariant. */}
       {preview && (
         <div className="np-export__preview">
           <h3>What this export contains</h3>
@@ -93,16 +98,14 @@ export function Export() {
       )}
 
       <div className="np-export__actions">
-        <button className="np-btn np-btn--primary" onClick={() => void doExport()}>
-          Export to file
+        <button className="np-btn np-btn--primary" disabled={busy} onClick={() => void doExport()}>
+          {busy ? "Exporting…" : "Export to file"}
         </button>
         <span className="np-export__egress">
           Export writes a local file. NetPulse never uploads it — sharing is a
           separate, explicit action (docs/23 §6).
         </span>
       </div>
-
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
     </section>
   );
 }

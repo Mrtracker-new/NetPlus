@@ -9,9 +9,13 @@
 
 import { useState } from "react";
 import type { AssistantAnswer } from "@netpulse/contract";
+import { Notice } from "@netpulse/components";
 import { query } from "../ipc";
 
-// A few grounded starting questions, so the surface is discoverable (docs/19 §8).
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 const SUGGESTIONS = [
   "Which host used the most bandwidth?",
   "What protocols am I using?",
@@ -22,7 +26,6 @@ const SUGGESTIONS = [
 function AnswerView({ answer }: { answer: AssistantAnswer }) {
   return (
     <div className="np-assistant__answer">
-      {/* The privacy posture, always visible (docs/19 §4). */}
       <div className="np-assistant__posture">
         <span className={answer.is_remote ? "np-posture np-posture--remote" : "np-posture np-posture--local"}>
           {answer.is_remote ? "Remote" : "Local"} · {answer.backend_id}
@@ -34,13 +37,10 @@ function AnswerView({ answer }: { answer: AssistantAnswer }) {
         )}
       </div>
 
-      {/* The answer text is composed only from grounded facts (docs/19 §3). */}
       <p className="np-assistant__text" style={{ whiteSpace: "pre-line" }}>
         {answer.text}
       </p>
 
-      {/* Per-request disclosure: exactly what a remote backend would receive,
-          shown before any opt-in (docs/19 §4.3). */}
       <details className="np-assistant__disclosure">
         <summary>What a remote assistant would be sent</summary>
         <pre className="np-assistant__disclosure-body">{answer.disclosure}</pre>
@@ -53,14 +53,19 @@ export function Assistant() {
   const [questionText, setQuestionText] = useState("");
   const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function ask(q: string) {
+    if (busy) return;
     const text = q.trim();
     if (!text) return;
+    setNotice(null);
     setBusy(true);
     try {
       const res = await query({ kind: "askAssistant", question: text });
       setAnswer(res.kind === "assistantAnswer" ? res.answer : null);
+    } catch (e) {
+      setNotice(toErrorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -68,6 +73,7 @@ export function Assistant() {
 
   return (
     <section className="np-assistant" aria-label="AI assistant">
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
       <form
         className="np-assistant__form"
         onSubmit={(e) => {
@@ -93,6 +99,7 @@ export function Assistant() {
           <button
             key={s}
             className="np-suggestion"
+            disabled={busy}
             onClick={() => {
               setQuestionText(s);
               void ask(s);

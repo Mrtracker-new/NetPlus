@@ -8,12 +8,15 @@
 
 import { useEffect, useState } from "react";
 import type { ExplorerEntry, ProjectionDepth } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 function contentAt(entry: ExplorerEntry, depth: ProjectionDepth): string {
-  // Additive ladder: the mode picks the default line (docs/15 §6).
   if (depth === "expert") return entry.expert;
   if (depth === "intermediate") return entry.intermediate;
   return entry.beginner;
@@ -25,12 +28,9 @@ function Entry({ entry, depth }: { entry: ExplorerEntry; depth: ProjectionDepth 
       <header className="np-ref__key">
         {entry.title}
         <code className="np-ref__id">{entry.key}</code>
-        {/* Reference ↔ reality: a real example in the learner's capture is
-            flagged so they can jump to their own data (docs/15 §5). */}
         {entry.examples_available && <span className="np-ref__mine">you have an example</span>}
       </header>
       <p className="np-ref__body">{contentAt(entry, depth)}</p>
-      {/* Escape hatch: the full expert truth is one expand away at any mode. */}
       {depth !== "expert" && (
         <details className="np-ref__more">
           <summary>Expert detail</summary>
@@ -52,6 +52,8 @@ export function Explorer() {
   const { depth } = useDisclosure();
   const [term, setTerm] = useState("");
   const [entries, setEntries] = useState<ExplorerEntry[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,9 +61,16 @@ export function Explorer() {
       term.trim().length > 0
         ? ({ kind: "explorerSearch", term } as const)
         : ({ kind: "explorerBrowse" } as const);
-    query(q).then((res) => {
-      if (!cancelled && res.kind === "explorerEntries") setEntries(res.entries);
-    });
+    query(q)
+      .then((res) => {
+        if (!cancelled && res.kind === "explorerEntries") setEntries(res.entries);
+      })
+      .catch((e) => {
+        if (!cancelled) setNotice(toErrorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -69,6 +78,7 @@ export function Explorer() {
 
   return (
     <section className="np-explorer" aria-label="Protocol Explorer">
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
       <input
         className="np-explorer__search"
         type="search"
@@ -77,7 +87,9 @@ export function Explorer() {
         onChange={(e) => setTerm(e.target.value)}
         aria-label="Search the protocol reference"
       />
-      {entries.length === 0 ? (
+      {!loaded ? (
+        <Spinner />
+      ) : entries.length === 0 ? (
         <EmptyState>No matching entry — try another word.</EmptyState>
       ) : (
         entries.map((entry) => <Entry key={entry.key} entry={entry} depth={depth} />)

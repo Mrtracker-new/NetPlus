@@ -8,10 +8,14 @@
 
 import { useEffect, useState } from "react";
 import type { LessonOffer } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 // The distinct session ids referenced by the current feed — the sessions we can
 // ask for grounded lesson offers.
@@ -65,6 +69,8 @@ export function Learn() {
   const { feed } = useStore();
   const { depth } = useDisclosure();
   const [offers, setOffers] = useState<LessonOffer[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -74,37 +80,44 @@ export function Learn() {
         const res = await query({ kind: "lessonOffers", session_id: sessionId, depth });
         return res.kind === "lessonOffers" ? res.offers : [];
       }),
-    ).then((results) => {
-      if (cancelled) return;
-      // Flatten, then de-duplicate by lesson id so the same concept is not
-      // offered twice across sessions (docs/13 §6 non-nagging).
-      const seen = new Set<string>();
-      const flat: LessonOffer[] = [];
-      for (const list of results) {
-        for (const offer of list) {
-          if (!seen.has(offer.lesson_id)) {
-            seen.add(offer.lesson_id);
-            flat.push(offer);
+    )
+      .then((results) => {
+        if (cancelled) return;
+        const seen = new Set<string>();
+        const flat: LessonOffer[] = [];
+        for (const list of results) {
+          for (const offer of list) {
+            if (!seen.has(offer.lesson_id)) {
+              seen.add(offer.lesson_id);
+              flat.push(offer);
+            }
           }
         }
-      }
-      setOffers(flat);
-    });
+        setOffers(flat);
+      })
+      .catch((e) => {
+        if (!cancelled) setNotice(toErrorMessage(e));
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [feed, depth]);
 
-  if (offers.length === 0) {
-    // Calm: nothing to teach yet is a fine, quiet state — never a nag.
-    return <EmptyState>No lessons yet — browse a few sites and they'll appear here.</EmptyState>;
+  if (!loaded) {
+    return <Spinner />;
   }
 
   return (
     <section className="np-learn" aria-label="Lessons from your traffic">
-      {offers.map((offer) => (
-        <Offer key={offer.lesson_id} offer={offer} />
-      ))}
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
+      {offers.length === 0 ? (
+        <EmptyState>No lessons yet — browse a few sites and they'll appear here.</EmptyState>
+      ) : (
+        offers.map((offer) => <Offer key={offer.lesson_id} offer={offer} />)
+      )}
     </section>
   );
 }

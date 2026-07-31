@@ -8,8 +8,13 @@
 
 import { useEffect, useState } from "react";
 import type { ReplayState } from "@netpulse/contract";
-import { EmptyState, Notice } from "@netpulse/components";
+import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query, command } from "../ipc";
+import { useBusy } from "../hooks/useBusy";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 const SPEEDS: Array<{ label: string; percent: number }> = [
   { label: "0.1× (teach)", percent: 10 },
@@ -23,93 +28,102 @@ function ms(ns: number): string {
 
 export function Replay() {
   const [state, setState] = useState<ReplayState | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
   function refresh() {
     query({ kind: "replayState" })
       .then((res) => setState(res.kind === "replayState" ? res.state : null))
-      .catch(() => setState(null));
+      .catch((e) => {
+        setState(null);
+        setNotice(toErrorMessage(e));
+      })
+      .finally(() => setIsLoaded(true));
   }
 
   useEffect(refresh, []);
 
-  async function send(c: Parameters<typeof command>[0]) {
+  const [busy, send] = useBusy(async (c: Parameters<typeof command>[0]) => {
     setNotice(null);
     try {
       await command(c);
       refresh();
     } catch (e) {
-      setNotice(String(e));
+      setNotice(toErrorMessage(e));
     }
-  }
+  });
 
-  const loaded = !!state && state.total_nanos > 0;
+  const hasRecording = !!state && state.total_nanos > 0;
 
   return (
     <section className="np-replay" aria-label="Replay">
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
       <p className="np-replay__note">
         Replay reuses the exact live pipeline — one pipeline, two sources — so what
         you see is precisely what the engine did. It reconstructs byte-identically
         every run (docs/21 §4, §6).
       </p>
 
-      {/* Transport: play / pause / step (docs/21 §5). */}
-      <div className="np-replay__transport" role="group" aria-label="Playback">
-        <button className="np-btn" onClick={() => void send({ kind: "replayPause" })}>
-          Pause
-        </button>
-        <button className="np-btn" onClick={() => void send({ kind: "replayPlay" })}>
-          Play
-        </button>
-        <button className="np-btn" onClick={() => void send({ kind: "replayStep" })}>
-          Step ›
-        </button>
-        <div className="np-replay__speeds">
-          {SPEEDS.map((s) => (
-            <button
-              key={s.percent}
-              className={
-                state?.speed_percent === s.percent ? "np-btn np-btn--active" : "np-btn"
-              }
-              onClick={() => void send({ kind: "replaySetSpeed", percent: s.percent })}
-            >
-              {s.label}
+      {!isLoaded ? (
+        <Spinner />
+      ) : (
+        <>
+          <div className="np-replay__transport" role="group" aria-label="Playback">
+            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayPause" })}>
+              Pause
             </button>
-          ))}
-        </div>
-      </div>
+            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayPlay" })}>
+              Play
+            </button>
+            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayStep" })}>
+              Step ›
+            </button>
+            <div className="np-replay__speeds">
+              {SPEEDS.map((s) => (
+                <button
+                  key={s.percent}
+                  disabled={busy}
+                  className={
+                    state?.speed_percent === s.percent ? "np-btn np-btn--active" : "np-btn"
+                  }
+                  onClick={() => void send({ kind: "replaySetSpeed", percent: s.percent })}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      {/* Seek — reconstructs correct state as of any instant (docs/21 §5). */}
-      <input
-        className="np-replay__seek"
-        type="range"
-        min={0}
-        max={state?.total_nanos ?? 0}
-        value={state?.position_nanos ?? 0}
-        aria-label="Seek"
-        disabled={!loaded}
-        onChange={(e) => void send({ kind: "replaySeek", mono_nanos: Number(e.target.value) })}
-      />
+          <input
+            className="np-replay__seek"
+            type="range"
+            min={0}
+            max={state?.total_nanos ?? 0}
+            value={state?.position_nanos ?? 0}
+            aria-label="Seek"
+            disabled={busy || !hasRecording}
+            onChange={(e) => void send({ kind: "replaySeek", mono_nanos: Number(e.target.value) })}
+          />
 
-      <div className="np-replay__readout">
-        <span>
-          {ms(state?.position_nanos ?? 0)} / {ms(state?.total_nanos ?? 0)}
-        </span>
-        <span>frame #{state?.frame_index ?? 0}</span>
-        <span>{state?.playing ? "playing" : "paused"}</span>
-        <span>{(state?.speed_percent ?? 100) / 100}×</span>
-        {state?.incomplete && (
-          // Gaps/truncation replayed as gaps, honestly (docs/21 §8).
-          <span className="np-replay__incomplete">recording incomplete</span>
-        )}
-      </div>
+          <div className="np-replay__readout">
+            <span>
+              {ms(state?.position_nanos ?? 0)} / {ms(state?.total_nanos ?? 0)}
+            </span>
+            <span>frame #{state?.frame_index ?? 0}</span>
+            <span>{state?.playing ? "playing" : "paused"}</span>
+            <span>{(state?.speed_percent ?? 100) / 100}×</span>
+            {state?.incomplete && (
+              <span className="np-replay__incomplete">recording incomplete</span>
+            )}
+          </div>
 
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      {!loaded && (
-        <EmptyState>
-          No recording loaded to replay. Make a recording, then step through it —
-          the same session, every time.
-        </EmptyState>
+          {!hasRecording && (
+            <EmptyState>
+              No recording loaded to replay. Make a recording, then step through it —
+              the same session, every time.
+            </EmptyState>
+          )}
+        </>
       )}
     </section>
   );

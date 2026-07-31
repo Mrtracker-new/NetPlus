@@ -8,8 +8,13 @@
 
 import { useEffect, useState } from "react";
 import type { RecordingSummary } from "@netpulse/contract";
-import { EmptyState, Notice } from "@netpulse/components";
+import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query, command } from "../ipc";
+import { useBusy } from "../hooks/useBusy";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 const LEVEL_LABEL: Record<RecordingSummary["privacy"]["level"], string> = {
   metadata_only: "Metadata only",
@@ -26,7 +31,6 @@ function RecordingCard({ rec }: { rec: RecordingSummary }) {
     <article className="np-recording">
       <header className="np-recording__head">
         <span className="np-recording__title">Recording #{rec.id}</span>
-        {/* The payload level is always explicit — no surprises (docs/22 §5). */}
         <span className="np-recording__level">{LEVEL_LABEL[rec.privacy.level]}</span>
       </header>
 
@@ -36,20 +40,16 @@ function RecordingCard({ rec }: { rec: RecordingSummary }) {
           {seconds(rec.from_mono_nanos)} → {seconds(rec.to_mono_nanos)}
         </span>
         {rec.incomplete && (
-          // A truncated/recovered recording is marked honestly (docs/21 §8).
           <span className="np-recording__incomplete">incomplete</span>
         )}
       </div>
 
-      {/* The privacy manifest, plainly (docs/22 §5): whether any payloads exist. */}
       <p className="np-recording__privacy">
         {rec.privacy.contains_payloads
           ? "Contains packet payloads."
           : "No packet payloads — safe to share for teaching and bug reports."}
       </p>
 
-      {/* Version pins let replay reproduce the same processing or disclose drift
-          (docs/22 §6, docs/21 §8). */}
       <details className="np-recording__pins">
         <summary>Determinism · version pins</summary>
         <ul>
@@ -72,30 +72,33 @@ export function Recordings() {
   function refresh() {
     query({ kind: "listRecordings" })
       .then((res) => setRecordings(res.kind === "recordings" ? res.recordings : []))
-      .catch(() => setRecordings([]))
+      .catch((e) => {
+        setRecordings([]);
+        setNotice(toErrorMessage(e));
+      })
       .finally(() => setLoaded(true));
   }
 
   useEffect(refresh, []);
 
-  async function record(kind: "startRecording" | "stopRecording") {
+  const [busy, record] = useBusy(async (kind: "startRecording" | "stopRecording") => {
     setNotice(null);
     try {
       await command({ kind });
       refresh();
     } catch (e) {
-      // Honest failure surfaced to the user (docs/02 §11), never a silent no-op.
-      setNotice(String(e));
+      setNotice(toErrorMessage(e));
     }
-  }
+  });
 
   return (
     <section className="np-recordings" aria-label="Recordings">
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
       <div className="np-recordings__controls">
-        <button className="np-btn" onClick={() => void record("startRecording")}>
+        <button className="np-btn" disabled={busy} onClick={() => void record("startRecording")}>
           Start recording
         </button>
-        <button className="np-btn" onClick={() => void record("stopRecording")}>
+        <button className="np-btn" disabled={busy} onClick={() => void record("stopRecording")}>
           Stop
         </button>
         <span className="np-recordings__hint">
@@ -103,9 +106,9 @@ export function Recordings() {
         </span>
       </div>
 
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-
-      {loaded && recordings.length === 0 ? (
+      {!loaded ? (
+        <Spinner />
+      ) : recordings.length === 0 ? (
         <EmptyState>
           No recordings yet. A recording is a self-contained, replayable capture you
           choose to make — with a privacy manifest stating exactly what's inside.

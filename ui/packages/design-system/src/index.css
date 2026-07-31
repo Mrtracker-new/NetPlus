@@ -889,7 +889,11 @@ button {
 .np-recordings,
 .np-replay,
 .np-export,
-.np-plugins {
+.np-plugins,
+.np-diagnostics,
+.np-fleet,
+.np-sandbox,
+.np-session-diff {
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
@@ -908,7 +912,11 @@ button {
 .np-plugin,
 .np-ref,
 .np-fanout,
-.np-assistant__answer {
+.np-assistant__answer,
+.np-diagnostics__result,
+.np-fleet__card,
+.np-sandbox__panel,
+.np-session-diff__panel {
   padding: var(--np-5);
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
@@ -2287,4 +2295,81 @@ button {
   .np-viz-bar {
     grid-template-columns: 8ch 1fr 7ch;
   }
+}
+
+/* ---- Diagnostics ---- */
+.np-diagnostics__actions {
+  display: flex;
+  gap: var(--np-3);
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+}
+.np-diagnostics__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+}
+.np-diagnostics__grade {
+  font-size: var(--np-fs-xl);
+  font-weight: var(--np-fw-bold);
+  color: var(--np-accent-strong);
+}
+
+/* ---- Fleet ---- */
+.np-fleet__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-4);
+}
+.np-fleet__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--np-4);
+}
+.np-fleet__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+}
+
+/* ---- Sandbox ---- */
+.np-sandbox__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-4);
+}
+.np-sandbox__controls {
+  display: flex;
+  gap: var(--np-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.np-sandbox__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+}
+
+/* ---- SessionDiff ---- */
+.np-session-diff__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-4);
+}
+.np-session-diff__compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+  gap: var(--np-4);
+}
+.np-session-diff__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
 }

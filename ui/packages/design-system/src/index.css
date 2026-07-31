@@ -560,6 +560,58 @@ button {
     0 0 0 2px var(--np-accent);
 }
 
+.np-btn--danger {
+  background: var(--np-finding);
+  color: #ffffff;
+}
+.np-btn--danger:hover {
+  filter: brightness(1.1);
+}
+
+/* ---- Confirmation dialog ---- */
+.np-dialog {
+  border: none;
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-6);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-lg);
+  color: var(--np-text);
+  width: min(90vw, 420px);
+  max-width: 420px;
+  margin: auto;
+  overflow: hidden;
+}
+.np-dialog[open] {
+  animation: np-dialog-in 0.18s ease-out;
+}
+@keyframes np-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.np-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+}
+.np-dialog__title {
+  font-size: var(--np-fs-lg);
+  margin-bottom: var(--np-2);
+}
+.np-dialog__message {
+  color: var(--np-text-dim);
+  margin-bottom: var(--np-5);
+}
+.np-dialog__actions {
+  display: flex;
+  gap: var(--np-3);
+  justify-content: flex-end;
+}
+
 .np-ok {
   color: var(--np-good);
   font-weight: 550;

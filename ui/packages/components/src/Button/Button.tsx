@@ -3,7 +3,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Spinner } from "../Spinner";
 import { cn } from "../utils/cn";
 
-export type ButtonVariant = "standard" | "primary" | "icon";
+export type ButtonVariant = "standard" | "primary" | "icon" | "danger";
 
 export interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
   variant?: ButtonVariant;
@@ -41,6 +41,7 @@ export const Button = memo(
         className={cn(
           baseClass,
           variant === "primary" && "np-btn--primary",
+          variant === "danger" && "np-btn--danger",
           active && "np-btn--active",
           className
         )}

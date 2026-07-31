@@ -1563,12 +1563,12 @@ button {
 }
 .np-viz-donut__total {
   font-family: var(--np-font-mono);
-  font-size: 13px;
+  font-size: var(--np-fs-sm);
   font-weight: 600;
   fill: var(--np-text);
 }
 .np-viz-donut__sub {
-  font-size: 9px;
+  font-size: var(--np-fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   fill: var(--np-text-mute);
@@ -1767,7 +1767,7 @@ button {
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  font-size: 18px;
+  font-size: var(--np-fs-lg);
   color: var(--np-accent-strong);
   background: var(--np-surface-1);
   box-shadow: var(--np-neu-sm);
@@ -1950,14 +1950,14 @@ button {
 }
 .np-cons__node-label {
   fill: var(--np-text-dim);
-  font-size: 10px;
+  font-size: var(--np-fs-xs);
   font-family: var(--np-font-mono);
   text-anchor: middle;
   pointer-events: none;
 }
 .np-cons__you-label {
   fill: var(--np-accent-strong);
-  font-size: 11px;
+  font-size: var(--np-fs-xs);
   font-weight: 700;
   letter-spacing: 0.12em;
   text-anchor: middle;

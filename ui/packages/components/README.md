@@ -1,9 +1,22 @@
-# @netpulse/components
+# `@netpulse/components`
 
-Shared, **disclosure-aware** React components over the model
-(`docs/0-foundation/04_Project_Structure.md` §4). Each domain component accepts a
-`mode` (Beginner / Intermediate / Expert) and renders the appropriate default
-depth of the *same* underlying data — a beginner narrative card and an expert
-packet grid are two components over one `Flow` object (`docs/01` §8.1, `docs/09`).
+Shared, disclosure-aware React UI components used across NetPulse screens.
 
-**Status: foundation stub.** Phase 2 (`docs/09`–`15`).
+---
+
+## Component Philosophy
+
+Every domain component in `@netpulse/components` accepts a progressive disclosure level (`Beginner`, `Intermediate`, `Expert`) and adjusts its rendered detail accordingly:
+
+- **Beginner**: High-level plain-language narrative summary, visual icons, and status badges.
+- **Intermediate**: Adds key metric breakdowns, protocol handshakes, and process attributions.
+- **Expert**: Dense technical presentation with hex viewer snippets, raw header flags, packet timing deltas, and flow state machine details.
+
+---
+
+## Key Components
+
+- **`NarrativeCard`**: Glass card presenting reconstructed network stories with severity badges and drill-down evidence chips.
+- **`EvidenceChip`**: Interactive badge linking a findings summary directly to underlying packet/flow data.
+- **`SeverityGlyph`**: Calibrated severity indicator matching standard design tokens.
+- **`DisclosureToggle`**: Segmented control enabling smooth switching between disclosure levels.

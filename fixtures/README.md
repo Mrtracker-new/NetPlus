@@ -1,11 +1,11 @@
-# fixtures/
+# Test Capture Fixtures (`fixtures/`)
 
-Recorded captures used as **deterministic test inputs**.
+Recorded network capture files (`.pcap` and `.pcapng`) used as deterministic inputs for integration testing, replay verification, and performance benchmarks.
 
-Because sessions replay deterministically (`docs/21`), the entire pipeline —
-reconstruction, narrative, detection — can be tested against fixed capture files
-with no live network. This powers reproducible CI and lets contributors without
-capture privileges run the full test suite (`docs/03` §12, `docs/04` §9).
+---
 
-**Status: empty at foundation stage.** Fixtures are added alongside Phase 1
-integration tests (`docs/05`–`08`).
+## Role in Testing & CI
+
+Because NetPulse session reconstruction and threat detection are 100% deterministic, the entire pipeline (decoding, flow state machine, security detectors, narrative cards) is tested against fixed capture files in this directory.
+
+This guarantees reproducible CI test execution without requiring live network interfaces or elevated privileges.

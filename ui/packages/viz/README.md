@@ -1,11 +1,24 @@
-# @netpulse/viz
+# `@netpulse/viz`
 
-WebGL/Canvas visualization primitives — large node-link connection graphs, dense
-scrubbing timelines, and particle-style packet-flow animations at 60 fps
-(`docs/0-foundation/03_Technology_Stack.md` §10, `docs/16`).
+High-performance WebGL and Canvas visualization primitives for NetPulse.
 
-Intentionally **framework-light** so the expensive-to-build rendering code is
-insulated from any future React change. Uses D3 for its *math* (scales, force
-layout, time axes) and paints with WebGL/Canvas rather than DOM/SVG.
+---
 
-**Status: foundation stub.** Phase 3 (`docs/10`, `docs/16`).
+## Technical Approach
+
+To achieve 60 fps rendering under heavy packet capture streaming without DOM overhead, `@netpulse/viz` separates layout math from rendering:
+
+- Uses **D3** for scale transformations, time axes, and force-directed node positioning.
+- Paints using **HTML5 Canvas 2D** or **WebGL** shaders rather than SVG/DOM elements.
+- Decoupled from React framework state — primitives consume lightweight data structures directly from the state store.
+
+---
+
+## Visualization Primitives
+
+- **`Sparkline`**: Compact sparkline component for real-time process bandwidth and flow rates.
+- **`AreaChart`**: Smooth, multi-layer throughput chart tracking ingress/egress bytes over time.
+- **`Donut`**: Interactive protocol breakdown chart.
+- **`FlowDiagram`**: Interactive node-link request flow mapping website loading sequences (DNS → TCP → TLS → HTTP) with animated packet particles.
+- **`ConfidenceMeter`**: Meter visualizing threat detector confidence scores.
+- **`PulseIndicator`**: Animated indicator showing live capture status and ring buffer health.

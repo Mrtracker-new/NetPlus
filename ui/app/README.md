@@ -1,15 +1,45 @@
-# @netpulse/app
+# `@netpulse/app`
 
-The application: routes, screens, and Beginner/Intermediate/Expert mode
-switching (`docs/0-foundation/04_Project_Structure.md` §4).
+The primary single-page React application for NetPulse, hosting the routing framework, screen views, state management store, and progressive disclosure controls.
 
-Planned structure (Phase 2):
+---
+
+## Directory Structure
 
 ```
 src/
-├── screens/   Dashboard, Timeline, Explorer, Security, Learn, Replay…
-├── state/     normalized store, stream subscriptions (renders deltas, not snapshots)
-└── modes/     Beginner/Intermediate/Expert progressive-disclosure logic
+├── screens/       Page components (Dashboard, Timeline, Security, Apps, Learn, Explorer, Plugins)
+├── state/         Zustand/React state store for live narrative cards, monitor metrics, and settings
+├── modes/         Progressive disclosure logic (Beginner, Intermediate, Expert mode filtering)
+├── hooks/         Custom hooks for live backend streaming, IPC queries, and window events
+├── viz/           Application-level visualizers and flow canvases
+├── i18n/          Internationalization and localization dictionary keys
+├── ipc.ts         Tauri IPC client wrapper calling netpulse-api commands and queries
+├── icons.tsx      SVG icon set for network protocols and UI actions
+├── App.tsx        Root application component with sidebar navigation and top bar
+└── main.tsx       Application entrypoint loading global CSS tokens and React root
 ```
 
-**Status: foundation stub.** No build wiring yet — Phase 2 (`docs/09`–`16`).
+---
+
+## Developer Usage
+
+### Development Server
+Run the Vite development server with hot-module reloading:
+```sh
+pnpm --filter @netpulse/app dev
+```
+
+### Typecheck & Lint
+Validate TypeScript types across the app:
+```sh
+pnpm --filter @netpulse/app typecheck
+```
+
+---
+
+## State & Data Flow
+
+- The app connects to the Rust `netpulse-engine` backend via Tauri v2 IPC (`ipc.ts`).
+- Telemetry updates (live flows, throughput, narrative cards, security findings) stream into `state/store.ts`.
+- Components consume state through custom hooks and dynamically adjust rendering depth based on the active progressive disclosure level.

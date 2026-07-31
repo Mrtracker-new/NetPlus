@@ -1,12 +1,14 @@
-# models/
+# Shipped Local ONNX Models & Model Cards (`models/`)
 
-Shipped ONNX model files (`.onnx`) plus **model cards** documenting each model's
-training data, intended use, and known limits.
+Local ONNX inference models (`.onnx`) and accompanying model cards documenting training data, intended use cases, and performance limitations.
 
-The model card is a honesty requirement (`docs/01` §7.2): a card discloses what
-an anomaly model can and cannot do. ML is *augmentation*; deterministic rules are
-the floor (`docs/03` §16, `docs/20`).
+---
 
-Inference is local and CPU-capable (ONNX Runtime, `docs/03` §6) — no network call.
+## Model Transparency Policy
 
-**Status: empty at foundation stage.** Populated in Phase 4 (`docs/20`).
+Every anomaly detection model shipped in this directory includes a corresponding model card disclosing:
+- Training datasets and baseline distribution assumption.
+- Intended usage boundaries and false-positive risk factors.
+- Hardware resource bounds and execution requirements.
+
+All model inference is performed locally using the ONNX Runtime CPU engine — no telemetry or model inputs leave the computer.

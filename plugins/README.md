@@ -1,31 +1,24 @@
-# plugins/
+# First-Party Reference Plugins (`plugins/`)
 
-First-party example plugins — reference implementations for each extension seam
-(`docs/24`): dissector, enrichment, detector, view/panel, and export plugins.
+Reference plugin implementations for NetPulse's extension seams.
 
-Each seam sits at a layer boundary and consumes only that layer's contract,
-preserving the strict layering (`docs/02` §4, §15). These examples show
-contributors how to extend NetPulse without forking, and they double as living
-conformance references (`docs/24` §10) — CI builds and tests them like any crate.
+Each plugin sits at a specific layer boundary, consumes only that layer's versioned contract, and respects strict capability boundaries (`crates/netpulse-plugin`).
 
-**Status: populated in Phase 5 (`docs/24`).** In-tree Rust plugins are the
-simplest, safest starting point (`docs/24` §7); dynamic/WASM loading is a future
-path, but the *contracts and capability model* (`crates/netpulse-plugin`) are the
-stable, specified part.
+---
 
-| Example | Seam | Implements | Reference for |
+## Reference Plugins Taxonomy
+
+| Plugin | Extension Seam | Target Trait | Description |
 |---|---|---|---|
-| [`example-dissector`](example-dissector/) | Decode (`docs/07`) | `Dissector` | New protocol parsing + explanations (the flagship seam) |
-| [`example-detector`](example-detector/) | Intelligence (`docs/17`) | `Detector` → `Finding` | New signals, structurally forced through the evidence-carrying finding model |
-| [`example-enrichment`](example-enrichment/) | Host/Process (`docs/12`) | `Enrichment` | New **local/offline** metadata — never the network |
-| [`example-export`](example-export/) | Export (`docs/23`) | `ExportPlugin` | New output formats under the privacy discipline (no implicit egress) |
+| [`example-dissector`](example-dissector/) | Protocol Decode | `Dissector` | Reference custom protocol dissector with field explanations. |
+| [`example-detector`](example-detector/) | Security Intel | `Detector` | Reference security detector generating evidence-carrying findings. |
+| [`example-enrichment`](example-enrichment/) | Host/Process | `Enrichment` | Reference local metadata enrichment plugin (offline IP/ASN mappings). |
+| [`example-export`](example-export/) | Export | `ExportPlugin` | Reference custom export plugin writing structured JSON outputs. |
 
-The **view/panel** seam (`docs/24` §4.4) runs in the webview consuming the
-Query/Stream API (the same contract the built-in UI uses); its capability boundary
-is modelled by `netpulse_plugin::ViewPlugin` and enforced by the UI sandbox
-(`docs/02` §10.2), so it has no standalone Rust example here.
+---
 
-Every seam is capability-bounded by type (`netpulse_plugin::capabilities_for`), and
-**no plugin type can acquire network/egress or system capability** — that variant
-does not exist in the model (`docs/24` §5). Enabling a non-first-party plugin is
-always an explicit, disclosed user choice.
+## Security & Capability Boundaries
+
+1. **No Network Egress**: Plugin capability masks strictly forbid outbound network access. No plugin type can request network egress.
+2. **Signature Verification**: First-party plugins are cryptographically signed with Ed25519 keys (`netpulse-plugin`).
+3. **Audited Isolation**: In-tree and WASM plugins run under restricted runtime environments without arbitrary OS access.

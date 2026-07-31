@@ -1,48 +1,38 @@
 # NetPulse
 
 > **Making the Invisible Internet Visible.**
-> A beginner-friendly yet professional Internet observability platform.
+> A beginner-friendly, production-grade Internet observability platform built in Rust and React/Tauri.
 
-NetPulse reconstructs, explains, and teaches the *complete story* behind every
-network event on your own computer — locally, privately, and beautifully. Where
-traditional analyzers show raw packets first, NetPulse shows **understanding**
-first: what happened, why, what it means, and whether anything is wrong — with
-the raw packets always one click away.
-
-- **Observe, don't intervene** — never blocks, injects, or modifies traffic.
-- **Local-first** — all core function works offline; no capture data leaves the
-  machine by default. There is exactly one auditable egress boundary (the
-  opt-in AI assistant).
-- **Honest over reassuring** — every security/anomaly finding carries a
-  calibrated confidence and links to the exact evidence.
-- **Understanding-first, progressive disclosure** — one rich data model, three
-  default depths (Beginner / Intermediate / Expert).
+NetPulse reconstructs, explains, and teaches the *complete story* behind every network event on your computer — locally, privately, and beautifully. Where traditional packet analyzers dump raw headers first, NetPulse delivers **understanding** first: what happened, why it happened, what it means, and whether any security/performance issue exists — with raw packet inspection always one click away.
 
 ---
 
-## Status
+## Core Guarantees
 
-The design suite (Phases 1–5) is implemented across the Rust workspace and the
-UI. In one line, the platform now does:
-
-| Phase | Capability | Where |
-|-------|------------|-------|
-| 1 | Offline capture → decode → flow/session reconstruction → private storage | `netpulse-capture` · `-decode` · `-flow` · `-storage` |
-| 2 | Human narrative, live monitoring, app attribution, the versioned UI contract | `netpulse-narrative` · `netpulse-api` · `ui/` |
-| 3 | Education: grounded lessons, protocol explorer, animations | `netpulse-learn` |
-| 4 | Intelligence: confidence-scored security & anomaly findings, grounded AI assistant | `netpulse-intel` · `netpulse-ai` |
-| 5 | Lifecycle: recording/replay, pcapng, export, and the plugin system | `netpulse-engine` · `netpulse-plugin` · `plugins/` |
-
-The next direction beyond this is charted in [`docs/6-roadmap`](docs/6-roadmap/)
-— that's *future* work, not a build phase.
+- **Observe, don't intervene** — NetPulse strictly listens. It never blocks, injects, or alters network traffic.
+- **Local-first & Private** — All packet parsing, flow reconstruction, anomaly detection, and lesson generation run entirely offline. Capture data never leaves your machine. Exactly one auditable egress boundary exists (the opt-in AI assistant in `netpulse-ai`).
+- **Honest over reassuring** — Every security and anomaly finding carries a calibrated confidence score and points to exact, immutable packet/flow evidence.
+- **Progressive disclosure** — One rich underlying data model served through three customizable depth levels (Beginner, Intermediate, Expert).
 
 ---
 
-## Architecture at a glance
+## Capability Matrix
 
-The crate dependency graph **is** the layer diagram. Arrows point strictly
-downward — a higher layer may depend on lower ones, never the reverse, and Cargo
-refuses to compile a cycle. Full detail in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+The platform design (Phases 1–5) is fully implemented across the Rust workspace and the React/Tauri desktop application:
+
+| Phase | Capability | Component | Description |
+|---|---|---|---|
+| **Phase 1** | Capture & Core | `netpulse-capture`, `-decode`, `-flow`, `-storage`, `-platform` | Multi-source capture (live Npcap / pcap / pcapng), zero-copy protocol decoding, flow & session reconstruction, SQLite & in-memory retention. |
+| **Phase 2** | Presentation | `netpulse-narrative`, `netpulse-api`, `ui/` | Human narrative feed, real-time bandwidth & latency monitoring, OS process attribution, versioned TypeScript contract (`v4`). |
+| **Phase 3** | Education | `netpulse-learn`, `ui/app` | Grounded interactive lessons, Website Load Journey reconstruction, interactive Protocol Explorer, animated flow visualizers. |
+| **Phase 4** | Intelligence | `netpulse-intel`, `netpulse-ai` | Confidence-scored threat detectors, statistical anomaly engine, grounded local-first AI explanation assistant. |
+| **Phase 5** | Lifecycle & Plugins | `netpulse-engine`, `netpulse-plugin`, `plugins/` | Recording/replay engine, pcapng import/export, reference WASM/in-tree plugin system (dissectors, detectors, enrichment, export). |
+
+---
+
+## Architecture at a Glance
+
+NetPulse strictly enforces a downward dependency hierarchy. Higher layers depend on lower layers, never the reverse. Cargo enforces cycle prevention at compile time. Full architectural specification lives in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ```
 netpulse-engine (bin) ┐   netpulse-capture-svc (bin) ┐   plugins/* (reference)
@@ -51,125 +41,151 @@ netpulse-engine (bin) ┐   netpulse-capture-svc (bin) ┐   plugins/* (referenc
         │      │    │        │        │      │        │        │
         └──────┴────┴────────┴────────┴──────┴────────┴─── netpulse-platform
                                    │                             │
-                             netpulse-core  (the shared vocabulary — base)
+                              netpulse-core  (shared data model & vocabulary)
 ```
 
-Four invariants the structure enforces:
+### Key Structural Invariants
 
-- **Parser isolation** — `netpulse-decode` is the hostile-input surface; it
-  depends only on `netpulse-core` and is fuzzed in isolation.
-- **Single egress boundary** — only `netpulse-ai` may open outbound
-  connections, so "no capture data leaves by default" is a one-crate audit.
-- **Platform isolation** — all OS-specific code lives in `netpulse-platform`;
-  everything above it is platform-neutral.
-- **One API contract** — `netpulse-api` (currently **v4**) is the single source
-  of truth for the backend↔frontend boundary; the UI's TypeScript types are
-  generated from it and cannot drift.
-
-Two processes run the product: **`netpulse-engine`** (analysis, at user
-privilege, serves the Query/Stream API) and **`netpulse-capture-svc`** (holds
-capture capability and nothing else — deliberately tiny).
+1. **Parser Isolation**: `netpulse-decode` handles hostile untrusted input. It depends solely on `netpulse-core` and is continuously fuzzed in isolation.
+2. **Single Egress Boundary**: Network calls are strictly forbidden across all crates except `netpulse-ai`. Verifying privacy compliance reduces to auditing a single crate.
+3. **Platform Isolation**: All OS-specific code (`#[cfg(target_os)]`) is encapsulated inside `netpulse-platform`. All upper crates remain 100% platform-neutral.
+4. **Contract Synchronization**: `netpulse-api` is the single source of truth for backend↔frontend IPC. TypeScript schemas in `@netpulse/contract` are generated directly from Rust types and drift-checked in CI.
+5. **Privilege Minimization**: Packet capture capabilities are isolated in `netpulse-capture-svc` (or `netpulse-platform`), minimizing elevated privilege exposure.
 
 ---
 
-## Requirements
+## Prerequisites
 
-- **Rust** — the pinned toolchain in `rust-toolchain.toml` (Rust 1.96). Install
-  via [rustup](https://rustup.rs); it picks up the pin automatically.
-- **Node 20+ and pnpm 9** — for the UI (`corepack enable` provides pnpm).
-- **Tauri CLI** — only for running the desktop app: `cargo install tauri-cli`.
+- **Rust**: Pinned toolchain specified in [`rust-toolchain.toml`](rust-toolchain.toml) (Rust 1.96). Install via [rustup](https://rustup.rs).
+- **Node.js & pnpm**: Node.js 20+ and pnpm 9 (`corepack enable` provisions pnpm automatically).
+- **Tauri CLI**: Required for running the native desktop application (`cargo install tauri-cli --version '^2'`).
+- **Npcap (Windows Live Capture)**: Required only for live adapter capture on Windows.
 
 ---
 
-## Run it
+## Quickstart
 
-### The Rust engine (backend)
-
-```sh
-cargo build --workspace          # compile every crate
-cargo test  --workspace          # run all tests
-cargo run   -p netpulse-engine   # prints the banner + usage
-
-# Analyze a capture file offline (the full reconstruction pipeline):
-cargo run -p netpulse-engine -- path/to/capture.pcap
-# → frames read, packets decoded, flows, sessions, causal links.
-# Payloads are never written to disk under the default MetadataOnly policy.
-```
-
-### The desktop app (UI)
+### 1. Rust Engine (CLI & Analysis)
 
 ```sh
-pnpm install                              # install UI workspace deps
-pnpm --filter @netpulse/app dev           # Vite dev server only (browser)
-cargo tauri dev                           # full desktop app (native window)
-```
+# Build all crates in the workspace
+cargo build --workspace
 
-`cargo tauri dev` builds the React frontend and the native shell together; the
-window is defined in `src-tauri/tauri.conf.json`.
-
-### Live capture (Windows)
-
-The desktop shell can capture your live traffic via **Npcap**. This is a Windows
-capability today, gated behind the `netpulse-platform/live-capture` feature (the
-default workspace build stays dependency-free — the feature is only enabled for
-the shell on Windows).
-
-One-time setup:
-
-1. Install **[Npcap](https://npcap.com/#download)** with *"WinPcap API-compatible
-   mode"* checked (needed at runtime).
-2. Install the **Npcap SDK** (same page) so `wpcap.lib` is available at link time.
-   Point the linker at it, e.g. in PowerShell before building:
-   ```powershell
-   $env:LIB = "C:\npcap-sdk\Lib\x64;$env:LIB"
-   ```
-3. Run the app **elevated** (packet capture needs admin).
-
-Then launch and click **Start capture** in the header (it uses your default
-adapter). Flows and narrative cards populate as you browse; **Stop capture** ends
-it. If Npcap is missing or you're not elevated, capture fails closed with an
-honest message rather than pretending — the screens stay in their empty state.
-
-> Prefer to work offline? Skip all of the above and set `NETPULSE_PCAP=<file>`
-> before `cargo tauri dev` to load a saved capture instead (no Npcap needed).
-
-### Quality gates (what CI runs)
-
-```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
+# Execute workspace unit & integration tests
 cargo test --workspace
 
-# Regenerate the UI TypeScript types from the Rust API contract:
-cargo test -p netpulse-api -- --ignored write_contract
-pnpm --filter @netpulse/contract typecheck
+# Analyze a PCAP capture file offline:
+cargo run -p netpulse-engine -- path/to/capture.pcap
 ```
 
-The API contract is drift-checked: if the Rust schema and the committed
-TypeScript types disagree, `cargo test` fails.
+### 2. UI & Web Development
+
+```sh
+# Install frontend workspace dependencies
+pnpm install
+
+# Typecheck the generated API contract
+pnpm --filter @netpulse/contract typecheck
+
+# Start the Vite React development server (Browser view)
+pnpm --filter @netpulse/app dev
+```
+
+### 3. Native Desktop Application (Tauri Shell)
+
+```sh
+# Run desktop app with hot-reloading native shell
+cargo tauri dev
+```
+
+> **Offline Mode Tip**: Set `NETPULSE_PCAP=fixtures/sample.pcap` before running `cargo tauri dev` to load a pre-recorded capture without needing live network privileges or Npcap.
 
 ---
 
-## Repository layout
+## Live Packet Capture Setup (Windows)
+
+Live interface capture on Windows uses **Npcap** via the `netpulse-platform/live-capture` feature.
+
+### One-Time Setup:
+1. Install **[Npcap](https://npcap.com/#download)** with *"WinPcap API-compatible mode"* checked.
+2. Install the **Npcap SDK**.
+3. Set the SDK linker search path (if not in standard location):
+   ```powershell
+   $env:NPCAP_SDK_PATH = "C:\npcap-sdk"
+   ```
+4. Run your terminal or IDE as **Administrator** (packet capture requires raw socket privileges).
+
+Click **Start Capture** in the top navigation bar to observe live network flows, process attributions, and human-readable narratives in real time.
+
+---
+
+## Repository Layout
 
 ```
-crates/      13 Rust crates — the product layers (see the diagram above)
-plugins/     first-party reference plugins (dissector, detector, enrichment, export)
-ui/          pnpm workspace — app + design-system, components, viz, contract packages
-src-tauri/   the Tauri desktop shell (its own build, excluded from the cargo workspace)
-docs/        the complete design specification, 00–25
-fixtures/    test capture fixtures    fuzz/  parser fuzz targets    scripts/  automation
+Netplus/
+├── crates/                  14 Rust crates — core engine, decode, flow, storage, intel, AI, API
+│   ├── netpulse-core        Shared types, models, disclosure levels, error taxonomy
+│   ├── netpulse-platform    OS network interfaces, socket->PID attribution, Npcap integration
+│   ├── netpulse-capture     PCAP/PCAPNG parsing, ring buffers, stream management
+│   ├── netpulse-capture-svc Privileged capture daemon entrypoint
+│   ├── netpulse-decode      Zero-copy protocol dissectors (Ethernet, IP, TCP, UDP, DNS, HTTP, TLS)
+│   ├── netpulse-flow        Flow assembly, session reconstruction, causal sequencing
+│   ├── netpulse-storage     SQLite & in-memory capture store, time-series retention
+│   ├── netpulse-narrative   Session-to-story translation & progressive disclosure cards
+│   ├── netpulse-intel       Confidence-scored security detectors & statistical anomaly engine
+│   ├── netpulse-ai          Grounded AI explanation backend & egress-audited LLM client
+│   ├── netpulse-learn       Interactive lesson engine & protocol reference data
+│   ├── netpulse-api         v4 DTO contract, command/query definitions, ts-rs codegen
+│   ├── netpulse-plugin      Capability-bounded WASM & in-tree plugin runtime
+│   └── netpulse-engine      Orchestrator binary, live loop, query execution
+├── ui/                      pnpm UI workspace
+│   ├── app/                 React application, screen router, state store, screens
+│   └── packages/
+│       ├── contract/        Generated TypeScript DTOs from netpulse-api
+│       ├── design-system/   Tokens, color palettes, dark mode, global typography & CSS
+│       ├── components/      Shared React UI components (Narrative cards, metrics, filters)
+│       └── viz/             Canvas/WebGL visualization primitives (Sparklines, Flow diagrams)
+├── src-tauri/               Tauri 2 desktop shell, IPC bridge, native window management
+├── plugins/                 First-party reference plugins (dissector, detector, enrichment, export)
+├── fixtures/                Deterministic test capture files (.pcap / .pcapng)
+├── fuzz/                    cargo-fuzz targets for protocol dissectors
+├── models/                  Local ONNX model files and model cards
+├── research/                Offline model training scripts (Python)
+└── scripts/                 Cross-platform build and release automation
+```
+
+---
+
+## Quality Gates & Verification
+
+Before committing code or submitting a pull request, run the CI quality checks:
+
+```sh
+# 1. Code Formatting
+cargo fmt --all --check
+
+# 2. Rust Linter
+cargo clippy --workspace --all-targets -- -D warnings
+
+# 3. Rust Unit & Integration Tests
+cargo test --workspace
+
+# 4. API Contract Drift Test & TS Verification
+cargo test -p netpulse-api -- --ignored write_contract
+pnpm --filter @netpulse/contract typecheck
+pnpm --filter @netpulse/app typecheck
 ```
 
 ---
 
 ## Documentation
 
-The complete design lives in [`docs/`](docs/README.md). Start with
-[`docs/0-foundation/00_Project_Overview.md`](docs/0-foundation/00_Project_Overview.md),
-then read by phase (`1-` … `5-`). Contributor rules are in
-[`CONTRIBUTING.md`](CONTRIBUTING.md) and [`ARCHITECTURE.md`](ARCHITECTURE.md).
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): System design, crate taxonomy, data flow pipeline, and layering constraints.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): Guidelines for adding protocol dissectors, security detectors, UI screens, and plugins.
+- [`SECURITY.md`](SECURITY.md): Threat model, security posture, parser isolation, and vulnerability reporting procedures.
+
+---
 
 ## License
 
-Dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.
+NetPulse is dual-licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at your option.

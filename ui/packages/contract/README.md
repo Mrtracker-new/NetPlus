@@ -1,12 +1,25 @@
-# @netpulse/contract
+# `@netpulse/contract`
 
-**Generated from the `netpulse-api` crate — do not hand-edit.**
+Auto-generated TypeScript DTO definitions matching the `netpulse-api` Rust crate (v4 contract).
 
-This package holds the TypeScript view of the Query/Stream/Command message
-schema (`docs/0-foundation/02_System_Architecture.md` §7,
-`docs/0-foundation/03_Technology_Stack.md` §7). Generating it from the Rust
-source of truth guarantees the UI and engine can never disagree about the shape
-of a `Flow`, `Session`, or `Finding`. A CI drift check fails the build if this
-package is out of sync with `netpulse-api`.
+---
 
-**Status: foundation stub.** ts-rs codegen is wired once the API schema firms up.
+## Contract Synchronization & Drift Prevention
+
+This package acts as the single versioned contract boundary between the Rust backend (`netpulse-engine`) and the React frontend (`ui/app`).
+
+### Automatic Codegen
+The TypeScript types in `src/index.ts` are generated directly from Rust DTO definitions using `ts-rs`:
+
+```sh
+# Regenerate TypeScript contract files from Rust source of truth:
+cargo test -p netpulse-api -- --ignored write_contract
+```
+
+### Type Verification
+Run TypeScript type validation across the generated contract:
+```sh
+pnpm --filter @netpulse/contract typecheck
+```
+
+CI enforces contract synchronization by failing if the Rust DTO definitions and the committed TypeScript types disagree. **Do not hand-edit `src/index.ts`.**

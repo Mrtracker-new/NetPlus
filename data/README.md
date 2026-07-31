@@ -1,9 +1,10 @@
-# data/
+# Local Data & Enrichment Databases (`data/`)
 
-Local enrichment databases: geo/ASN, CDN IP ranges, OUI (MAC vendor).
+Local offline enrichment databases used by NetPulse for GeoIP mapping, ASN resolution, CDN identification, and MAC vendor lookups.
 
-**Local-only. No live lookups** (`docs/02` §10.3) — NetPulse never phones home to
-resolve a host. Enrichment (`Host.geo`, `Host.asn`, `Host.org`) reads only from
-these files.
+---
 
-**Status: empty at foundation stage.** Populated as enrichment lands (`docs/12`).
+## Privacy Policy
+
+- **Strictly Offline**: NetPulse **never** performs remote DNS or HTTP lookups to enrich host or IP metadata.
+- **Local Lookups**: Host geolocation (`Host.geo`), autonomous system numbers (`Host.asn`), and organization names (`Host.org`) are resolved exclusively against local files in this directory.

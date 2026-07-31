@@ -1,12 +1,22 @@
-# fuzz/
+# Protocol Dissector Fuzz Targets (`fuzz/`)
 
-`cargo-fuzz` targets — one per dissector in `netpulse-decode`, plus other
-hostile-input parsers.
+`cargo-fuzz` targets for protocol dissectors in `netpulse-decode` and hostile packet parsers.
 
-The decode crate is the primary attack surface (bytes controlled by remote
-parties). Every dissector gets a fuzz target, and continuous fuzzing gates CI
-(`docs/03` §3, `docs/04` §3.4, §7). This is how NetPulse avoids the dissector
-memory-safety bug class that dominates C-based analyzers' CVEs.
+---
 
-**Status: empty at foundation stage.** Targets are added with each dissector in
-Phase 1 (`docs/07`).
+## Security Rationale
+
+`netpulse-decode` processes untrusted network bytes sent by remote endpoints. To prevent memory safety bugs, panics, and infinite loops, every protocol dissector has a dedicated fuzz target.
+
+## Running Fuzzers
+
+```sh
+# Install cargo-fuzz (once):
+cargo install cargo-fuzz
+
+# Run fuzz target for DNS dissector:
+cargo fuzz run fuzz_dns
+
+# Run fuzz target for HTTP dissector:
+cargo fuzz run fuzz_http
+```

@@ -1,9 +1,10 @@
-# scripts/
+# Development & Release Automation Scripts (`scripts/`)
 
-Dev, build, and release automation.
+Cross-platform automation tools for building, packaging, testing, and contract codegen.
 
-Cross-platform by policy — Node or Rust, not shell-only (`docs/04` §5) — so the
-same scripts run on Windows, macOS, and Linux.
+---
 
-**Status: empty at foundation stage.** Scripts are added as build/release needs
-appear.
+## Script Policies
+
+- **Cross-Platform**: Automation scripts use Node.js or Rust to guarantee identical execution on Windows, macOS, and Linux.
+- **CI/CD Integration**: Scripts in this directory are invoked by GitHub Actions workflows ([`.github/workflows/`](../.github/workflows/)) for quality gate enforcement.

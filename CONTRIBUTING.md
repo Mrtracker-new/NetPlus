@@ -1,68 +1,107 @@
 # Contributing to NetPulse
 
-Thank you for your interest. NetPulse aims to make network understanding
-accessible without dumbing it down — contributions of code, lessons,
-visualizations, and documentation are all welcome.
+Thank you for contributing to NetPulse! NetPulse aims to make network understanding accessible to everyone without sacrificing technical depth. Contributions of code, dissectors, detectors, visualizers, lessons, and documentation are all welcome.
 
-## Before you start
+---
 
-1. Read the foundation docs (`docs/0-foundation/00`–`04`). They are short and
-   they define the vision, the architecture, and the layout every change must
-   respect.
-2. Every feature must pass the **feature-acceptance filter** (`docs/01` §6): it
-   answers at least one of the six questions (*what happened / why / what's
-   happening now / what's next / what does it mean / what should I do*) **and**
-   satisfies every hard constraint (local-first, observe-only, honest, budgeted,
-   progressive). We do not add features because competitors have them.
+## 1. Before You Start
 
-## Where your change belongs
+1. Review [`ARCHITECTURE.md`](ARCHITECTURE.md) to understand the core vision, system architecture, technology stack, and repository layering rules.
+2. Every feature must satisfy the **Feature Acceptance Filter**:
+   - It must answer at least one of the six fundamental questions:
+     - *What happened?*
+     - *Why did it happen?*
+     - *What is happening right now?*
+     - *What happens next?*
+     - *What does it mean?*
+     - *What should I do?*
+   - It must satisfy all hard constraints: **local-first**, **observe-only**, **honest confidence**, **budgeted performance**, and **progressive disclosure**.
 
-The repository layout is architecture made physical. Find your on-ramp
-(`docs/04` §10):
+---
 
-| I want to… | Work in… | Read first |
+## 2. Component On-Ramp
+
+Find the layer appropriate for your change:
+
+| Goal | Primary Location | Key Concepts |
 |---|---|---|
-| Add a protocol dissector | `crates/netpulse-decode` + `fuzz/` | `docs/07` |
-| Add a security/anomaly detector | `crates/netpulse-intel` | `docs/17`, `18`, `20` |
-| Improve a visualization | `ui/packages/viz` | `docs/10`, `16` |
-| Add/adjust a UI screen | `ui/app/src/screens` | `docs/09`–`15` |
-| Write a lesson | `crates/netpulse-learn` + content | `docs/13` |
-| Port to a new OS | `crates/netpulse-platform` | `docs/05`, `12` |
-| Add an export format | export plugin + `netpulse-api` | `docs/23`, `24` |
-| Tune the AI explanations | `crates/netpulse-ai` | `docs/19` |
+| Add or improve a protocol dissector | `crates/netpulse-decode` & `fuzz/` | Zero-copy parsing, explanation keys, fuzzing |
+| Add a security or anomaly detector | `crates/netpulse-intel` | Rules engine, calibrated confidence, evidence links |
+| Create a visualization primitive | `ui/packages/viz` | WebGL/Canvas, D3 scales, 60 fps target |
+| Add or modify a UI screen | `ui/app/src/screens` | Progressive disclosure, responsive layouts |
+| Write an interactive lesson | `crates/netpulse-learn` | Grounded learning, website loading journeys |
+| Support OS platform features | `crates/netpulse-platform` | Socket attribution, platform isolation, raw capture |
+| Extend export capabilities | `plugins/` & `netpulse-plugin` | Export plugin seam, strict privacy controls |
 
-## The layering rule
+---
 
-The crate dependency graph must stay a strict downward hierarchy (see
-`ARCHITECTURE.md`). Cargo rejects cycles, but also avoid reaching *around*
-layers. If your change wants an upward dependency, the design is probably wrong —
-open a discussion first.
+## 3. Step-by-Step Developer Workflows
 
-## Dependency policy
+### Workflow A: Adding a New Protocol Dissector
 
-Dependencies are attack surface (`docs/03` §14). Prefer few, well-audited,
-widely-used crates. **No dependency may introduce mandatory network egress** —
-outbound networking belongs only in `netpulse-ai`.
+1. **Implement Dissector**: Open [`crates/netpulse-decode/src/`](crates/netpulse-decode/src/) and create a new module implementing the protocol parser.
+2. **Zero-Copy & Safety**: Parse using byte slices (`&[u8]`) without unnecessary allocations. Ensure `#![forbid(unsafe_code)]` or justify any unsafe usage.
+3. **Explanation Keys**: Assign stable explanation keys to key fields (e.g., `dns.qtype`, `tls.sni`) so the education engine (`netpulse-learn`) and AI backend can link explanations.
+4. **Add Unit Tests & Fixtures**: Place sample capture files in [`fixtures/`](fixtures/) and write unit tests in `netpulse-decode`.
+5. **Add Fuzz Target**: Create a corresponding `cargo-fuzz` target in [`fuzz/fuzz_targets/`](fuzz/fuzz_targets/) to ensure hostile byte inputs never crash the engine.
 
-## Local checks (run before pushing)
+### Workflow B: Adding a Security Detector
+
+1. **Implement Detector**: Open [`crates/netpulse-intel/src/rules/`](crates/netpulse-intel/src/rules/) and create a new rule implementing the `Detector` trait.
+2. **Evidence Invariant**: Every `Finding` returned **must** include immutable evidence references (`flow_id`, `packet_id`, or `session_id`). Findings without evidence are invalid.
+3. **Calibrated Confidence**: Assign a confidence score (`Low`, `Medium`, `High`, `Certain`) based on factual signal strength — never overstate findings.
+4. **Add Tests**: Write unit tests asserting both detection on malicious traffic and false-positive resilience on normal traffic.
+
+### Workflow C: Modifying the API Schema & Contract
+
+1. **Modify DTOs**: Update Rust types in [`crates/netpulse-api/src/dto.rs`](crates/netpulse-api/src/dto.rs).
+2. **Regenerate TypeScript Contract**:
+   ```sh
+   cargo test -p netpulse-api -- --ignored write_contract
+   ```
+3. **Verify Contract**: Run typechecking across the UI workspace:
+   ```sh
+   pnpm --filter @netpulse/contract typecheck
+   ```
+
+### Workflow D: Adding UI Screens & Components
+
+1. **Design System**: Use tokens, typography, and colors from `@netpulse/design-system`. Never hardcode ad-hoc hex colors.
+2. **Progressive Disclosure**: Respect the user's selected depth level (`Beginner`, `Intermediate`, `Expert`).
+3. **Visual Density**: Ensure data density scales smoothly without layout breakage across window sizes.
+
+---
+
+## 4. Quality Gates & Local Checks
+
+Run these commands before pushing any commits:
 
 ```sh
-cargo fmt --all
-cargo clippy --workspace -- -D warnings
-cargo build --workspace
-cargo test  --workspace
+# 1. Rust Formatting
+cargo fmt --all --check
+
+# 2. Rust Linter
+cargo clippy --workspace --all-targets -- -D warnings
+
+# 3. Rust Workspace Tests
+cargo test --workspace
+
+# 4. TypeScript Contract & Application Checks
+pnpm --filter @netpulse/contract typecheck
+pnpm --filter @netpulse/app typecheck
 ```
 
-Dissectors additionally require a fuzz target and property tests where
-applicable. The whole pipeline is testable without a live network by replaying
-fixtures in `fixtures/` (`docs/21`).
+---
 
-## Commit and PR conventions
+## 5. Architectural Rules & Dependency Policy
 
-- Keep commits focused; write messages that explain *why*.
-- Reference the relevant doc section(s) in non-trivial changes.
-- CI runs the 3-OS matrix (build, test, fmt, clippy) — it must be green.
+- **No Upward Dependencies**: Never introduce a dependency from a lower crate to a higher crate.
+- **Dependency Minimization**: Third-party dependencies are attack surface. Prefer audited, standard Rust crates.
+- **Egress Isolation**: No new dependency may introduce background network calls. All outbound network traffic is restricted to `netpulse-ai`.
 
-## Code of conduct
+---
 
-Participation is governed by [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+## 6. Commit & Pull Request Guidelines
+
+- **Commit Messages**: Write clear, descriptive commit titles and bodies explaining *why* a change was made.
+- **CI Readiness**: Ensure all local quality gate checks pass cleanly before opening a pull request.

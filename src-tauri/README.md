@@ -1,43 +1,56 @@
-# netpulse-shell (`src-tauri`)
+# `netpulse-shell` (`src-tauri`)
 
-The Tauri desktop shell (`docs/0-foundation/03_Technology_Stack.md` §8). It hosts
-the React webview from `ui/app` and bridges the enumerated
-`netpulse-api` Query/Command surface to `netpulse-engine` (`src/main.rs`).
+The desktop application shell for NetPulse, powered by Tauri v2.
 
-**Deliberately outside the Rust workspace.** The root `Cargo.toml` excludes
-`src-tauri` because building it requires the platform webview libraries and the
-Tauri CLI, which the pure-Rust CI job does not provision. It builds under the UI
-toolchain instead:
+---
+
+## Architecture & Responsibilities
+
+`src-tauri` hosts the native OS window, embeds the Vite React frontend (`ui/app`), and exposes Tauri IPC commands bridging backend queries from `netpulse-engine` to the UI webview.
 
 ```
-cargo install tauri-cli --version '^2'   # once
-pnpm install                             # from repo root (workspace)
-cargo tauri dev                          # from src-tauri/
+┌─────────────────────────────────────────────────────────────┐
+│                       React Webview                         │
+│                    (`ui/app` single-page app)               │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Tauri IPC (invoke / emit)
+┌──────────────────────────────▼──────────────────────────────┐
+│                    Tauri Shell (`src-tauri`)                │
+│  - Window Management                                        │
+│  - IPC Command Router (`src/main.rs`)                       │
+│  - Live Capture Stream Events (`feed-delta`)                │
+└──────────────────────────────┬──────────────────────────────┘
+                               │ Query / Command (`netpulse-api`)
+┌──────────────────────────────▼──────────────────────────────┐
+│                   Rust Engine (`netpulse-engine`)           │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## What is real vs. stubbed
+---
 
-- **Real:** the IPC bridge — `query`/`command` map the contract to the engine's
-  read-only presentation view (`present()`), keeping the observe-only guarantee
-  auditable (two commands, nothing else).
-- **Stubbed (honest):** live capture and recording refuse with a clear error,
-  because the per-OS capture backend is still a documented stub in
-  `netpulse-platform` (Phase 1). Attribution answers `Unknown` until a live
-  `SocketTableSource` is wired (`docs/12` §4).
+## Building & Running
 
-## Npcap SDK Path Configuration (Windows Live Capture)
+### Prerequisites
+- Install Tauri CLI v2: `cargo install tauri-cli --version '^2'`
+- Node.js 20+ and pnpm 9 installed
 
-When compiling on Windows with Npcap live capture support, the build script dynamically resolves the Npcap SDK linker search path in the following order:
+### Execution Commands
+```sh
+# Run desktop app with hot-reloading native shell (from repo root):
+cargo tauri dev
 
-1. `NPCAP_SDK_PATH` environment variable (e.g., `NPCAP_SDK_PATH=C:\npcap-sdk`)
+# Build production application bundle:
+cargo tauri build
+```
+
+---
+
+## Windows Npcap SDK Linker Configuration
+
+When compiling on Windows with live capture support (`netpulse-platform/live-capture`), the build script dynamically resolves the Npcap SDK linker search path in the following order:
+
+1. `NPCAP_SDK_PATH` environment variable (e.g., `$env:NPCAP_SDK_PATH = "C:\npcap-sdk"`)
 2. `LIB` environment variable
 3. `VCPKG_ROOT` directory (`%VCPKG_ROOT%\installed\x64-windows\lib`)
 4. `%ProgramFiles%\Npcap SDK\Lib\x64`
 5. `C:\npcap-sdk\Lib\x64`
-
-No hardcoded machine paths are committed in `.cargo/config.toml`.
-
-## Note on assets
-
-`icons/icon.png` and a real code-signing/bundle config are added when packaging
-is set up; they are intentionally absent from this scaffold.

@@ -369,7 +369,7 @@ button {
   text-overflow: ellipsis;
 }
 .np-capture__iface:disabled {
-  opacity: 0.6;
+  opacity: var(--np-opacity-muted);
 }
 .np-capture__iface:focus {
   outline: none;
@@ -665,7 +665,7 @@ button {
   filter: brightness(1.04);
 }
 .np-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--np-opacity-disabled);
   cursor: default;
   box-shadow: var(--np-neu-inset);
 }
@@ -1186,7 +1186,7 @@ button {
   transform: translateY(1px);
 }
 .np-assistant__ask:disabled {
-  opacity: 0.6;
+  opacity: var(--np-opacity-muted);
   cursor: default;
 }
 .np-assistant__suggestions {
@@ -1898,7 +1898,7 @@ button {
   fill: none;
   stroke: var(--np-border-strong);
   stroke-dasharray: 2 6;
-  opacity: 0.6;
+  opacity: var(--np-opacity-muted);
 }
 .np-cons__arc {
   fill: none;
@@ -1922,7 +1922,7 @@ button {
 .np-cons__you-ring {
   fill: none;
   stroke: var(--np-accent);
-  opacity: 0.5;
+  opacity: var(--np-opacity-disabled);
   transform-origin: center;
   animation: np-cons-ping 3s ease-out infinite;
 }
@@ -2072,7 +2072,7 @@ button {
 @keyframes np-cons-ping {
   0% {
     transform: scale(0.6);
-    opacity: 0.6;
+    opacity: var(--np-opacity-muted);
   }
   100% {
     transform: scale(1.9);
@@ -2114,7 +2114,7 @@ button {
     transform: scale(1);
   }
   50% {
-    opacity: 0.45;
+    opacity: var(--np-opacity-hint);
     transform: scale(0.82);
   }
 }

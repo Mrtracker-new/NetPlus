@@ -540,6 +540,26 @@ button {
   }
 }
 
+/* ---- Standard input ---- */
+.np-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--np-2) var(--np-3);
+  background: var(--np-surface-1);
+  border: none;
+  border-radius: var(--np-radius-sm);
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-text);
+  font: inherit;
+  font-size: var(--np-fs-sm);
+  outline: none;
+}
+.np-input:focus-visible {
+  box-shadow:
+    var(--np-neu-inset),
+    0 0 0 2px var(--np-accent);
+}
+
 .np-ok {
   color: var(--np-good);
   font-weight: 550;

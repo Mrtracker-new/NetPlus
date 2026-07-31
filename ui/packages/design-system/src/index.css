@@ -371,8 +371,9 @@ button {
 .np-capture__iface:disabled {
   opacity: var(--np-opacity-muted);
 }
-.np-capture__iface:focus {
-  outline: none;
+.np-capture__iface:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
 }
 .np-capture__err {
   font-size: var(--np-fs-xs);
@@ -411,6 +412,10 @@ button {
   color: var(--np-accent-strong);
   font-weight: var(--np-fw-semibold);
   box-shadow: var(--np-neu-sm);
+}
+.np-mode:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: -2px;
 }
 
 /* ============================ Primitives ============================ */
@@ -1165,8 +1170,10 @@ button {
   color: var(--np-text);
   font: inherit;
 }
-.np-assistant__input:focus {
-  outline: none;
+.np-assistant__input:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  box-shadow: var(--np-glow);
 }
 .np-assistant__ask {
   border: none;
@@ -1252,8 +1259,10 @@ button {
   color: var(--np-text);
   font: inherit;
 }
-.np-explorer__search:focus {
-  outline: none;
+.np-explorer__search:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  box-shadow: var(--np-glow);
 }
 .np-ref {
   display: flex;

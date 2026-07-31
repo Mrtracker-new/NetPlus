@@ -1,36 +1,79 @@
 import { useEffect, useState } from "react";
+import type { FleetHost } from "@netpulse/contract";
+import { Badge, Spinner, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
+import { useDisclosure } from "../modes/DisclosureContext";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 export function FleetScreen() {
-  const [hosts, setHosts] = useState<any[]>([]);
+  const [hosts, setHosts] = useState<FleetHost[]>([]);
+  const [loaded, setLoaded] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const { shows } = useDisclosure();
 
   useEffect(() => {
-    query({ kind: "listFleetHosts" }).then((res) => {
-      if (res.kind === "fleetHosts") setHosts(res.hosts);
-    }).catch(console.error);
+    let cancelled = false;
+    query({ kind: "listFleetHosts" })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.kind === "fleetHosts") {
+          setHosts(res.hosts);
+        } else {
+          setHosts([]);
+          setNotice("Unexpected response kind from backend.");
+        }
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setHosts([]);
+          setNotice(toErrorMessage(e));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
-    <div style={{ padding: "24px", color: "#e2e8f0" }}>
-      <h2 style={{ color: "#2fe0d6" }}>Fleet Multi-Host Observation</h2>
-      <p style={{ color: "#94a3b8" }}>
+    <section className="np-fleet" aria-label="Fleet Observation">
+      <h2>Fleet Multi-Host Observation</h2>
+      <p className="np-fleet__desc">
         Local-first telemetry aggregation from user-owned capture agents over framed binary transport.
       </p>
 
-      <div style={{ background: "#121722", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-        <h3>Registered Fleet Nodes ({hosts.length})</h3>
-        {hosts.map((h, i) => (
-          <div key={i} style={{ background: "#1a2130", padding: "12px", borderRadius: "6px", marginBottom: "8px", display: "flex", justifyContent: "space-between" }}>
-            <div>
-              <strong>{h.friendlyName || h.hostname}</strong> ({h.os} / {h.platform})
-              <p style={{ margin: "4px 0 0 0", color: "#94a3b8", fontSize: "0.85rem" }}>Agent ID: {h.hostId} | Version: {h.agentVersion}</p>
-            </div>
-            <div>
-              <span style={{ padding: "4px 8px", background: "#3fb984", color: "#0b0e14", borderRadius: "4px", fontWeight: "bold" }}>{h.status}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      {!loaded ? (
+        <Spinner label="Loading fleet hosts…" />
+      ) : hosts.length === 0 ? (
+        <EmptyState>No NetPulse agents are currently reporting to the fleet.</EmptyState>
+      ) : (
+        <div className="np-fleet__grid" role="list">
+          {hosts.map((h) => (
+            <article className="np-fleet__node" key={h.hostId} role="listitem">
+              <div>
+                <strong className="np-fleet__name">{h.friendlyName || h.hostname}</strong> ({h.os} / {h.platform})
+                <p className="np-fleet__meta">
+                  {shows("intermediate") && `Agent ID: ${h.hostId} | `}
+                  Version: {h.agentVersion}
+                </p>
+              </div>
+              <div>
+                <Badge variant="kind" aria-label={`Status: ${h.status}`}>
+                  {h.status}
+                </Badge>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

@@ -2327,6 +2327,9 @@ button {
 }
 
 /* ---- Fleet ---- */
+.np-fleet__desc {
+  color: var(--np-text-dim);
+}
 .np-fleet__header {
   display: flex;
   justify-content: space-between;
@@ -2339,10 +2342,24 @@ button {
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: var(--np-4);
 }
-.np-fleet__card {
+.np-fleet__card,
+.np-fleet__node {
   display: flex;
-  flex-direction: column;
-  gap: var(--np-2);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--np-4);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+}
+.np-fleet__name {
+  font-weight: var(--np-fw-bold);
+  word-break: break-word;
+}
+.np-fleet__meta {
+  margin: var(--np-1) 0 0 0;
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-sm);
 }
 
 /* ---- Sandbox ---- */

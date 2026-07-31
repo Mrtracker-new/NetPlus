@@ -96,6 +96,18 @@ export interface BufferbloatResult {
   grade: string;
 }
 
+export type FleetHostStatus = "Online" | "Offline" | "Degraded" | "Healthy" | "Unknown";
+
+export interface FleetHost {
+  hostId: string;
+  hostname: string;
+  friendlyName?: string | null;
+  os: string;
+  platform: string;
+  agentVersion: string;
+  status: FleetHostStatus;
+}
+
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
   | { kind: "narrativeFeed"; cards: NarrativeCard[] }
@@ -123,7 +135,7 @@ export type QueryResponse =
   | { kind: "bufferbloatResult"; result: BufferbloatResult }
   | { kind: "decodedPacketInspection"; inspection: any }
   | { kind: "sessionDiff"; diff: any }
-  | { kind: "fleetHosts"; hosts: any[] };
+  | { kind: "fleetHosts"; hosts: FleetHost[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic (docs/02 §10). */

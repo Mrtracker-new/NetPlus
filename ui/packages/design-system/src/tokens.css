@@ -28,11 +28,11 @@
   /* ---- Text ---- */
   --np-text: #232a3a;
   --np-text-dim: #5a6478;
-  --np-text-mute: #8a93a6;
+  --np-text-mute: #6e7890;
 
   /* ---- Accent: the pulse, now a calm mint ---- */
   --np-accent: #57c9ac;
-  --np-accent-strong: #2fa789;
+  --np-accent-strong: #1d8f74;
   --np-accent-soft: rgba(87, 201, 172, 0.16);
   --np-accent-line: rgba(87, 201, 172, 0.42);
   --np-accent-2: #7c83f7;
@@ -42,16 +42,17 @@
 
   /* ---- Semantics: calm, not alarmist ---- */
   --np-neutral: #97a0b4;
-  --np-good: #35b085;
+  --np-good: #28926d;
   --np-good-soft: rgba(53, 176, 133, 0.15);
-  --np-notable: #e0982f;
+  --np-notable: #b87a1f;
   --np-notable-soft: rgba(224, 152, 47, 0.16);
-  --np-finding: #e56b71;
+  --np-finding: #c44d53;
   --np-finding-soft: rgba(229, 107, 113, 0.15);
 
   /* ---- Typography ---- */
   --np-font: "Inter", "Segoe UI", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --np-font-mono: "JetBrains Mono", "Cascadia Code", "SF Mono", ui-monospace, "Consolas", monospace;
+  --np-fs-2xs: 0.5625rem; /* 9px */
   --np-fs-xs: 0.6875rem;   /* 11px */
   --np-fs-sm: 0.78rem;     /* ~12.5px */
   --np-fs-base: 0.875rem;  /* 14px */
@@ -63,7 +64,15 @@
   --np-tracking: 0.01em;
   --np-tracking-wide: 0.08em;
 
+  /* ---- Font weights ---- */
+  --np-fw-regular: 400;
+  --np-fw-medium: 550;
+  --np-fw-semibold: 650;
+  --np-fw-bold: 700;
+  --np-fw-heavy: 750;
+
   /* ---- Space: 4px grid ---- */
+  --np-0: 2px;
   --np-1: 4px;
   --np-2: 8px;
   --np-3: 12px;
@@ -74,6 +83,7 @@
   --np-8: 64px;
 
   /* ---- Radius: generous, pill-friendly ---- */
+  --np-radius-xs: 6px;
   --np-radius-sm: 12px;
   --np-radius: 18px;
   --np-radius-lg: 28px;
@@ -102,6 +112,23 @@
   --np-t: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   --np-t-slow: 360ms cubic-bezier(0.4, 0, 0.2, 1);
 
+  /* ---- Z-index layers ---- */
+  --np-z-base: 1;
+  --np-z-elevated: 2;
+  --np-z-sticky: 5;
+  --np-z-tooltip: 50;
+  --np-z-overlay: 100;
+
+  /* ---- Opacity ---- */
+  --np-opacity-disabled: 0.5;
+  --np-opacity-muted: 0.6;
+  --np-opacity-hint: 0.45;
+
+  /* ---- Breakpoints (reference, used in @media rules) ----
+   * --np-bp-desktop: 1120px
+   * --np-bp-tablet: 720px
+   * --np-bp-mobile: 480px */
+
   /* ---- Layout ---- */
   --np-rail: 76px;         /* slim icon rail (ref) */
   --np-rail-right: 300px;  /* right context rail */
@@ -123,7 +150,7 @@
 
   --np-text: #e7ebf3;
   --np-text-dim: #9aa3b8;
-  --np-text-mute: #616a7e;
+  --np-text-mute: #737d94;
 
   --np-accent: #2fe0d6;
   --np-accent-strong: #5cf0e7;

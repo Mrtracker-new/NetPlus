@@ -3,7 +3,7 @@
  * (docs/01 §9: one visual vocabulary); this file gives them form. Import once
  * from the app root:  import "@netpulse/design-system/styles.css".
  *
- * Structure: tokens → reset → app shell → primitives → constellation → per-screen.
+ * Structure: tokens → reset → app shell → primitives → constellation → per-screen → media queries.
  * Light neumorphic is the default; a deep-observatory dark theme lives under
  * [data-theme="dark"]. Density scales with disclosure via [data-depth]. */
 
@@ -22,6 +22,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  min-width: 0;
 }
 
 body {
@@ -35,6 +36,7 @@ body {
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
 h1,
@@ -71,13 +73,13 @@ button {
   scrollbar-color: var(--np-surface-3) transparent;
 }
 *::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-thumb {
   background: var(--np-surface-3);
   border-radius: var(--np-radius-pill);
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 
@@ -87,17 +89,12 @@ button {
   display: grid;
   grid-template-columns: var(--np-rail) 1fr var(--np-rail-right);
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   padding: var(--np-4);
   gap: var(--np-4);
-}
-@media (max-width: 1120px) {
-  .np-app {
-    grid-template-columns: var(--np-rail) 1fr;
-  }
-  .np-rail-right {
-    display: none;
-  }
+  min-width: 0;
+  max-width: 100vw;
 }
 
 /* ---- Left icon rail ---- */
@@ -110,11 +107,10 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
-  /* Must NOT clip: the hover tooltips sit outside the rail (left: 100%). A
-     scroll container would clip them, so the rail never scrolls — the 13 items
-     fit the column; on a short window they compress via the gap below. */
+  /* Must NOT clip on desktop: hover tooltips sit outside the rail (left: 100%). */
   overflow: visible;
   min-height: 0;
+  flex: none;
 }
 .np-nav__brand {
   display: grid;
@@ -190,6 +186,7 @@ button {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 100%;
   gap: var(--np-4);
   overflow: hidden;
 }
@@ -206,6 +203,8 @@ button {
   border: 1px solid var(--np-glass-border);
   box-shadow: var(--np-neu-sm);
   flex: none;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .np-brand {
@@ -213,6 +212,7 @@ button {
   font-size: var(--np-fs-md);
   letter-spacing: -0.02em;
   color: var(--np-text);
+  white-space: nowrap;
 }
 /* A breathing pulse dot beside the wordmark — the "live" motif (docs/17 §8). */
 .np-brand::before {
@@ -228,18 +228,21 @@ button {
   vertical-align: middle;
 }
 
-/* A non-functional search affordance to anchor the header (ref). */
+/* Search affordance to anchor the header. Flexible width. */
 .np-search {
   display: inline-flex;
   align-items: center;
   gap: var(--np-2);
   padding: var(--np-2) var(--np-4);
-  min-width: 200px;
+  width: min(240px, 100%);
   border-radius: var(--np-radius-pill);
   background: var(--np-surface-1);
   box-shadow: var(--np-neu-inset);
   color: var(--np-text-mute);
   font-size: var(--np-fs-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .np-search svg {
   width: 15px;
@@ -249,27 +252,33 @@ button {
 
 .np-header__spacer {
   flex: 1;
+  min-width: 0;
 }
 
 .np-main > main {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--np-1) var(--np-2) var(--np-6);
+  min-width: 0;
+  max-width: 100%;
 }
 
-/* ---- Right context rail (real NetPulse content, not the ref's social feed) ---- */
+/* ---- Right context rail ---- */
 .np-rail-right {
   display: flex;
   flex-direction: column;
   gap: var(--np-4);
   padding: var(--np-2);
   overflow-y: auto;
+  min-width: 0;
 }
 .np-rail-card {
   padding: var(--np-4);
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
+  min-width: 0;
 }
 .np-rail-card__title {
   font-size: var(--np-fs-xs);
@@ -331,6 +340,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: var(--np-2);
+  min-width: 0;
 }
 .np-capture__dot {
   width: 9px;
@@ -339,6 +349,7 @@ button {
   background: var(--np-finding);
   box-shadow: 0 0 10px var(--np-finding);
   animation: np-pulse 1.4s ease-in-out infinite;
+  flex: none;
 }
 .np-capture__btn--live {
   color: var(--np-finding);
@@ -346,7 +357,7 @@ button {
   box-shadow: var(--np-neu-inset);
 }
 .np-capture__iface {
-  max-width: 190px;
+  width: min(190px, 100%);
   padding: var(--np-2) var(--np-3);
   background: var(--np-surface-1);
   color: var(--np-text-dim);
@@ -355,6 +366,7 @@ button {
   box-shadow: var(--np-neu-inset);
   font: inherit;
   font-size: var(--np-fs-sm);
+  text-overflow: ellipsis;
 }
 .np-capture__iface:disabled {
   opacity: 0.6;
@@ -379,6 +391,7 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-pill);
   box-shadow: var(--np-neu-inset);
+  max-width: 100%;
 }
 .np-mode {
   border: none;
@@ -413,9 +426,6 @@ button {
   color: var(--np-text-dim);
   font-size: var(--np-fs-md);
 }
-/* Compact variant — for empty states that sit under another block (e.g. the
-   dashboard feed below the constellation), so idle screens don't stack two
-   tall voids and force a long scroll. */
 .np-empty--compact {
   min-height: 0;
   margin: var(--np-5) auto;
@@ -458,6 +468,7 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius);
   box-shadow: var(--np-neu-inset);
+  max-width: 100%;
 }
 
 /* Buttons — soft raised, press = inset. */
@@ -472,6 +483,7 @@ button {
   box-shadow: var(--np-neu-sm);
   transition: box-shadow var(--np-t), color var(--np-t), transform var(--np-t),
     background var(--np-t);
+  white-space: nowrap;
 }
 .np-btn:hover {
   color: var(--np-accent-strong);
@@ -532,7 +544,12 @@ button {
   box-shadow: var(--np-neu-inset);
 }
 
-/* Generic tables (Apps, Monitor breakdowns). */
+/* Generic tables (Apps, Monitor breakdowns). Wrappers support smooth touch scrolling. */
+.np-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .np-breakdown,
 .np-apps table {
   width: 100%;
@@ -565,14 +582,16 @@ button {
 /* ---- Stat tiles / KPI row (ref "You have been online 124 / visited 315") ---- */
 .np-kpis {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(150px, 100%), 1fr));
   gap: var(--np-4);
+  min-width: 0;
 }
 .np-kpi {
   padding: var(--np-4) var(--np-5);
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
+  min-width: 0;
 }
 .np-kpi__label {
   font-size: var(--np-fs-xs);
@@ -587,6 +606,7 @@ button {
   letter-spacing: -0.02em;
   color: var(--np-text);
   line-height: 1.1;
+  word-break: break-word;
 }
 .np-kpi__value span {
   font-size: var(--np-fs-sm);
@@ -601,6 +621,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--np-4);
+  min-width: 0;
 }
 
 .np-card {
@@ -610,6 +631,8 @@ button {
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
   transition: box-shadow var(--np-t), transform var(--np-t);
+  min-width: 0;
+  max-width: 100%;
 }
 .np-card:hover {
   transform: translateY(-2px);
@@ -638,6 +661,7 @@ button {
   gap: var(--np-2);
   font-weight: 650;
   font-size: var(--np-fs-md);
+  word-break: break-word;
 }
 .np-card--notable .np-card__headline > [aria-hidden] {
   color: var(--np-notable);
@@ -648,6 +672,7 @@ button {
 .np-card__summary {
   margin-top: var(--np-2);
   color: var(--np-text-dim);
+  word-break: break-word;
 }
 .np-card__lines {
   margin: var(--np-3) 0 0;
@@ -655,6 +680,7 @@ button {
   color: var(--np-text-dim);
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
+  word-break: break-all;
 }
 .np-card__lines li {
   margin: 2px 0;
@@ -663,6 +689,7 @@ button {
   margin-top: var(--np-3);
   display: flex;
   gap: var(--np-2);
+  flex-wrap: wrap;
 }
 
 /* ============================ Dashboard hero ============================ */
@@ -671,15 +698,18 @@ button {
   font-weight: 750;
   letter-spacing: -0.03em;
   margin-bottom: var(--np-1);
+  word-break: break-word;
 }
 .np-hero__sub {
   color: var(--np-text-dim);
   margin-bottom: var(--np-5);
+  word-break: break-word;
 }
 .np-dash {
   display: flex;
   flex-direction: column;
   gap: var(--np-5);
+  min-width: 0;
 }
 .np-dash__section-title {
   font-size: var(--np-fs-lg);
@@ -701,11 +731,13 @@ button {
 .np-replay,
 .np-export,
 .np-plugins {
+  width: 100%;
   max-width: 1000px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--np-4);
+  min-width: 0;
 }
 
 /* Shared soft-plate look for the many block-level containers. */
@@ -722,6 +754,8 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* ---- Monitor ---- */
@@ -750,6 +784,7 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--np-3);
+  flex-wrap: wrap;
 }
 .np-finding__title {
   font-weight: 650;
@@ -771,6 +806,7 @@ button {
   align-items: center;
   gap: var(--np-3);
   margin: var(--np-2) 0;
+  flex-wrap: wrap;
 }
 .np-finding__explanation {
   color: var(--np-text-dim);
@@ -784,6 +820,7 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-sm);
   box-shadow: var(--np-neu-inset);
+  word-break: break-all;
 }
 .np-finding__corroboration {
   margin-top: var(--np-2);
@@ -878,6 +915,7 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
   color: var(--np-text-mute);
+  word-break: break-all;
 }
 .np-fanout h3 {
   font-size: var(--np-fs-base);
@@ -915,6 +953,7 @@ button {
   align-items: center;
   padding: var(--np-2) 0;
   border-bottom: 1px solid var(--np-hairline);
+  min-width: 0;
 }
 .np-track__label {
   color: var(--np-text-dim);
@@ -928,6 +967,7 @@ button {
   flex-wrap: wrap;
   min-height: 28px;
   align-items: center;
+  min-width: 0;
 }
 .np-span {
   padding: var(--np-1) var(--np-3);
@@ -945,9 +985,11 @@ button {
 .np-assistant__form {
   display: flex;
   gap: var(--np-2);
+  flex-wrap: wrap;
 }
 .np-assistant__input {
   flex: 1;
+  min-width: min(200px, 100%);
   padding: var(--np-3) var(--np-5);
   background: var(--np-surface-1);
   border: none;
@@ -1095,6 +1137,7 @@ button {
   padding: var(--np-3);
   border-radius: var(--np-radius-sm);
   box-shadow: var(--np-neu-inset);
+  word-break: break-all;
 }
 .np-lesson__check,
 .np-lesson__answer,
@@ -1128,6 +1171,7 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--np-3);
+  flex-wrap: wrap;
 }
 .np-recording__title {
   font-weight: 650;
@@ -1164,6 +1208,7 @@ button {
 .np-replay__speeds {
   display: flex;
   gap: var(--np-2);
+  flex-wrap: wrap;
 }
 
 /* ---- Export ---- */
@@ -1183,6 +1228,7 @@ button {
   border-radius: var(--np-radius-sm);
   box-shadow: var(--np-neu-inset);
   white-space: pre-wrap;
+  word-break: break-all;
 }
 .np-export__egress {
   color: var(--np-good);
@@ -1201,7 +1247,6 @@ button {
 .np-export__preview li {
   margin: 2px 0;
 }
-/* Recording version-pin + detail lists read as compact mono rows. */
 .np-recording__meta {
   display: flex;
   flex-wrap: wrap;
@@ -1240,6 +1285,7 @@ button {
   align-items: baseline;
   justify-content: space-between;
   gap: var(--np-3);
+  flex-wrap: wrap;
 }
 .np-plugin__name {
   font-weight: 650;
@@ -1287,6 +1333,7 @@ button {
   display: flex;
   gap: var(--np-2);
   margin-top: var(--np-1);
+  flex-wrap: wrap;
 }
 
 /* ============================ Visualization ============================ */
@@ -1296,6 +1343,8 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
+  min-width: 0;
+  max-width: 100%;
 }
 .np-panel__title {
   font-size: var(--np-fs-xs);
@@ -1308,17 +1357,14 @@ button {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   gap: var(--np-4);
-}
-@media (max-width: 720px) {
-  .np-monitor__top {
-    grid-template-columns: 1fr;
-  }
+  min-width: 0;
 }
 
 /* Area chart */
 .np-viz-area__svg {
   width: 100%;
-  height: 96px;
+  max-width: 100%;
+  height: auto;
   display: block;
 }
 .np-viz-cap {
@@ -1346,6 +1392,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--np-4);
+  flex-wrap: wrap;
 }
 .np-viz-donut__total {
   font-family: var(--np-font-mono);
@@ -1401,6 +1448,7 @@ button {
   align-items: center;
   gap: var(--np-3);
   padding: var(--np-1) 0;
+  min-width: 0;
 }
 .np-viz-bar__label {
   font-size: var(--np-fs-sm);
@@ -1434,6 +1482,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--np-3);
+  min-width: 0;
 }
 .np-viz-conf__track {
   flex: 1;
@@ -1465,6 +1514,7 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
+  min-width: 0;
 }
 .np-ribbon__lane {
   display: grid;
@@ -1472,6 +1522,7 @@ button {
   align-items: center;
   gap: var(--np-3);
   padding: var(--np-2) 0;
+  min-width: 0;
 }
 .np-ribbon__lane-label {
   font-size: var(--np-fs-xs);
@@ -1526,6 +1577,8 @@ button {
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  min-width: 0;
 }
 .np-jflow__track {
   display: flex;
@@ -1589,6 +1642,7 @@ button {
   margin-top: var(--np-5);
   padding-top: var(--np-4);
   border-top: 1px solid var(--np-hairline);
+  flex-wrap: wrap;
 }
 .np-jflow__hub {
   flex: none;
@@ -1648,25 +1702,21 @@ button {
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
   overflow: hidden;
-}
-/* Relative stage so the HTML tooltip can be positioned against the SVG box.
- * The SVG uses width:100%;height:auto with a viewBox, so its box matches the
- * viewBox aspect exactly (no letterboxing) — percentage mapping is precise. */
-.np-cons__stage {
-  position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 .np-cons__stage {
   position: relative;
+  min-width: 0;
 }
 .np-cons__svg {
   display: block;
   width: 100%;
+  max-width: 100%;
   height: auto;
   touch-action: none;
   cursor: grab;
 }
-/* Idle: no hosts to plot, so don't reserve the full ~500px stage — collapse to a
-   calm band with just the YOU pulse, so the dashboard doesn't scroll into a void. */
 .np-cons--quiet .np-cons__svg {
   height: 220px;
   cursor: default;
@@ -1726,8 +1776,6 @@ button {
 .np-cons__node-dot--degraded {
   fill: var(--np-notable);
 }
-/* Reveal scales the INNER group only (the outer group owns the translate
-   attribute). fill-box keeps the scale origin at the node's own center. */
 .np-cons__node-in--reveal {
   transform-box: fill-box;
   transform-origin: center;
@@ -1748,7 +1796,6 @@ button {
   text-anchor: middle;
   pointer-events: none;
 }
-/* Glass tooltip + expanded detail card (HTML overlay above the SVG). */
 .np-cons__tip {
   position: absolute;
   transform: translate(-50%, calc(-100% - 14px));
@@ -1771,8 +1818,6 @@ button {
   white-space: nowrap;
   max-width: 28ch;
 }
-/* The raw IP under a foregrounded hostname — muted, monospace, the source of
-   truth kept visible even when a name is shown. */
 .np-cons__tip-ip {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
@@ -1782,7 +1827,6 @@ button {
   white-space: nowrap;
   max-width: 28ch;
 }
-/* Provenance tag (DNS / TLS SNI) so a name is never mistaken for a lookup. */
 .np-cons__tip-src {
   color: var(--np-text-dim);
   text-transform: uppercase;
@@ -1818,7 +1862,6 @@ button {
 .np-cons__status--degraded {
   color: var(--np-notable);
 }
-/* Legend + controls under the map. */
 .np-cons__foot {
   display: flex;
   align-items: center;
@@ -1845,7 +1888,6 @@ button {
   font-size: var(--np-fs-xs);
   color: var(--np-text-mute);
 }
-/* Screen-reader parity list (visually hidden). */
 .np-sr-only {
   position: absolute;
   width: 1px;
@@ -1857,6 +1899,8 @@ button {
   white-space: nowrap;
   border: 0;
 }
+
+/* ============================ Motion & Disclosure ============================ */
 
 @keyframes np-cons-ping {
   0% {
@@ -1896,8 +1940,6 @@ button {
   }
 }
 
-/* ============================ Motion ============================ */
-
 @keyframes np-pulse {
   0%,
   100% {
@@ -1929,5 +1971,161 @@ button {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
+  }
+}
+
+/* ============================ Consolidated Media Queries ============================
+ * Documented Breakpoint Tokens:
+ * Desktop:  > 1120px  (--np-bp-desktop: 1120px)
+ * Tablet:   <= 1120px (--np-bp-tablet: 720px)
+ * Mobile:   <= 720px  (--np-bp-mobile: 480px)
+ * Small:    <= 480px down to 320px
+ */
+
+/* ---- Tablet & Medium Viewports (<= 1120px) ---- */
+@media (max-width: 1120px) {
+  .np-app {
+    grid-template-columns: var(--np-rail) 1fr;
+  }
+
+  /* Completely hide right rail on tablet to avoid grid auto-placement row overflow */
+  .np-rail-right {
+    display: none !important;
+  }
+}
+
+/* ---- Mobile & Compact Viewports (<= 720px) ---- */
+@media (max-width: 720px) {
+  .np-app {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    height: 100vh;
+    height: 100dvh;
+    padding: var(--np-2);
+    gap: var(--np-2);
+    overflow: hidden;
+  }
+
+  /* Transform left vertical rail into top horizontal scrollable nav bar */
+  .np-nav {
+    flex-direction: row;
+    width: 100%;
+    height: auto;
+    min-height: auto;
+    padding: var(--np-2) var(--np-3);
+    border-radius: var(--np-radius);
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    gap: var(--np-2);
+    box-shadow: var(--np-neu-sm);
+  }
+
+  .np-nav__brand {
+    margin-bottom: 0;
+    margin-right: var(--np-2);
+    width: 36px;
+    height: 36px;
+  }
+
+  .np-nav__item {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* Disable hover tooltips on mobile touch screens */
+  .np-nav__item::after {
+    display: none !important;
+  }
+
+  /* Header responsive layout */
+  .np-header {
+    flex-wrap: wrap;
+    padding: var(--np-2) var(--np-3);
+    gap: var(--np-2);
+    border-radius: var(--np-radius);
+  }
+
+  .np-search {
+    display: none !important; /* Hide decorative search on compact mobile */
+  }
+
+  .np-capture {
+    flex-wrap: wrap;
+  }
+
+  .np-capture__iface {
+    width: min(140px, 100%);
+  }
+
+  .np-monitor__top {
+    grid-template-columns: 1fr;
+  }
+
+  .np-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+    gap: var(--np-2);
+  }
+
+  .np-track {
+    grid-template-columns: 1fr;
+    gap: var(--np-1);
+  }
+
+  .np-ribbon__lane {
+    grid-template-columns: 1fr;
+    gap: var(--np-1);
+  }
+
+  .np-ribbon__axis {
+    padding-left: 0;
+  }
+}
+
+/* ---- Small Mobile Viewports (<= 480px down to 320px) ---- */
+@media (max-width: 480px) {
+  .np-app {
+    padding: var(--np-1);
+    gap: var(--np-1);
+  }
+
+  .np-header {
+    padding: var(--np-2);
+  }
+
+  .np-brand {
+    font-size: var(--np-fs-base);
+  }
+
+  .np-capture__iface {
+    width: min(110px, 100%);
+    font-size: var(--np-fs-xs);
+    padding: var(--np-1) var(--np-2);
+  }
+
+  .np-btn {
+    padding: var(--np-1) var(--np-3);
+    font-size: var(--np-fs-xs);
+  }
+
+  .np-kpi {
+    padding: var(--np-3);
+  }
+
+  .np-kpi__value {
+    font-size: var(--np-fs-lg);
+  }
+
+  .np-hero__title {
+    font-size: var(--np-fs-xl);
+  }
+
+  .np-card {
+    padding: var(--np-4) var(--np-4) var(--np-4) var(--np-5);
+  }
+
+  .np-viz-bar {
+    grid-template-columns: 8ch 1fr 7ch;
   }
 }

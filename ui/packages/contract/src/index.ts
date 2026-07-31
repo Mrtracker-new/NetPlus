@@ -69,6 +69,33 @@ export type Query =
   | { kind: "compareSessions"; sessionIdA: number; sessionIdB: number }
   | { kind: "listFleetHosts" };
 
+export interface PingResult {
+  target: string;
+  sent: number;
+  received: number;
+  lossPct: number;
+  minRttMs: number;
+  avgRttMs: number;
+  maxRttMs: number;
+  stddevRttMs?: number;
+}
+
+export interface TracerouteHop {
+  ttl: number;
+  ip: string;
+  hostname?: string | null;
+  rttMs: number;
+  status?: string;
+}
+
+export interface BufferbloatResult {
+  target: string;
+  idleRttMs: number;
+  loadedRttMs: number;
+  deltaRttMs: number;
+  grade: string;
+}
+
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
   | { kind: "narrativeFeed"; cards: NarrativeCard[] }
@@ -91,9 +118,9 @@ export type QueryResponse =
   | { kind: "plugins"; plugins: PluginDescriptor[] }
   | { kind: "interfaces"; interfaces: Interface[] }
   | { kind: "capabilityRegistry"; registry: any }
-  | { kind: "pingResult"; result: any }
-  | { kind: "tracerouteResult"; hops: any[] }
-  | { kind: "bufferbloatResult"; result: any }
+  | { kind: "pingResult"; result: PingResult }
+  | { kind: "tracerouteResult"; hops: TracerouteHop[] }
+  | { kind: "bufferbloatResult"; result: BufferbloatResult }
   | { kind: "decodedPacketInspection"; inspection: any }
   | { kind: "sessionDiff"; diff: any }
   | { kind: "fleetHosts"; hosts: any[] };

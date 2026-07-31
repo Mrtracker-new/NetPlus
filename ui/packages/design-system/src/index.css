@@ -2305,6 +2305,9 @@ button {
 }
 
 /* ---- Diagnostics ---- */
+.np-diagnostics__desc {
+  color: var(--np-text-dim);
+}
 .np-diagnostics__actions {
   display: flex;
   gap: var(--np-3);

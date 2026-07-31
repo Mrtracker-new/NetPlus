@@ -1,112 +1,138 @@
 import { useState } from "react";
+import type { PingResult, TracerouteHop, BufferbloatResult } from "@netpulse/contract";
+import { Button, Input, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
+import { useBusy } from "../hooks/useBusy";
+import { useDisclosure } from "../modes/DisclosureContext";
+
+function toErrorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
 
 export function DiagnosticsScreen() {
   const [target, setTarget] = useState("1.1.1.1");
-  const [pingResult, setPingResult] = useState<any>(null);
-  const [tracerouteHops, setTracerouteHops] = useState<any[]>([]);
-  const [bufferbloat, setBufferbloat] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [pingResult, setPingResult] = useState<PingResult | null>(null);
+  const [tracerouteHops, setTracerouteHops] = useState<TracerouteHop[]>([]);
+  const [bufferbloat, setBufferbloat] = useState<BufferbloatResult | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
-  const runPing = async () => {
-    setLoading(true);
+  const { shows } = useDisclosure();
+
+  const [pingBusy, runPing] = useBusy(async () => {
+    setNotice(null);
     try {
       const res = await query({ kind: "runPing", target, count: 4 });
       if (res.kind === "pingResult") setPingResult(res.result);
     } catch (e) {
-      console.error(e);
+      setNotice(toErrorMessage(e));
     }
-    setLoading(false);
-  };
+  });
 
-  const runTraceroute = async () => {
-    setLoading(true);
+  const [traceBusy, runTraceroute] = useBusy(async () => {
+    setNotice(null);
     try {
       const res = await query({ kind: "runTraceroute", target, transport: "icmp", maxHops: 10 });
       if (res.kind === "tracerouteResult") setTracerouteHops(res.hops);
     } catch (e) {
-      console.error(e);
+      setNotice(toErrorMessage(e));
     }
-    setLoading(false);
-  };
+  });
 
-  const runBufferbloat = async () => {
-    setLoading(true);
+  const [bloatBusy, runBufferbloat] = useBusy(async () => {
+    setNotice(null);
     try {
       const res = await query({ kind: "runBufferbloatTest", target });
       if (res.kind === "bufferbloatResult") setBufferbloat(res.result);
     } catch (e) {
-      console.error(e);
+      setNotice(toErrorMessage(e));
     }
-    setLoading(false);
-  };
+  });
+
+  const isBusy = pingBusy || traceBusy || bloatBusy;
+  const hasResults = Boolean(pingResult || tracerouteHops.length > 0 || bufferbloat);
 
   return (
-    <div style={{ padding: "24px", color: "#e2e8f0" }}>
-      <h2 style={{ color: "#2fe0d6" }}>Active Network Diagnostics</h2>
-      <p style={{ color: "#94a3b8" }}>
+    <section className="np-diagnostics" aria-label="Network Diagnostics">
+      <h2>Active Network Diagnostics</h2>
+      <p className="np-diagnostics__desc">
         Opt-in probes: ICMP/UDP Ping, Multi-Transport Traceroute, and Bandwidth-Constrained Bufferbloat Testing.
       </p>
 
-      <div style={{ display: "flex", gap: "12px", marginBottom: "24px" }}>
-        <input
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      <div className="np-diagnostics__actions">
+        <Input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
           placeholder="Target Host (e.g. 1.1.1.1)"
-          style={{ padding: "8px 12px", background: "#1a2130", border: "1px solid #334155", color: "#fff", borderRadius: "6px" }}
+          aria-label="Target Host"
         />
-        <button onClick={runPing} disabled={loading} style={{ padding: "8px 16px", background: "#2fe0d6", color: "#0b0e14", fontWeight: "bold", borderRadius: "6px", border: "none" }}>
+        <Button variant="primary" busy={pingBusy} disabled={isBusy} onClick={() => void runPing()}>
           Ping Probe
-        </button>
-        <button onClick={runTraceroute} disabled={loading} style={{ padding: "8px 16px", background: "#6366f1", color: "#fff", fontWeight: "bold", borderRadius: "6px", border: "none" }}>
+        </Button>
+        <Button variant="standard" busy={traceBusy} disabled={isBusy} onClick={() => void runTraceroute()}>
           Traceroute
-        </button>
-        <button onClick={runBufferbloat} disabled={loading} style={{ padding: "8px 16px", background: "#f5b544", color: "#0b0e14", fontWeight: "bold", borderRadius: "6px", border: "none" }}>
+        </Button>
+        <Button variant="standard" busy={bloatBusy} disabled={isBusy} onClick={() => void runBufferbloat()}>
           Bufferbloat Test
-        </button>
+        </Button>
       </div>
 
-      {pingResult && (
-        <div style={{ background: "#121722", padding: "16px", borderRadius: "8px", marginBottom: "16px", border: "1px solid #1e293b" }}>
-          <h3>Ping Results for {pingResult.target}</h3>
-          <p>Sent: {pingResult.sent} | Received: {pingResult.received} | Loss: {pingResult.lossPct}%</p>
-          <p>RTT: Min {pingResult.minRttMs}ms / Avg {pingResult.avgRttMs}ms / Max {pingResult.maxRttMs}ms</p>
-        </div>
-      )}
+      {!hasResults && !isBusy && !notice ? (
+        <EmptyState>
+          Run a probe to display diagnostic results (Ping, Traceroute, or Bufferbloat).
+        </EmptyState>
+      ) : (
+        <div aria-live="polite">
+          {pingResult && (
+            <div className="np-diagnostics__result">
+              <h3>Ping Results for {pingResult.target}</h3>
+              <p>Sent: {pingResult.sent} | Received: {pingResult.received} | Loss: {pingResult.lossPct}%</p>
+              <p>RTT: Min {pingResult.minRttMs}ms / Avg {pingResult.avgRttMs}ms / Max {pingResult.maxRttMs}ms</p>
+            </div>
+          )}
 
-      {tracerouteHops.length > 0 && (
-        <div style={{ background: "#121722", padding: "16px", borderRadius: "8px", marginBottom: "16px", border: "1px solid #1e293b" }}>
-          <h3>Traceroute Hops ({tracerouteHops.length} hops)</h3>
-          <table style={{ width: "100%", textAlign: "left" }}>
-            <thead>
-              <tr style={{ color: "#94a3b8" }}>
-                <th>TTL</th>
-                <th>IP</th>
-                <th>Hostname</th>
-                <th>RTT (ms)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tracerouteHops.map((h, i) => (
-                <tr key={i}>
-                  <td>{h.ttl}</td>
-                  <td>{h.ip}</td>
-                  <td>{h.hostname || "-"}</td>
-                  <td>{h.rttMs} ms</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+          {tracerouteHops.length > 0 && (
+            <div className="np-diagnostics__result">
+              <h3>Traceroute Hops ({tracerouteHops.length} hops)</h3>
+              <table className="np-breakdown">
+                <thead>
+                  <tr>
+                    <th scope="col">TTL</th>
+                    <th scope="col">IP</th>
+                    <th scope="col">Hostname</th>
+                    <th scope="col">RTT (ms)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tracerouteHops.map((h, i) => (
+                    <tr key={i}>
+                      <td>{h.ttl}</td>
+                      <td>{h.ip}</td>
+                      <td>{h.hostname || "-"}</td>
+                      <td>{h.rttMs} ms</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-      {bufferbloat && (
-        <div style={{ background: "#121722", padding: "16px", borderRadius: "8px", border: "1px solid #1e293b" }}>
-          <h3>Bufferbloat Scorecard</h3>
-          <p>Grade: <strong style={{ color: "#2fe0d6", fontSize: "1.5rem" }}>{bufferbloat.grade}</strong></p>
-          <p>Idle RTT: {bufferbloat.idleRttMs}ms | Loaded RTT: {bufferbloat.loadedRttMs}ms | Delta: +{bufferbloat.deltaRttMs}ms</p>
+          {bufferbloat && (
+            <div className="np-diagnostics__result">
+              <h3>Bufferbloat Scorecard</h3>
+              <p>
+                Grade: <span className="np-diagnostics__grade">{bufferbloat.grade}</span>
+              </p>
+              {shows("intermediate") && (
+                <p>
+                  Idle RTT: {bufferbloat.idleRttMs}ms | Loaded RTT: {bufferbloat.loadedRttMs}ms | Delta: +{bufferbloat.deltaRttMs}ms
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
-    </div>
+    </section>
   );
 }

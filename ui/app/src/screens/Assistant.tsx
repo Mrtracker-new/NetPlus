@@ -101,6 +101,7 @@ export function Assistant() {
             className="np-suggestion"
             disabled={busy}
             onClick={() => {
+              if (busy) return;
               setQuestionText(s);
               void ask(s);
             }}

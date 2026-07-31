@@ -2492,3 +2492,10 @@ button {
 .np-session-diff__evidence {
   color: var(--np-text-dim);
 }
+
+.np-lang-toggle {
+  font-weight: var(--np-fw-semibold);
+  font-size: var(--np-fs-sm);
+  width: auto;
+  padding: 0 var(--np-radius-xs);
+}

@@ -217,11 +217,10 @@ function LanguageToggle() {
 
   return (
     <button
-      className="np-iconbtn"
+      className="np-iconbtn np-lang-toggle"
       onClick={toggleLanguage}
       aria-label="Switch Language"
       title={`Language: ${currentLang.toUpperCase()}`}
-      style={{ fontWeight: 600, fontSize: "0.85rem", width: "auto", padding: "0 6px" }}
     >
       {currentLang.toUpperCase()}
     </button>

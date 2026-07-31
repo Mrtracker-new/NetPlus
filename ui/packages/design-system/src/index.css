@@ -43,7 +43,7 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   letter-spacing: -0.02em;
 }
 
@@ -409,7 +409,7 @@ button {
 .np-mode--active {
   background: var(--np-surface-1);
   color: var(--np-accent-strong);
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   box-shadow: var(--np-neu-sm);
 }
 
@@ -614,7 +614,7 @@ button {
 
 .np-ok {
   color: var(--np-good);
-  font-weight: 550;
+  font-weight: var(--np-fw-medium);
 }
 .np-loss {
   display: flex;
@@ -638,7 +638,7 @@ button {
   padding: var(--np-2) var(--np-5);
   border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-sm);
-  font-weight: 550;
+  font-weight: var(--np-fw-medium);
   box-shadow: var(--np-neu-sm);
   transition: box-shadow var(--np-t), color var(--np-t), transform var(--np-t),
     background var(--np-t);
@@ -658,7 +658,7 @@ button {
 .np-btn--primary {
   background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
   color: var(--np-on-accent);
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
 }
 .np-btn--primary:hover {
   color: var(--np-on-accent);
@@ -761,7 +761,7 @@ button {
 .np-kpi__value {
   margin-top: var(--np-1);
   font-size: var(--np-fs-xl);
-  font-weight: 700;
+  font-weight: var(--np-fw-bold);
   letter-spacing: -0.02em;
   color: var(--np-text);
   line-height: 1.1;
@@ -769,7 +769,7 @@ button {
 }
 .np-kpi__value span {
   font-size: var(--np-fs-sm);
-  font-weight: 500;
+  font-weight: var(--np-fw-medium);
   color: var(--np-text-mute);
   margin-left: 4px;
 }
@@ -818,7 +818,7 @@ button {
   display: flex;
   align-items: center;
   gap: var(--np-2);
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   font-size: var(--np-fs-md);
   word-break: break-word;
 }
@@ -854,7 +854,7 @@ button {
 /* ============================ Dashboard hero ============================ */
 .np-hero__title {
   font-size: var(--np-fs-2xl);
-  font-weight: 750;
+  font-weight: var(--np-fw-heavy);
   letter-spacing: -0.03em;
   margin-bottom: var(--np-1);
   word-break: break-word;
@@ -872,7 +872,7 @@ button {
 }
 .np-dash__section-title {
   font-size: var(--np-fs-lg);
-  font-weight: 700;
+  font-weight: var(--np-fw-bold);
   margin-bottom: var(--np-3);
 }
 
@@ -954,7 +954,7 @@ button {
   flex-wrap: wrap;
 }
 .np-finding__title {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   font-size: var(--np-fs-md);
 }
 .np-finding__kind {
@@ -1071,7 +1071,7 @@ button {
   box-shadow: 0 0 10px var(--np-accent);
 }
 .np-stage__title {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
 }
 .np-stage__narration {
   margin-top: var(--np-1);
@@ -1104,7 +1104,7 @@ button {
   border-bottom: 1px solid var(--np-hairline);
 }
 .np-fanout__label {
-  font-weight: 550;
+  font-weight: var(--np-fw-medium);
 }
 .np-fanout__meta {
   font-family: var(--np-font-mono);
@@ -1174,7 +1174,7 @@ button {
   border-radius: var(--np-radius-pill);
   background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
   color: var(--np-on-accent);
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   box-shadow: var(--np-neu-sm);
   transition: box-shadow var(--np-t), filter var(--np-t), transform var(--np-t);
 }
@@ -1261,7 +1261,7 @@ button {
   gap: var(--np-1);
 }
 .np-ref__key {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
 }
 .np-ref__id {
   font-family: var(--np-font-mono);
@@ -1292,7 +1292,7 @@ button {
   color: var(--np-accent-2);
 }
 .np-lesson__title {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   font-size: var(--np-fs-md);
   margin: var(--np-1) 0;
 }
@@ -1341,7 +1341,7 @@ button {
   flex-wrap: wrap;
 }
 .np-recording__title {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
 }
 .np-recording__level,
 .np-recording__meta,
@@ -1455,7 +1455,7 @@ button {
   flex-wrap: wrap;
 }
 .np-plugin__name {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
 }
 .np-plugin__type {
   font-family: var(--np-font-mono);
@@ -1564,7 +1564,7 @@ button {
 .np-viz-donut__total {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-sm);
-  font-weight: 600;
+  font-weight: var(--np-fw-semibold);
   fill: var(--np-text);
 }
 .np-viz-donut__sub {
@@ -1958,7 +1958,7 @@ button {
 .np-cons__you-label {
   fill: var(--np-accent-strong);
   font-size: var(--np-fs-xs);
-  font-weight: 700;
+  font-weight: var(--np-fw-bold);
   letter-spacing: 0.12em;
   text-anchor: middle;
   pointer-events: none;
@@ -1978,7 +1978,7 @@ button {
   z-index: 5;
 }
 .np-cons__tip-host {
-  font-weight: 650;
+  font-weight: var(--np-fw-semibold);
   font-size: var(--np-fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2009,7 +2009,7 @@ button {
 }
 .np-cons__tip-row b {
   font-family: var(--np-font-mono);
-  font-weight: 600;
+  font-weight: var(--np-fw-semibold);
   color: var(--np-text);
 }
 .np-cons__status {

@@ -453,6 +453,59 @@ button {
   animation: np-pulse 3s ease-in-out infinite;
 }
 
+/* ---- Inline notice (error / success / warning) ---- */
+.np-notice {
+  font-size: var(--np-fs-sm);
+  padding: var(--np-2) var(--np-4);
+  border-radius: var(--np-radius-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--np-2);
+  min-width: 0;
+}
+.np-notice--error {
+  color: var(--np-finding);
+  background: var(--np-finding-soft);
+}
+.np-notice--success {
+  color: var(--np-good);
+  background: var(--np-good-soft);
+}
+.np-notice--warning {
+  color: var(--np-notable);
+  background: var(--np-notable-soft);
+}
+.np-notice__icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.np-notice__content {
+  flex: 1;
+  min-width: 0;
+}
+.np-notice__dismiss {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: var(--np-fs-md);
+  opacity: var(--np-opacity-muted);
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.np-notice__dismiss:hover {
+  opacity: 1;
+}
+.np-notice__dismiss:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+  border-radius: 2px;
+  opacity: 1;
+}
+
 .np-ok {
   color: var(--np-good);
   font-weight: 550;

@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import type { ExportFormat, ExportPreview, PayloadLevel } from "@netpulse/contract";
+import { Notice } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const FORMATS: Array<{ id: ExportFormat; label: string; blurb: string }> = [
@@ -101,7 +102,7 @@ export function Export() {
         </span>
       </div>
 
-      {notice && <p className="np-export__notice">{notice}</p>}
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
     </section>
   );
 }

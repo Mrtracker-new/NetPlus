@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { RecordingSummary } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, Notice } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const LEVEL_LABEL: Record<RecordingSummary["privacy"]["level"], string> = {
@@ -103,7 +103,7 @@ export function Recordings() {
         </span>
       </div>
 
-      {notice && <p className="np-recordings__notice">{notice}</p>}
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
 
       {loaded && recordings.length === 0 ? (
         <EmptyState>

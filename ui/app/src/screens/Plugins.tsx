@@ -9,7 +9,7 @@
 
 import { useEffect, useState } from "react";
 import type { PluginDescriptor } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, Notice } from "@netpulse/components";
 import { query, command } from "../ipc";
 
 const TYPE_LABEL: Record<PluginDescriptor["plugin_type"], string> = {
@@ -101,7 +101,7 @@ export function Plugins() {
         the AI assistant (docs/24 §5).
       </p>
 
-      {notice && <p className="np-plugins__notice">{notice}</p>}
+      <Notice message={notice} onDismiss={() => setNotice(null)} />
 
       {loaded && plugins.length === 0 ? (
         <EmptyState>No plugins registered.</EmptyState>

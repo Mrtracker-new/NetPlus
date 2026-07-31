@@ -83,6 +83,12 @@ jobs:
       - name: Typecheck components
         run: pnpm --filter @netpulse/components typecheck
 
+      - name: Build viz
+        run: pnpm --filter @netpulse/viz build
+
+      - name: Typecheck viz
+        run: pnpm --filter @netpulse/viz typecheck
+
       - name: Typecheck app
         run: pnpm --filter @netpulse/app typecheck
 

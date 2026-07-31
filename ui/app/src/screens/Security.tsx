@@ -11,7 +11,7 @@ import type { SecurityFinding } from "@netpulse/contract";
 import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
-import { ConfidenceMeter } from "../viz";
+import { ConfidenceMeter } from "@netpulse/viz";
 
 // Human-readable label for the specific finding kind (docs/17 §4 named set).
 const KIND_LABEL: Record<SecurityFinding["kind"], string> = {

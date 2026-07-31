@@ -6,7 +6,7 @@
 import type { Breakdown, Diagnosis } from "@netpulse/contract";
 import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
-import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "../viz";
+import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "@netpulse/viz";
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   return (

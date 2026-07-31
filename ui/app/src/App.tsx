@@ -14,7 +14,7 @@ import { useLiveData } from "./state/useLiveData";
 import { useStore } from "./state/store";
 import { command, query } from "./ipc";
 import { Icon, type IconName } from "./icons";
-import { humanBytes, primaryHostName } from "./viz";
+import { humanBytes, primaryHostName } from "@netpulse/viz";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";

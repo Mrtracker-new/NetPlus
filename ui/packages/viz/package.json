@@ -3,5 +3,36 @@
   "version": "0.1.0",
   "private": true,
   "description": "WebGL/Canvas visualization primitives: graphs, timelines, packet-flow animations. Framework-light.",
-  "license": "MIT OR Apache-2.0"
+  "license": "MIT OR Apache-2.0",
+  "sideEffects": false,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@netpulse/contract": "workspace:*",
+    "@netpulse/components": "workspace:*",
+    "@netpulse/design-system": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.4.0"
+  }
 }

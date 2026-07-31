@@ -9,8 +9,7 @@ import type { NarrativeCard, Severity } from "@netpulse/contract";
 import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { useDisclosure } from "../modes/DisclosureContext";
-import { Constellation } from "../viz/Constellation";
-import { humanBytes } from "../viz";
+import { Constellation, humanBytes } from "@netpulse/viz";
 
 // Severity as icon + label — colour is never the sole carrier of meaning
 // (docs/09 §12), and findings stay calm, never alarmist (docs/09 §5.2).

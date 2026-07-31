@@ -12,7 +12,7 @@ import { EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
-import { JourneyFlow } from "../viz";
+import { JourneyFlow } from "@netpulse/viz";
 
 // The most recent session in the feed — the journey we open by default.
 function latestSessionId(feed: ReturnType<typeof useStore>["feed"]): number | null {

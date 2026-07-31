@@ -81,7 +81,33 @@ importers:
 
   ui/packages/design-system: {}
 
-  ui/packages/viz: {}
+  ui/packages/viz:
+    dependencies:
+      '@netpulse/components':
+        specifier: workspace:*
+        version: link:../components
+      '@netpulse/contract':
+        specifier: workspace:*
+        version: link:../contract
+      '@netpulse/design-system':
+        specifier: workspace:*
+        version: link:../design-system
+      react:
+        specifier: ^18
+        version: 18.3.1
+      react-dom:
+        specifier: ^18
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@types/react':
+        specifier: ^18.3.3
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.0
+        version: 18.3.7(@types/react@18.3.31)
+      typescript:
+        specifier: ^5.4.0
+        version: 5.9.3
 
 packages:
 

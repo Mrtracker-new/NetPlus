@@ -6,7 +6,7 @@
 
 import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
-import { TimeRibbon } from "../viz";
+import { TimeRibbon } from "@netpulse/viz";
 
 export function Timeline() {
   const { feed } = useStore();

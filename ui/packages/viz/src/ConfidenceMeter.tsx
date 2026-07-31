@@ -1,0 +1,30 @@
+import { memo } from "react";
+import type { ReactElement } from "react";
+
+export interface ConfidenceMeterProps {
+  percent: number;
+  qualitative?: string;
+}
+
+/** A calibrated-confidence meter (docs/17 §5). Neutral accent — confidence is not
+ *  severity, so it never uses an alarm color; the qualitative word carries meaning
+ *  alongside the number. */
+export const ConfidenceMeter = memo(function ConfidenceMeter({
+  percent,
+  qualitative,
+}: ConfidenceMeterProps): ReactElement {
+  const p = Math.max(0, Math.min(100, percent));
+  return (
+    <div className="np-viz-conf" role="meter" aria-valuenow={p} aria-valuemin={0} aria-valuemax={100}>
+      <span className="np-viz-conf__track">
+        <span className="np-viz-conf__fill" style={{ width: `${p}%` }} />
+      </span>
+      <span className="np-viz-conf__num">
+        {qualitative ? `${qualitative} · ` : ""}
+        {p}%
+      </span>
+    </div>
+  );
+});
+
+ConfidenceMeter.displayName = "ConfidenceMeter";

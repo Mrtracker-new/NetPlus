@@ -12,9 +12,9 @@
 // it stops under prefers-reduced-motion, while hovering (so a tooltip stays put),
 // while dragging, and when the tab is hidden.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { BreakdownRow } from "@netpulse/contract";
-import { humanBytes, hostSourceLabel, primaryHostName } from "./index";
+import { humanBytes, hostSourceLabel, primaryHostName } from "./utils";
 
 // viewBox geometry (SVG scales to container width; aspect is fixed so the HTML
 // tooltip can map viewBox coords → percentage of the stage box precisely).
@@ -107,13 +107,15 @@ function layout(hosts: BreakdownRow[]): Placed[] {
   return placed;
 }
 
-export function Constellation({
-  hosts,
-  lossIndicators = 0,
-}: {
+export interface ConstellationProps {
   hosts: BreakdownRow[];
   lossIndicators?: number;
-}) {
+}
+
+export const Constellation = memo(function Constellation({
+  hosts,
+  lossIndicators = 0,
+}: ConstellationProps) {
   const reduced = usePrefersReducedMotion();
   const placed = useMemo(() => layout(hosts), [hosts]);
 
@@ -443,4 +445,6 @@ export function Constellation({
       </ul>
     </div>
   );
-}
+});
+
+Constellation.displayName = "Constellation";

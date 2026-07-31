@@ -174,7 +174,7 @@ button {
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--np-t), transform var(--np-t);
-  z-index: 50;
+  z-index: var(--np-z-tooltip);
 }
 .np-nav__item:hover::after {
   opacity: 1;
@@ -1719,7 +1719,7 @@ button {
 }
 .np-ribbon__mark:hover {
   transform: translateY(-50%) rotate(45deg) scale(1.4);
-  z-index: 2;
+  z-index: var(--np-z-elevated);
 }
 .np-ribbon__mark[data-sev="notable"] {
   background: var(--np-notable);
@@ -1975,7 +1975,7 @@ button {
   border: 1px solid var(--np-glass-border);
   box-shadow: var(--np-neu);
   pointer-events: none;
-  z-index: 5;
+  z-index: var(--np-z-sticky);
 }
 .np-cons__tip-host {
   font-weight: var(--np-fw-semibold);

@@ -123,6 +123,17 @@ export interface PacketInspection {
   diagnostics: readonly FieldDiagnostic[];
 }
 
+export interface SessionDiff {
+  sessionIdA: number;
+  sessionIdB: number;
+  rttDeltaMs: number;
+  ttfbDeltaMs: number;
+  protocolShift: string;
+  semanticExplanation: string;
+  confidence: string;
+  evidence: readonly string[];
+}
+
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =
   | { kind: "narrativeFeed"; cards: NarrativeCard[] }
@@ -149,7 +160,7 @@ export type QueryResponse =
   | { kind: "tracerouteResult"; hops: TracerouteHop[] }
   | { kind: "bufferbloatResult"; result: BufferbloatResult }
   | { kind: "decodedPacketInspection"; inspection: PacketInspection }
-  | { kind: "sessionDiff"; diff: any }
+  | { kind: "sessionDiff"; diff: SessionDiff }
   | { kind: "fleetHosts"; hosts: FleetHost[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:

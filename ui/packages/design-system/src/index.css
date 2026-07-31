@@ -2422,6 +2422,24 @@ button {
 }
 
 /* ---- SessionDiff ---- */
+.np-session-diff__desc {
+  color: var(--np-text-dim);
+}
+.np-session-diff__controls {
+  display: flex;
+  gap: var(--np-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.np-session-diff__fieldset {
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: var(--np-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
 .np-session-diff__header {
   display: flex;
   justify-content: space-between;
@@ -2438,4 +2456,39 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--np-3);
+  padding: var(--np-5);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
+}
+.np-session-diff__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--np-3);
+  margin-bottom: var(--np-4);
+}
+.np-session-diff__metric-label {
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-sm);
+  font-weight: var(--np-fw-bold);
+}
+.np-session-diff__metric-val {
+  font-size: var(--np-fs-lg);
+  margin: var(--np-1) 0 0 0;
+}
+.np-session-diff__rtt {
+  color: var(--np-success);
+  font-weight: var(--np-fw-bold);
+}
+.np-session-diff__confidence {
+  color: var(--np-accent-strong);
+}
+.np-session-diff__explanation {
+  padding: var(--np-3);
+  background: var(--np-surface-2);
+  border-radius: var(--np-radius-md);
+  margin: var(--np-3) 0;
+}
+.np-session-diff__evidence {
+  color: var(--np-text-dim);
 }

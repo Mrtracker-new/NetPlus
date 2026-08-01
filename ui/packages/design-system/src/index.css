@@ -107,10 +107,14 @@ button {
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
-  /* Must NOT clip on desktop: hover tooltips sit outside the rail (left: 100%). */
-  overflow: visible;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   min-height: 0;
   flex: none;
+}
+.np-nav::-webkit-scrollbar {
+  display: none;
 }
 .np-nav__brand {
   display: grid;
@@ -154,12 +158,12 @@ button {
   width: 18px;
   height: 18px;
 }
-/* Tooltip label on hover — the rail is icon-only (ref). */
+/* Tooltip label on hover — fixed position escapes overflow-y: auto clipping. */
 .np-nav__item::after {
   content: attr(data-label);
-  position: absolute;
-  left: calc(100% + 10px);
-  top: 50%;
+  position: fixed;
+  left: 74px;
+  margin-top: 17px;
   transform: translateY(-50%) scale(0.96);
   padding: 4px 10px;
   border-radius: var(--np-radius-pill);

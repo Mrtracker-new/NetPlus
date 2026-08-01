@@ -425,7 +425,8 @@ function Shell() {
           <ThemeToggle />
           <LanguageToggle />
         </header>
-        <main>
+        {/* Force remount so entry animation runs on navigation */}
+        <main key={screen}>
           {screen === "dashboard" && <Dashboard />}
           {screen === "journey" && <Journey />}
           {screen === "timeline" && <Timeline />}

@@ -252,6 +252,26 @@ button {
   padding: var(--np-1) var(--np-2) var(--np-6);
   min-width: 0;
   max-width: 100%;
+  animation: np-screen-enter 200ms ease-out both;
+}
+
+@keyframes np-screen-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-main > main {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---- Right context rail ---- */

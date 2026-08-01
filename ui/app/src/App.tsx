@@ -452,8 +452,7 @@ function Shell() {
       <div className="np-main">
         <header className="np-header">
           <span className="np-brand">NetPulse</span>
-          <span className="np-search" aria-hidden="true">
-            <Icon name="search" />
+          <span className="np-screen-indicator" role="status" aria-label={t(`screen_titles.${screen}` as any)}>
             {t(`screen_titles.${screen}` as any)}
           </span>
           <span className="np-header__spacer" />

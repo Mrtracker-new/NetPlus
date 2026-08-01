@@ -267,26 +267,21 @@ button {
   vertical-align: middle;
 }
 
-/* Search affordance to anchor the header. Flexible width. */
-.np-search {
+/* Screen title indicator in the header — breadcrumb anchor. */
+.np-screen-indicator {
   display: inline-flex;
   align-items: center;
   gap: var(--np-2);
   padding: var(--np-2) var(--np-4);
-  width: min(240px, 100%);
   border-radius: var(--np-radius-pill);
   background: var(--np-surface-1);
   box-shadow: var(--np-neu-inset);
   color: var(--np-text-mute);
   font-size: var(--np-fs-sm);
+  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-.np-search svg {
-  width: 15px;
-  height: 15px;
-  flex: none;
 }
 
 .np-header__spacer {
@@ -2335,8 +2330,8 @@ button {
     border-radius: var(--np-radius);
   }
 
-  .np-search {
-    display: none !important; /* Hide decorative search on compact mobile */
+  .np-screen-indicator {
+    display: none !important; /* Hide screen indicator on compact mobile */
   }
 
   .np-capture {

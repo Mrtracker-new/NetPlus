@@ -2150,11 +2150,33 @@ button {
 [data-depth="beginner"] .np-main > main {
   --np-fs-base: 0.94rem;
 }
-[data-depth="expert"] .np-feed {
+
+/* Hide technical readouts, raw hex dumps, stage details, and numeric percentage digits in beginner depth */
+[data-depth="beginner"] .np-finding__technical,
+[data-depth="beginner"] .np-sandbox__hex,
+[data-depth="beginner"] .np-stage__detail,
+[data-depth="beginner"] .np-ref__more,
+[data-depth="beginner"] .np-protocol-debug,
+[data-depth="beginner"] .np-viz-conf__pct,
+[data-depth="beginner"] .np-viz-conf__sep {
+  display: none !important;
+}
+
+/* Expert depth: dense, comprehensive technical data view with compact padding and wide containers */
+[data-depth="expert"] .np-main > main {
+  padding: var(--np-1) var(--np-2) var(--np-4);
   max-width: 100%;
 }
-[data-depth="expert"] .np-main > main {
-  padding: var(--np-1) var(--np-2) var(--np-5);
+
+[data-depth="expert"] .np-feed,
+[data-depth="expert"] .np-apps,
+[data-depth="expert"] .np-journey,
+[data-depth="expert"] .np-security,
+[data-depth="expert"] .np-explorer,
+[data-depth="expert"] .np-diagnostics,
+[data-depth="expert"] .np-sandbox {
+  max-width: 100%;
+  width: 100%;
 }
 
 /* Respect reduced-motion (docs/16 §perf, accessibility). */

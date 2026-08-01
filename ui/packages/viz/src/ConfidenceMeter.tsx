@@ -20,8 +20,9 @@ export const ConfidenceMeter = memo(function ConfidenceMeter({
         <span className="np-viz-conf__fill" style={{ width: `${p}%` }} />
       </span>
       <span className="np-viz-conf__num">
-        {qualitative ? `${qualitative} · ` : ""}
-        {p}%
+        {qualitative && <span className="np-viz-conf__qualitative">{qualitative}</span>}
+        {qualitative && <span className="np-viz-conf__sep"> · </span>}
+        <span className="np-viz-conf__pct">{p}%</span>
       </span>
     </div>
   );

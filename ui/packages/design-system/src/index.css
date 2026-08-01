@@ -1283,6 +1283,7 @@ button {
 }
 .np-assistant__text {
   color: var(--np-text);
+  white-space: pre-line;
 }
 .np-assistant__disclosure {
   margin-top: var(--np-3);

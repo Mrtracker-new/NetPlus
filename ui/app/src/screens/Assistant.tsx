@@ -38,7 +38,7 @@ function AnswerView({ answer }: { answer: AssistantAnswer }) {
         )}
       </div>
 
-      <p className="np-assistant__text" style={{ whiteSpace: "pre-line" }}>
+      <p className="np-assistant__text">
         {answer.text}
       </p>
 

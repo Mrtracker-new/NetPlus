@@ -40,7 +40,11 @@ export type IconName =
   | "sun"
   | "moon"
   | "search"
-  | "brand";
+  | "brand"
+  | "diagnostics"
+  | "sandbox"
+  | "fleet"
+  | "compare";
 
 const PATHS: Record<IconName, ReactElement> = {
   dashboard: (
@@ -151,6 +155,40 @@ const PATHS: Record<IconName, ReactElement> = {
   brand: (
     <>
       <path d="M3 12h4l2-5 4 10 2-5h6" />
+    </>
+  ),
+  diagnostics: (
+    <>
+      <path d="M6 3v6a6 6 0 0 0 12 0V3" />
+      <path d="M12 15v2a3 3 0 0 0 3 3h2" />
+      <circle cx="19" cy="20" r="1.5" />
+      <path d="M4.5 3h3M16.5 3h3" />
+    </>
+  ),
+  sandbox: (
+    <>
+      <path d="M9 3h6" />
+      <path d="M10 3v4.5l-5.2 8.8A2 2 0 0 0 6.5 19.5h11a2 2 0 0 0 1.7-3.2L14 7.5V3" />
+      <path d="M8.5 14h7" />
+    </>
+  ),
+  fleet: (
+    <>
+      <rect x="3" y="3" width="18" height="5" rx="1.5" />
+      <rect x="3" y="9.5" width="18" height="5" rx="1.5" />
+      <rect x="3" y="16" width="18" height="5" rx="1.5" />
+      <circle cx="6" cy="5.5" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="12" r="0.75" fill="currentColor" stroke="none" />
+      <circle cx="6" cy="18.5" r="0.75" fill="currentColor" stroke="none" />
+      <path d="M10 5.5h5M10 12h5M10 18.5h5" />
+    </>
+  ),
+  compare: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M12 4v16" />
+      <path d="M9 10l-2 2 2 2" />
+      <path d="M15 10l2 2-2 2" />
     </>
   ),
 };

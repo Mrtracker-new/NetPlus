@@ -11,7 +11,7 @@ import type { SecurityFinding } from "@netpulse/contract";
 import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
-import { ConfidenceMeter } from "@netpulse/viz";
+import { ConfidenceMeter, IncidentTimelineViz } from "@netpulse/viz";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function toErrorMessage(e: unknown): string {
@@ -93,6 +93,7 @@ function FindingCard({
 
 export function Security() {
   const { depth } = useDisclosure();
+  const { navigateToEvidence } = useEvidenceNavigation();
   const [findings, setFindings] = useState<SecurityFinding[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -149,6 +150,8 @@ export function Security() {
               </div>
             ))}
           </div>
+
+          <IncidentTimelineViz findings={findings} onNavigateEvidence={navigateToEvidence} />
 
           {findings.map((f) => {
             const k = keyOf(f);

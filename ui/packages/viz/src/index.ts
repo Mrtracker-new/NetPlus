@@ -22,6 +22,9 @@ export type { ConfidenceMeterProps } from "./ConfidenceMeter";
 export { Constellation } from "./Constellation";
 export type { ConstellationProps } from "./Constellation";
 
+export { IncidentTimelineViz } from "./IncidentTimeline";
+export type { IncidentTimelineVizProps } from "./IncidentTimeline";
+
 export {
   hostSourceRank,
   hostSourceLabel,

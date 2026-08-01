@@ -114,7 +114,8 @@ function ModeSwitch() {
 // capture indicator is mandatory). Observe-only: this starts/stops a read-only
 // frame stream, never touching traffic (docs/01 X1). The picker chooses an
 // adapter; id 0 = "Default adapter", which the platform backend resolves.
-function CaptureControl() {
+function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) {
+  const { t } = useTranslation("common");
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,9 +143,11 @@ function CaptureControl() {
     setError(null);
     try {
       if (running) {
+        onAnnounce?.(t("capture.stopped_announcement"));
         await command({ kind: "stopCapture", iface_id: ifaceId });
         setRunning(false);
       } else {
+        onAnnounce?.(t("capture.capturing_announcement"));
         await command({ kind: "startCapture", iface_id: ifaceId });
         setRunning(true);
       }
@@ -163,10 +166,10 @@ function CaptureControl() {
         className="np-capture__iface"
         value={ifaceId}
         disabled={running || busy}
-        aria-label="Capture interface"
+        aria-label={t("capture.select_adapter")}
         onChange={(e) => setIfaceId(Number(e.target.value))}
       >
-        <option value={0}>Default adapter</option>
+        <option value={0}>{t("capture.default_adapter")}</option>
         {interfaces.map((i) => (
           <option key={i.id} value={i.id}>
             {i.description ?? i.name}
@@ -174,11 +177,14 @@ function CaptureControl() {
         ))}
       </select>
       <button
+        type="button"
+        aria-pressed={running}
+        aria-live="polite"
         className={running ? "np-btn np-capture__btn--live" : "np-btn np-btn--primary"}
         onClick={toggle}
         disabled={busy}
       >
-        {busy ? "…" : running ? "Stop capture" : "Start capture"}
+        {busy ? "…" : running ? t("actions.stop_capture") : t("actions.start_capture")}
       </button>
       {error && (
         <span className="np-capture__err" role="status" title={error}>
@@ -228,6 +234,7 @@ function LanguageToggle() {
 }
 
 function CapabilityCard() {
+  const { t } = useTranslation("common");
   const [handshake, setHandshake] = useState<{
     apiVersion: number;
     hostVersion: number;
@@ -285,7 +292,7 @@ function CapabilityCard() {
 
   return (
     <section className="np-rail-card np-capability-card">
-      <h2 className="np-rail-card__title">Capability Registry & System</h2>
+      <h2 className="np-rail-card__title">{t("rail.capability_registry")}</h2>
       <ul className="np-rail-list" style={{ marginBottom: "0.5rem" }}>
         <li>
           API Version
@@ -330,8 +337,9 @@ function CapabilityCard() {
 }
 
 // The right context rail — real NetPulse content only (docs honesty: no invented
-// users/resources). Capture status, the top observed hosts, and quick controls.
+// users/resources). Capture status, top observed hosts, and quick controls.
 function RightRail() {
+  const { t } = useTranslation("common");
   const { monitor, feed } = useStore();
   const hosts = monitor
     ? [...monitor.by_host.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6)
@@ -341,31 +349,31 @@ function RightRail() {
   return (
     <aside className="np-rail-right" aria-label="Context">
       <section className="np-rail-card">
-        <h2 className="np-rail-card__title">This session</h2>
+        <h2 className="np-rail-card__title">{t("rail.this_session")}</h2>
         <ul className="np-rail-list">
           <li>
-            Hosts observed
+            {t("rail.hosts_observed")}
             <span className="np-rail-list__val">{monitor?.by_host.rows.length ?? 0}</span>
           </li>
           <li>
-            Active flows
+            {t("rail.active_flows")}
             <span className="np-rail-list__val">{totalFlows}</span>
           </li>
           <li>
-            Narrative cards
+            {t("rail.narrative_cards")}
             <span className="np-rail-list__val">{feed.length}</span>
           </li>
           <li>
-            Capture drops
+            {t("rail.capture_drops")}
             <span className="np-rail-list__val">{monitor?.capture_drops ?? 0}</span>
           </li>
         </ul>
       </section>
 
       <section className="np-rail-card">
-        <h2 className="np-rail-card__title">Top hosts</h2>
+        <h2 className="np-rail-card__title">{t("rail.top_hosts")}</h2>
         {hosts.length === 0 ? (
-          <p className="np-cons__hint">Quiet — no hosts yet.</p>
+          <p className="np-cons__hint">{t("rail.quiet_no_hosts")}</p>
         ) : (
           <ul className="np-rail-list">
             {hosts.map((h) => {
@@ -378,8 +386,6 @@ function RightRail() {
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
                     }}
-                    // The raw IP is always available on hover, even when a name
-                    // is foregrounded — the address stays the source of truth.
                     title={nm ? `${nm.name} · ${h.label}` : h.label}
                   >
                     {nm ? nm.name : h.label}
@@ -393,7 +399,7 @@ function RightRail() {
       </section>
 
       <section className="np-rail-card">
-        <h2 className="np-rail-card__title">View density</h2>
+        <h2 className="np-rail-card__title">{t("rail.view_density")}</h2>
         <ModeSwitch />
       </section>
 
@@ -405,15 +411,18 @@ function RightRail() {
 function Shell() {
   const { screen, setScreen } = useEvidenceNavigation();
   const { t } = useTranslation("common");
-  // The data pump: feeds the client store from the engine (feed + monitor), and
-  // subscribes to live capture deltas when running in Tauri.
+  const [announcement, setAnnouncement] = useState("");
+
   useLiveData();
-  // Disclosure mode drives visual density via the [data-depth] CSS hook
-  // (docs/09 §6.3): beginners get roomier type, experts get compact data.
   const { depth } = useDisclosure();
 
   return (
     <div className="np-app" data-depth={depth}>
+      {/* Top-level dedicated ARIA Live Region for accessibility announcements */}
+      <div className="np-sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
       <nav className="np-nav" aria-label="Primary navigation">
         <div className="np-nav__brand" title="NetPulse">
           <Icon name="brand" />
@@ -460,7 +469,7 @@ function Shell() {
             {t(`screen_titles.${screen}` as any)}
           </span>
           <span className="np-header__spacer" />
-          <CaptureControl />
+          <CaptureControl onAnnounce={setAnnouncement} />
           <ThemeToggle />
           <LanguageToggle />
         </header>
@@ -500,4 +509,3 @@ export function App() {
     </DisclosureProvider>
   );
 }
-

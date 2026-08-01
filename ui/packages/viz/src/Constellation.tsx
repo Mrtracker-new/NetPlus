@@ -6,8 +6,9 @@
 // nodes, you, hud, tooltip. SVG attributes mutate via refs in a single 60fps
 // requestAnimationFrame loop to maintain zero-runtime-dep 60fps GPU performance.
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
-import type { BreakdownRow } from "@netpulse/contract";
+import { memo, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState } from "react";
+import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
+import { EvidenceChips } from "@netpulse/components";
 import { humanBytes, hostSourceLabel, primaryHostName } from "./utils";
 
 const W = 720;
@@ -118,7 +119,7 @@ function layout(hosts: BreakdownRow[]): Placed[] {
     const ordered = [...rows].sort((a, b) => hashStr(a.label) - hashStr(b.label));
     ordered.forEach((row, j) => {
       const angle = (j / Math.max(n, 1)) * Math.PI * 2 + ring * 0.5;
-      // Elegant node dot radius: 5.5px to 10.5px
+      // Node dot radius: 5.5px to 10.5px
       const size = 5.5 + Math.sqrt(row.bytes / maxBytes) * 5;
       placed.push({
         key: row.label,
@@ -139,14 +140,58 @@ function layout(hosts: BreakdownRow[]): Placed[] {
 export interface ConstellationProps {
   hosts: BreakdownRow[];
   lossIndicators?: number;
+  onNavigate?: (ref: EvidenceRef, source?: any) => void;
+}
+
+interface InteractionState {
+  playing: boolean;
+  hovered: number | null;
+  selected: string | null;
+}
+
+type InteractionAction =
+  | { type: "TOGGLE_PLAYING" }
+  | { type: "SET_HOVERED"; index: number | null }
+  | { type: "TOGGLE_SELECT"; key: string }
+  | { type: "CLEAR_SELECT" };
+
+function interactionReducer(state: InteractionState, action: InteractionAction): InteractionState {
+  switch (action.type) {
+    case "TOGGLE_PLAYING":
+      return { ...state, playing: !state.playing };
+    case "SET_HOVERED":
+      return { ...state, hovered: action.index };
+    case "TOGGLE_SELECT":
+      return { ...state, selected: state.selected === action.key ? null : action.key };
+    case "CLEAR_SELECT":
+      return { ...state, selected: null };
+    default:
+      return state;
+  }
 }
 
 export const Constellation = memo(function Constellation({
   hosts,
   lossIndicators = 0,
+  onNavigate,
 }: ConstellationProps) {
+  const baseId = useId().replace(/:/g, "_");
+  const gridId = `np-cyber-grid-${baseId}`;
+  const maskId = `np-grid-mask-${baseId}`;
+  const fadeId = `np-grid-fade-${baseId}`;
+  const youGradId = `np-cons-you-${baseId}`;
+
   const reduced = usePrefersReducedMotion();
   const placed = useMemo(() => layout(hosts), [hosts]);
+
+  // Reducer for interaction state
+  const [state, dispatch] = useReducer(interactionReducer, {
+    playing: true,
+    hovered: null,
+    selected: null,
+  });
+
+  const { playing, hovered, selected } = state;
 
   // Imperative animation state refs
   const nodeRefs = useRef<Array<SVGGElement | null>>([]);
@@ -159,10 +204,13 @@ export const Constellation = memo(function Constellation({
   const draggingRef = useRef(false);
   const dragRef = useRef<{ startX: number; startRot: number } | null>(null);
 
-  // React state
-  const [playing, setPlaying] = useState(true);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [selected, setSelected] = useState<string | null>(null);
+  // Clean up stale refs when placed length changes
+  useEffect(() => {
+    nodeRefs.current.splice(placed.length);
+    arcRefs.current.splice(placed.length);
+    packetRefs.current.splice(placed.length);
+    posRef.current.splice(placed.length);
+  }, [placed.length]);
 
   // Reveal effect for newly observed hosts
   const prevKeys = useRef<Set<string>>(new Set());
@@ -171,12 +219,13 @@ export const Constellation = memo(function Constellation({
     for (const p of placed) if (!prevKeys.current.has(p.key)) fresh.add(p.key);
     return fresh;
   }, [placed]);
+
   useEffect(() => {
     prevKeys.current = new Set(placed.map((p) => p.key));
   }, [placed]);
 
   // Paint single frame
-  function paint(rot: number, phase: number) {
+  const paint = useCallback((rot: number, phase: number) => {
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i]!;
       const a = p.angle + rot;
@@ -197,13 +246,12 @@ export const Constellation = memo(function Constellation({
         }
       }
     }
-  }
+  }, [placed, reduced]);
 
   // Paint initial layout frame
   useEffect(() => {
     paint(rotationRef.current, phaseRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, reduced]);
+  }, [placed, reduced, paint]);
 
   // Animation loop with rAF
   useEffect(() => {
@@ -226,38 +274,43 @@ export const Constellation = memo(function Constellation({
 
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placed, reduced, playing]);
+  }, [placed, reduced, playing, paint]);
 
   // Pointer drag to rotate
-  function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
+  const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     draggingRef.current = true;
     dragRef.current = { startX: e.clientX, startRot: rotationRef.current };
-    e.currentTarget.setPointerCapture(e.pointerId);
-  }
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+  }, []);
 
-  function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
+  const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!draggingRef.current || !dragRef.current) return;
     const dx = e.clientX - dragRef.current.startX;
     rotationRef.current = dragRef.current.startRot + dx * 0.005;
     paint(rotationRef.current, phaseRef.current);
-  }
+  }, [paint]);
 
-  function onPointerUp(e: React.PointerEvent<SVGSVGElement>) {
+  const onPointerUp = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     draggingRef.current = false;
     dragRef.current = null;
     e.currentTarget.releasePointerCapture?.(e.pointerId);
-  }
+  }, []);
 
-  function host(i: number) {
+  const hostHover = useCallback((i: number) => {
     hoveredRef.current = true;
-    setHovered(i);
-  }
+    dispatch({ type: "SET_HOVERED", index: i });
+  }, []);
 
-  function unhost() {
+  const hostLeave = useCallback(() => {
     hoveredRef.current = false;
-    setHovered(null);
-  }
+    dispatch({ type: "SET_HOVERED", index: null });
+  }, []);
+
+  const handleNavigateEvidence = useCallback((ref: EvidenceRef) => {
+    if (onNavigate) {
+      onNavigate(ref, "constellation");
+    }
+  }, [onNavigate]);
 
   const selectedPlaced = placed.find((p) => p.key === selected) ?? null;
   const tip = hovered != null ? placed[hovered] : null;
@@ -278,20 +331,20 @@ export const Constellation = memo(function Constellation({
           onPointerLeave={onPointerUp}
         >
           <defs>
-            <pattern id="np-cyber-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+            <pattern id={gridId} width="32" height="32" patternUnits="userSpaceOnUse">
               <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(47, 224, 214, 0.1)" strokeWidth="0.8" />
               <circle cx="0" cy="0" r="1" fill="rgba(47, 224, 214, 0.2)" />
             </pattern>
-            <radialGradient id="np-grid-fade" cx="50%" cy="50%" r="50%">
+            <radialGradient id={fadeId} cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#fff" stopOpacity="0.85" />
               <stop offset="60%" stopColor="#fff" stopOpacity="0.4" />
               <stop offset="100%" stopColor="#fff" stopOpacity="0.12" />
             </radialGradient>
-            <mask id="np-grid-mask">
-              <rect width={W} height={H} fill="url(#np-grid-fade)" />
+            <mask id={maskId}>
+              <rect width={W} height={H} fill={`url(#${fadeId})`} />
             </mask>
 
-            <radialGradient id="np-cons-you" cx="50%" cy="50%" r="50%">
+            <radialGradient id={youGradId} cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#5cf0e7" />
               <stop offset="100%" stopColor="#2fe0d6" />
             </radialGradient>
@@ -303,11 +356,11 @@ export const Constellation = memo(function Constellation({
           </g>
 
           {/* Layer 2: Cyber Grid Layer (Faded towards edges) */}
-          <g className="np-cons__layer-grid" mask="url(#np-grid-mask)">
-            <rect width={W} height={H} fill="url(#np-cyber-grid)" />
+          <g className="np-cons__layer-grid" mask={`url(#${maskId})`}>
+            <rect width={W} height={H} fill={`url(#${gridId})`} />
           </g>
 
-          {/* Layer 3: Radar Layer (Rings + 15s Continuous 360° GPU Radar Sweep Cone) */}
+          {/* Layer 3: Radar Layer (Rings + Continuous Radar Sweep Cone) */}
           <g className="np-cons__layer-radar">
             {!quiet &&
               RINGS.map((r) => <circle key={r} className="np-cons__ring" cx={CX} cy={CY} r={r} />)}
@@ -327,7 +380,7 @@ export const Constellation = memo(function Constellation({
             )}
           </g>
 
-          {/* Layer 4: Link Layer (Data Beams with Logarithmic Width & Status Colors) */}
+          {/* Layer 4: Link Layer (Data Beams) */}
           <g className="np-cons__layer-links">
             {placed.map((p, i) => {
               const isHov = hovered === i;
@@ -354,7 +407,7 @@ export const Constellation = memo(function Constellation({
             })}
           </g>
 
-          {/* Layer 5: Packet Layer (rAF Driven Traveling Pulse Dots) */}
+          {/* Layer 5: Packet Layer */}
           <g className="np-cons__layer-packets">
             {placed.map((p, i) => {
               const isHov = hovered === i;
@@ -378,7 +431,7 @@ export const Constellation = memo(function Constellation({
             })}
           </g>
 
-          {/* Layer 6: Node Layer (Multi-layer Halos + Explicit Vibrant Inline Style Node Dots) */}
+          {/* Layer 6: Node Layer (Keyboard & Mouse Accessible) */}
           <g className="np-cons__layer-nodes">
             {placed.map((p, i) => {
               const x0 = CX + Math.cos(p.angle) * p.radius;
@@ -388,25 +441,36 @@ export const Constellation = memo(function Constellation({
               const isDimmed =
                 (hovered != null && !isHov) || (selected != null && !isSel && hovered == null);
               const nodeColor = getStatusColor(p.semanticStatus);
+              const hostNameStr = primaryHostName(p.row)?.name ?? p.row.label;
+
               return (
                 <g
                   key={`node-${p.key}`}
                   ref={(el) => {
                     nodeRefs.current[i] = el;
                   }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Host ${hostNameStr}, ${humanBytes(p.row.bytes)}, ${p.semanticStatus}`}
                   className={`np-cons__node ${isHov ? "np-cons__node--hovered" : ""} ${
                     isSel ? "np-cons__node--selected" : ""
                   } ${isDimmed ? "np-cons__node--dimmed" : ""}`}
                   transform={`translate(${x0} ${y0})`}
-                  onMouseEnter={() => host(i)}
-                  onMouseLeave={unhost}
-                  onClick={() => setSelected(isSel ? null : p.key)}
+                  onMouseEnter={() => hostHover(i)}
+                  onMouseLeave={hostLeave}
+                  onClick={() => dispatch({ type: "TOGGLE_SELECT", key: p.key })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      dispatch({ type: "TOGGLE_SELECT", key: p.key });
+                    }
+                  }}
                 >
                   <g className={revealSet.has(p.key) ? "np-cons__node-in--reveal" : undefined}>
                     {/* Hover & Selection rings */}
                     <circle className="np-cons__node-halo" r={p.size + 6} stroke={nodeColor} />
                     {isSel && <circle className="np-cons__node-halo-outer" r={p.size + 10} stroke={nodeColor} />}
-                    {/* Core Vibrant Node Dot with explicit inline style override */}
+                    {/* Core Node Dot */}
                     <circle
                       className={`np-cons__node-dot np-cons__node-dot--${p.semanticStatus}`}
                       r={isSel ? p.size + 2 : p.size}
@@ -417,7 +481,7 @@ export const Constellation = memo(function Constellation({
                       }}
                     />
                     <text className="np-cons__node-label" y={p.size + 11}>
-                      {truncate(primaryHostName(p.row)?.name ?? p.row.label)}
+                      {truncate(hostNameStr)}
                     </text>
                   </g>
                 </g>
@@ -425,7 +489,7 @@ export const Constellation = memo(function Constellation({
             })}
           </g>
 
-          {/* Layer 7: Center YOU Layer (Dual-layer Breathing Glow + Heartbeat Wave) */}
+          {/* Layer 7: Center YOU Layer */}
           <g className="np-cons__layer-you">
             <circle className="np-cons__you-breath" cx={CX} cy={CY} r={YOU_R + 8} />
             {!reduced && <circle className="np-cons__you-heartbeat" cx={CX} cy={CY} r={YOU_R} />}
@@ -441,7 +505,7 @@ export const Constellation = memo(function Constellation({
             </text>
           </g>
 
-          {/* Layer 8: HUD Layer (Corner Brackets + Cardinal Degree Ticks) */}
+          {/* Layer 8: HUD Layer */}
           <g className="np-cons__layer-hud" pointerEvents="none">
             <path d="M 14 26 L 14 14 L 26 14" fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
             <path d={`M ${W - 26} 14 L ${W - 14} 14 L ${W - 14} 26`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
@@ -455,7 +519,7 @@ export const Constellation = memo(function Constellation({
           </g>
         </svg>
 
-        {/* Layer 9: Cyber HUD Tooltip Panel */}
+        {/* Layer 9: Tooltip Panel */}
         {tip && tipPos && (
           <div
             className="np-cons__tip"
@@ -527,34 +591,56 @@ export const Constellation = memo(function Constellation({
           <button
             type="button"
             className="np-cons__pause-btn"
-            onClick={() => setPlaying((v) => !v)}
+            onClick={() => dispatch({ type: "TOGGLE_PLAYING" })}
             aria-pressed={!playing}
           >
             {playing ? "Pause" : "Play"}
           </button>
         )}
-        <span className="np-cons__hint">drag to rotate · hover a host · click to pin</span>
+        <span className="np-cons__hint">drag to rotate · hover a host · click/press Enter to pin</span>
       </div>
 
-      {/* Pinned detail panel */}
+      {/* Pinned Detail Panel with Interactive EvidenceChips */}
       {selectedPlaced && (
-        <div className="np-loss" style={{ marginTop: "var(--np-3)" }}>
-          {(() => {
-            const nm = primaryHostName(selectedPlaced.row);
-            return nm ? (
-              <span>
-                host: {nm.name} <span className="np-cons__tip-src">({selectedPlaced.row.label} · {hostSourceLabel(nm.source)})</span>
-              </span>
-            ) : (
-              <span>host: {selectedPlaced.row.label}</span>
-            );
-          })()}
-          <span>{humanBytes(selectedPlaced.row.bytes)}</span>
-          <span>{selectedPlaced.row.flows} flows</span>
-          <span>{selectedPlaced.row.evidence.length} evidence</span>
-          <span className={`np-cons__status np-cons__status--${selectedPlaced.semanticStatus}`}>
-            {selectedPlaced.semanticStatus}
-          </span>
+        <div className="np-loss" style={{ marginTop: "var(--np-3)", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            {(() => {
+              const nm = primaryHostName(selectedPlaced.row);
+              return nm ? (
+                <span>
+                  <strong>Host:</strong> {nm.name} <span className="np-cons__tip-src">({selectedPlaced.row.label} · {hostSourceLabel(nm.source)})</span>
+                </span>
+              ) : (
+                <span><strong>Host:</strong> {selectedPlaced.row.label}</span>
+              );
+            })()}
+            <button
+              type="button"
+              className="np-btn np-btn--ghost"
+              style={{ fontSize: "0.75rem", padding: "0.1rem 0.4rem" }}
+              onClick={() => dispatch({ type: "CLEAR_SELECT" })}
+            >
+              Close
+            </button>
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", fontSize: "0.85rem" }}>
+            <span>Traffic: <b>{humanBytes(selectedPlaced.row.bytes)}</b></span>
+            <span>Flows: <b>{selectedPlaced.row.flows}</b></span>
+            <span className={`np-cons__status np-cons__status--${selectedPlaced.semanticStatus}`}>
+              Status: <b>{selectedPlaced.semanticStatus}</b>
+            </span>
+          </div>
+
+          {selectedPlaced.row.evidence.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <span style={{ fontSize: "0.8rem", color: "var(--np-text-mute)" }}>Evidence:</span>
+              <EvidenceChips
+                evidence={selectedPlaced.row.evidence}
+                onNavigate={handleNavigateEvidence}
+              />
+            </div>
+          )}
         </div>
       )}
 

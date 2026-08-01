@@ -47,8 +47,8 @@
     "compare": "Session Compare"
   },
   "actions": {
-    "start_capture": "Start Capture",
-    "stop_capture": "Stop Capture",
+    "start_capture": "Start capture",
+    "stop_capture": "Stop capture",
     "export_data": "Export Data",
     "refresh": "Refresh",
     "enable": "Enable",
@@ -64,9 +64,31 @@
     "healthy": "Healthy",
     "degraded": "Degraded",
     "unhealthy": "Unhealthy",
-    "capturing": "Capturing",
+    "capturing": "Capturing...",
+    "stopped": "Stopped",
+    "initializing": "Initializing...",
     "idle": "Idle",
     "unknown": "Unknown"
+  },
+  "rail": {
+    "this_session": "This session",
+    "top_hosts": "Top hosts",
+    "view_density": "View density",
+    "capability_registry": "Capability Registry & System",
+    "hosts_observed": "Hosts observed",
+    "active_flows": "Active flows",
+    "narrative_cards": "Narrative cards",
+    "capture_drops": "Capture drops",
+    "duration": "Duration",
+    "adapter": "Adapter",
+    "quiet_no_hosts": "Quiet — no hosts yet."
+  },
+  "capture": {
+    "default_adapter": "Default adapter",
+    "select_adapter": "Capture interface",
+    "capturing_announcement": "Live network capture started.",
+    "stopped_announcement": "Network capture stopped.",
+    "initializing_announcement": "Initializing capture driver..."
   },
   "depth": {
     "beginner": "Beginner",

@@ -47,8 +47,8 @@
     "compare": "Comparativa de Sesiones"
   },
   "actions": {
-    "start_capture": "Iniciar Captura",
-    "stop_capture": "Detener Captura",
+    "start_capture": "Iniciar captura",
+    "stop_capture": "Detener captura",
     "export_data": "Exportar Datos",
     "refresh": "Actualizar",
     "enable": "Habilitar",
@@ -64,9 +64,31 @@
     "healthy": "Saludable",
     "degraded": "Degradado",
     "unhealthy": "No Saludable",
-    "capturing": "Capturando",
+    "capturing": "Capturando...",
+    "stopped": "Detenido",
+    "initializing": "Inicializando...",
     "idle": "Inactivo",
     "unknown": "Desconocido"
+  },
+  "rail": {
+    "this_session": "Esta sesión",
+    "top_hosts": "Principales hosts",
+    "view_density": "Densidad de vista",
+    "capability_registry": "Registro de capacidades y sistema",
+    "hosts_observed": "Hosts observados",
+    "active_flows": "Flujos activos",
+    "narrative_cards": "Tarjetas narrativas",
+    "capture_drops": "Paquetes descartados",
+    "duration": "Duración",
+    "adapter": "Adaptador",
+    "quiet_no_hosts": "Tranquilo — aún no hay hosts."
+  },
+  "capture": {
+    "default_adapter": "Adaptador predeterminado",
+    "select_adapter": "Interfaz de captura",
+    "capturing_announcement": "Captura de red en vivo iniciada.",
+    "stopped_announcement": "Captura de red detenida.",
+    "initializing_announcement": "Inicializando controlador de captura..."
   },
   "depth": {
     "beginner": "Principiante",

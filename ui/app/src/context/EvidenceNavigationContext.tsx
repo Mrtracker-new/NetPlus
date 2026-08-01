@@ -27,11 +27,20 @@ export type NavigationTarget =
   | { screen: "timeline"; packetId?: number; timestamp?: number }
   | null;
 
+export type NavigationSource =
+  | "dashboard"
+  | "constellation"
+  | "timeline"
+  | "compare"
+  | "sandbox"
+  | "feed"
+  | "kpi";
+
 export interface EvidenceNavigationContextValue {
   screen: Screen;
   navigationTarget: NavigationTarget;
   setScreen: (screen: Screen) => void;
-  navigateToEvidence: (ref: EvidenceRef) => void;
+  navigateToEvidence: (ref: EvidenceRef, source?: NavigationSource) => void;
   clearNavigationTarget: () => void;
 }
 
@@ -46,7 +55,7 @@ export function EvidenceNavigationProvider({ children }: { children: ReactNode }
     setNavigationTarget(null);
   }, []);
 
-  const navigateToEvidence = useCallback((ref: EvidenceRef) => {
+  const navigateToEvidence = useCallback((ref: EvidenceRef, _source?: NavigationSource) => {
     if (!ref || typeof ref !== "object" || !("kind" in ref)) {
       return;
     }

@@ -1,10 +1,24 @@
 {
   "title": "Network Dashboard",
+  "hero_subtitle": "A live, honest picture of what this device is talking to — nothing invented.",
   "live_traffic": "Live Traffic Stream",
+  "hosts_observed": "Hosts Observed",
   "active_flows": "Active Flows",
   "active_sessions": "Active Sessions",
   "total_bytes": "Total Bytes Processed",
+  "narrative_cards": "Narrative Cards",
   "packets_captured": "Packets Captured",
   "capture_drops": "Capture Drops",
-  "no_traffic": "No traffic captured yet. Click Start Capture to begin."
+  "whats_happening": "What's happening",
+  "no_traffic": "Quiet — no active hosts yet. Start a capture to see who this device talks to.",
+  "loading_snapshot": "Loading network snapshot...",
+  "error_driver_missing_title": "Npcap Driver Missing",
+  "error_driver_missing_desc": "Packet capture driver is not installed on this system.",
+  "error_permission_title": "Permission Denied",
+  "error_permission_desc": "Administrator privileges are required to open raw capture sockets.",
+  "error_backend_disconnected_title": "Backend Disconnected",
+  "error_backend_disconnected_desc": "Unable to communicate with the NetPulse engine daemon.",
+  "error_adapter_lost_title": "Adapter Disconnected",
+  "error_adapter_lost_desc": "Selected network interface is no longer available.",
+  "retry_connection": "Retry Connection"
 }

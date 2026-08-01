@@ -1,10 +1,24 @@
 {
   "title": "Panel Principal de Red",
+  "hero_subtitle": "Una imagen en vivo y honesta de con qué se comunica este dispositivo: nada inventado.",
   "live_traffic": "Flujo de Tráfico en Vivo",
+  "hosts_observed": "Hosts Observados",
   "active_flows": "Flujos Activos",
   "active_sessions": "Sesiones Activas",
   "total_bytes": "Bytes Totales Procesados",
+  "narrative_cards": "Tarjetas Narrativas",
   "packets_captured": "Paquetes Capturados",
   "capture_drops": "Paquetes Descartados",
-  "no_traffic": "Aún no hay tráfico capturado. Haga clic en Iniciar Captura para comenzar."
+  "whats_happening": "¿Qué está pasando?",
+  "no_traffic": "Tranquilo — aún no hay hosts activos. Inicia una captura para ver con quién habla este dispositivo.",
+  "loading_snapshot": "Cargando captura de red...",
+  "error_driver_missing_title": "Controlador Npcap no encontrado",
+  "error_driver_missing_desc": "El controlador de captura de paquetes no está instalado en este sistema.",
+  "error_permission_title": "Permiso Denegado",
+  "error_permission_desc": "Se requieren privilegios de administrador para abrir el socket de captura.",
+  "error_backend_disconnected_title": "Motor Desconectado",
+  "error_backend_disconnected_desc": "No se puede comunicar con el motor daemon de NetPulse.",
+  "error_adapter_lost_title": "Adaptador Desconectado",
+  "error_adapter_lost_desc": "La interfaz de red seleccionada ya no está disponible.",
+  "retry_connection": "Reintentar Conexión"
 }

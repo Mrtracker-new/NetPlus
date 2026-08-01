@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { LessonOffer } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
@@ -110,7 +110,15 @@ export function Learn() {
   }, [feed, depth]);
 
   if (!loaded) {
-    return <Spinner />;
+    return (
+      <section className="np-learn" aria-label="Lessons loading" aria-busy="true">
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Skeleton height={120} width="100%" />
+          <Skeleton height={120} width="100%" />
+          <Skeleton height={120} width="100%" />
+        </div>
+      </section>
+    );
   }
 
   return (

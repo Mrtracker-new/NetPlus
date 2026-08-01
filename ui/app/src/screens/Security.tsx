@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { SecurityFinding } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { ConfidenceMeter, IncidentTimelineViz } from "@netpulse/viz";
@@ -121,7 +121,20 @@ export function Security() {
   }
 
   if (!loaded) {
-    return <Spinner />;
+    return (
+      <section className="np-security" aria-label="Security findings loading" aria-busy="true">
+        <div className="np-kpis" style={{ marginBottom: "1.5rem" }}>
+          <Skeleton height={70} width="100%" />
+          <Skeleton height={70} width="100%" />
+          <Skeleton height={70} width="100%" />
+          <Skeleton height={70} width="100%" />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Skeleton height={150} width="100%" />
+          <Skeleton height={150} width="100%" />
+        </div>
+      </section>
+    );
   }
 
   const byCat = (c: SecurityFinding["category"]) =>

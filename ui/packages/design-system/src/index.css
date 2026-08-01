@@ -2499,3 +2499,59 @@ button {
   width: auto;
   padding: 0 var(--np-radius-xs);
 }
+
+/* ============================ Skeleton Loading Placeholders ============================ */
+.np-skeleton {
+  display: block;
+  background-color: var(--np-surface-2);
+  border-radius: var(--np-radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.np-skeleton--text {
+  height: 1em;
+  border-radius: var(--np-radius-sm);
+}
+
+.np-skeleton--circular {
+  border-radius: 50%;
+}
+
+.np-skeleton--rectangular {
+  border-radius: 0;
+}
+
+.np-skeleton--rounded {
+  border-radius: var(--np-radius-md);
+}
+
+.np-skeleton--animated::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--np-surface-3) 50%,
+    transparent 100%
+  );
+  animation: np-shimmer 1.8s infinite;
+}
+
+@keyframes np-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-skeleton--animated::after {
+    animation: none;
+  }
+}
+

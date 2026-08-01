@@ -6,4 +6,5 @@ export * from "./Card";
 export * from "./Badge";
 export * from "./Input";
 export * from "./ConfirmDialog";
+export * from "./Skeleton";
 export { cn } from "./utils/cn";

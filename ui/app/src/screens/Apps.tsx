@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Attribution, AttributionConfidence } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { query } from "../ipc";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
@@ -67,7 +67,16 @@ export function Apps() {
   }, [feed, targetFlowId]);
 
   if (!loaded) {
-    return <Spinner />;
+    return (
+      <section className="np-apps" aria-label="Applications loading" aria-busy="true">
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", width: "100%" }}>
+          <Skeleton height={42} width="100%" />
+          <Skeleton height={42} width="100%" />
+          <Skeleton height={42} width="100%" />
+          <Skeleton height={42} width="100%" />
+        </div>
+      </section>
+    );
   }
 
   const displayedRows = targetFlowId !== null

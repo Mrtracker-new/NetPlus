@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { PageJourney } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
@@ -65,7 +65,16 @@ export function Journey() {
   }, [feed, depth, activeSessionId]);
 
   if (!loaded) {
-    return <Spinner />;
+    return (
+      <section className="np-journey" aria-label="Website journey loading" aria-busy="true">
+        <Skeleton height={140} width="100%" style={{ marginBottom: "1.5rem" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Skeleton height={80} width="100%" />
+          <Skeleton height={80} width="100%" />
+          <Skeleton height={80} width="100%" />
+        </div>
+      </section>
+    );
   }
 
   return (

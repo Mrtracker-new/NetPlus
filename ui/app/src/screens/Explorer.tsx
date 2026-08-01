@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import type { ExplorerEntry, ProjectionDepth } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 
@@ -88,7 +88,11 @@ export function Explorer() {
         aria-label="Search the protocol reference"
       />
       {!loaded ? (
-        <Spinner />
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
+          <Skeleton height={90} width="100%" />
+          <Skeleton height={90} width="100%" />
+          <Skeleton height={90} width="100%" />
+        </div>
       ) : entries.length === 0 ? (
         <EmptyState>No matching entry — try another word.</EmptyState>
       ) : (

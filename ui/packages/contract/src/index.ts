@@ -65,7 +65,7 @@ export type Query =
   | { kind: "handshake"; client_version: number }
   | { kind: "getCapabilityRegistry" }
   | { kind: "runPing"; target: string; count: number }
-  | { kind: "runTraceroute"; target: string; transport: string; maxHops: number }
+  | { kind: "runTraceroute"; target: string; transport: string; max_hops: number; maxHops?: number }
   | { kind: "runBufferbloatTest"; target?: string }
   | { kind: "buildAndDecodePacket"; layers: string[] }
   | { kind: "compareSessions"; sessionIdA: number; sessionIdB: number }
@@ -75,10 +75,15 @@ export interface PingResult {
   target: string;
   sent: number;
   received: number;
-  lossPct: number;
-  minRttMs: number;
-  avgRttMs: number;
-  maxRttMs: number;
+  loss_pct?: number;
+  lossPct?: number;
+  min_rtt_ms?: number;
+  minRttMs?: number;
+  avg_rtt_ms?: number;
+  avgRttMs?: number;
+  max_rtt_ms?: number;
+  maxRttMs?: number;
+  stddev_rtt_ms?: number;
   stddevRttMs?: number;
 }
 
@@ -86,15 +91,19 @@ export interface TracerouteHop {
   ttl: number;
   ip: string;
   hostname?: string | null;
-  rttMs: number;
+  rtt_ms?: number;
+  rttMs?: number;
   status?: string;
 }
 
 export interface BufferbloatResult {
   target: string;
-  idleRttMs: number;
-  loadedRttMs: number;
-  deltaRttMs: number;
+  idle_rtt_ms?: number;
+  idleRttMs?: number;
+  loaded_rtt_ms?: number;
+  loadedRttMs?: number;
+  delta_rtt_ms?: number;
+  deltaRttMs?: number;
   grade: string;
 }
 

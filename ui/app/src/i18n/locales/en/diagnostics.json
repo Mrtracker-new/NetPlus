@@ -1,9 +1,40 @@
 {
   "title": "Active Network Diagnostics",
   "desc": "Opt-in probes: ICMP/UDP Ping, Multi-Transport Traceroute, and Bandwidth-Constrained Bufferbloat Testing.",
-  "target_placeholder": "Target Host (e.g. 1.1.1.1)",
+  "target_placeholder": "Target Host (e.g. 1.1.1.1, google.com)",
   "ping_btn": "Ping Probe",
   "traceroute_btn": "Traceroute",
   "bufferbloat_btn": "Bufferbloat Test",
-  "empty": "Run a probe to display diagnostic results (Ping, Traceroute, or Bufferbloat)."
+  "empty": "Enter a target hostname or IP address (IPv4, IPv6, domain) and choose a diagnostic probe.",
+  "invalid_target": "Please enter a valid target hostname, IPv4, IPv6, or localhost address.",
+  "clear_all": "Clear Results",
+  "ping": {
+    "title": "Ping Results for {{target}}",
+    "sent": "Sent: {{sent}}",
+    "received": "Received: {{received}}",
+    "loss": "Loss: {{loss}}%",
+    "rtt_min": "Min RTT: {{min}}ms",
+    "rtt_avg": "Avg RTT: {{avg}}ms",
+    "rtt_max": "Max RTT: {{max}}ms",
+    "jitter": "Jitter: {{jitter}}ms"
+  },
+  "traceroute": {
+    "title": "Traceroute Hops for {{target}} ({{count}} hops)",
+    "ttl": "TTL",
+    "ip": "IP Address",
+    "hostname": "Hostname",
+    "rtt": "RTT (ms)"
+  },
+  "bufferbloat": {
+    "title": "Bufferbloat Scorecard for {{target}}",
+    "grade": "Grade:",
+    "idle_rtt": "Idle RTT: {{idle}}ms",
+    "loaded_rtt": "Loaded RTT: {{loaded}}ms",
+    "delta_rtt": "Delta: +{{delta}}ms",
+    "recommendations": {
+      "gaming": "Gaming:",
+      "voip": "VoIP & Calls:",
+      "uploads": "Large Uploads:"
+    }
+  }
 }

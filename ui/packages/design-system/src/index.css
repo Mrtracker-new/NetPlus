@@ -102,8 +102,8 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--np-2);
-  padding: var(--np-4) var(--np-2);
+  gap: 2px;
+  padding: var(--np-2);
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
   box-shadow: var(--np-neu);
@@ -115,9 +115,9 @@ button {
 .np-nav__brand {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  margin-bottom: var(--np-3);
+  width: 36px;
+  height: 36px;
+  margin-bottom: 2px;
   border-radius: var(--np-radius);
   color: var(--np-on-accent);
   background: linear-gradient(145deg, var(--np-accent-strong), var(--np-accent));
@@ -128,8 +128,8 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  width: 46px;
-  height: 46px;
+  width: 34px;
+  height: 34px;
   flex: none;
   border: none;
   border-radius: var(--np-radius);
@@ -151,8 +151,8 @@ button {
   box-shadow: var(--np-neu-inset);
 }
 .np-nav__item svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
 }
 /* Tooltip label on hover — the rail is icon-only (ref). */
 .np-nav__item::after {
@@ -161,19 +161,64 @@ button {
   left: calc(100% + 10px);
   top: 50%;
   transform: translateY(-50%) scale(0.96);
-  padding: var(--np-1) var(--np-3);
+  padding: 4px 10px;
   border-radius: var(--np-radius-pill);
   color: var(--np-text);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-surface-3);
+  box-shadow: var(--np-neu-sm);
   font-size: var(--np-fs-sm);
+  font-weight: 500;
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--np-t), transform var(--np-t);
-  z-index: var(--np-z-tooltip);
+  z-index: 1000;
 }
 .np-nav__item:hover::after {
   opacity: 1;
   transform: translateY(-50%) scale(1);
+}
+
+/* ---- Navigation groups, headings & dividers ---- */
+.np-nav__group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 100%;
+}
+.np-nav__divider {
+  width: 18px;
+  height: 1px;
+  margin: 2px 0;
+  border: none;
+  background-color: var(--np-surface-3);
+  opacity: 0.6;
+}
+.np-nav__group-label {
+  font-size: 0.525rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--np-text-mute);
+  margin: 2px 0 1px 0;
+  user-select: none;
+  text-align: center;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+  opacity: 0.85;
+}
+.np-nav__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
 }
 
 /* ---- Main column: glass header + scrolling content ---- */
@@ -2248,6 +2293,29 @@ button {
   .np-nav__item {
     width: 38px;
     height: 38px;
+  }
+
+  .np-nav__group {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--np-1);
+    width: auto;
+    flex-shrink: 0;
+  }
+  .np-nav__divider {
+    width: 1px;
+    height: 20px;
+    margin: 0 var(--np-2);
+  }
+  .np-nav__group-label {
+    margin: 0 var(--np-1);
+    font-size: 0.625rem;
+    max-width: none;
+  }
+  .np-nav__items {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--np-1);
   }
 
   /* Disable hover tooltips on mobile touch screens */

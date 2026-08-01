@@ -35,6 +35,60 @@ import { FleetScreen } from "./screens/Fleet";
 import { SessionDiffScreen } from "./screens/SessionDiff";
 import { EvidenceNavigationProvider, useEvidenceNavigation, type Screen } from "./context/EvidenceNavigationContext";
 
+type NavItemDef = {
+  icon: IconName;
+  labelKey: string;
+};
+
+const NAV_ITEMS: Record<Screen, NavItemDef> = {
+  dashboard: { icon: "dashboard", labelKey: "navigation.dashboard" },
+  journey: { icon: "journey", labelKey: "navigation.journey" },
+  timeline: { icon: "timeline", labelKey: "navigation.timeline" },
+  monitoring: { icon: "monitoring", labelKey: "navigation.monitoring" },
+  apps: { icon: "apps", labelKey: "navigation.apps" },
+  diagnostics: { icon: "diagnostics", labelKey: "navigation.diagnostics" },
+  sandbox: { icon: "sandbox", labelKey: "navigation.sandbox" },
+  fleet: { icon: "fleet", labelKey: "navigation.fleet" },
+  compare: { icon: "compare", labelKey: "navigation.compare" },
+  security: { icon: "security", labelKey: "navigation.security" },
+  assistant: { icon: "assistant", labelKey: "navigation.assistant" },
+  learn: { icon: "learn", labelKey: "navigation.learn" },
+  explorer: { icon: "explorer", labelKey: "navigation.explorer" },
+  recordings: { icon: "recordings", labelKey: "navigation.recordings" },
+  replay: { icon: "replay", labelKey: "navigation.replay" },
+  export: { icon: "export", labelKey: "navigation.export" },
+  plugins: { icon: "plugins", labelKey: "navigation.plugins" },
+};
+
+type NavGroupDef = {
+  id: string;
+  labelKey: string;
+  itemIds: readonly Screen[];
+};
+
+const NAV_GROUPS: readonly NavGroupDef[] = [
+  {
+    id: "observe",
+    labelKey: "nav_groups.observe",
+    itemIds: ["dashboard", "journey", "timeline", "monitoring", "apps"],
+  },
+  {
+    id: "analyze",
+    labelKey: "nav_groups.analyze",
+    itemIds: ["diagnostics", "sandbox", "fleet", "compare", "security", "assistant"],
+  },
+  {
+    id: "learn",
+    labelKey: "nav_groups.learn",
+    itemIds: ["learn", "explorer"],
+  },
+  {
+    id: "lifecycle",
+    labelKey: "nav_groups.lifecycle",
+    itemIds: ["recordings", "replay", "export", "plugins"],
+  },
+] as const;
+
 function ModeSwitch() {
   const { depth, setDepth } = useDisclosure();
   return (
@@ -354,43 +408,44 @@ function Shell() {
   // (docs/09 §6.3): beginners get roomier type, experts get compact data.
   const { depth } = useDisclosure();
 
-  const navItems: Array<{ id: Screen; label: string; icon: IconName }> = [
-    { id: "dashboard", label: t("navigation.dashboard"), icon: "dashboard" },
-    { id: "journey", label: t("navigation.journey"), icon: "journey" },
-    { id: "timeline", label: t("navigation.timeline"), icon: "timeline" },
-    { id: "monitoring", label: t("navigation.monitoring"), icon: "monitoring" },
-    { id: "apps", label: t("navigation.apps"), icon: "apps" },
-    { id: "diagnostics", label: t("navigation.diagnostics"), icon: "diagnostics" },
-    { id: "sandbox", label: t("navigation.sandbox"), icon: "sandbox" },
-    { id: "fleet", label: t("navigation.fleet"), icon: "fleet" },
-    { id: "compare", label: t("navigation.compare"), icon: "compare" },
-    { id: "security", label: t("navigation.security"), icon: "security" },
-    { id: "assistant", label: t("navigation.assistant"), icon: "assistant" },
-    { id: "learn", label: t("navigation.learn"), icon: "learn" },
-    { id: "explorer", label: t("navigation.explorer"), icon: "explorer" },
-    { id: "recordings", label: t("navigation.recordings"), icon: "recordings" },
-    { id: "replay", label: t("navigation.replay"), icon: "replay" },
-    { id: "export", label: t("navigation.export"), icon: "export" },
-    { id: "plugins", label: t("navigation.plugins"), icon: "plugins" },
-  ];
-
   return (
     <div className="np-app" data-depth={depth}>
-      <nav className="np-nav" aria-label="Primary">
+      <nav className="np-nav" aria-label="Primary navigation">
         <div className="np-nav__brand" title="NetPulse">
           <Icon name="brand" />
         </div>
-        {navItems.map((item) => (
-          <button
-            key={item.id}
-            data-label={item.label}
-            aria-label={item.label}
-            aria-current={item.id === screen ? "page" : undefined}
-            className={item.id === screen ? "np-nav__item np-nav__item--active" : "np-nav__item"}
-            onClick={() => setScreen(item.id)}
+        {NAV_GROUPS.map((group, groupIdx) => (
+          <section
+            key={group.id}
+            className="np-nav__group"
+            role="group"
+            aria-labelledby={`nav-group-${group.id}`}
           >
-            <Icon name={item.icon} />
-          </button>
+            {groupIdx > 0 && <hr className="np-nav__divider" aria-hidden="true" />}
+            <h2 id={`nav-group-${group.id}`} className="np-nav__group-label" title={t(group.labelKey as any)}>
+              {t(group.labelKey as any)}
+            </h2>
+            <ul className="np-nav__items" role="list">
+              {group.itemIds.map((id) => {
+                const item = NAV_ITEMS[id];
+                const label = t(item.labelKey as any);
+                return (
+                  <li key={id}>
+                    <button
+                      title={label}
+                      data-label={label}
+                      aria-label={label}
+                      aria-current={id === screen ? "page" : undefined}
+                      className={id === screen ? "np-nav__item np-nav__item--active" : "np-nav__item"}
+                      onClick={() => setScreen(id)}
+                    >
+                      <Icon name={item.icon} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         ))}
       </nav>
 

@@ -1,6 +1,12 @@
 {
   "app_name": "NetPulse",
   "tagline": "Inteligencia y Análisis de Red en Tiempo Real",
+  "nav_groups": {
+    "analyze": "Analizar",
+    "learn": "Aprender",
+    "lifecycle": "Ciclo de vida",
+    "observe": "Observar"
+  },
   "navigation": {
     "dashboard": "Panel",
     "journey": "Trayecto",

@@ -1,6 +1,12 @@
 {
   "app_name": "NetPulse",
   "tagline": "Real-time Network Intelligence & Analysis",
+  "nav_groups": {
+    "analyze": "Analyze",
+    "learn": "Learn",
+    "lifecycle": "Lifecycle",
+    "observe": "Observe"
+  },
   "navigation": {
     "dashboard": "Dashboard",
     "journey": "Journey",

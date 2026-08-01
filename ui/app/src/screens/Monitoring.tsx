@@ -26,6 +26,30 @@ function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   );
 }
 
+function BreakdownTable({ breakdown }: { breakdown: Breakdown }) {
+  const rows = [...breakdown.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6);
+  if (rows.length === 0) return null;
+  return (
+    <section className="np-panel">
+      <table className="np-breakdown" aria-label={`Top ${breakdown.dimension} breakdown`}>
+        <caption>Top {breakdown.dimension} breakdown</caption>
+        <tbody>
+          {rows.map((r) => {
+            const nm = primaryHostName(r);
+            return (
+              <tr key={r.label}>
+                <td>{nm ? nm.name : r.label}</td>
+                <td>{nm ? r.label : `${r.flows} flow${r.flows === 1 ? "" : "s"}`}</td>
+                <td style={{ textAlign: "right" }}>{humanBytes(r.bytes)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
 function HostBars({ breakdown }: { breakdown: Breakdown }) {
   const rows = [...breakdown.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6);
   const max = rows.reduce((m, r) => Math.max(m, r.bytes), 0);
@@ -91,6 +115,7 @@ export function Monitoring() {
       </div>
 
       <HostBars breakdown={monitor.by_host} />
+      <BreakdownTable breakdown={monitor.by_host} />
 
       <div className="np-loss">
         {/* Two separate figures — never summed (docs/11 §6.4). */}

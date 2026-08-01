@@ -61,9 +61,23 @@ export const CATEGORICAL = [
 ] as const;
 
 export function categoricalColor(i: number): string {
-  // Fold anything past the palette into a neutral "other" rather than inventing a
-  // hue (dataviz non-negotiable).
   return i < CATEGORICAL.length ? CATEGORICAL[i]! : "var(--np-text-mute)";
+}
+
+/** Stable color mapping for protocols so users build muscle memory (e.g. TCP is always blue). */
+const PROTOCOL_COLORS: Record<string, string> = {
+  TCP: "#3E8FE0",
+  UDP: "#B47B24",
+  TLS: "#3FA87C",
+  HTTPS: "#3FA87C",
+  HTTP: "#1EA39C",
+  DNS: "#7C83F7",
+  ICMP: "#E04E54",
+};
+
+export function protocolColor(protocolName: string, fallbackIndex: number): string {
+  const upper = protocolName.toUpperCase().trim();
+  return PROTOCOL_COLORS[upper] ?? categoricalColor(fallbackIndex);
 }
 
 export function humanBytes(bytes: number): string {

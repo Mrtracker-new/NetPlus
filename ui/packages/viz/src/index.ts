@@ -31,6 +31,7 @@ export {
   primaryHostName,
   CATEGORICAL,
   categoricalColor,
+  protocolColor,
   humanBytes,
 } from "./utils";
 

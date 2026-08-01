@@ -193,6 +193,7 @@ function ThemeToggle() {
   const [theme, toggle] = useTheme();
   return (
     <button
+      type="button"
       className="np-iconbtn"
       onClick={toggle}
       aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
@@ -215,6 +216,7 @@ function LanguageToggle() {
 
   return (
     <button
+      type="button"
       className="np-iconbtn np-lang-toggle"
       onClick={toggleLanguage}
       aria-label="Switch Language"

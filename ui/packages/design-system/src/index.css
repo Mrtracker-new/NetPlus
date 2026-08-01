@@ -2698,10 +2698,19 @@ button {
 }
 
 .np-lang-toggle {
-  font-weight: var(--np-fw-semibold);
-  font-size: var(--np-fs-sm);
-  width: auto;
-  padding: 0 var(--np-radius-xs);
+  font-weight: var(--np-fw-bold);
+  font-size: var(--np-fs-xs);
+  letter-spacing: 0.03em;
+  width: 38px;
+  height: 38px;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  line-height: 1;
 }
 
 /* ============================ Skeleton Loading Placeholders ============================ */

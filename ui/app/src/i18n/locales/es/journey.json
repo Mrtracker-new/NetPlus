@@ -1,11 +1,33 @@
 {
   "title": "Trayecto web",
+  "hero_subtitle": "Reconstruye la historia de carga de la página paso a paso, desde la consulta DNS hasta el despliegue en CDN.",
+  "select_session": "Seleccionar Sesión",
+  "search_sessions": "Buscar sesiones por dominio o ID...",
+  "latest_session": "Última — #{{id}}",
   "filter_banner": "Viendo el trayecto de la sesión #{{sessionId}}",
-  "empty": "Visita un sitio web y su trayecto aparecerá aquí.",
-  "fanout": {
-    "title_one": "Habló con {{count}} lugar",
-    "title_other": "Habló con {{count}} lugares",
-    "connections_one": "{{count}} conexión",
-    "connections_other": "{{count}} conexiones"
+  "clear_filter": "Borrar Filtro de Sesión",
+  "back_to_latest": "Volver a la Última Sesión",
+  "reload_snapshot": "Recargar Captura",
+  "summary_title": "Resumen del Trayecto",
+  "summary_duration": "Duración",
+  "summary_ttfb": "TTFB",
+  "summary_requests": "Peticiones",
+  "summary_organizations": "Organizaciones",
+  "summary_third_party": "Terceros",
+  "summary_evidence": "Evidencias de Telemetría",
+  "servers_contacted": "Servidores Contactados",
+  "connections_one": "{{count}} conexión",
+  "connections_other": "{{count}} conexiones",
+  "org_summary": "{{hosts}} hosts · {{requests}} peticiones",
+  "empty": "Aún no se ha capturado ningún trayecto. Inicia una captura para reconstruir la línea de tiempo.",
+  "error_loading": "Error al cargar el trayecto de la sesión.",
+  "stages": {
+    "navigation": "Navegación",
+    "dns_resolution": "Resolución DNS",
+    "connection": "Conexión TCP",
+    "encryption": "Cifrado TLS",
+    "request": "Petición HTTP",
+    "fan_out": "Despliegue CDN",
+    "completion": "Completado"
   }
 }

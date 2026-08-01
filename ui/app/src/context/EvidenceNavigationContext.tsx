@@ -29,6 +29,7 @@ export type NavigationTarget =
 
 export type NavigationSource =
   | "dashboard"
+  | "journey"
   | "constellation"
   | "timeline"
   | "compare"

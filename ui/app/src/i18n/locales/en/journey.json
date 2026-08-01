@@ -1,11 +1,33 @@
 {
   "title": "Website journey",
+  "hero_subtitle": "Reconstruct the page-load story stage by stage — from DNS lookup to CDN fan-out.",
+  "select_session": "Select Session",
+  "search_sessions": "Search sessions by domain or ID...",
+  "latest_session": "Latest — #{{id}}",
   "filter_banner": "Viewing journey for session #{{sessionId}}",
-  "empty": "Visit a website and its journey will appear here.",
-  "fanout": {
-    "title_one": "Talked to {{count}} place",
-    "title_other": "Talked to {{count}} places",
-    "connections_one": "{{count}} connection",
-    "connections_other": "{{count}} connections"
+  "clear_filter": "Clear Session Filter",
+  "back_to_latest": "Back to Latest Session",
+  "reload_snapshot": "Reload Snapshot",
+  "summary_title": "Journey Summary",
+  "summary_duration": "Duration",
+  "summary_ttfb": "TTFB",
+  "summary_requests": "Requests",
+  "summary_organizations": "Organizations",
+  "summary_third_party": "Third-Party",
+  "summary_evidence": "Telemetry Evidence",
+  "servers_contacted": "Servers Contacted",
+  "connections_one": "{{count}} connection",
+  "connections_other": "{{count}} connections",
+  "org_summary": "{{hosts}} hosts · {{requests}} requests",
+  "empty": "No journey has been captured yet. Run a capture to reconstruct the page-load timeline.",
+  "error_loading": "Failed to load session journey.",
+  "stages": {
+    "navigation": "Navigation",
+    "dns_resolution": "DNS Resolution",
+    "connection": "Connection",
+    "encryption": "Encryption",
+    "request": "HTTP Request",
+    "fan_out": "Fan-out",
+    "completion": "Completion"
   }
 }

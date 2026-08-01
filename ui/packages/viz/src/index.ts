@@ -10,8 +10,8 @@ export type { DonutProps } from "./Donut";
 export { BarRow } from "./BarRow";
 export type { BarRowProps } from "./BarRow";
 
-export { JourneyFlow } from "./JourneyFlow";
-export type { JourneyFlowProps } from "./JourneyFlow";
+export { JourneyFlow, STAGE_CONFIG_REGISTRY } from "./JourneyFlow";
+export type { JourneyFlowProps, StageConfig } from "./JourneyFlow";
 
 export { TimeRibbon } from "./TimeRibbon";
 export type { TimeRibbonProps } from "./TimeRibbon";

@@ -2369,17 +2369,60 @@ button {
 
 /* ---- Small Mobile Viewports (<= 480px down to 320px) ---- */
 @media (max-width: 480px) {
+  /* 1. App Layout & Bottom Nav Bar */
   .np-app {
+    grid-template-rows: auto 1fr auto;
     padding: var(--np-1);
     gap: var(--np-1);
+    height: 100vh;
+    height: 100dvh;
   }
 
+  .np-nav {
+    order: 3;
+    width: 100%;
+    height: auto;
+    padding: var(--np-1) var(--np-2);
+    border-radius: var(--np-radius);
+    justify-content: flex-start;
+    gap: var(--np-1);
+    box-shadow: var(--np-neu-sm);
+  }
+
+  .np-nav__brand {
+    width: 32px;
+    height: 32px;
+  }
+
+  .np-nav__item {
+    width: 34px;
+    height: 34px;
+  }
+
+  .np-nav__group-label {
+    font-size: 0.5rem;
+  }
+
+  /* 2. Vertical Header Stacking */
   .np-header {
+    flex-direction: column;
+    align-items: stretch;
     padding: var(--np-2);
+    gap: var(--np-2);
+  }
+
+  .np-header__spacer {
+    display: none;
   }
 
   .np-brand {
     font-size: var(--np-fs-base);
+  }
+
+  .np-capture {
+    width: 100%;
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   .np-capture__iface {
@@ -2393,6 +2436,42 @@ button {
     font-size: var(--np-fs-xs);
   }
 
+  /* 3. Horizontally Scrollable Tables */
+  table,
+  .np-table-wrapper {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+
+  /* 4. Reduced Padding on Section Wrappers */
+  .np-main > main {
+    padding: var(--np-2);
+  }
+
+  .np-panel,
+  .np-card,
+  .np-apps,
+  .np-journey,
+  .np-timeline,
+  .np-monitor,
+  .np-diagnostics,
+  .np-sandbox,
+  .np-fleet,
+  .np-session-diff,
+  .np-security,
+  .np-assistant,
+  .np-learn,
+  .np-explorer,
+  .np-recordings,
+  .np-replay,
+  .np-export,
+  .np-plugins {
+    padding: var(--np-2);
+  }
+
   .np-kpi {
     padding: var(--np-3);
   }
@@ -2403,10 +2482,6 @@ button {
 
   .np-hero__title {
     font-size: var(--np-fs-xl);
-  }
-
-  .np-card {
-    padding: var(--np-4) var(--np-4) var(--np-4) var(--np-5);
   }
 
   .np-viz-bar {

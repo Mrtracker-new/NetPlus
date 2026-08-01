@@ -1,0 +1,5 @@
+{
+  "title": "Deterministic Capture Replay",
+  "desc": "Replay PCAP streams offline to observe protocol state machine transitions.",
+  "empty": "Select a recording to initiate offline playback."
+}

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SessionDiff } from "@netpulse/contract";
 import { Button, Input, Spinner, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
@@ -14,6 +15,7 @@ function parseSessionId(input: string): number {
 }
 
 export function SessionDiffScreen() {
+  const { t } = useTranslation("compare");
   const [sessionA, setSessionA] = useState<number>(1);
   const [sessionB, setSessionB] = useState<number>(2);
   const [diff, setDiff] = useState<SessionDiff | null>(null);
@@ -55,9 +57,9 @@ export function SessionDiffScreen() {
       aria-labelledby="session-diff-title"
       aria-describedby="session-diff-description"
     >
-      <h2 id="session-diff-title">Session Semantic Diff Engine</h2>
+      <h2 id="session-diff-title">{t("title")}</h2>
       <p id="session-diff-description" className="np-session-diff__desc">
-        Side-by-side session comparison with rule-based explanations, evidence provenance, and confidence scoring.
+        {t("desc")}
       </p>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
@@ -68,18 +70,18 @@ export function SessionDiffScreen() {
             type="number"
             value={sessionA}
             onChange={(e) => setSessionA(parseSessionId(e.target.value))}
-            placeholder="Session A ID"
-            aria-label="Session A ID"
+            placeholder={t("select_baseline")}
+            aria-label={t("select_baseline")}
           />
           <Input
             type="number"
             value={sessionB}
             onChange={(e) => setSessionB(parseSessionId(e.target.value))}
-            placeholder="Session B ID"
-            aria-label="Session B ID"
+            placeholder={t("select_target")}
+            aria-label={t("select_target")}
           />
           <Button type="submit" variant="primary" busy={compareBusy}>
-            Compare Sessions
+            {t("run_diff")}
           </Button>
         </fieldset>
       </form>
@@ -132,9 +134,7 @@ export function SessionDiffScreen() {
           )}
         </article>
       ) : (
-        <EmptyState>
-          Enter Session IDs and click "Compare Sessions" to generate a semantic diff report.
-        </EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       )}
     </section>
   );

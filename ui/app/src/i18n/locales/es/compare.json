@@ -1,0 +1,8 @@
+{
+  "title": "Diferencial de Sesión y Comparación Cruzada",
+  "desc": "Comparación de comportamiento entre capturas para aislar causas de regresión y anomalías de latencia.",
+  "select_baseline": "Seleccionar Sesión Base",
+  "select_target": "Seleccionar Sesión Comparativa",
+  "run_diff": "Comparar Sesiones",
+  "empty": "Selecciona dos sesiones de captura para generar un informe comparativo."
+}

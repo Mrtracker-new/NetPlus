@@ -1,0 +1,7 @@
+{
+  "title": "Live Monitoring & System Health",
+  "desc": "Real-time stream of network interfaces, latency distribution, throughput, and error rates.",
+  "interfaces": "Interfaces",
+  "rx_tx": "RX: {{rx}} · TX: {{tx}}",
+  "empty": "No active network interfaces detected."
+}

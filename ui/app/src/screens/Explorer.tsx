@@ -7,6 +7,7 @@
 // without leaving Beginner mode globally (the escape hatch, docs/09 §6.3).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ExplorerEntry, ProjectionDepth } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { query } from "../ipc";
@@ -49,6 +50,7 @@ function Entry({ entry, depth }: { entry: ExplorerEntry; depth: ProjectionDepth 
 }
 
 export function Explorer() {
+  const { t } = useTranslation(["explorer", "common"]);
   const { depth } = useDisclosure();
   const [term, setTerm] = useState("");
   const [entries, setEntries] = useState<ExplorerEntry[]>([]);
@@ -77,15 +79,15 @@ export function Explorer() {
   }, [term]);
 
   return (
-    <section className="np-explorer" aria-label="Protocol Explorer">
+    <section className="np-explorer" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <input
         className="np-explorer__search"
         type="search"
-        placeholder="Search: padlock, RST, NXDOMAIN, 404…"
+        placeholder={t("search_placeholder")}
         value={term}
         onChange={(e) => setTerm(e.target.value)}
-        aria-label="Search the protocol reference"
+        aria-label={t("search_placeholder")}
       />
       {!loaded ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
@@ -94,7 +96,7 @@ export function Explorer() {
           <Skeleton height={90} width="100%" />
         </div>
       ) : entries.length === 0 ? (
-        <EmptyState>No matching entry — try another word.</EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         entries.map((entry) => <Entry key={entry.key} entry={entry} depth={depth} />)
       )}

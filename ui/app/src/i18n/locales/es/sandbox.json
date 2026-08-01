@@ -1,0 +1,8 @@
+{
+  "title": "Entorno de Pruebas de Protocolo y Constructor Interactivo",
+  "desc": "Construcción segura de paquetes fuera de línea y validación RFC (Solo observación; Sin transmisión).",
+  "build_btn": "Construir e Inspeccionar Paquete",
+  "http1_stack": "Pila HTTP/1.1",
+  "http3_stack": "Pila HTTP/3",
+  "empty": "Construye un paquete personalizado o elige una de las pilas preestablecidas para inspeccionar capas y diagnósticos."
+}

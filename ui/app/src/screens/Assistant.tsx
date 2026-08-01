@@ -8,6 +8,7 @@
 // (docs/19 §3).
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { AssistantAnswer } from "@netpulse/contract";
 import { Notice } from "@netpulse/components";
 import { query } from "../ipc";
@@ -50,6 +51,7 @@ function AnswerView({ answer }: { answer: AssistantAnswer }) {
 }
 
 export function Assistant() {
+  const { t } = useTranslation(["assistant", "common"]);
   const [questionText, setQuestionText] = useState("");
   const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
   const [busy, setBusy] = useState(false);
@@ -72,7 +74,7 @@ export function Assistant() {
   }
 
   return (
-    <section className="np-assistant" aria-label="AI assistant">
+    <section className="np-assistant" aria-label={t("common:navigation.assistant")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <form
         className="np-assistant__form"
@@ -85,8 +87,8 @@ export function Assistant() {
           className="np-assistant__input"
           type="text"
           value={questionText}
-          placeholder="Ask about your captured traffic…"
-          aria-label="Ask the assistant a question"
+          placeholder={t("assistant:placeholder")}
+          aria-label={t("common:navigation.assistant")}
           onChange={(e) => setQuestionText(e.target.value)}
         />
         <button className="np-assistant__ask" type="submit" disabled={busy}>

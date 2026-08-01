@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { FleetHost } from "@netpulse/contract";
 import { Badge, Spinner, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
@@ -9,6 +10,7 @@ function toErrorMessage(e: unknown): string {
 }
 
 export function FleetScreen() {
+  const { t } = useTranslation(["fleet", "common"]);
   const [hosts, setHosts] = useState<FleetHost[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,18 +44,16 @@ export function FleetScreen() {
   }, []);
 
   return (
-    <section className="np-fleet" aria-label="Fleet Observation">
-      <h2>Fleet Multi-Host Observation</h2>
-      <p className="np-fleet__desc">
-        Local-first telemetry aggregation from user-owned capture agents over framed binary transport.
-      </p>
+    <section className="np-fleet" aria-label={t("title")}>
+      <h2>{t("title")}</h2>
+      <p className="np-fleet__desc">{t("desc")}</p>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
       {!loaded ? (
-        <Spinner label="Loading fleet hosts…" />
+        <Spinner />
       ) : hosts.length === 0 ? (
-        <EmptyState>No NetPulse agents are currently reporting to the fleet.</EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         <div className="np-fleet__grid" role="list">
           {hosts.map((h) => (

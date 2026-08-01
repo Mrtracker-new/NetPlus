@@ -1,0 +1,5 @@
+{
+  "title": "Reproducción Determinista de Capturas",
+  "desc": "Reproduce flujos PCAP sin conexión para observar transiciones de la máquina de estados.",
+  "empty": "Selecciona una grabación para iniciar la reproducción sin conexión."
+}

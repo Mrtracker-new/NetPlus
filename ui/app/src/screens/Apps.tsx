@@ -1,15 +1,10 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Attribution, AttributionConfidence } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { query } from "../ipc";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-
-const CONFIDENCE_LABEL: Record<AttributionConfidence, string> = {
-  high: "confident",
-  low: "tentative",
-  unknown: "unknown owner",
-};
 
 function toErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -28,11 +23,18 @@ function flowIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[] {
 }
 
 export function Apps() {
+  const { t } = useTranslation(["apps", "common"]);
   const { feed } = useStore();
   const { navigationTarget, clearNavigationTarget } = useEvidenceNavigation();
   const [rows, setRows] = useState<Array<{ flowId: number; attr: Attribution }>>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const confidenceLabel: Record<AttributionConfidence, string> = {
+    high: t("table.confident"),
+    low: t("table.tentative"),
+    unknown: t("table.unknown_owner"),
+  };
 
   const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
 
@@ -84,29 +86,29 @@ export function Apps() {
     : rows;
 
   return (
-    <section className="np-apps" aria-label="Applications">
+    <section className="np-apps" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       {targetFlowId !== null && (
         <div className="np-filter-banner" style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }} role="status">
-          <span>Filtered to flow #{targetFlowId}</span>
+          <span>{t("filtered_banner", { flowId: targetFlowId })}</span>
           <button className="np-btn np-btn--secondary" onClick={clearNavigationTarget}>
-            Show all flows
+            {t("common:actions.show_all")}
           </button>
         </div>
       )}
       {displayedRows.length === 0 ? (
         <EmptyState>
-          {targetFlowId !== null ? `No flow found for id #${targetFlowId}` : "No attributed flows yet."}
+          {targetFlowId !== null ? t("empty_filtered", { flowId: targetFlowId }) : t("empty_default")}
         </EmptyState>
       ) : (
         <table>
           <tbody>
             {displayedRows.map(({ flowId, attr }) => (
               <tr key={flowId}>
-                <td>flow #{flowId}</td>
-                <td>{attr.process_name ?? "unknown owner"}</td>
-                <td>{attr.pid !== null ? `pid ${attr.pid}` : "—"}</td>
-                <td>{CONFIDENCE_LABEL[attr.confidence]}</td>
+                <td>{t("table.flow", { id: flowId })}</td>
+                <td>{attr.process_name ?? t("table.unknown_owner")}</td>
+                <td>{attr.pid !== null ? t("table.pid", { pid: attr.pid }) : "—"}</td>
+                <td>{confidenceLabel[attr.confidence]}</td>
               </tr>
             ))}
           </tbody>

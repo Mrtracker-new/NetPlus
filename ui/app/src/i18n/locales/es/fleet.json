@@ -1,0 +1,7 @@
+{
+  "title": "Topología de Flota y Cluster Multinodo",
+  "desc": "Transmisiones de captura agregadas entre nodos, latidos de sincronización y consenso de salud del cluster.",
+  "nodes_title": "Nodos del Cluster ({{count}})",
+  "sync_time": "Última Sincronización: {{time}}",
+  "empty": "No hay nodos remotos conectados. Ejecutando agente local de nodo único."
+}

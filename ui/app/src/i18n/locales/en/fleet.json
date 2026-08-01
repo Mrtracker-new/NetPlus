@@ -1,0 +1,7 @@
+{
+  "title": "Multi-Node Fleet & Cluster Topology",
+  "desc": "Aggregated cross-node capture streams, sync heartbeats, and cluster health consensus.",
+  "nodes_title": "Cluster Nodes ({{count}})",
+  "sync_time": "Last Sync: {{time}}",
+  "empty": "No remote cluster nodes connected. Running single-node local agent."
+}

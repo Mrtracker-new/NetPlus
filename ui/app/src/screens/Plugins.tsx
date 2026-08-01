@@ -8,6 +8,7 @@
 // exist in the model, keeping the privacy guarantee auditable (docs/24 §5).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PluginDescriptor } from "@netpulse/contract";
 import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query, command } from "../ipc";
@@ -39,6 +40,7 @@ function PluginRow({
   busy: boolean;
   onToggle: (enable: boolean) => void;
 }) {
+  const { t } = useTranslation("common");
   return (
     <article className={p.enabled ? "np-plugin np-plugin--on" : "np-plugin"}>
       <header className="np-plugin__head">
@@ -70,7 +72,7 @@ function PluginRow({
           disabled={busy || (!p.compatible && !p.enabled)}
           onClick={() => onToggle(!p.enabled)}
         >
-          {busy ? "Updating…" : p.enabled ? "Disable" : "Enable"}
+          {busy ? "…" : p.enabled ? t("actions.disable") : t("actions.enable")}
         </button>
       </footer>
     </article>
@@ -78,6 +80,7 @@ function PluginRow({
 }
 
 export function Plugins() {
+  const { t } = useTranslation(["plugins", "common"]);
   const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -110,7 +113,7 @@ export function Plugins() {
   }
 
   return (
-    <section className="np-plugins" aria-label="Plugins">
+    <section className="np-plugins" aria-label={t("common:navigation.plugins")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <p className="np-plugins__note">
         Plugins extend NetPulse at defined seams. Each is capability-bounded by its

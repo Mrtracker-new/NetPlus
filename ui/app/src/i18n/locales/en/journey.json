@@ -1,0 +1,11 @@
+{
+  "title": "Website journey",
+  "filter_banner": "Viewing journey for session #{{sessionId}}",
+  "empty": "Visit a website and its journey will appear here.",
+  "fanout": {
+    "title_one": "Talked to {{count}} place",
+    "title_other": "Talked to {{count}} places",
+    "connections_one": "{{count}} connection",
+    "connections_other": "{{count}} connections"
+  }
+}

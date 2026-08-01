@@ -1,0 +1,5 @@
+{
+  "title": "Grabaciones de Sesión Guardadas",
+  "desc": "Gestiona e inspecciona sesiones de captura locales PCAP y JSON.",
+  "empty": "No se encontraron grabaciones de captura guardadas."
+}

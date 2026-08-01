@@ -1,0 +1,9 @@
+{
+  "title": "Diagnósticos de Red Activos",
+  "desc": "Pruebas opcionales: Ping ICMP/UDP, Traceroute Multitransporte y Pruebas de Bufferbloat.",
+  "target_placeholder": "Host Destino (ej. 1.1.1.1)",
+  "ping_btn": "Prueba Ping",
+  "traceroute_btn": "Traceroute",
+  "bufferbloat_btn": "Prueba Bufferbloat",
+  "empty": "Ejecuta una prueba para mostrar los resultados de diagnóstico (Ping, Traceroute o Bufferbloat)."
+}

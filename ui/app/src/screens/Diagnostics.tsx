@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PingResult, TracerouteHop, BufferbloatResult } from "@netpulse/contract";
 import { Button, Input, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
@@ -10,6 +11,7 @@ function toErrorMessage(e: unknown): string {
 }
 
 export function DiagnosticsScreen() {
+  const { t } = useTranslation(["diagnostics", "common"]);
   const [target, setTarget] = useState("1.1.1.1");
   const [pingResult, setPingResult] = useState<PingResult | null>(null);
   const [tracerouteHops, setTracerouteHops] = useState<TracerouteHop[]>([]);
@@ -52,11 +54,9 @@ export function DiagnosticsScreen() {
   const hasResults = Boolean(pingResult || tracerouteHops.length > 0 || bufferbloat);
 
   return (
-    <section className="np-diagnostics" aria-label="Network Diagnostics">
-      <h2>Active Network Diagnostics</h2>
-      <p className="np-diagnostics__desc">
-        Opt-in probes: ICMP/UDP Ping, Multi-Transport Traceroute, and Bandwidth-Constrained Bufferbloat Testing.
-      </p>
+    <section className="np-diagnostics" aria-label={t("title")}>
+      <h2>{t("title")}</h2>
+      <p className="np-diagnostics__desc">{t("desc")}</p>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
@@ -64,24 +64,22 @@ export function DiagnosticsScreen() {
         <Input
           value={target}
           onChange={(e) => setTarget(e.target.value)}
-          placeholder="Target Host (e.g. 1.1.1.1)"
-          aria-label="Target Host"
+          placeholder={t("target_placeholder")}
+          aria-label={t("target_placeholder")}
         />
         <Button variant="primary" busy={pingBusy} disabled={isBusy} onClick={() => void runPing()}>
-          Ping Probe
+          {t("ping_btn")}
         </Button>
         <Button variant="standard" busy={traceBusy} disabled={isBusy} onClick={() => void runTraceroute()}>
-          Traceroute
+          {t("traceroute_btn")}
         </Button>
         <Button variant="standard" busy={bloatBusy} disabled={isBusy} onClick={() => void runBufferbloat()}>
-          Bufferbloat Test
+          {t("bufferbloat_btn")}
         </Button>
       </div>
 
       {!hasResults && !isBusy && !notice ? (
-        <EmptyState>
-          Run a probe to display diagnostic results (Ping, Traceroute, or Bufferbloat).
-        </EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         <div aria-live="polite">
           {pingResult && (

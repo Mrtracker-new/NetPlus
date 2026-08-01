@@ -1,0 +1,8 @@
+{
+  "title": "Protocol Sandbox & Interactive Packet Builder",
+  "desc": "Safe offline packet construction & RFC diagnostic field validation (Observe-Only; Zero Transmit path).",
+  "build_btn": "Build & Inspect Packet",
+  "http1_stack": "HTTP/1.1 Stack",
+  "http3_stack": "HTTP/3 Stack",
+  "empty": "Build a custom packet or choose one of the preset protocol stacks to inspect packet layers and diagnostics."
+}

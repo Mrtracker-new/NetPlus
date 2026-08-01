@@ -1,0 +1,13 @@
+{
+  "title": "Aplicaciones",
+  "filtered_banner": "Filtrado al flujo #{{flowId}}",
+  "empty_filtered": "No se encontró ningún flujo para el id #{{flowId}}",
+  "empty_default": "Aún no hay flujos atribuidos.",
+  "table": {
+    "flow": "flujo #{{id}}",
+    "pid": "pid {{pid}}",
+    "unknown_owner": "propietario desconocido",
+    "confident": "confiado",
+    "tentative": "tentativo"
+  }
+}

@@ -6,6 +6,7 @@
 // export writes a file — NetPulse never auto-transmits it (docs/23 §6, docs/02 §10).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ExportFormat, ExportPreview, PayloadLevel } from "@netpulse/contract";
 import { Notice } from "@netpulse/components";
 import { query, command } from "../ipc";
@@ -23,6 +24,7 @@ const FORMATS: Array<{ id: ExportFormat; label: string; blurb: string }> = [
 ];
 
 export function Export() {
+  const { t } = useTranslation(["export", "common"]);
   const [format, setFormat] = useState<ExportFormat>("json");
   const [preview, setPreview] = useState<ExportPreview | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function Export() {
   });
 
   return (
-    <section className="np-export" aria-label="Export">
+    <section className="np-export" aria-label={t("common:navigation.export")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <div className="np-export__formats" role="radiogroup" aria-label="Export format">
         {FORMATS.map((f) => (

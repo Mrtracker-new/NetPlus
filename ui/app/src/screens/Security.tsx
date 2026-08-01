@@ -7,6 +7,7 @@
 // benign recurrences (docs/17 §7.2) — kept local, never uploaded (docs/01 X3).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { SecurityFinding } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
@@ -92,6 +93,7 @@ function FindingCard({
 }
 
 export function Security() {
+  const { t } = useTranslation(["security", "common"]);
   const { depth } = useDisclosure();
   const { navigateToEvidence } = useEvidenceNavigation();
   const [findings, setFindings] = useState<SecurityFinding[]>([]);
@@ -147,7 +149,7 @@ export function Security() {
   ];
 
   return (
-    <section className="np-security" aria-label="Security findings">
+    <section className="np-security" aria-label={t("common:navigation.security")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       {findings.length === 0 ? (
         <EmptyState>

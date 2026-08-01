@@ -1,0 +1,5 @@
+{
+  "title": "Timeline",
+  "filter_banner": "Filtered to packet #{{packetId}}",
+  "empty": "No timeline events captured yet."
+}

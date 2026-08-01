@@ -1,0 +1,9 @@
+{
+  "title": "Active Network Diagnostics",
+  "desc": "Opt-in probes: ICMP/UDP Ping, Multi-Transport Traceroute, and Bandwidth-Constrained Bufferbloat Testing.",
+  "target_placeholder": "Target Host (e.g. 1.1.1.1)",
+  "ping_btn": "Ping Probe",
+  "traceroute_btn": "Traceroute",
+  "bufferbloat_btn": "Bufferbloat Test",
+  "empty": "Run a probe to display diagnostic results (Ping, Traceroute, or Bufferbloat)."
+}

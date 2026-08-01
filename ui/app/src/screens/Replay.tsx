@@ -7,6 +7,7 @@
 // With no recording loaded, the transport is honest about having nothing to play.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { ReplayState } from "@netpulse/contract";
 import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query, command } from "../ipc";
@@ -27,6 +28,7 @@ function ms(ns: number): string {
 }
 
 export function Replay() {
+  const { t } = useTranslation(["replay", "common"]);
   const [state, setState] = useState<ReplayState | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,12 +58,10 @@ export function Replay() {
   const hasRecording = !!state && state.total_nanos > 0;
 
   return (
-    <section className="np-replay" aria-label="Replay">
+    <section className="np-replay" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <p className="np-replay__note">
-        Replay reuses the exact live pipeline — one pipeline, two sources — so what
-        you see is precisely what the engine did. It reconstructs byte-identically
-        every run (docs/21 §4, §6).
+        {t("desc")}
       </p>
 
       {!isLoaded ? (
@@ -118,10 +118,7 @@ export function Replay() {
           </div>
 
           {!hasRecording && (
-            <EmptyState>
-              No recording loaded to replay. Make a recording, then step through it —
-              the same session, every time.
-            </EmptyState>
+            <EmptyState>{t("empty")}</EmptyState>
           )}
         </>
       )}

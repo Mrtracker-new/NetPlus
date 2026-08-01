@@ -1,0 +1,5 @@
+{
+  "title": "Saved Session Recordings",
+  "desc": "Manage and inspect local PCAP & JSON capture sessions.",
+  "empty": "No saved capture recordings found."
+}

@@ -1,0 +1,7 @@
+{
+  "title": "Monitoreo en Vivo y Salud del Sistema",
+  "desc": "Flujo en tiempo real de interfaces de red, distribución de latencia, rendimiento y tasa de errores.",
+  "interfaces": "Interfaces",
+  "rx_tx": "Recepción: {{rx}} · Transmisión: {{tx}}",
+  "empty": "No se detectaron interfaces de red activas."
+}

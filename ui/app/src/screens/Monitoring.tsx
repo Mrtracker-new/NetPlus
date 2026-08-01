@@ -3,6 +3,7 @@
 // "looks like", never a verdict (docs/11 §6.3). Capture loss and network loss
 // are shown as distinct figures — conflating them would be a lie (docs/11 §6.4).
 
+import { useTranslation } from "react-i18next";
 import type { Breakdown, Diagnosis, CaptureStats, ShedStage } from "@netpulse/contract";
 import { EmptyState, EvidenceChips } from "@netpulse/components";
 import { useStore } from "../state/store";
@@ -146,6 +147,7 @@ function HostBars({ breakdown }: { breakdown: Breakdown }) {
 }
 
 export function Monitoring() {
+  const { t } = useTranslation(["monitoring", "common"]);
   const { monitor, throughput } = useStore();
   if (!monitor) {
     return <EmptyState>Idle — no traffic to measure.</EmptyState>;
@@ -163,7 +165,7 @@ export function Monitoring() {
   ];
 
   return (
-    <section className="np-monitor" aria-label="Monitoring">
+    <section className="np-monitor" aria-label={t("common:navigation.monitoring")}>
       <div className="np-kpis">
         {kpis.map((k) => (
           <div className="np-kpi" key={k.label}>

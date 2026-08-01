@@ -4,12 +4,14 @@
 // second entry point into the one model, from the time axis rather than the feed
 // (docs/10 §6). Dense GPU rendering (docs/10 §8) is a later optimization.
 
+import { useTranslation } from "react-i18next";
 import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { TimeRibbon } from "@netpulse/viz";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 export function Timeline() {
+  const { t } = useTranslation(["timeline", "common"]);
   const { feed } = useStore();
   const { navigationTarget } = useEvidenceNavigation();
 
@@ -25,16 +27,16 @@ export function Timeline() {
   }));
 
   if (events.length === 0) {
-    return <EmptyState>Nothing on the timeline yet — it fills as traffic is reconstructed.</EmptyState>;
+    return <EmptyState>{t("empty")}</EmptyState>;
   }
 
   return (
-    <section className="np-timeline" aria-label="Timeline">
+    <section className="np-timeline" aria-label={t("title")}>
       {navigationTarget?.screen === "timeline" && (
         <div className="np-filter-banner" style={{ marginBottom: "1rem" }} role="status">
           {highlightPacketId !== undefined
-            ? `Highlighted packet #${highlightPacketId} on timeline`
-            : "Highlighted timestamp on timeline"}
+            ? t("filter_banner", { packetId: highlightPacketId })
+            : t("title")}
         </div>
       )}
       <TimeRibbon

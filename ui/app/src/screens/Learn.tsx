@@ -7,6 +7,7 @@
 // data, so it can never be wrong about what they actually did (docs/13 §11).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { LessonOffer } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
@@ -69,6 +70,7 @@ function Offer({ offer }: { offer: LessonOffer }) {
 }
 
 export function Learn() {
+  const { t } = useTranslation(["learn", "common"]);
   const { feed } = useStore();
   const { depth } = useDisclosure();
   const [offers, setOffers] = useState<LessonOffer[]>([]);
@@ -122,10 +124,10 @@ export function Learn() {
   }
 
   return (
-    <section className="np-learn" aria-label="Lessons from your traffic">
+    <section className="np-learn" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       {offers.length === 0 ? (
-        <EmptyState>No lessons yet — browse a few sites and they'll appear here.</EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         offers.map((offer) => <Offer key={offer.lesson_id} offer={offer} />)
       )}

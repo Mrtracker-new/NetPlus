@@ -35,47 +35,6 @@ import { FleetScreen } from "./screens/Fleet";
 import { SessionDiffScreen } from "./screens/SessionDiff";
 import { EvidenceNavigationProvider, useEvidenceNavigation, type Screen } from "./context/EvidenceNavigationContext";
 
-const NAV: Array<{ id: Screen; label: string; icon: IconName }> = [
-  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-  { id: "journey", label: "Journey", icon: "journey" },
-  { id: "timeline", label: "Timeline", icon: "timeline" },
-  { id: "monitoring", label: "Monitor", icon: "monitoring" },
-  { id: "apps", label: "Apps", icon: "apps" },
-  { id: "diagnostics", label: "Diagnostics", icon: "diagnostics" },
-  { id: "sandbox", label: "Sandbox", icon: "sandbox" },
-  { id: "fleet", label: "Fleet", icon: "fleet" },
-  { id: "compare", label: "Compare", icon: "compare" },
-  { id: "security", label: "Security", icon: "security" },
-  { id: "assistant", label: "Assistant", icon: "assistant" },
-  { id: "learn", label: "Learn", icon: "learn" },
-  { id: "explorer", label: "Explorer", icon: "explorer" },
-  // Phase 5 lifecycle surfaces (docs/21–24).
-  { id: "recordings", label: "Recordings", icon: "recordings" },
-  { id: "replay", label: "Replay", icon: "replay" },
-  { id: "export", label: "Export", icon: "export" },
-  { id: "plugins", label: "Plugins", icon: "plugins" },
-];
-
-const SCREEN_TITLE: Record<Screen, string> = {
-  dashboard: "Dashboard",
-  journey: "Page Journey",
-  timeline: "Timeline",
-  monitoring: "Monitoring",
-  apps: "Applications",
-  security: "Security",
-  assistant: "Assistant",
-  learn: "Learn",
-  explorer: "Explorer",
-  recordings: "Recordings",
-  replay: "Replay",
-  export: "Export",
-  plugins: "Plugins",
-  diagnostics: "Diagnostics",
-  sandbox: "Protocol Sandbox",
-  fleet: "Fleet",
-  compare: "Session Compare",
-};
-
 function ModeSwitch() {
   const { depth, setDepth } = useDisclosure();
   return (
@@ -387,19 +346,41 @@ function RightRail() {
 
 function Shell() {
   const { screen, setScreen } = useEvidenceNavigation();
+  const { t } = useTranslation("common");
   // The data pump: feeds the client store from the engine (feed + monitor), and
   // subscribes to live capture deltas when running in Tauri.
   useLiveData();
   // Disclosure mode drives visual density via the [data-depth] CSS hook
   // (docs/09 §6.3): beginners get roomier type, experts get compact data.
   const { depth } = useDisclosure();
+
+  const navItems: Array<{ id: Screen; label: string; icon: IconName }> = [
+    { id: "dashboard", label: t("navigation.dashboard"), icon: "dashboard" },
+    { id: "journey", label: t("navigation.journey"), icon: "journey" },
+    { id: "timeline", label: t("navigation.timeline"), icon: "timeline" },
+    { id: "monitoring", label: t("navigation.monitoring"), icon: "monitoring" },
+    { id: "apps", label: t("navigation.apps"), icon: "apps" },
+    { id: "diagnostics", label: t("navigation.diagnostics"), icon: "diagnostics" },
+    { id: "sandbox", label: t("navigation.sandbox"), icon: "sandbox" },
+    { id: "fleet", label: t("navigation.fleet"), icon: "fleet" },
+    { id: "compare", label: t("navigation.compare"), icon: "compare" },
+    { id: "security", label: t("navigation.security"), icon: "security" },
+    { id: "assistant", label: t("navigation.assistant"), icon: "assistant" },
+    { id: "learn", label: t("navigation.learn"), icon: "learn" },
+    { id: "explorer", label: t("navigation.explorer"), icon: "explorer" },
+    { id: "recordings", label: t("navigation.recordings"), icon: "recordings" },
+    { id: "replay", label: t("navigation.replay"), icon: "replay" },
+    { id: "export", label: t("navigation.export"), icon: "export" },
+    { id: "plugins", label: t("navigation.plugins"), icon: "plugins" },
+  ];
+
   return (
     <div className="np-app" data-depth={depth}>
       <nav className="np-nav" aria-label="Primary">
         <div className="np-nav__brand" title="NetPulse">
           <Icon name="brand" />
         </div>
-        {NAV.map((item) => (
+        {navItems.map((item) => (
           <button
             key={item.id}
             data-label={item.label}
@@ -418,7 +399,7 @@ function Shell() {
           <span className="np-brand">NetPulse</span>
           <span className="np-search" aria-hidden="true">
             <Icon name="search" />
-            {SCREEN_TITLE[screen]}
+            {t(`screen_titles.${screen}` as any)}
           </span>
           <span className="np-header__spacer" />
           <CaptureControl />

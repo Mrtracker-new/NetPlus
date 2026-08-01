@@ -7,6 +7,7 @@
 // a recording fails closed rather than sealing an empty artifact (docs/02 §11).
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { RecordingSummary } from "@netpulse/contract";
 import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query, command } from "../ipc";
@@ -65,6 +66,7 @@ function RecordingCard({ rec }: { rec: RecordingSummary }) {
 }
 
 export function Recordings() {
+  const { t } = useTranslation(["recordings", "common"]);
   const [recordings, setRecordings] = useState<RecordingSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -92,27 +94,24 @@ export function Recordings() {
   });
 
   return (
-    <section className="np-recordings" aria-label="Recordings">
+    <section className="np-recordings" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       <div className="np-recordings__controls">
         <button className="np-btn" disabled={busy} onClick={() => void record("startRecording")}>
-          Start recording
+          {t("common:actions.start_capture")}
         </button>
         <button className="np-btn" disabled={busy} onClick={() => void record("stopRecording")}>
-          Stop
+          {t("common:actions.stop_capture")}
         </button>
         <span className="np-recordings__hint">
-          Recording is local and deliberate — nothing is uploaded (docs/22 §5).
+          {t("desc")}
         </span>
       </div>
 
       {!loaded ? (
         <Spinner />
       ) : recordings.length === 0 ? (
-        <EmptyState>
-          No recordings yet. A recording is a self-contained, replayable capture you
-          choose to make — with a privacy manifest stating exactly what's inside.
-        </EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         recordings.map((r) => <RecordingCard key={r.id} rec={r} />)
       )}

@@ -1,0 +1,5 @@
+{
+  "title": "Línea de tiempo",
+  "filter_banner": "Filtrado al paquete #{{packetId}}",
+  "empty": "Aún no se han capturado eventos en la línea de tiempo."
+}

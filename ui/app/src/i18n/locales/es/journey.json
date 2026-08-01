@@ -1,0 +1,11 @@
+{
+  "title": "Trayecto web",
+  "filter_banner": "Viendo el trayecto de la sesión #{{sessionId}}",
+  "empty": "Visita un sitio web y su trayecto aparecerá aquí.",
+  "fanout": {
+    "title_one": "Habló con {{count}} lugar",
+    "title_other": "Habló con {{count}} lugares",
+    "connections_one": "{{count}} conexión",
+    "connections_other": "{{count}} conexiones"
+  }
+}

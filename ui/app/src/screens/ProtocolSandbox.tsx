@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { DiagnosticSeverity, PacketInspection } from "@netpulse/contract";
 import { Button, Badge, Spinner, Notice, EmptyState } from "@netpulse/components";
 import { query } from "../ipc";
@@ -20,6 +21,7 @@ function normalizeSeverity(value: string): DiagnosticSeverity {
 }
 
 export function ProtocolSandboxScreen() {
+  const { t } = useTranslation(["sandbox", "common"]);
   const [layers, setLayers] = useState<string[]>(["Ethernet", "IPv4", "TCP", "HTTP/1.1"]);
   const [inspection, setInspection] = useState<PacketInspection | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -56,30 +58,28 @@ export function ProtocolSandboxScreen() {
 
   return (
     <section className="np-sandbox" aria-labelledby="protocol-sandbox-title">
-      <h2 id="protocol-sandbox-title">Protocol Sandbox & Interactive Packet Builder</h2>
-      <p className="np-sandbox__desc">
-        Safe offline packet construction & RFC diagnostic field validation (Observe-Only; Zero Transmit path).
-      </p>
+      <h2 id="protocol-sandbox-title">{t("title")}</h2>
+      <p className="np-sandbox__desc">{t("desc")}</p>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
       <div className="np-sandbox__controls">
         <Button variant="primary" busy={inspectBusy} disabled={inspectBusy} onClick={() => void inspectPacket()}>
-          Build & Inspect Packet
+          {t("build_btn")}
         </Button>
         <Button
           variant="standard"
           disabled={inspectBusy}
           onClick={() => selectPreset(["Ethernet", "IPv4", "TCP", "HTTP/1.1"])}
         >
-          HTTP/1.1 Stack
+          {t("http1_stack")}
         </Button>
         <Button
           variant="standard"
           disabled={inspectBusy}
           onClick={() => selectPreset(["Ethernet", "IPv6", "UDP", "QUIC", "HTTP/3"])}
         >
-          HTTP/3 Stack
+          {t("http3_stack")}
         </Button>
       </div>
 
@@ -128,9 +128,7 @@ export function ProtocolSandboxScreen() {
           </article>
         </div>
       ) : (
-        <EmptyState>
-          Build a custom packet or choose one of the preset protocol stacks to inspect packet layers and diagnostics.
-        </EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       )}
     </section>
   );

@@ -7,6 +7,7 @@
 // disclosed progressively (docs/14 §7) — the engine already gated it by depth.
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { PageJourney } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
@@ -30,6 +31,7 @@ function latestSessionId(feed: ReturnType<typeof useStore>["feed"]): number | nu
 }
 
 export function Journey() {
+  const { t } = useTranslation(["journey", "common"]);
   const { feed } = useStore();
   const { depth } = useDisclosure();
   const { navigationTarget, navigateToEvidence } = useEvidenceNavigation();
@@ -78,15 +80,15 @@ export function Journey() {
   }
 
   return (
-    <section className="np-journey" aria-label="Website journey">
+    <section className="np-journey" aria-label={t("title")}>
       <Notice message={notice} onDismiss={() => setNotice(null)} />
       {activeSessionId !== null && navigationTarget?.screen === "journey" && (
         <div className="np-filter-banner" role="status">
-          Viewing journey for session #{activeSessionId}
+          {t("filter_banner", { sessionId: activeSessionId })}
         </div>
       )}
       {!journey ? (
-        <EmptyState>Visit a website and its journey will appear here.</EmptyState>
+        <EmptyState>{t("empty")}</EmptyState>
       ) : (
         <>
           {/* The signature flow diagram: stages with traveling packets + fan-out. */}
@@ -108,13 +110,13 @@ export function Journey() {
           (docs/14 §5). Labeled by organization from local enrichment. */}
       {journey.fanout.length > 0 && (
         <aside className="np-fanout" aria-label="Servers contacted">
-          <h3>Talked to {journey.fanout.length} place(s)</h3>
+          <h3>{t("fanout.title", { count: journey.fanout.length })}</h3>
           <ul>
             {journey.fanout.map((node) => (
               <li key={node.label}>
                 <span className="np-fanout__label">{node.label}</span>
                 <span className="np-fanout__meta">
-                  {node.flows} connection{node.flows === 1 ? "" : "s"} · {humanBytes(node.bytes)}
+                  {t("fanout.connections", { count: node.flows })} · {humanBytes(node.bytes)}
                 </span>
               </li>
             ))}

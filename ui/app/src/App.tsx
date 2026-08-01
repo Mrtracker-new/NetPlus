@@ -32,25 +32,7 @@ import { DiagnosticsScreen } from "./screens/Diagnostics";
 import { ProtocolSandboxScreen } from "./screens/ProtocolSandbox";
 import { FleetScreen } from "./screens/Fleet";
 import { SessionDiffScreen } from "./screens/SessionDiff";
-
-type Screen =
-  | "dashboard"
-  | "journey"
-  | "timeline"
-  | "monitoring"
-  | "apps"
-  | "security"
-  | "assistant"
-  | "learn"
-  | "explorer"
-  | "recordings"
-  | "replay"
-  | "export"
-  | "plugins"
-  | "diagnostics"
-  | "sandbox"
-  | "fleet"
-  | "compare";
+import { EvidenceNavigationProvider, useEvidenceNavigation, type Screen } from "./context/EvidenceNavigationContext";
 
 const NAV: Array<{ id: Screen; label: string; icon: IconName }> = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
@@ -299,7 +281,7 @@ function RightRail() {
 }
 
 function Shell() {
-  const [screen, setScreen] = useState<Screen>("dashboard");
+  const { screen, setScreen } = useEvidenceNavigation();
   // The data pump: feeds the client store from the engine (feed + monitor), and
   // subscribes to live capture deltas when running in Tauri.
   useLiveData();
@@ -367,7 +349,10 @@ function Shell() {
 export function App() {
   return (
     <DisclosureProvider>
-      <Shell />
+      <EvidenceNavigationProvider>
+        <Shell />
+      </EvidenceNavigationProvider>
     </DisclosureProvider>
   );
 }
+

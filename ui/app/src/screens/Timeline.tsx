@@ -7,9 +7,17 @@
 import { EmptyState } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { TimeRibbon } from "@netpulse/viz";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 export function Timeline() {
   const { feed } = useStore();
+  const { navigationTarget } = useEvidenceNavigation();
+
+  const highlightPacketId =
+    navigationTarget?.screen === "timeline" ? navigationTarget.packetId : undefined;
+  const highlightTimestamp =
+    navigationTarget?.screen === "timeline" ? navigationTarget.timestamp : undefined;
+
   const events = feed.map((c) => ({
     at: c.at_mono_nanos,
     label: c.headline,
@@ -22,7 +30,19 @@ export function Timeline() {
 
   return (
     <section className="np-timeline" aria-label="Timeline">
-      <TimeRibbon events={events} />
+      {navigationTarget?.screen === "timeline" && (
+        <div className="np-filter-banner" style={{ marginBottom: "1rem" }} role="status">
+          {highlightPacketId !== undefined
+            ? `Highlighted packet #${highlightPacketId} on timeline`
+            : "Highlighted timestamp on timeline"}
+        </div>
+      )}
+      <TimeRibbon
+        events={events}
+        highlightPacketId={highlightPacketId}
+        highlightTimestamp={highlightTimestamp}
+      />
     </section>
   );
 }
+

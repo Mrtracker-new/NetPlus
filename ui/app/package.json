@@ -8,24 +8,29 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run src/__tests__ --environment jsdom --globals"
   },
   "dependencies": {
-    "@netpulse/contract": "workspace:*",
     "@netpulse/components": "workspace:*",
-    "@netpulse/viz": "workspace:*",
+    "@netpulse/contract": "workspace:*",
     "@netpulse/design-system": "workspace:*",
+    "@netpulse/viz": "workspace:*",
     "@tauri-apps/api": "^2.0.0",
+    "i18next": "^23.11.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "i18next": "^23.11.5",
     "react-i18next": "^14.1.2"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "jsdom": "^30.0.1",
     "typescript": "^5.4.0",
-    "vite": "^5.4.0"
+    "vite": "^5.4.0",
+    "vitest": "^2.1.8"
   }
 }

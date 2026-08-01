@@ -8,10 +8,11 @@
 
 import { useEffect, useState } from "react";
 import type { LessonOffer } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
+import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function toErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -30,6 +31,8 @@ function sessionIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[]
 }
 
 function Offer({ offer }: { offer: LessonOffer }) {
+  const { navigateToEvidence } = useEvidenceNavigation();
+
   return (
     <article className="np-lesson">
       <header className="np-lesson__title">
@@ -59,7 +62,7 @@ function Offer({ offer }: { offer: LessonOffer }) {
       )}
 
       <footer className="np-lesson__foot">
-        <span className="np-evidence-count">{offer.evidence.length} evidence</span>
+        <EvidenceChips evidence={offer.evidence} onNavigate={navigateToEvidence} />
       </footer>
     </article>
   );

@@ -8,11 +8,12 @@
 
 import { useEffect, useState } from "react";
 import type { PageJourney } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
+import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore } from "../state/store";
-import { JourneyFlow } from "@netpulse/viz";
+import { JourneyFlow, humanBytes } from "@netpulse/viz";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function toErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -28,28 +29,27 @@ function latestSessionId(feed: ReturnType<typeof useStore>["feed"]): number | nu
   return null;
 }
 
-function humanBytes(bytes: number): string {
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${bytes} B`;
-}
-
 export function Journey() {
   const { feed } = useStore();
   const { depth } = useDisclosure();
+  const { navigationTarget, navigateToEvidence } = useEvidenceNavigation();
   const [journey, setJourney] = useState<PageJourney | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const activeSessionId =
+    navigationTarget?.screen === "journey"
+      ? navigationTarget.sessionId
+      : latestSessionId(feed);
+
   useEffect(() => {
     let cancelled = false;
-    const sessionId = latestSessionId(feed);
-    if (sessionId === null) {
+    if (activeSessionId === null) {
       setJourney(null);
       setLoaded(true);
       return;
     }
-    query({ kind: "journeyStagesOfSession", session_id: sessionId, depth })
+    query({ kind: "journeyStagesOfSession", session_id: activeSessionId, depth })
       .then((res) => {
         if (!cancelled && res.kind === "pageJourney") setJourney(res.journey);
       })
@@ -62,7 +62,7 @@ export function Journey() {
     return () => {
       cancelled = true;
     };
-  }, [feed, depth]);
+  }, [feed, depth, activeSessionId]);
 
   if (!loaded) {
     return <Spinner />;
@@ -71,6 +71,11 @@ export function Journey() {
   return (
     <section className="np-journey" aria-label="Website journey">
       <Notice message={notice} onDismiss={() => setNotice(null)} />
+      {activeSessionId !== null && navigationTarget?.screen === "journey" && (
+        <div className="np-filter-banner" role="status">
+          Viewing journey for session #{activeSessionId}
+        </div>
+      )}
       {!journey ? (
         <EmptyState>Visit a website and its journey will appear here.</EmptyState>
       ) : (
@@ -85,7 +90,7 @@ export function Journey() {
             <p className="np-stage__narration">{stage.narration}</p>
             {/* detail is present only at Intermediate+ (engine-gated, docs/14 §7). */}
             {stage.detail && <p className="np-stage__detail">{stage.detail}</p>}
-            <span className="np-evidence-count">{stage.evidence.length} evidence</span>
+            <EvidenceChips evidence={stage.evidence} onNavigate={navigateToEvidence} />
           </li>
         ))}
       </ol>

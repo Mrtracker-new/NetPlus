@@ -8,10 +8,11 @@
 
 import { useEffect, useState } from "react";
 import type { SecurityFinding } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
+import { EmptyState, Notice, Spinner, EvidenceChips } from "@netpulse/components";
 import { query } from "../ipc";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { ConfidenceMeter } from "@netpulse/viz";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function toErrorMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -40,6 +41,8 @@ function FindingCard({
   onMarkExpected: () => void;
 }) {
   const { shows } = useDisclosure();
+  const { navigateToEvidence } = useEvidenceNavigation();
+
   return (
     <article className={expected ? "np-finding np-finding--expected" : "np-finding"}>
       <header className="np-finding__head">
@@ -74,7 +77,7 @@ function FindingCard({
 
       <footer className="np-finding__foot">
         <span className="np-finding__action">{finding.suggested_action}</span>
-        <span className="np-evidence-count">{finding.evidence.length} evidence</span>
+        <EvidenceChips evidence={finding.evidence} onNavigate={navigateToEvidence} />
         <button
           className="np-finding__expected-btn"
           disabled={expected}

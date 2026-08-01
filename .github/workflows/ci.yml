@@ -92,6 +92,12 @@ jobs:
       - name: Typecheck app
         run: pnpm --filter @netpulse/app typecheck
 
+      - name: Test components
+        run: pnpm --filter @netpulse/components test
+
+      - name: Test app
+        run: pnpm --filter @netpulse/app test
+
   audit:
     name: Security Audit (cargo-audit + cargo-deny + pnpm audit)
     runs-on: ubuntu-latest

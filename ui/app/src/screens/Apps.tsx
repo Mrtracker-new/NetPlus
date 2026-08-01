@@ -1,13 +1,9 @@
-// Application Tracking — "which app is using the Internet, and why?" (docs/12).
-// Attribution maps a flow to the process that owns it; where the OS gives no
-// clear owner, we say "unknown" honestly rather than guess (docs/12 §8), and
-// every attribution carries its confidence (docs/12 §5.4).
-
 import { useEffect, useState } from "react";
 import type { Attribution, AttributionConfidence } from "@netpulse/contract";
 import { EmptyState, Notice, Spinner } from "@netpulse/components";
 import { query } from "../ipc";
 import { useStore } from "../state/store";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 const CONFIDENCE_LABEL: Record<AttributionConfidence, string> = {
   high: "confident",
@@ -33,13 +29,21 @@ function flowIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[] {
 
 export function Apps() {
   const { feed } = useStore();
+  const { navigationTarget, clearNavigationTarget } = useEvidenceNavigation();
   const [rows, setRows] = useState<Array<{ flowId: number; attr: Attribution }>>([]);
   const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
+
   useEffect(() => {
     let cancelled = false;
-    const flowIds = flowIdsFromFeed(feed);
+    const flowIdsSet = new Set(flowIdsFromFeed(feed));
+    if (targetFlowId !== null) {
+      flowIdsSet.add(targetFlowId);
+    }
+    const flowIds = [...flowIdsSet];
+
     Promise.all(
       flowIds.map(async (flowId) => {
         const res = await query({ kind: "attributionOfFlow", flow_id: flowId });
@@ -60,21 +64,35 @@ export function Apps() {
     return () => {
       cancelled = true;
     };
-  }, [feed]);
+  }, [feed, targetFlowId]);
 
   if (!loaded) {
     return <Spinner />;
   }
 
+  const displayedRows = targetFlowId !== null
+    ? rows.filter((r) => r.flowId === targetFlowId)
+    : rows;
+
   return (
     <section className="np-apps" aria-label="Applications">
       <Notice message={notice} onDismiss={() => setNotice(null)} />
-      {rows.length === 0 ? (
-        <EmptyState>No attributed flows yet.</EmptyState>
+      {targetFlowId !== null && (
+        <div className="np-filter-banner" style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }} role="status">
+          <span>Filtered to flow #{targetFlowId}</span>
+          <button className="np-btn np-btn--secondary" onClick={clearNavigationTarget}>
+            Show all flows
+          </button>
+        </div>
+      )}
+      {displayedRows.length === 0 ? (
+        <EmptyState>
+          {targetFlowId !== null ? `No flow found for id #${targetFlowId}` : "No attributed flows yet."}
+        </EmptyState>
       ) : (
         <table>
           <tbody>
-            {rows.map(({ flowId, attr }) => (
+            {displayedRows.map(({ flowId, attr }) => (
               <tr key={flowId}>
                 <td>flow #{flowId}</td>
                 <td>{attr.process_name ?? "unknown owner"}</td>
@@ -88,3 +106,4 @@ export function Apps() {
     </section>
   );
 }
+

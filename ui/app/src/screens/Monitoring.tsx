@@ -4,17 +4,20 @@
 // are shown as distinct figures — conflating them would be a lie (docs/11 §6.4).
 
 import type { Breakdown, Diagnosis } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, EvidenceChips } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "@netpulse/viz";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
+  const { navigateToEvidence } = useEvidenceNavigation();
+
   return (
     <article className="np-diagnosis">
       <p>{diagnosis.explanation}</p>
       {/* Confidence is always shown — honest over reassuring (docs/11 §6.3). */}
       <ConfidenceMeter percent={diagnosis.confidence_percent} />
-      <span className="np-evidence-count">{diagnosis.evidence.length} evidence</span>
+      <EvidenceChips evidence={diagnosis.evidence} onNavigate={navigateToEvidence} />
     </article>
   );
 }

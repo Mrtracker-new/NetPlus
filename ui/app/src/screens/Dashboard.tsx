@@ -6,10 +6,11 @@
 
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity } from "@netpulse/contract";
-import { EmptyState } from "@netpulse/components";
+import { EmptyState, EvidenceChips } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { Constellation, humanBytes } from "@netpulse/viz";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 // Severity as icon + label — colour is never the sole carrier of meaning
 // (docs/09 §12), and findings stay calm, never alarmist (docs/09 §5.2).
@@ -19,19 +20,10 @@ const SEVERITY_ICON: Record<Severity, string> = {
   finding: "⚠",
 };
 
-function EvidenceBadge({ card }: { card: NarrativeCard }) {
-  const n = card.evidence.length;
-  // Provenance is always present (docs/02 §6.3); the badge is the drill-down
-  // affordance toward session → flow → protocol → raw (docs/09 §8).
-  return (
-    <button className="np-evidence" title="Show the flows and session behind this">
-      {n} evidence →
-    </button>
-  );
-}
-
 function Card({ card }: { card: NarrativeCard }) {
   const { shows } = useDisclosure();
+  const { navigateToEvidence } = useEvidenceNavigation();
+
   return (
     <article className={`np-card np-card--${card.severity}`}>
       <header className="np-card__headline">
@@ -47,7 +39,7 @@ function Card({ card }: { card: NarrativeCard }) {
         </ul>
       )}
       <footer className="np-card__foot">
-        <EvidenceBadge card={card} />
+        <EvidenceChips evidence={card.evidence} onNavigate={navigateToEvidence} />
       </footer>
     </article>
   );

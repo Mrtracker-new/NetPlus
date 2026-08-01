@@ -28,6 +28,7 @@ import type {
   PayloadLevel,
   PluginDescriptor,
   Interface,
+  HandshakeResponse,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -61,6 +62,7 @@ export type Query =
   | { kind: "exportPreview"; selection: ExportSelection; format: ExportFormat }
   | { kind: "listPlugins" }
   | { kind: "interfaces" }
+  | { kind: "handshake"; client_version: number }
   | { kind: "getCapabilityRegistry" }
   | { kind: "runPing"; target: string; count: number }
   | { kind: "runTraceroute"; target: string; transport: string; maxHops: number }
@@ -155,6 +157,7 @@ export type QueryResponse =
   | { kind: "exportPreview"; preview: ExportPreview }
   | { kind: "plugins"; plugins: PluginDescriptor[] }
   | { kind: "interfaces"; interfaces: Interface[] }
+  | { kind: "handshake"; handshake: HandshakeResponse }
   | { kind: "capabilityRegistry"; registry: any }
   | { kind: "pingResult"; result: PingResult }
   | { kind: "tracerouteResult"; hops: TracerouteHop[] }

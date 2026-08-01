@@ -3,11 +3,81 @@
 // "looks like", never a verdict (docs/11 §6.3). Capture loss and network loss
 // are shown as distinct figures — conflating them would be a lie (docs/11 §6.4).
 
-import type { Breakdown, Diagnosis } from "@netpulse/contract";
+import type { Breakdown, Diagnosis, CaptureStats, ShedStage } from "@netpulse/contract";
 import { EmptyState, EvidenceChips } from "@netpulse/components";
 import { useStore } from "../state/store";
 import { AreaChart, BarRow, ConfidenceMeter, Donut, humanBytes, primaryHostName } from "@netpulse/viz";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
+
+function CaptureHealthPanel({
+  stats,
+  captureDrops,
+}: {
+  stats?: CaptureStats;
+  captureDrops: number;
+}) {
+  const bufferFrames = stats?.buffer_frames ?? 0;
+  const bufferCapacity = stats?.buffer_capacity ?? 1000;
+  const bufferPercent =
+    bufferCapacity > 0 ? Math.round((bufferFrames / bufferCapacity) * 100) : 0;
+  const stage: ShedStage = stats?.shed_stage ?? "none";
+  const drops = stats?.dropped ?? captureDrops;
+
+  const stageInfo: Record<ShedStage, { label: string; color: string }> = {
+    none: { label: "Full Fidelity", color: "#10b981" },
+    payloads_off: { label: "Payloads Off", color: "#f59e0b" },
+    sample_dissection: { label: "Sample Dissection", color: "#f59e0b" },
+    coarsen_metrics: { label: "Coarsened Metrics", color: "#f59e0b" },
+    drop_packets: { label: "Dropping Packets", color: "#ef4444" },
+  };
+
+  const currentStage = stageInfo[stage] ?? stageInfo.none;
+
+  return (
+    <section className="np-panel np-capture-health" aria-label="Capture Health">
+      <h3 className="np-panel__title">Capture Health</h3>
+      <div className="np-kpis">
+        <div className="np-kpi">
+          <div className="np-kpi__label">Buffer Usage</div>
+          <div className="np-kpi__value">{bufferPercent}%</div>
+          <div style={{ fontSize: "0.75rem", color: "var(--np-text-mute)", marginTop: "2px" }}>
+            {bufferFrames} / {bufferCapacity} frames
+          </div>
+        </div>
+        <div className="np-kpi">
+          <div className="np-kpi__label">Shedding Stage</div>
+          <div
+            className="np-kpi__value"
+            style={{
+              color: currentStage.color,
+              fontSize: "1rem",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+            }}
+          >
+            <span
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: currentStage.color,
+                display: "inline-block",
+              }}
+            />
+            {currentStage.label}
+          </div>
+        </div>
+        <div className="np-kpi">
+          <div className="np-kpi__label">Drop Count</div>
+          <div className="np-kpi__value" style={{ color: drops > 0 ? "#ef4444" : "inherit" }}>
+            {drops}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   const { navigateToEvidence } = useEvidenceNavigation();
@@ -102,6 +172,8 @@ export function Monitoring() {
           </div>
         ))}
       </div>
+
+      <CaptureHealthPanel stats={monitor.capture_stats} captureDrops={monitor.capture_drops} />
 
       <div className="np-monitor__top">
         <section className="np-panel">

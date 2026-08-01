@@ -56,12 +56,27 @@ export interface Diagnosis {
   evidence: EvidenceRef[];
 }
 
+export type ShedStage =
+  | "none"
+  | "payloads_off"
+  | "sample_dissection"
+  | "coarsen_metrics"
+  | "drop_packets";
+
+export interface CaptureStats {
+  buffer_frames: number;
+  buffer_capacity: number;
+  shed_stage: ShedStage;
+  dropped: number;
+}
+
 export interface MonitorSnapshot {
   by_protocol: Breakdown;
   by_host: Breakdown;
   diagnoses: Diagnosis[];
   network_loss_indicators: number;
   capture_drops: number;
+  capture_stats?: CaptureStats;
 }
 
 export interface Attribution {

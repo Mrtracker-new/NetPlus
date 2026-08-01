@@ -1,72 +1,31 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Attribution, AttributionConfidence } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
-import { query } from "../ipc";
-import { useStore } from "../state/store";
-import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-// Collect the distinct flow ids referenced by the current feed — the flows we
-// can ask attribution about.
-function flowIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[] {
-  const ids = new Set<number>();
-  for (const card of feed) {
-    for (const e of card.evidence) {
-      if (e.kind === "flow") ids.add(e.id);
-    }
-  }
-  return [...ids];
-}
+import { useAppsController } from "../hooks/useAppsController";
+import { AppsSummary } from "./Apps/AppsSummary";
+import { AppsFilters } from "./Apps/AppsFilters";
+import { ProcessRow } from "./Apps/ProcessRow";
 
 export function Apps() {
   const { t } = useTranslation(["apps", "common"]);
-  const { feed } = useStore();
-  const { navigationTarget, clearNavigationTarget } = useEvidenceNavigation();
-  const [rows, setRows] = useState<Array<{ flowId: number; attr: Attribution }>>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
 
-  const confidenceLabel: Record<AttributionConfidence, string> = {
-    high: t("table.confident"),
-    low: t("table.tentative"),
-    unknown: t("table.unknown_owner"),
-  };
-
-  const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
-
-  useEffect(() => {
-    let cancelled = false;
-    const flowIdsSet = new Set(flowIdsFromFeed(feed));
-    if (targetFlowId !== null) {
-      flowIdsSet.add(targetFlowId);
-    }
-    const flowIds = [...flowIdsSet];
-
-    Promise.all(
-      flowIds.map(async (flowId) => {
-        const res = await query({ kind: "attributionOfFlow", flow_id: flowId });
-        return res.kind === "attribution" ? { flowId, attr: res.attribution } : null;
-      }),
-    )
-      .then((results) => {
-        if (!cancelled) {
-          setRows(results.filter((r): r is { flowId: number; attr: Attribution } => r !== null));
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setNotice(toErrorMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [feed, targetFlowId]);
+  const {
+    rows,
+    groupedProcesses,
+    summaryMetrics,
+    searchQuery,
+    setSearchQuery,
+    confidenceFilter,
+    setConfidenceFilter,
+    targetFlowId,
+    clearTargetFlow,
+    expandedKeys,
+    toggleExpandGroup,
+    inspectFlow,
+    loaded,
+    notice,
+    setNotice,
+    announcement,
+  } = useAppsController();
 
   if (!loaded) {
     return (
@@ -81,40 +40,111 @@ export function Apps() {
     );
   }
 
-  const displayedRows = targetFlowId !== null
-    ? rows.filter((r) => r.flowId === targetFlowId)
-    : rows;
+  const hasActiveFilters = searchQuery.trim().length > 0 || confidenceFilter !== "all";
 
   return (
     <section className="np-apps" aria-label={t("title")}>
+      <header style={{ marginBottom: "1.25rem" }}>
+        <h1 className="np-hero__title">{t("title")}</h1>
+        <p className="np-hero__sub">{t("hero_subtitle")}</p>
+      </header>
+
+      {/* Screen Reader Live Announcement Region */}
+      <div className="np-sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      {/* Error Notice Banner */}
       <Notice message={notice} onDismiss={() => setNotice(null)} />
+
+      {/* Filtered Target Flow Banner */}
       {targetFlowId !== null && (
-        <div className="np-filter-banner" style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }} role="status">
+        <div
+          className="np-filter-banner"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "1.25rem",
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px solid var(--np-accent, #2fe0d6)",
+            padding: "0.6rem 1rem",
+            borderRadius: "var(--np-radius-md, 8px)",
+          }}
+          role="status"
+        >
           <span>{t("filtered_banner", { flowId: targetFlowId })}</span>
-          <button className="np-btn np-btn--secondary" onClick={clearNavigationTarget}>
-            {t("common:actions.show_all")}
+          <button type="button" className="np-btn np-btn--ghost" onClick={clearTargetFlow}>
+            ✕ {t("clear_filter")}
           </button>
         </div>
       )}
-      {displayedRows.length === 0 ? (
+
+      {/* Classified Empty Capture State */}
+      {rows.length === 0 ? (
         <EmptyState>
           {targetFlowId !== null ? t("empty_filtered", { flowId: targetFlowId }) : t("empty_default")}
         </EmptyState>
       ) : (
-        <table>
-          <tbody>
-            {displayedRows.map(({ flowId, attr }) => (
-              <tr key={flowId}>
-                <td>{t("table.flow", { id: flowId })}</td>
-                <td>{attr.process_name ?? t("table.unknown_owner")}</td>
-                <td>{attr.pid !== null ? t("table.pid", { pid: attr.pid }) : "—"}</td>
-                <td>{confidenceLabel[attr.confidence]}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <>
+          {/* Header Summary KPI Cards */}
+          <AppsSummary metrics={summaryMetrics} />
+
+          {/* Search & Confidence Level Filter Bar */}
+          <AppsFilters
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            confidenceFilter={confidenceFilter}
+            onConfidenceChange={setConfidenceFilter}
+          />
+
+          {/* Classified Filter Empty State vs Process Table */}
+          {groupedProcesses.length === 0 ? (
+            <div style={{ margin: "2rem 0" }}>
+              <EmptyState>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                  <div>{t("empty_search")}</div>
+                  {hasActiveFilters && (
+                    <button
+                      type="button"
+                      className="np-btn np-btn--primary"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setConfidenceFilter("all");
+                      }}
+                    >
+                      {t("clear_filter")}
+                    </button>
+                  )}
+                </div>
+              </EmptyState>
+            </div>
+          ) : (
+            <table aria-label={t("title")} style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 0.5rem" }}>
+              <thead>
+                <tr style={{ textAlign: "left", color: "var(--np-muted, #8b9bb4)", fontSize: "0.8rem" }}>
+                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.process")}</th>
+                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.pid")}</th>
+                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.flows")}</th>
+                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.confidence")}</th>
+                  <th scope="col" style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>{t("table_headers.actions")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupedProcesses.map((group) => (
+                  <ProcessRow
+                    key={group.key}
+                    group={group}
+                    isExpanded={expandedKeys.has(group.key)}
+                    onToggleExpand={toggleExpandGroup}
+                    onInspectFlow={inspectFlow}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+        </>
       )}
     </section>
   );
 }
-

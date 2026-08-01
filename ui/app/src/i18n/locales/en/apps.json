@@ -1,13 +1,33 @@
 {
-  "title": "Applications",
-  "filtered_banner": "Filtered to flow #{{flowId}}",
-  "empty_filtered": "No flow found for id #{{flowId}}",
-  "empty_default": "No attributed flows yet.",
-  "table": {
-    "flow": "flow #{{id}}",
-    "pid": "pid {{pid}}",
-    "unknown_owner": "unknown owner",
-    "confident": "confident",
-    "tentative": "tentative"
-  }
+  "title": "Applications & Lineage",
+  "hero_subtitle": "Process attribution, socket lineage, and confidence scoring across active network flows.",
+  "kpi_apps": "Attributed Apps",
+  "kpi_flows": "Active Flows",
+  "kpi_confident": "High Confidence",
+  "kpi_unattributed": "Unattributed",
+  "search_placeholder": "Search applications by process name, PID, or flow ID...",
+  "filter_all": "All Severities",
+  "filter_confident": "High Confidence",
+  "filter_tentative": "Tentative",
+  "filter_unknown": "Unknown Owner",
+  "filtered_banner": "Filtered to target flow #{{flowId}}",
+  "clear_filter": "Clear Filter",
+  "empty_default": "No attributed applications captured yet. Start a capture session to populate process lineage.",
+  "empty_filtered": "No application found matching target flow #{{flowId}}.",
+  "empty_search": "No applications match the current search query or confidence filter.",
+  "table_headers": {
+    "process": "Process Name",
+    "pid": "PID",
+    "flows": "Flow Count",
+    "confidence": "Confidence",
+    "actions": "Actions"
+  },
+  "confidence_labels": {
+    "high": "High Confidence",
+    "low": "Tentative",
+    "unknown": "Unknown Owner"
+  },
+  "inspect_flow": "Inspect Flow",
+  "expand": "Expand",
+  "collapse": "Collapse"
 }

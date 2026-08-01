@@ -1,13 +1,33 @@
 {
-  "title": "Aplicaciones",
-  "filtered_banner": "Filtrado al flujo #{{flowId}}",
-  "empty_filtered": "No se encontró ningún flujo para el id #{{flowId}}",
-  "empty_default": "Aún no hay flujos atribuidos.",
-  "table": {
-    "flow": "flujo #{{id}}",
-    "pid": "pid {{pid}}",
-    "unknown_owner": "propietario desconocido",
-    "confident": "confiado",
-    "tentative": "tentativo"
-  }
+  "title": "Aplicaciones y Linaje",
+  "hero_subtitle": "Atribución de procesos, linaje de sockets y puntuación de confianza en flujos de red activos.",
+  "kpi_apps": "Aplicaciones Atribuidas",
+  "kpi_flows": "Flujos Activos",
+  "kpi_confident": "Alta Confianza",
+  "kpi_unattributed": "Sin Atribuir",
+  "search_placeholder": "Buscar aplicaciones por nombre de proceso, PID o ID de flujo...",
+  "filter_all": "Todas",
+  "filter_confident": "Alta Confianza",
+  "filter_tentative": "Tentativa",
+  "filter_unknown": "Propietario Desconocido",
+  "filtered_banner": "Filtrado al flujo de destino #{{flowId}}",
+  "clear_filter": "Limpiar Filtro",
+  "empty_default": "Aún no se han capturado aplicaciones atribuidas. Inicia una captura para ver el linaje de procesos.",
+  "empty_filtered": "No se encontró ninguna aplicación que coincida con el flujo de destino #{{flowId}}.",
+  "empty_search": "Ninguna aplicación coincide con la búsqueda o el filtro de confianza actual.",
+  "table_headers": {
+    "process": "Nombre del Proceso",
+    "pid": "PID",
+    "flows": "Conteo de Flujos",
+    "confidence": "Confianza",
+    "actions": "Acciones"
+  },
+  "confidence_labels": {
+    "high": "Alta Confianza",
+    "low": "Tentativa",
+    "unknown": "Propietario Desconocido"
+  },
+  "inspect_flow": "Inspeccionar Flujo",
+  "expand": "Expandir",
+  "collapse": "Contraer"
 }

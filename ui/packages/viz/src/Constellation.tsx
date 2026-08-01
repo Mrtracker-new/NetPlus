@@ -1,42 +1,48 @@
-// The Network Constellation — the Dashboard centerpiece (a you-at-center radial
-// map of the hosts NetPulse has *actually observed*). Every figure it shows is
-// real: node size = real bytes, arc presence = real flows, hover/expand read the
-// real BreakdownRow. There is no geography, no latency, no country and no
-// "attack origin" here because the engine has none of those (docs honesty-by-
-// construction, contract generated.ts) — inventing them would be a lie.
+// The Network Constellation — Cyber Network Visualizer (you-at-center radial map).
+// Every figure shown is real: node size = real bytes, arc width = log(bytes),
+// hover/expand read the real BreakdownRow. Honesty-by-construction.
 //
-// It is hand-rolled SVG (no three.js / globe.gl) to keep the zero-runtime-dep
-// rule, matching the existing viz primitives. A single requestAnimationFrame loop
-// mutates SVG attributes through refs so the ambient rotation and traveling
-// packets run at 60fps without re-rendering React. Rotation is honestly gated:
-// it stops under prefers-reduced-motion, while hovering (so a tooltip stays put),
-// while dragging, and when the tab is hidden.
+// Structured into distinct SVG rendering layers: bg, grid, radar, links, packets,
+// nodes, you, hud, tooltip. SVG attributes mutate via refs in a single 60fps
+// requestAnimationFrame loop to maintain zero-runtime-dep 60fps GPU performance.
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import type { BreakdownRow } from "@netpulse/contract";
 import { humanBytes, hostSourceLabel, primaryHostName } from "./utils";
 
-// viewBox geometry (SVG scales to container width; aspect is fixed so the HTML
-// tooltip can map viewBox coords → percentage of the stage box precisely).
 const W = 720;
 const H = 500;
 const CX = W / 2;
 const CY = H / 2;
 const RINGS = [96, 150, 205]; // inner→outer; heavier hosts sit closer to YOU
 const MAX_NODES = 12; // keep the field legible; overflow is disclosed honestly
-const YOU_R = 30;
+const YOU_R = 26;
 
-type Status = "active" | "idle";
+export type Status = "active" | "idle";
+export type SemanticStatus = "healthy" | "busy" | "warning" | "error" | "idle";
+
+const STATUS_COLORS: Record<SemanticStatus, string> = {
+  healthy: "#2fe0d6",
+  busy: "#6f76f5",
+  warning: "#f2b64d",
+  error: "#ef6167",
+  idle: "#a0aec0",
+};
+
+function getStatusColor(status: SemanticStatus): string {
+  return STATUS_COLORS[status] || "#a0aec0";
+}
 
 interface Placed {
   key: string;
   row: BreakdownRow;
-  angle: number; // base angle (radians), before ambient rotation
+  angle: number; // base angle (radians)
   radius: number;
   size: number; // node dot radius
   status: Status;
-  phase: number; // packet travel offset so arcs don't pulse in lockstep
-  share: number; // fraction of total observed bytes (real)
+  semanticStatus: SemanticStatus;
+  phase: number; // packet travel offset
+  share: number; // fraction of total observed bytes
 }
 
 /** FNV-1a — a stable per-label hash so a host keeps its slot frame-to-frame. */
@@ -53,8 +59,33 @@ function truncate(s: string, n = 16): string {
   return s.length > n ? `${s.slice(0, n - 1)}…` : s;
 }
 
-/** Reactive prefers-reduced-motion — gates the JS animation loop (the global CSS
- *  rule can't stop requestAnimationFrame). */
+/** Determine semantic status mapping from real telemetry */
+function getSemanticStatus(row: BreakdownRow): SemanticStatus {
+  if (row.bytes === 0) return "idle";
+  if (row.flows > 15 || row.bytes > 5_000_000) return "busy";
+  return "healthy";
+}
+
+/** Logarithmic link width calculation (log10 bytes) */
+function getLinkWidth(bytes: number): number {
+  if (bytes <= 0) return 1;
+  const logVal = Math.log10(bytes);
+  return Math.max(1.2, Math.min(5.5, Math.max(0, logVal - 2) * 1.1));
+}
+
+/** Extract protocol tags (TLS, DNS, HTTP, QUIC, etc.) from host label */
+function extractProtocols(row: BreakdownRow): string[] {
+  const protos = new Set<string>();
+  const lbl = row.label.toLowerCase();
+  if (lbl.includes("443") || lbl.includes("https")) protos.add("TLS");
+  if (lbl.includes("53") || lbl.includes("dns")) protos.add("DNS");
+  if (lbl.includes("80") || lbl.includes("http")) protos.add("HTTP");
+  if (lbl.includes("quic")) protos.add("QUIC");
+  if (protos.size === 0) protos.add("TCP");
+  return Array.from(protos);
+}
+
+/** Reactive prefers-reduced-motion check */
 function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -68,15 +99,12 @@ function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-/** Lay hosts out on concentric rings: ranked by bytes (heavier = inner ring),
- *  evenly spaced within each ring, staggered per ring. Deterministic given the
- *  set of hosts, so the field is stable between snapshots. */
+/** Layout hosts on concentric rings ranked by bytes */
 function layout(hosts: BreakdownRow[]): Placed[] {
   const ranked = [...hosts].sort((a, b) => b.bytes - a.bytes).slice(0, MAX_NODES);
   const totalBytes = hosts.reduce((s, r) => s + r.bytes, 0) || 1;
   const maxBytes = ranked.reduce((m, r) => Math.max(m, r.bytes), 0) || 1;
 
-  // Bucket ranks into rings: inner ring fills first (the heaviest talkers).
   const perRing = Math.ceil(ranked.length / RINGS.length) || 1;
   const rings: BreakdownRow[][] = RINGS.map(() => []);
   ranked.forEach((row, i) => {
@@ -87,11 +115,11 @@ function layout(hosts: BreakdownRow[]): Placed[] {
   const placed: Placed[] = [];
   rings.forEach((rows, ring) => {
     const n = rows.length;
-    // Order within a ring by hash so spacing is stable but not rank-jittery.
     const ordered = [...rows].sort((a, b) => hashStr(a.label) - hashStr(b.label));
     ordered.forEach((row, j) => {
       const angle = (j / Math.max(n, 1)) * Math.PI * 2 + ring * 0.5;
-      const size = 7 + Math.sqrt(row.bytes / maxBytes) * 13;
+      // Elegant node dot radius: 5.5px to 10.5px
+      const size = 5.5 + Math.sqrt(row.bytes / maxBytes) * 5;
       placed.push({
         key: row.label,
         row,
@@ -99,6 +127,7 @@ function layout(hosts: BreakdownRow[]): Placed[] {
         radius: RINGS[ring]!,
         size,
         status: row.bytes > 0 ? "active" : "idle",
+        semanticStatus: getSemanticStatus(row),
         phase: (hashStr(row.label) % 1000) / 1000,
         share: row.bytes / totalBytes,
       });
@@ -119,7 +148,7 @@ export const Constellation = memo(function Constellation({
   const reduced = usePrefersReducedMotion();
   const placed = useMemo(() => layout(hosts), [hosts]);
 
-  // Imperative animation state (refs → no re-render on each frame).
+  // Imperative animation state refs
   const nodeRefs = useRef<Array<SVGGElement | null>>([]);
   const arcRefs = useRef<Array<SVGPathElement | null>>([]);
   const packetRefs = useRef<Array<SVGCircleElement | null>>([]);
@@ -130,12 +159,12 @@ export const Constellation = memo(function Constellation({
   const draggingRef = useRef(false);
   const dragRef = useRef<{ startX: number; startRot: number } | null>(null);
 
-  // React state (only what needs to paint declaratively).
+  // React state
   const [playing, setPlaying] = useState(true);
   const [hovered, setHovered] = useState<number | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
-  // Reveal: hosts new since the last snapshot animate outward once.
+  // Reveal effect for newly observed hosts
   const prevKeys = useRef<Set<string>>(new Set());
   const revealSet = useMemo(() => {
     const fresh = new Set<string>();
@@ -146,7 +175,7 @@ export const Constellation = memo(function Constellation({
     prevKeys.current = new Set(placed.map((p) => p.key));
   }, [placed]);
 
-  // Write one node/arc/packet to the DOM at a given global rotation.
+  // Paint single frame
   function paint(rot: number, phase: number) {
     for (let i = 0; i < placed.length; i++) {
       const p = placed[i]!;
@@ -162,7 +191,7 @@ export const Constellation = memo(function Constellation({
           const t = (phase + p.phase) % 1;
           pk.setAttribute("cx", String(CX + (x - CX) * t));
           pk.setAttribute("cy", String(CY + (y - CY) * t));
-          pk.setAttribute("opacity", String(Math.sin(t * Math.PI) * 0.9));
+          pk.setAttribute("opacity", String(Math.sin(t * Math.PI) * 0.95));
         } else {
           pk.setAttribute("opacity", "0");
         }
@@ -170,46 +199,50 @@ export const Constellation = memo(function Constellation({
     }
   }
 
-  // Paint once synchronously on layout change (correct first frame, and the only
-  // paint under reduced-motion).
+  // Paint initial layout frame
   useEffect(() => {
     paint(rotationRef.current, phaseRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed, reduced]);
 
-  // The animation loop. Rotation advances only when playing, not hovered, not
-  // dragging; packets advance whenever motion is allowed.
+  // Animation loop with rAF
   useEffect(() => {
-    if (reduced) return; // static field; CSS also freezes decorative animations
     let raf = 0;
     let last = 0;
+
     const step = (ts: number) => {
       const dt = last ? Math.min((ts - last) / 1000, 0.05) : 0;
       last = ts;
-      if (playing && !hoveredRef.current && !draggingRef.current) {
-        rotationRef.current += dt * 0.06; // ~3.4°/s — a calm drift
+
+      // Rotation advances when playing, not hovered, not dragging
+      if (playing && !hoveredRef.current && !draggingRef.current && !reduced) {
+        rotationRef.current += dt * 0.06; // ~3.4°/s calm drift
       }
+
       phaseRef.current = (phaseRef.current + dt * 0.5) % 1;
       paint(rotationRef.current, phaseRef.current);
       raf = requestAnimationFrame(step);
     };
+
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placed, reduced, playing]);
 
-  // Pointer-drag to rotate the field (no external lib).
+  // Pointer drag to rotate
   function onPointerDown(e: React.PointerEvent<SVGSVGElement>) {
     draggingRef.current = true;
     dragRef.current = { startX: e.clientX, startRot: rotationRef.current };
     e.currentTarget.setPointerCapture(e.pointerId);
   }
+
   function onPointerMove(e: React.PointerEvent<SVGSVGElement>) {
     if (!draggingRef.current || !dragRef.current) return;
     const dx = e.clientX - dragRef.current.startX;
     rotationRef.current = dragRef.current.startRot + dx * 0.005;
-    if (reduced) paint(rotationRef.current, phaseRef.current);
+    paint(rotationRef.current, phaseRef.current);
   }
+
   function onPointerUp(e: React.PointerEvent<SVGSVGElement>) {
     draggingRef.current = false;
     dragRef.current = null;
@@ -220,6 +253,7 @@ export const Constellation = memo(function Constellation({
     hoveredRef.current = true;
     setHovered(i);
   }
+
   function unhost() {
     hoveredRef.current = false;
     setHovered(null);
@@ -228,8 +262,6 @@ export const Constellation = memo(function Constellation({
   const selectedPlaced = placed.find((p) => p.key === selected) ?? null;
   const tip = hovered != null ? placed[hovered] : null;
   const tipPos = hovered != null ? posRef.current[hovered] : null;
-
-  // Empty / calm-idle: a lone YOU pulse — never a void (docs/09 §11).
   const quiet = placed.length === 0;
 
   return (
@@ -246,94 +278,184 @@ export const Constellation = memo(function Constellation({
           onPointerLeave={onPointerUp}
         >
           <defs>
+            <pattern id="np-cyber-grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(47, 224, 214, 0.1)" strokeWidth="0.8" />
+              <circle cx="0" cy="0" r="1" fill="rgba(47, 224, 214, 0.2)" />
+            </pattern>
+            <radialGradient id="np-grid-fade" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor="#fff" stopOpacity="0.85" />
+              <stop offset="60%" stopColor="#fff" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#fff" stopOpacity="0.12" />
+            </radialGradient>
+            <mask id="np-grid-mask">
+              <rect width={W} height={H} fill="url(#np-grid-fade)" />
+            </mask>
+
             <radialGradient id="np-cons-you" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--np-accent-strong)" />
-              <stop offset="100%" stopColor="var(--np-accent)" />
+              <stop offset="0%" stopColor="#5cf0e7" />
+              <stop offset="100%" stopColor="#2fe0d6" />
             </radialGradient>
           </defs>
 
-          {/* Orbit guide rings. */}
-          {!quiet &&
-            RINGS.map((r) => <circle key={r} className="np-cons__ring" cx={CX} cy={CY} r={r} />)}
+          {/* Layer 1: Background Layer */}
+          <g className="np-cons__layer-bg">
+            <rect width={W} height={H} fill="transparent" />
+          </g>
 
-          {/* Arcs first (under nodes). Straight radial links from YOU to each host;
-              thickness encodes real flow count. */}
-          {placed.map((p, i) => (
-            <path
-              key={`arc-${p.key}`}
-              ref={(el) => {
-                arcRefs.current[i] = el;
-              }}
-              className={`np-cons__arc${p.status === "idle" ? " np-cons__arc--idle" : ""}`}
-              strokeWidth={Math.min(1 + p.row.flows * 0.4, 4)}
-              d={`M${CX} ${CY} L${CX + Math.cos(p.angle) * p.radius} ${
-                CY + Math.sin(p.angle) * p.radius
-              }`}
-            />
-          ))}
+          {/* Layer 2: Cyber Grid Layer (Faded towards edges) */}
+          <g className="np-cons__layer-grid" mask="url(#np-grid-mask)">
+            <rect width={W} height={H} fill="url(#np-cyber-grid)" />
+          </g>
 
-          {/* Traveling packets (the live signal). */}
-          {placed.map((p, i) => (
+          {/* Layer 3: Radar Layer (Rings + 15s Continuous 360° GPU Radar Sweep Cone) */}
+          <g className="np-cons__layer-radar">
+            {!quiet &&
+              RINGS.map((r) => <circle key={r} className="np-cons__ring" cx={CX} cy={CY} r={r} />)}
+            {!reduced && (
+              <g transform={`translate(${CX}, ${CY})`}>
+                <g className="np-cons__radar-sweep">
+                  <path
+                    d={`M 0 0 L ${RINGS[RINGS.length - 1]!} 0 A ${
+                      RINGS[RINGS.length - 1]!
+                    } ${RINGS[RINGS.length - 1]!} 0 0 1 ${
+                      Math.cos(0.55) * RINGS[RINGS.length - 1]!
+                    } ${Math.sin(0.55) * RINGS[RINGS.length - 1]!} Z`}
+                    fill="rgba(47, 224, 214, 0.045)"
+                  />
+                </g>
+              </g>
+            )}
+          </g>
+
+          {/* Layer 4: Link Layer (Data Beams with Logarithmic Width & Status Colors) */}
+          <g className="np-cons__layer-links">
+            {placed.map((p, i) => {
+              const isHov = hovered === i;
+              const isSel = p.key === selected;
+              const isDimmed = hovered != null && !isHov;
+              const linkColor = getStatusColor(p.semanticStatus);
+              return (
+                <path
+                  key={`arc-${p.key}`}
+                  ref={(el) => {
+                    arcRefs.current[i] = el;
+                  }}
+                  className={`np-cons__arc np-cons__arc--${p.semanticStatus} ${
+                    isDimmed ? "np-cons__arc--dimmed" : ""
+                  } ${isHov || isSel ? "np-cons__arc--highlighted" : ""}`}
+                  stroke={linkColor}
+                  strokeWidth={getLinkWidth(p.row.bytes)}
+                  strokeOpacity={isHov || isSel ? 0.95 : 0.45}
+                  d={`M${CX} ${CY} L${CX + Math.cos(p.angle) * p.radius} ${
+                    CY + Math.sin(p.angle) * p.radius
+                  }`}
+                />
+              );
+            })}
+          </g>
+
+          {/* Layer 5: Packet Layer (rAF Driven Traveling Pulse Dots) */}
+          <g className="np-cons__layer-packets">
+            {placed.map((p, i) => {
+              const isHov = hovered === i;
+              const isSel = p.key === selected;
+              const isDimmed = hovered != null && !isHov;
+              return (
+                <circle
+                  key={`pk-${p.key}`}
+                  ref={(el) => {
+                    packetRefs.current[i] = el;
+                  }}
+                  className={`np-cons__packet ${isDimmed ? "np-cons__packet--dimmed" : ""} ${
+                    isHov || isSel ? "np-cons__packet--highlighted" : ""
+                  }`}
+                  r={2.4}
+                  cx={CX}
+                  cy={CY}
+                  opacity={0}
+                />
+              );
+            })}
+          </g>
+
+          {/* Layer 6: Node Layer (Multi-layer Halos + Explicit Vibrant Inline Style Node Dots) */}
+          <g className="np-cons__layer-nodes">
+            {placed.map((p, i) => {
+              const x0 = CX + Math.cos(p.angle) * p.radius;
+              const y0 = CY + Math.sin(p.angle) * p.radius;
+              const isSel = p.key === selected;
+              const isHov = hovered === i;
+              const isDimmed =
+                (hovered != null && !isHov) || (selected != null && !isSel && hovered == null);
+              const nodeColor = getStatusColor(p.semanticStatus);
+              return (
+                <g
+                  key={`node-${p.key}`}
+                  ref={(el) => {
+                    nodeRefs.current[i] = el;
+                  }}
+                  className={`np-cons__node ${isHov ? "np-cons__node--hovered" : ""} ${
+                    isSel ? "np-cons__node--selected" : ""
+                  } ${isDimmed ? "np-cons__node--dimmed" : ""}`}
+                  transform={`translate(${x0} ${y0})`}
+                  onMouseEnter={() => host(i)}
+                  onMouseLeave={unhost}
+                  onClick={() => setSelected(isSel ? null : p.key)}
+                >
+                  <g className={revealSet.has(p.key) ? "np-cons__node-in--reveal" : undefined}>
+                    {/* Hover & Selection rings */}
+                    <circle className="np-cons__node-halo" r={p.size + 6} stroke={nodeColor} />
+                    {isSel && <circle className="np-cons__node-halo-outer" r={p.size + 10} stroke={nodeColor} />}
+                    {/* Core Vibrant Node Dot with explicit inline style override */}
+                    <circle
+                      className={`np-cons__node-dot np-cons__node-dot--${p.semanticStatus}`}
+                      r={isSel ? p.size + 2 : p.size}
+                      style={{
+                        fill: nodeColor,
+                        stroke: "rgba(255, 255, 255, 0.45)",
+                        strokeWidth: 1.5,
+                      }}
+                    />
+                    <text className="np-cons__node-label" y={p.size + 11}>
+                      {truncate(primaryHostName(p.row)?.name ?? p.row.label)}
+                    </text>
+                  </g>
+                </g>
+              );
+            })}
+          </g>
+
+          {/* Layer 7: Center YOU Layer (Dual-layer Breathing Glow + Heartbeat Wave) */}
+          <g className="np-cons__layer-you">
+            <circle className="np-cons__you-breath" cx={CX} cy={CY} r={YOU_R + 8} />
+            {!reduced && <circle className="np-cons__you-heartbeat" cx={CX} cy={CY} r={YOU_R} />}
             <circle
-              key={`pk-${p.key}`}
-              ref={(el) => {
-                packetRefs.current[i] = el;
-              }}
-              className="np-cons__packet"
-              r={2.6}
+              className="np-cons__you"
               cx={CX}
               cy={CY}
-              opacity={0}
+              r={YOU_R}
+              style={{ fill: "#2fe0d6", stroke: "#5cf0e7", strokeWidth: 2 }}
             />
-          ))}
-
-          {/* Center YOU node with an outward ping. */}
-          <g>
-            <circle className="np-cons__you-ring" cx={CX} cy={CY} r={YOU_R} />
-            <circle className="np-cons__you" cx={CX} cy={CY} r={YOU_R} />
             <text className="np-cons__you-label" x={CX} y={CY + 4}>
               YOU
             </text>
           </g>
 
-          {/* Host nodes. Positioned via transform in the loop; labels stay upright
-              because the group only translates (never rotates). */}
-          {placed.map((p, i) => {
-            const x0 = CX + Math.cos(p.angle) * p.radius;
-            const y0 = CY + Math.sin(p.angle) * p.radius;
-            const isSel = p.key === selected;
-            return (
-              <g
-                key={`node-${p.key}`}
-                ref={(el) => {
-                  nodeRefs.current[i] = el;
-                }}
-                className="np-cons__node"
-                transform={`translate(${x0} ${y0})`}
-                onMouseEnter={() => host(i)}
-                onMouseLeave={unhost}
-                onClick={() => setSelected(isSel ? null : p.key)}
-              >
-                {/* Inner group carries the CSS scale reveal. It MUST be separate
-                    from the outer group: the outer group is positioned via the SVG
-                    `transform` *attribute* (translate), and a CSS `transform`
-                    animation on the same element would override that and collapse
-                    the node to the SVG origin. */}
-                <g className={revealSet.has(p.key) ? "np-cons__node-in--reveal" : undefined}>
-                  <circle
-                    className={`np-cons__node-dot np-cons__node-dot--${p.status}`}
-                    r={isSel ? p.size + 3 : p.size}
-                  />
-                  <text className="np-cons__node-label" y={p.size + 13}>
-                    {truncate(primaryHostName(p.row)?.name ?? p.row.label)}
-                  </text>
-                </g>
-              </g>
-            );
-          })}
+          {/* Layer 8: HUD Layer (Corner Brackets + Cardinal Degree Ticks) */}
+          <g className="np-cons__layer-hud" pointerEvents="none">
+            <path d="M 14 26 L 14 14 L 26 14" fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
+            <path d={`M ${W - 26} 14 L ${W - 14} 14 L ${W - 14} 26`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
+            <path d={`M 14 ${H - 26} L 14 ${H - 14} L 26 ${H - 14}`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
+            <path d={`M ${W - 26} ${H - 14} L ${W - 14} ${H - 14} L ${W - 14} ${H - 26}`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
+
+            <text x={CX} y={CY - RINGS[2]! - 8} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="middle">000°</text>
+            <text x={CX + RINGS[2]! + 12} y={CY + 3} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="start">090°</text>
+            <text x={CX} y={CY + RINGS[2]! + 14} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="middle">180°</text>
+            <text x={CX - RINGS[2]! - 12} y={CY + 3} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="end">270°</text>
+          </g>
         </svg>
 
-        {/* Glass tooltip — real figures only. */}
+        {/* Layer 9: Cyber HUD Tooltip Panel */}
         {tip && tipPos && (
           <div
             className="np-cons__tip"
@@ -341,60 +463,70 @@ export const Constellation = memo(function Constellation({
           >
             {(() => {
               const nm = primaryHostName(tip.row);
-              return nm ? (
+              const protos = extractProtocols(tip.row);
+              return (
                 <>
-                  <div className="np-cons__tip-host" title={`${nm.name} (via ${hostSourceLabel(nm.source)})`}>
-                    {nm.name}
+                  <div className="np-cons__tip-host" title={nm ? `${nm.name} (${tip.row.label})` : tip.row.label}>
+                    {nm ? nm.name : tip.row.label}
                   </div>
                   <div className="np-cons__tip-ip">
-                    {tip.row.label}
-                    <span className="np-cons__tip-src"> · {hostSourceLabel(nm.source)}</span>
+                    {tip.row.label} {nm && <span className="np-cons__tip-src">· {hostSourceLabel(nm.source)}</span>}
                   </div>
+                  <div className="np-cons__tip-divider" />
+                  <div className="np-cons__tip-row">
+                    <span>Status</span>
+                    <span className={`np-cons__status np-cons__status--${tip.semanticStatus}`}>
+                      ● {tip.semanticStatus}
+                    </span>
+                  </div>
+                  <div className="np-cons__tip-row">
+                    <span>Traffic</span>
+                    <b>{humanBytes(tip.row.bytes)}</b>
+                  </div>
+                  <div className="np-cons__tip-row">
+                    <span>Flows</span>
+                    <b>{tip.row.flows}</b>
+                  </div>
+                  {protos.length > 0 && (
+                    <div className="np-cons__protocol-pills">
+                      {protos.map((pr) => (
+                        <span key={pr} className="np-cons__proto-pill">{pr}</span>
+                      ))}
+                    </div>
+                  )}
                 </>
-              ) : (
-                <div className="np-cons__tip-host">{tip.row.label}</div>
               );
             })()}
-            <div className="np-cons__tip-row">
-              <span>Traffic</span>
-              <b>{humanBytes(tip.row.bytes)}</b>
-            </div>
-            <div className="np-cons__tip-row">
-              <span>Flows</span>
-              <b>{tip.row.flows}</b>
-            </div>
-            <div className="np-cons__tip-row">
-              <span
-                className={`np-cons__status np-cons__status--${tip.status}`}
-              >
-                {tip.status === "active" ? "● active" : "○ idle"}
-              </span>
-              <span>{(tip.share * 100).toFixed(tip.share < 0.01 ? 2 : 0)}%</span>
-            </div>
           </div>
         )}
       </div>
 
-      {/* Legend + honest controls. */}
+      {/* Legend & Controls */}
       <div className="np-cons__foot">
         <span className="np-cons__legend">
-          <i style={{ background: "var(--np-accent)" }} /> active host
+          <i style={{ background: STATUS_COLORS.healthy }} /> healthy
         </span>
         <span className="np-cons__legend">
-          <i style={{ background: "var(--np-neutral)" }} /> idle
+          <i style={{ background: STATUS_COLORS.busy }} /> high throughput
+        </span>
+        <span className="np-cons__legend">
+          <i style={{ background: STATUS_COLORS.warning }} /> loss/retransmit
+        </span>
+        <span className="np-cons__legend">
+          <i style={{ background: STATUS_COLORS.idle }} /> idle
         </span>
         {lossIndicators > 0 && (
           <span className="np-cons__legend" title="Network loss indicators (global, not per-host)">
-            <i style={{ background: "var(--np-notable)" }} /> network loss: {lossIndicators}
+            <i style={{ background: STATUS_COLORS.warning }} /> loss: {lossIndicators}
           </span>
         )}
         {hosts.length > MAX_NODES && (
-          <span className="np-cons__legend">showing top {MAX_NODES} of {hosts.length}</span>
+          <span className="np-cons__legend">top {MAX_NODES} of {hosts.length}</span>
         )}
         {!reduced && (
           <button
-            className="np-btn"
-            style={{ marginLeft: "auto" }}
+            type="button"
+            className="np-cons__pause-btn"
             onClick={() => setPlaying((v) => !v)}
             aria-pressed={!playing}
           >
@@ -404,7 +536,7 @@ export const Constellation = memo(function Constellation({
         <span className="np-cons__hint">drag to rotate · hover a host · click to pin</span>
       </div>
 
-      {/* Pinned detail — real evidence-backed figures, no invented sub-nodes. */}
+      {/* Pinned detail panel */}
       {selectedPlaced && (
         <div className="np-loss" style={{ marginTop: "var(--np-3)" }}>
           {(() => {
@@ -420,13 +552,13 @@ export const Constellation = memo(function Constellation({
           <span>{humanBytes(selectedPlaced.row.bytes)}</span>
           <span>{selectedPlaced.row.flows} flows</span>
           <span>{selectedPlaced.row.evidence.length} evidence</span>
-          <span className={`np-cons__status np-cons__status--${selectedPlaced.status}`}>
-            {selectedPlaced.status}
+          <span className={`np-cons__status np-cons__status--${selectedPlaced.semanticStatus}`}>
+            {selectedPlaced.semanticStatus}
           </span>
         </div>
       )}
 
-      {/* Quiet state copy + screen-reader parity. */}
+      {/* Quiet state fallback */}
       {quiet && (
         <p className="np-cons__hint" style={{ textAlign: "center", marginTop: "var(--np-2)" }}>
           Quiet — no active hosts yet. Start a capture to see who this device talks to.
@@ -438,7 +570,7 @@ export const Constellation = memo(function Constellation({
           const who = nm ? `${nm.name} (${p.row.label})` : p.row.label;
           return (
             <li key={p.key}>
-              {who}: {humanBytes(p.row.bytes)}, {p.row.flows} flows, {p.status}
+              {who}: {humanBytes(p.row.bytes)}, {p.row.flows} flows, {p.semanticStatus}
             </li>
           );
         })}

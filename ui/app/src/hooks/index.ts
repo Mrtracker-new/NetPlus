@@ -5,3 +5,4 @@ export { useMonitoringController } from "./useMonitoringController";
 export { useAppsController } from "./useAppsController";
 export { useDiagnosticsController } from "./useDiagnosticsController";
 export { useSandboxController } from "./useSandboxController";
+export { useFleetController } from "./useFleetController";

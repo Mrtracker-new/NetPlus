@@ -1,76 +1,84 @@
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { FleetHost } from "@netpulse/contract";
-import { Badge, Spinner, Notice, EmptyState } from "@netpulse/components";
-import { query } from "../ipc";
-import { useDisclosure } from "../modes/DisclosureContext";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
+import { Button, Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { useFleetController } from "../hooks/useFleetController";
+import { FleetSummaryKpis } from "./Fleet/FleetSummaryKpis";
+import { FleetFilters } from "./Fleet/FleetFilters";
+import { FleetNodeCard } from "./Fleet/FleetNodeCard";
 
 export function FleetScreen() {
   const { t } = useTranslation(["fleet", "common"]);
-  const [hosts, setHosts] = useState<FleetHost[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  const { shows } = useDisclosure();
-
-  useEffect(() => {
-    let cancelled = false;
-    query({ kind: "listFleetHosts" })
-      .then((res) => {
-        if (cancelled) return;
-        if (res.kind === "fleetHosts") {
-          setHosts(res.hosts);
-        } else {
-          setHosts([]);
-          setNotice("Unexpected response kind from backend.");
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setHosts([]);
-          setNotice(toErrorMessage(e));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const {
+    hosts,
+    filteredHosts,
+    search,
+    setSearch,
+    statusFilter,
+    setStatusFilter,
+    summary,
+    loaded,
+    refreshing,
+    notice,
+    setNotice,
+    lastSyncedTime,
+    refresh,
+    announcement,
+  } = useFleetController();
 
   return (
     <section className="np-fleet" aria-label={t("title")}>
-      <h2>{t("title")}</h2>
-      <p className="np-fleet__desc">{t("desc")}</p>
+      {/* Screen Reader Live Announcement */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div>
+          <h2 style={{ margin: "0 0 0.25rem 0" }}>{t("title")}</h2>
+          <p className="np-fleet__desc" style={{ margin: 0, color: "var(--np-subtext, #94a3b8)" }}>
+            {t("desc")}
+          </p>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+          {lastSyncedTime && (
+            <span style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", fontFamily: "monospace" }}>
+              {t("sync_time", { time: lastSyncedTime })}
+            </span>
+          )}
+          <Button variant="standard" busy={refreshing} disabled={refreshing} onClick={refresh}>
+            🔄 {refreshing ? t("actions.refreshing") : t("actions.refresh")}
+          </Button>
+        </div>
+      </div>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
+      {/* Fleet Summary KPIs Bar */}
+      <FleetSummaryKpis summary={summary} />
+
+      {/* Search & Status Filters */}
+      <FleetFilters
+        search={search}
+        onSearchChange={setSearch}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+      />
+
+      {/* Main Node List */}
       {!loaded ? (
-        <Spinner />
+        <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <Skeleton height="80px" />
+          <Skeleton height="80px" />
+          <Skeleton height="80px" />
+        </div>
       ) : hosts.length === 0 ? (
         <EmptyState>{t("empty")}</EmptyState>
+      ) : filteredHosts.length === 0 ? (
+        <EmptyState>{t("no_filter_matches")}</EmptyState>
       ) : (
-        <div className="np-fleet__grid" role="list">
-          {hosts.map((h) => (
-            <article className="np-fleet__node" key={h.hostId} role="listitem">
-              <div>
-                <strong className="np-fleet__name">{h.friendlyName || h.hostname}</strong> ({h.os} / {h.platform})
-                <p className="np-fleet__meta">
-                  {shows("intermediate") && `Agent ID: ${h.hostId} | `}
-                  Version: {h.agentVersion}
-                </p>
-              </div>
-              <div>
-                <Badge variant="kind" aria-label={`Status: ${h.status}`}>
-                  {h.status}
-                </Badge>
-              </div>
-            </article>
+        <div className="np-fleet__grid" role="list" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          {filteredHosts.map((h) => (
+            <FleetNodeCard key={h.hostId} host={h} />
           ))}
         </div>
       )}

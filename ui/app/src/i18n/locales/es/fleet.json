@@ -3,5 +3,36 @@
   "desc": "Transmisiones de captura agregadas entre nodos, latidos de sincronización y consenso de salud del cluster.",
   "nodes_title": "Nodos del Cluster ({{count}})",
   "sync_time": "Última Sincronización: {{time}}",
-  "empty": "No hay nodos remotos conectados. Ejecutando agente local de nodo único."
+  "empty": "No hay nodos remotos conectados. Ejecutando agente local de nodo único.",
+  "no_filter_matches": "Ningún nodo de la flota coincide con su búsqueda o filtro de estado.",
+  "kpis": {
+    "total": "Nodos Totales",
+    "online": "Nodos En Línea",
+    "degraded": "Degradados / Sincronizando",
+    "offline": "Nodos Fuera de Línea"
+  },
+  "filters": {
+    "search_placeholder": "Filtrar por nombre, IP, SO, plataforma o ID...",
+    "status_all": "Todos",
+    "status_online": "En Línea",
+    "status_degraded": "Degradado",
+    "status_offline": "Fuera de Línea"
+  },
+  "status": {
+    "online": "En Línea",
+    "degraded": "Degradado",
+    "offline": "Fuera de Línea",
+    "unknown": "Desconocido"
+  },
+  "card": {
+    "version": "Versión",
+    "agent_id": "ID de Agente",
+    "platform": "Plataforma",
+    "os": "SO",
+    "last_seen": "Último Latido"
+  },
+  "actions": {
+    "refresh": "Actualizar Flota",
+    "refreshing": "Actualizando..."
+  }
 }

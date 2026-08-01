@@ -3,5 +3,36 @@
   "desc": "Aggregated cross-node capture streams, sync heartbeats, and cluster health consensus.",
   "nodes_title": "Cluster Nodes ({{count}})",
   "sync_time": "Last Sync: {{time}}",
-  "empty": "No remote cluster nodes connected. Running single-node local agent."
+  "empty": "No remote cluster nodes connected. Running single-node local agent.",
+  "no_filter_matches": "No fleet nodes match your search query or status filter.",
+  "kpis": {
+    "total": "Total Nodes",
+    "online": "Online Nodes",
+    "degraded": "Degraded / Syncing",
+    "offline": "Offline Nodes"
+  },
+  "filters": {
+    "search_placeholder": "Filter by hostname, IP, OS, platform, or ID...",
+    "status_all": "All",
+    "status_online": "Online",
+    "status_degraded": "Degraded",
+    "status_offline": "Offline"
+  },
+  "status": {
+    "online": "Online",
+    "degraded": "Degraded",
+    "offline": "Offline",
+    "unknown": "Unknown"
+  },
+  "card": {
+    "version": "Version",
+    "agent_id": "Agent ID",
+    "platform": "Platform",
+    "os": "OS",
+    "last_seen": "Last Heartbeat"
+  },
+  "actions": {
+    "refresh": "Refresh Fleet",
+    "refreshing": "Refreshing..."
+  }
 }

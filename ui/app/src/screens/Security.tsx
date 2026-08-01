@@ -52,6 +52,7 @@ function FindingCard({
 
       <div className="np-finding__confidence">
         <ConfidenceMeter percent={finding.confidence_percent} qualitative={finding.qualitative} />
+        <span className="np-confidence-word">{finding.qualitative}</span>
       </div>
 
       <p className="np-finding__explanation">{finding.explanation}</p>

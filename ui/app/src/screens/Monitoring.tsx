@@ -11,12 +11,16 @@ import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 function DiagnosisCard({ diagnosis }: { diagnosis: Diagnosis }) {
   const { navigateToEvidence } = useEvidenceNavigation();
+  const confidenceWord = (diagnosis as { confidence_word?: string }).confidence_word;
 
   return (
     <article className="np-diagnosis">
       <p>{diagnosis.explanation}</p>
       {/* Confidence is always shown — honest over reassuring (docs/11 §6.3). */}
-      <ConfidenceMeter percent={diagnosis.confidence_percent} />
+      <ConfidenceMeter
+        percent={diagnosis.confidence_percent}
+        qualitative={confidenceWord}
+      />
       <EvidenceChips evidence={diagnosis.evidence} onNavigate={navigateToEvidence} />
     </article>
   );

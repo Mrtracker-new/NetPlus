@@ -440,23 +440,40 @@ button {
 
 /* ---- Disclosure mode switch (segmented pill control) ---- */
 .np-modes {
-  display: inline-flex;
-  padding: 4px;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px;
   gap: 2px;
   background: var(--np-surface-1);
   border-radius: var(--np-radius-pill);
   box-shadow: var(--np-neu-inset);
-  max-width: 100%;
+  position: relative;
+  align-items: center;
+  overflow: hidden;
 }
 .np-mode {
+  flex: 1 1 0%;
+  min-width: 0;
   border: none;
   background: transparent;
   color: var(--np-text-dim);
-  padding: var(--np-1) var(--np-4);
+  padding: 6px 8px;
   border-radius: var(--np-radius-pill);
-  font-size: var(--np-fs-sm);
+  font-family: inherit;
+  font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-medium);
   text-transform: capitalize;
-  transition: background var(--np-t), color var(--np-t), box-shadow var(--np-t);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  transition: background var(--np-t), color var(--np-t), box-shadow var(--np-t), transform var(--np-t);
 }
 .np-mode:hover {
   color: var(--np-text);
@@ -466,10 +483,12 @@ button {
   color: var(--np-accent-strong);
   font-weight: var(--np-fw-semibold);
   box-shadow: var(--np-neu-sm);
+  z-index: 1;
 }
 .np-mode:focus-visible {
   outline: 2px solid var(--np-accent-strong);
   outline-offset: -2px;
+  z-index: 2;
 }
 
 /* ============================ Primitives ============================ */

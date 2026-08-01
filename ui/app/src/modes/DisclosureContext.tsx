@@ -45,7 +45,9 @@ export function DisclosureProvider({ children }: { children: ReactNode }) {
     setDepthState(d);
     localStorage.setItem(STORAGE_KEY, d);
     // Tell the engine so its default projection depth follows the UI mode.
-    void command({ kind: "setDepth", depth: d });
+    void command({ kind: "setDepth", depth: d }).catch(() => {
+      /* Browser preview / test env without Tauri host */
+    });
   }, []);
 
   const value = useMemo<DisclosureState>(

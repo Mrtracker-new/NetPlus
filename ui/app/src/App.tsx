@@ -96,8 +96,10 @@ function ModeSwitch() {
       {DEPTHS.map((d: ProjectionDepth) => (
         <button
           key={d}
+          type="button"
           role="radio"
           aria-checked={d === depth}
+          title={d}
           className={d === depth ? "np-mode np-mode--active" : "np-mode"}
           onClick={() => setDepth(d)}
         >

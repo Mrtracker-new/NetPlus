@@ -1,4 +1,4 @@
-import type { Severity } from "@netpulse/contract";
+import type { Severity, EvidenceRef } from "@netpulse/contract";
 
 export interface Slice {
   label: string;
@@ -9,4 +9,9 @@ export interface RibbonEvent {
   at: number;
   label: string;
   severity: Severity;
+  packetId?: number;
+  summary?: string;
+  evidence?: EvidenceRef[];
+  lines?: string[];
+  [key: string]: any;
 }

@@ -1,5 +1,25 @@
 {
   "title": "Timeline",
+  "hero_subtitle": "Reconstructed event timeline laned by severity on a unified time axis.",
   "filter_banner": "Filtered to packet #{{packetId}}",
-  "empty": "No timeline events captured yet."
+  "clear_filter": "Clear Timeline Filters",
+  "filter_all": "All Severities",
+  "filter_findings": "Findings",
+  "filter_notable": "Notable",
+  "filter_neutral": "Events",
+  "search_placeholder": "Search timeline events by headline, summary, packet ID...",
+  "summary_events": "Total Events",
+  "summary_findings": "Findings",
+  "summary_notable": "Notable",
+  "summary_span": "Time Span",
+  "inspector_title": "Selected Event Inspector",
+  "prev_event": "Previous Event",
+  "next_event": "Next Event",
+  "no_match": "No timeline events match the current search or severity filter.",
+  "lanes": {
+    "finding": "Findings",
+    "notable": "Notable",
+    "neutral": "Events"
+  },
+  "empty": "No timeline events captured yet. Start a capture session to populate the timeline."
 }

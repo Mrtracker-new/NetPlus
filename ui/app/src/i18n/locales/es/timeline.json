@@ -1,5 +1,25 @@
 {
   "title": "Línea de tiempo",
+  "hero_subtitle": "Línea de tiempo de eventos reconstruidos clasificados por gravedad en un eje temporal unificado.",
   "filter_banner": "Filtrado al paquete #{{packetId}}",
-  "empty": "Aún no se han capturado eventos en la línea de tiempo."
+  "clear_filter": "Borrar Filtros de la Línea de Tiempo",
+  "filter_all": "Todas las Gravedades",
+  "filter_findings": "Hallazgos",
+  "filter_notable": "Notables",
+  "filter_neutral": "Eventos",
+  "search_placeholder": "Buscar eventos por titular, resumen, ID de paquete...",
+  "summary_events": "Eventos Totales",
+  "summary_findings": "Hallazgos",
+  "summary_notable": "Notables",
+  "summary_span": "Intervalo de Tiempo",
+  "inspector_title": "Inspector del Evento Seleccionado",
+  "prev_event": "Evento Anterior",
+  "next_event": "Evento Siguiente",
+  "no_match": "Ningún evento coincide con el filtro de búsqueda o gravedad actual.",
+  "lanes": {
+    "finding": "Hallazgos",
+    "notable": "Notables",
+    "neutral": "Eventos"
+  },
+  "empty": "Aún no se han capturado eventos en la línea de tiempo. Inicia una captura para poblarla."
 }

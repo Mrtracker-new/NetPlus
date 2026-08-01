@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useRef, useCallback } from "react";
 import type { ReactElement } from "react";
 import type { Severity } from "@netpulse/contract";
 import { EmptyState } from "@netpulse/components";
@@ -8,6 +8,9 @@ export interface TimeRibbonProps {
   events: RibbonEvent[];
   highlightPacketId?: number;
   highlightTimestamp?: number;
+  selectedIndex?: number | null;
+  onSelectEvent?: (event: any, index: number) => void;
+  axisTicks?: Array<{ positionPercent: number; label: string }>;
 }
 
 const RIBBON_LANES: Array<{ severity: Severity; label: string }> = [
@@ -17,52 +20,108 @@ const RIBBON_LANES: Array<{ severity: Severity; label: string }> = [
 ];
 
 /** Events on one shared time axis, laned by severity (docs/10 §4): anything at the
- *  same moment lines up vertically. Marks carry severity by shape+color and name
- *  themselves on hover — the drill-down entry point from the time axis (docs/10 §6). */
+ *  same moment lines up vertically. Interactive native button marks carry severity
+ *  by shape+color and support arrow-key navigation (docs/10 §6). */
 export const TimeRibbon = memo(function TimeRibbon({
   events,
   highlightPacketId,
   highlightTimestamp,
+  selectedIndex = null,
+  onSelectEvent,
+  axisTicks,
 }: TimeRibbonProps): ReactElement {
-  const highlightedRef = useRef<HTMLSpanElement | null>(null);
+  const highlightedRef = useRef<HTMLButtonElement | null>(null);
+  const markRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
     if (highlightedRef.current) {
-      highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      if (typeof highlightedRef.current.scrollIntoView === "function") {
+        highlightedRef.current.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      }
     }
   }, [highlightPacketId, highlightTimestamp]);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (events.length === 0) return;
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const next = Math.min(events.length - 1, index + 1);
+        markRefs.current[next]?.focus();
+        onSelectEvent?.(events[next]!, next);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const prev = Math.max(0, index - 1);
+        markRefs.current[prev]?.focus();
+        onSelectEvent?.(events[prev]!, prev);
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        markRefs.current[0]?.focus();
+        onSelectEvent?.(events[0]!, 0);
+      } else if (e.key === "End") {
+        e.preventDefault();
+        const last = events.length - 1;
+        markRefs.current[last]?.focus();
+        onSelectEvent?.(events[last]!, last);
+      }
+    },
+    [events, onSelectEvent]
+  );
+
   if (events.length === 0) {
-    return <EmptyState>No events yet — the timeline fills as traffic is reconstructed.</EmptyState>;
+    return <EmptyState>No timeline events to display.</EmptyState>;
   }
 
   const times = events.map((e) => e.at);
   const min = Math.min(...times);
   const max = Math.max(...times);
   const span = max - min || 1;
-  const pos = (at: number) => `${(((at - min) / span) * 98).toFixed(2)}%`;
+
+  // Clamped proportional positioning (2% to 98%)
+  const pos = (at: number) => {
+    const ratio = (at - min) / span;
+    const clamped = Math.max(0.02, Math.min(0.98, ratio));
+    return `${(clamped * 100).toFixed(2)}%`;
+  };
 
   return (
-    <div className="np-ribbon">
+    <div className="np-ribbon" role="region" aria-label="Interactive event timeline ribbon">
       {RIBBON_LANES.map((lane) => {
         const laneEvents = events.filter((e) => e.severity === lane.severity);
         return (
           <div className="np-ribbon__lane" key={lane.severity}>
             <span className="np-ribbon__lane-label">{lane.label}</span>
-            <div className="np-ribbon__track">
-              {laneEvents.map((e, i) => {
+            <div className="np-ribbon__track" style={{ position: "relative" }}>
+              {laneEvents.map((e) => {
+                const globalIndex = events.indexOf(e);
                 const isHighlighted =
+                  selectedIndex === globalIndex ||
                   (highlightPacketId !== undefined && (e as { packetId?: number }).packetId === highlightPacketId) ||
                   (highlightTimestamp !== undefined && Math.abs(e.at - highlightTimestamp) < 1000);
 
                 return (
-                  <span
-                    key={`${e.at}-${i}`}
-                    ref={isHighlighted ? highlightedRef : undefined}
+                  <button
+                    type="button"
+                    key={`${e.at}-${globalIndex}`}
+                    ref={(el) => {
+                      markRefs.current[globalIndex] = el;
+                      if (isHighlighted) highlightedRef.current = el;
+                    }}
                     className={`np-ribbon__mark ${isHighlighted ? "np-ribbon__mark--highlighted" : ""}`}
+                    aria-current={isHighlighted ? "true" : undefined}
+                    aria-label={`Event ${globalIndex + 1}: ${e.label} (${e.severity})`}
                     data-sev={e.severity}
                     data-highlighted={isHighlighted ? "true" : undefined}
-                    style={{ left: pos(e.at) }}
+                    onClick={() => onSelectEvent?.(e, globalIndex)}
+                    onKeyDown={(evt) => handleKeyDown(evt, globalIndex)}
+                    style={{
+                      left: pos(e.at),
+                      position: "absolute",
+                      cursor: "pointer",
+                      border: isHighlighted ? "2px solid var(--np-accent, #2fe0d6)" : "none",
+                      transform: isHighlighted ? "scale(1.35)" : "scale(1)",
+                      transition: "transform 0.15s ease, border-color 0.15s ease",
+                    }}
                     title={e.label}
                   />
                 );
@@ -71,9 +130,20 @@ export const TimeRibbon = memo(function TimeRibbon({
           </div>
         );
       })}
-      <div className="np-ribbon__axis">
-        <span>earlier</span>
-        <span>now</span>
+
+      <div className="np-ribbon__axis" style={{ display: "flex", justifyContent: "space-between" }}>
+        {axisTicks && axisTicks.length > 0 ? (
+          axisTicks.map((tick, i) => (
+            <span key={i} style={{ fontSize: "0.75rem", color: "var(--np-muted, #8b9bb4)" }}>
+              {tick.label}
+            </span>
+          ))
+        ) : (
+          <>
+            <span>earlier</span>
+            <span>now</span>
+          </>
+        )}
       </div>
     </div>
   );

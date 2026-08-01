@@ -1,50 +1,133 @@
 // Timeline — "what happened, and when?" (docs/10). One shared time axis with the
 // reconstructed events laned by severity, so anything at the same moment lines up
-// vertically (docs/10 §4). The feed cards double as time-positioned marks here — a
-// second entry point into the one model, from the time axis rather than the feed
-// (docs/10 §6). Dense GPU rendering (docs/10 §8) is a later optimization.
+// vertically (docs/10 §4).
 
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { EmptyState } from "@netpulse/components";
-import { useStore } from "../state/store";
+import { EmptyState, Notice } from "@netpulse/components";
+import { useTimelineController } from "../hooks/useTimelineController";
 import { TimeRibbon } from "@netpulse/viz";
-import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
+import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
+import { TimelineSummary } from "./Timeline/TimelineSummary";
+import { TimelineFilters } from "./Timeline/TimelineFilters";
+import { TimelineInspector } from "./Timeline/TimelineInspector";
 
 export function Timeline() {
   const { t } = useTranslation(["timeline", "common"]);
-  const { feed } = useStore();
-  const { navigationTarget } = useEvidenceNavigation();
+  const { navigateToEvidence } = useEvidenceNavigation();
 
-  const highlightPacketId =
-    navigationTarget?.screen === "timeline" ? navigationTarget.packetId : undefined;
-  const highlightTimestamp =
-    navigationTarget?.screen === "timeline" ? navigationTarget.timestamp : undefined;
+  const {
+    events,
+    filteredEvents,
+    summaryMetrics,
+    axisTicks,
+    selectedEvent,
+    selectedEventIndex,
+    searchQuery,
+    severityFilter,
+    highlightPacketId,
+    highlightTimestamp,
+    announcement,
+    actions,
+  } = useTimelineController();
 
-  const events = feed.map((c) => ({
-    at: c.at_mono_nanos,
-    label: c.headline,
-    severity: c.severity,
-  }));
+  const handleNavigateEvidence = useCallback(
+    (ref: any, source?: NavigationSource) => {
+      navigateToEvidence(ref, source ?? "timeline");
+    },
+    [navigateToEvidence]
+  );
 
-  if (events.length === 0) {
-    return <EmptyState>{t("empty")}</EmptyState>;
-  }
+  const hasActiveFilters = searchQuery.trim().length > 0 || severityFilter !== "all" || highlightPacketId !== undefined;
 
   return (
     <section className="np-timeline" aria-label={t("title")}>
-      {navigationTarget?.screen === "timeline" && (
-        <div className="np-filter-banner" style={{ marginBottom: "1rem" }} role="status">
-          {highlightPacketId !== undefined
-            ? t("filter_banner", { packetId: highlightPacketId })
-            : t("title")}
+      <header style={{ marginBottom: "1rem" }}>
+        <h1 className="np-hero__title">{t("title")}</h1>
+        <p className="np-hero__sub">{t("hero_subtitle")}</p>
+      </header>
+
+      {/* Screen Reader Live Announcement Region */}
+      <div className="np-sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      {/* Highlight Filter Banner */}
+      {highlightPacketId !== undefined && (
+        <div style={{ marginBottom: "1.25rem" }}>
+          <Notice level="warning">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span>{t("filter_banner", { packetId: highlightPacketId })}</span>
+              <button
+                type="button"
+                className="np-btn np-btn--ghost"
+                style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem" }}
+                onClick={actions.clearFilters}
+              >
+                ✕ {t("clear_filter")}
+              </button>
+            </div>
+          </Notice>
         </div>
       )}
-      <TimeRibbon
-        events={events}
-        highlightPacketId={highlightPacketId}
-        highlightTimestamp={highlightTimestamp}
-      />
+
+      {/* Classified Capture Empty State */}
+      {events.length === 0 ? (
+        <EmptyState>{t("empty")}</EmptyState>
+      ) : (
+        <>
+          {/* Summary KPI Header Card */}
+          {summaryMetrics && <TimelineSummary metrics={summaryMetrics} />}
+
+          {/* Search & Severity Filter Bar */}
+          <TimelineFilters
+            searchQuery={searchQuery}
+            onSearchChange={actions.setSearchQuery}
+            severityFilter={severityFilter}
+            onSeverityChange={actions.setSeverityFilter}
+            onClearFilters={actions.clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+
+          {/* Classified Filter Empty State vs Ribbon View */}
+          {filteredEvents.length === 0 ? (
+            <div style={{ margin: "2rem 0" }}>
+              <EmptyState>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
+                  <div>{t("no_match")}</div>
+                  <button type="button" className="np-btn np-btn--primary" onClick={actions.clearFilters}>
+                    {t("clear_filter")}
+                  </button>
+                </div>
+              </EmptyState>
+            </div>
+          ) : (
+            <>
+              {/* Interactive Native Button TimeRibbon */}
+              <TimeRibbon
+                events={filteredEvents}
+                highlightPacketId={highlightPacketId}
+                highlightTimestamp={highlightTimestamp}
+                selectedIndex={selectedEventIndex}
+                onSelectEvent={actions.selectEvent}
+                axisTicks={axisTicks}
+              />
+
+              {/* Selected Event Detail Inspector Card */}
+              {selectedEvent && selectedEventIndex !== null && (
+                <TimelineInspector
+                  event={selectedEvent}
+                  currentIndex={selectedEventIndex}
+                  totalCount={filteredEvents.length}
+                  onPrev={actions.selectPrevEvent}
+                  onNext={actions.selectNextEvent}
+                  onNavigateEvidence={handleNavigateEvidence}
+                />
+              )}
+            </>
+          )}
+        </>
+      )}
     </section>
   );
 }
-

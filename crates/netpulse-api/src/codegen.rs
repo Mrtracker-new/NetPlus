@@ -46,6 +46,16 @@ pub fn typescript_contract() -> String {
         &["local_wifi", "distant_server", "slow_dns", "congestion"],
     ));
     s.push_str(&union("AttributionConfidence", &["high", "low", "unknown"]));
+    s.push_str(&union(
+        "ShedStage",
+        &[
+            "none",
+            "payloads_off",
+            "sample_dissection",
+            "coarsen_metrics",
+            "drop_packets",
+        ],
+    ));
 
     // --- EvidenceRef: internally-tagged union (matches #[serde(tag,content)]) ---
     s.push_str(
@@ -95,6 +105,15 @@ pub fn typescript_contract() -> String {
         ],
     ));
     s.push_str(&iface(
+        "CaptureStats",
+        &[
+            ("buffer_frames", "number"),
+            ("buffer_capacity", "number"),
+            ("shed_stage", "ShedStage"),
+            ("dropped", "number"),
+        ],
+    ));
+    s.push_str(&iface(
         "MonitorSnapshot",
         &[
             ("by_protocol", "Breakdown"),
@@ -102,6 +121,7 @@ pub fn typescript_contract() -> String {
             ("diagnoses", "Diagnosis[]"),
             ("network_loss_indicators", "number"),
             ("capture_drops", "number"),
+            ("capture_stats?", "CaptureStats"),
         ],
     ));
     s.push_str(&iface(

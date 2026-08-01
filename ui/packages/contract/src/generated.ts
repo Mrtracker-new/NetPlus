@@ -17,6 +17,8 @@ export type Cause = "local_wifi" | "distant_server" | "slow_dns" | "congestion";
 
 export type AttributionConfidence = "high" | "low" | "unknown";
 
+export type ShedStage = "none" | "payloads_off" | "sample_dissection" | "coarsen_metrics" | "drop_packets";
+
 export type EvidenceRef =
   | { kind: "packet"; id: number }
   | { kind: "flow"; id: number }
@@ -55,13 +57,6 @@ export interface Diagnosis {
   explanation: string;
   evidence: EvidenceRef[];
 }
-
-export type ShedStage =
-  | "none"
-  | "payloads_off"
-  | "sample_dissection"
-  | "coarsen_metrics"
-  | "drop_packets";
 
 export interface CaptureStats {
   buffer_frames: number;

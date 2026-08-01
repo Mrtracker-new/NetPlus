@@ -1,55 +1,30 @@
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { SessionDiff } from "@netpulse/contract";
-import { Button, Input, Spinner, Notice, EmptyState } from "@netpulse/components";
-import { query } from "../ipc";
-import { useBusy } from "../hooks/useBusy";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-function parseSessionId(input: string): number {
-  const parsed = Number.parseInt(input.trim(), 10);
-  return Number.isNaN(parsed) ? 0 : parsed;
-}
+import { Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { useCompareController } from "../hooks/useCompareController";
+import { CompareControls } from "./Compare/CompareControls";
+import { CompareScorecards } from "./Compare/CompareScorecards";
+import { EvidenceList } from "./Compare/EvidenceList";
 
 export function SessionDiffScreen() {
-  const { t } = useTranslation("compare");
-  const [sessionA, setSessionA] = useState<number>(1);
-  const [sessionB, setSessionB] = useState<number>(2);
-  const [diff, setDiff] = useState<SessionDiff | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const { t } = useTranslation(["compare", "common"]);
+  const {
+    sessionA,
+    setSessionA,
+    sessionB,
+    setSessionB,
+    diff,
+    isComparing,
+    notice,
+    setNotice,
+    announcement,
+    actions,
+  } = useCompareController();
 
-  const [compareBusy, doCompare] = useBusy(async () => {
-    if (sessionA <= 0 || sessionB <= 0) {
-      setNotice("Session IDs must be positive integers.");
-      return;
-    }
-    if (sessionA === sessionB) {
-      setNotice("Select two different session IDs to compare.");
-      return;
-    }
-
-    setNotice(null);
-    setDiff(null);
-
-    try {
-      const res = await query({ kind: "compareSessions", sessionIdA: sessionA, sessionIdB: sessionB });
-      if (res.kind === "sessionDiff") {
-        setDiff(res.diff);
-      } else {
-        setNotice("Unexpected response kind from backend.");
-      }
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    }
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    void doCompare();
-  };
+  const localizedNotice = notice
+    ? notice.startsWith("errors.")
+      ? t(notice as any)
+      : notice
+    : null;
 
   return (
     <section
@@ -57,81 +32,67 @@ export function SessionDiffScreen() {
       aria-labelledby="session-diff-title"
       aria-describedby="session-diff-description"
     >
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
       <h2 id="session-diff-title">{t("title")}</h2>
-      <p id="session-diff-description" className="np-session-diff__desc">
+      <p id="session-diff-description" className="np-session-diff__desc" style={{ color: "var(--np-subtext, #94a3b8)", marginBottom: "1.25rem" }}>
         {t("desc")}
       </p>
 
-      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+      {localizedNotice && (
+        <Notice message={localizedNotice} level="error" onDismiss={() => setNotice(null)} />
+      )}
 
-      <form className="np-session-diff__controls" onSubmit={handleSubmit} noValidate>
-        <fieldset className="np-session-diff__fieldset" disabled={compareBusy}>
-          <Input
-            type="number"
-            value={sessionA}
-            onChange={(e) => setSessionA(parseSessionId(e.target.value))}
-            placeholder={t("select_baseline")}
-            aria-label={t("select_baseline")}
-          />
-          <Input
-            type="number"
-            value={sessionB}
-            onChange={(e) => setSessionB(parseSessionId(e.target.value))}
-            placeholder={t("select_target")}
-            aria-label={t("select_target")}
-          />
-          <Button type="submit" variant="primary" busy={compareBusy}>
-            {t("run_diff")}
-          </Button>
-        </fieldset>
-      </form>
+      {/* Session Controls */}
+      <CompareControls
+        sessionA={sessionA}
+        sessionB={sessionB}
+        onSessionAChange={setSessionA}
+        onSessionBChange={setSessionB}
+        onSwap={actions.swapSessions}
+        onCompare={() => void actions.runCompare()}
+        isComparing={isComparing}
+      />
 
-      {compareBusy ? (
-        <div role="status" aria-live="polite" aria-busy="true">
-          <Spinner label="Comparing sessions…" />
+      {/* Main Results Panel */}
+      {isComparing ? (
+        <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+          <Skeleton height="100px" />
+          <Skeleton height="160px" />
         </div>
       ) : diff ? (
-        <article className="np-session-diff__panel">
-          <h3>
-            Comparison Report (Session #{diff.sessionIdA} vs #{diff.sessionIdB})
+        <article
+          className="np-session-diff__panel"
+          style={{
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "1.25rem 1.5rem",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+          }}
+        >
+          <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
+            {t("report_title", { a: diff.sessionIdA, b: diff.sessionIdB })}
           </h3>
 
-          <dl className="np-session-diff__metrics">
-            <div>
-              <dt className="np-session-diff__metric-label">RTT Δ</dt>
-              <dd className="np-session-diff__metric-val np-session-diff__rtt">{diff.rttDeltaMs} ms</dd>
-            </div>
-            <div>
-              <dt className="np-session-diff__metric-label">TTFB Δ</dt>
-              <dd className="np-session-diff__metric-val">{diff.ttfbDeltaMs} ms</dd>
-            </div>
-            <div>
-              <dt className="np-session-diff__metric-label">Protocol Shift</dt>
-              <dd className="np-session-diff__metric-val">{diff.protocolShift}</dd>
-            </div>
-            <div>
-              <dt className="np-session-diff__metric-label">Confidence</dt>
-              <dd className="np-session-diff__metric-val np-session-diff__confidence">{diff.confidence}</dd>
-            </div>
-          </dl>
+          {/* Delta Scorecards */}
+          <CompareScorecards diff={diff} />
 
-          <div className="np-session-diff__explanation">
-            <h4>Semantic Explanation</h4>
-            <p>{diff.semanticExplanation}</p>
+          {/* Semantic Explanation */}
+          <div className="np-session-diff__explanation" style={{ marginBottom: "1.25rem" }}>
+            <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.95rem", color: "var(--np-subtext, #94a3b8)" }}>
+              {t("explanation")}
+            </h4>
+            <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--np-text, #e2e8f0)", lineHeight: "1.6" }}>
+              {diff.semanticExplanation}
+            </p>
           </div>
 
-          <h3>Supporting Evidence</h3>
-          {diff.evidence.length > 0 ? (
-            <ul role="list">
-              {diff.evidence.map((e, idx) => (
-                <li key={idx} role="listitem" className="np-session-diff__evidence">
-                  {e}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="np-session-diff__evidence">No supporting evidence available.</p>
-          )}
+          {/* Supporting Evidence List */}
+          <EvidenceList evidence={diff.evidence} />
         </article>
       ) : (
         <EmptyState>{t("empty")}</EmptyState>

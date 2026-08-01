@@ -1,8 +1,24 @@
 {
   "title": "Diferencial de Sesión y Comparación Cruzada",
   "desc": "Comparación de comportamiento entre capturas para aislar causas de regresión y anomalías de latencia.",
-  "select_baseline": "Seleccionar Sesión Base",
-  "select_target": "Seleccionar Sesión Comparativa",
+  "select_baseline": "ID de Sesión Base (ej. 1)",
+  "select_target": "ID de Sesión Comparativa (ej. 2)",
   "run_diff": "Comparar Sesiones",
-  "empty": "Selecciona dos sesiones de captura para generar un informe comparativo."
+  "swap_btn": "Intercambiar Sesiones",
+  "empty": "Selecciona dos sesiones de captura para generar un informe comparativo.",
+  "report_title": "Informe Comparativo (Sesión #{{a}} vs #{{b}})",
+  "metrics": {
+    "rtt_delta": "Δ RTT",
+    "ttfb_delta": "Δ TTFB",
+    "protocol_shift": "Cambio de Protocolo",
+    "confidence": "Confianza"
+  },
+  "explanation": "Explicación Semántica",
+  "evidence": "Evidencia de Soporte",
+  "no_evidence": "No hay evidencia de soporte disponible.",
+  "errors": {
+    "err_positive": "Los ID de sesión deben ser enteros positivos.",
+    "err_different": "Selecciona dos ID de sesión diferentes para comparar."
+  },
+  "building": "Comparando sesiones..."
 }

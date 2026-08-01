@@ -1,8 +1,24 @@
 {
   "title": "Session Diff & Cross-Session Comparison",
   "desc": "Side-by-side behavioral diffing across captures to isolate regression causes and latency anomalies.",
-  "select_baseline": "Select Baseline Session",
-  "select_target": "Select Comparison Session",
+  "select_baseline": "Baseline Session ID (e.g. 1)",
+  "select_target": "Comparison Session ID (e.g. 2)",
   "run_diff": "Compare Sessions",
-  "empty": "Select two capture sessions to generate a diff report."
+  "swap_btn": "Swap Sessions",
+  "empty": "Select two capture sessions to generate a diff report.",
+  "report_title": "Comparison Report (Session #{{a}} vs #{{b}})",
+  "metrics": {
+    "rtt_delta": "RTT Δ",
+    "ttfb_delta": "TTFB Δ",
+    "protocol_shift": "Protocol Shift",
+    "confidence": "Confidence"
+  },
+  "explanation": "Semantic Explanation",
+  "evidence": "Supporting Evidence",
+  "no_evidence": "No supporting evidence available.",
+  "errors": {
+    "err_positive": "Session IDs must be positive integers.",
+    "err_different": "Select two different session IDs to compare."
+  },
+  "building": "Comparing sessions..."
 }

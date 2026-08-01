@@ -68,7 +68,7 @@ export type Query =
   | { kind: "runTraceroute"; target: string; transport: string; max_hops: number; maxHops?: number }
   | { kind: "runBufferbloatTest"; target?: string }
   | { kind: "buildAndDecodePacket"; layers: string[] }
-  | { kind: "compareSessions"; sessionIdA: number; sessionIdB: number }
+  | { kind: "compareSessions"; session_id_a: number; session_id_b: number; sessionIdA?: number; sessionIdB?: number }
   | { kind: "listFleetHosts" };
 
 export interface PingResult {
@@ -135,14 +135,20 @@ export interface PacketInspection {
 }
 
 export interface SessionDiff {
+  session_id_a?: number;
   sessionIdA: number;
+  session_id_b?: number;
   sessionIdB: number;
+  rtt_delta_ms?: number;
   rttDeltaMs: number;
+  ttfb_delta_ms?: number;
   ttfbDeltaMs: number;
   protocolShift: string;
+  protocol_shift?: string;
   semanticExplanation: string;
+  semantic_explanation?: string;
   confidence: string;
-  evidence: readonly string[];
+  evidence: string[];
 }
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */

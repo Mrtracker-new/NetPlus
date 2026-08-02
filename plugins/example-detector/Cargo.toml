@@ -1,6 +1,6 @@
 [package]
 name = "example-detector"
-description = "First-party reference detector plugin — emits Findings through the honesty-preserving model (docs/24 §4.2)."
+description = "First-party reference detector plugin — emits Findings through the honesty-preserving model."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

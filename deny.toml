@@ -1,4 +1,4 @@
-# Cargo-deny supply chain security configuration (docs/03 §14, docs/04 §7).
+# Cargo-deny supply chain security configuration.
 
 [graph]
 targets = [
@@ -39,7 +39,7 @@ highlight = "all"
 skip = []
 skip-tree = []
 deny = [
-    # Single Egress Boundary Enforcement (docs/02 §10, docs/04 §7).
+    # Single Egress Boundary Enforcement.
     # Outbound network client crates are banned everywhere except netpulse-ai.
 
     # HTTP clients

@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-storage"
-description = "Ring buffer, time-series metrics, capture store — private, bounded, crash-safe (docs/08)."
+description = "Ring buffer, time-series metrics, capture store — private, bounded, crash-safe."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-learn"
-description = "Education engine: grounded lessons, protocol explorer, and animation models over the user's own captures (docs/13, docs/15, docs/16)."
+description = "Education engine: grounded lessons, protocol explorer, and animation models over the user's own captures."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,15 +11,15 @@ authors.workspace = true
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
 netpulse-storage = { path = "../netpulse-storage" }
-# The education layer speaks the explanation-key vocabulary (docs/07 §7): lessons,
+# The education layer speaks the explanation-key vocabulary: lessons,
 # the explorer, and animations all key off `netpulse-decode`'s emitted keys and
-# their content, so one identifier unifies the whole system (docs/07 §7.3). decode
+# their content, so one identifier unifies the whole system. decode
 # stays dependency-light itself, so this does not widen the fuzzed parser's deps.
 netpulse-decode = { path = "../netpulse-decode" }
 serde.workspace = true
 
 [dev-dependencies]
-# Progress persistence is verified by a serde round-trip (docs/13 §11); JSON is
+# Progress persistence is verified by a serde round-trip; JSON is
 # the test encoding only — the crate itself pulls in no serialization format.
 serde_json.workspace = true
 

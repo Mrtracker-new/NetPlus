@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-flow"
-description = "Flow + session reconstruction: sharded state machines, direction pairing, metrics (docs/06)."
+description = "Flow + session reconstruction: sharded state machines, direction pairing, metrics."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

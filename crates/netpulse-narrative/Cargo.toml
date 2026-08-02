@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-narrative"
-description = "Session → human narrative projection (docs/09, docs/14). Holds no capture logic."
+description = "Session → human narrative projection. Holds no capture logic."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

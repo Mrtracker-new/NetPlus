@@ -1,4 +1,4 @@
-# The NetPulse desktop shell (docs/03 §8, docs/04 §3). Tauri hosts the webview
+# The NetPulse desktop shell. Tauri hosts the webview
 # and bridges IPC to the engine. This crate is deliberately OUTSIDE the Rust
 # workspace (see the root Cargo.toml `exclude`): it needs the platform webview
 # libraries and the Tauri CLI, provisioned by the UI job, not the pure-Rust CI.
@@ -30,7 +30,7 @@ netpulse-capture-svc = { path = "../crates/netpulse-capture-svc" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
 
-# Live capture is a Windows/Npcap capability today (docs/05); enable the platform
+# Live capture is a Windows/Npcap capability today; enable the platform
 # backend only there so the shell still builds on other targets (the feature
 # stays off and capture fails closed honestly).
 [target.'cfg(windows)'.dependencies]
@@ -46,4 +46,3 @@ codegen-units = 1
 strip = true
 panic = "abort"
 opt-level = "z"
-

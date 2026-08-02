@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-api"
-description = "The Query/Stream/Command contract — single versioned source of truth for the IPC boundary (docs/02 §7)."
+description = "The Query/Stream/Command contract — single versioned source of truth for the IPC boundary."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

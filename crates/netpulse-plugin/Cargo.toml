@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-plugin"
-description = "The extension seams: plugin types, contracts, and the capability/trust model that keeps third-party code from breaking NetPulse's guarantees (docs/24)."
+description = "The extension seams: plugin types, contracts, and the capability/trust model that keeps third-party code from breaking NetPulse's guarantees."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,7 @@ authors.workspace = true
 
 # Deps are deliberately minimal: core (for the reused Dissector/Detector traits
 # and the Finding model) and serde. NO networking crate — a plugin never gets
-# egress, and this crate must not add any (docs/24 §5, egress-boundary gate
-# docs/04 §7).
+# egress, and this crate must not add any (egress-boundary gate).
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
 serde = { workspace = true }

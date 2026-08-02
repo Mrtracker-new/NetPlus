@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-platform"
-description = "OS shims: all non-portable code lives behind narrow traits here (docs/03 §13, docs/04 §3.2)."
+description = "OS shims: all non-portable code lives behind narrow traits here."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,8 +10,8 @@ authors.workspace = true
 
 [features]
 # Live packet capture via libpcap/Npcap. OFF by default so the standard
-# workspace build and CI stay dependency-free and platform-neutral (docs/03 §14:
-# dependencies are attack surface). The Tauri shell turns it on for Windows.
+# workspace build and CI stay dependency-free and platform-neutral (dependencies
+# are attack surface). The Tauri shell turns it on for Windows.
 live-capture = ["dep:pcap", "dep:netstat2", "dep:sysinfo"]
 
 [dependencies]
@@ -22,7 +22,7 @@ tracing.workspace = true
 # we only do on Windows. Encapsulates all the FFI `unsafe`, so this crate keeps
 # `#![forbid(unsafe_code)]`. Requires the Npcap SDK at build and Npcap at runtime.
 pcap = { version = "2", optional = true }
-# Socket-table attribution (docs/12): map a connection's 5-tuple to its owning
+# Socket-table attribution: map a connection's 5-tuple to its owning
 # PID. `netstat2` wraps the OS calls (GetExtendedTcpTable on Windows, etc.), so
 # this crate stays `#![forbid(unsafe_code)]` like the pcap path.
 netstat2 = { version = "0.11", optional = true }

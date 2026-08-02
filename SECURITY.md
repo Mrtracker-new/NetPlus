@@ -9,8 +9,8 @@ NetPulse is a local-first Internet observability platform that parses network tr
 **Please do not open public GitHub issues for security vulnerabilities.**
 
 To report a vulnerability privately:
-1. Submit a report through GitHub's [Private Vulnerability Reporting](https://docs.github.com/en/code-security/security-advisories/guidance-on-reporting-and-writing-information-about-vulnerabilities/privately-reporting-a-security-vulnerability) on this repository.
-2. Alternatively, email the maintainers directly at `security@netpulse.example`.
+1. Submit a report through GitHub's [Private Vulnerability Reporting](https://github.com/netpulse/netpulse/security/advisories/new) on this repository.
+2. Alternatively, email the maintainers directly.
 
 ### Please Include:
 - A clear description of the vulnerability and its potential impact.
@@ -59,7 +59,7 @@ NetPulse minimizes its attack surface through five structural boundaries:
 1. **Observe-Only Guarantee**: NetPulse uses passive socket capture techniques. It lacks code paths to drop, inject, modify, or reroute network packets.
 2. **Parser Isolation & Fuzzing**: `netpulse-decode` processes untrusted packet payloads. It depends only on `netpulse-core`, forbids unsafe memory manipulations wherever possible, and undergoes continuous fuzzing with `cargo-fuzz`.
 3. **Single Egress Boundary**: All crates except `netpulse-ai` are prohibited from creating network sockets or performing HTTP/TCP calls. Verifying data privacy reduces to auditing a single crate.
-4. **Least-Privilege Privilege Separation**: Packet capture capability is isolated to `netpulse-capture-svc` (or `netpulse-platform`), allowing the main analysis engine (`netpulse-engine`) and UI shell to execute unprivileged.
+4. **Least-Privilege Separation**: Packet capture capability is isolated to `netpulse-capture-svc` (or `netpulse-platform`), allowing the main analysis engine (`netpulse-engine`) and UI shell to execute unprivileged.
 
 ---
 

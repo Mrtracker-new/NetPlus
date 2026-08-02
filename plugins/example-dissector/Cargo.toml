@@ -1,6 +1,6 @@
 [package]
 name = "example-dissector"
-description = "First-party reference dissector plugin — the flagship seam (docs/24 §4.1)."
+description = "First-party reference dissector plugin — the flagship seam."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

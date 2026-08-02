@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-intel"
-description = "Security + anomaly detection core: Detectors emitting confidence-scored Findings (docs/17, 18, 20)."
+description = "Security + anomaly detection core: Detectors emitting confidence-scored Findings."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

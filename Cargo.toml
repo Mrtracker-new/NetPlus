@@ -1,21 +1,19 @@
 # NetPulse — Rust workspace manifest.
 #
-# The dependency graph across these crates *is* the layer diagram from
-# docs/0-foundation/02_System_Architecture.md §4. Arrows point strictly
-# downward; Cargo forbids cycles, so a layer violation fails to compile.
-# See docs/0-foundation/04_Project_Structure.md for the full mapping.
+# The dependency graph across these crates is the system layer diagram.
+# Arrows point strictly downward; Cargo forbids cycles, so a layer violation fails to compile.
+# See ARCHITECTURE.md for the full system architecture mapping.
 
 [workspace]
 resolver = "2"
 # `crates/*` are the product layers; `plugins/*` are the first-party reference
-# plugins (docs/24 §6) — in-tree so CI builds and conformance-tests them as living
-# examples of each extension seam (docs/24 §10).
+# plugins — in-tree so CI builds and conformance-tests them as living
+# examples of each extension seam.
 members = ["crates/*", "plugins/*"]
 # The Tauri desktop shell is its own build: it depends on the platform webview
 # system libraries and the Tauri CLI, which the pure-Rust workspace CI job does
 # not provision. Excluding it keeps `cargo build/test --workspace` fast and
-# webview-free; the shell is built by the UI job under the Tauri toolchain
-# (docs/03 §8, docs/04 §7).
+# webview-free; the shell is built by the UI job under the Tauri toolchain.
 exclude = ["src-tauri"]
 
 [workspace.package]
@@ -28,12 +26,12 @@ authors = ["The NetPulse contributors"]
 
 # Shared external dependencies, pinned once and referenced with
 # `<crate>.workspace = true`. Kept deliberately small: for a security tool,
-# dependencies are attack surface (docs/03 §14).
+# dependencies represent attack surface.
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
-# JSON is the control/low-volume IPC encoding (docs/03 §7); used by the API
-# contract crate and its drift tests. Not a networking dependency, so it does
-# not affect the single-egress-boundary gate (docs/04 §7).
+# JSON is the control/low-volume IPC encoding; used by the API contract crate
+# and its drift tests. Not a networking dependency, so it does not affect the
+# single-egress-boundary gate.
 serde_json = "1"
 thiserror = "2"
 tracing = { version = "0.1", features = ["std"] }
@@ -48,7 +46,7 @@ directories = "6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 # Workspace-wide lints. Memory safety on hostile input is the defining
-# requirement of this codebase (docs/03 §3), so unsafe is denied by default.
+# requirement of this codebase, so unsafe is denied by default.
 # Crates that genuinely need it (e.g. netpulse-platform FFI) re-allow locally
 # with a documented justification and review.
 [workspace.lints.rust]

@@ -1,6 +1,6 @@
 [package]
 name = "netpulse-decode"
-description = "Protocol dissection — the security-critical parser. Fuzzed in isolation (docs/07, docs/04 §3.4)."
+description = "Protocol dissection — the security-critical parser. Fuzzed in isolation."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

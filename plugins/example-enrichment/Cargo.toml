@@ -1,6 +1,6 @@
 [package]
 name = "example-enrichment"
-description = "First-party reference enrichment plugin — local/offline metadata only, never the network (docs/24 §4.3)."
+description = "First-party reference enrichment plugin — local/offline metadata only, never the network."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

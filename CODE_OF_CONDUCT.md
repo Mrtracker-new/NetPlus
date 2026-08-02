@@ -52,9 +52,7 @@ an individual is officially representing the community in public spaces.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the community leaders responsible for enforcement at
-`conduct@netpulse.example` (placeholder — update before public release). All
-complaints will be reviewed and investigated promptly and fairly.
+reported to the project maintainers. All complaints will be reviewed and investigated promptly and fairly.
 
 ## Attribution
 

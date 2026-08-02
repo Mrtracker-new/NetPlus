@@ -1,104 +1,114 @@
-// Protocol Explorer — the interactive reference (docs/15). A place to understand
-// any field NetPulse dissects, on demand, at your level — "no dead ends"
-// (docs/01 E1). It is a pure presenter of the explanation-key content (docs/15
-// §12): browse everything, or search by a beginner's words ("padlock",
-// "connection refused", "not found") and reach the precise entry (docs/15 §8).
-// Content is layered by disclosure mode, but any entry can be expanded to expert
-// without leaving Beginner mode globally (the escape hatch, docs/09 §6.3).
-
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import type { ExplorerEntry, ProjectionDepth } from "@netpulse/contract";
-import { EmptyState, Notice, Skeleton } from "@netpulse/components";
-import { query } from "../ipc";
+import { EmptyState, Notice, Skeleton, Input, Button } from "@netpulse/components";
 import { useDisclosure } from "../modes/DisclosureContext";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-function contentAt(entry: ExplorerEntry, depth: ProjectionDepth): string {
-  if (depth === "expert") return entry.expert;
-  if (depth === "intermediate") return entry.intermediate;
-  return entry.beginner;
-}
-
-function Entry({ entry, depth }: { entry: ExplorerEntry; depth: ProjectionDepth }) {
-  return (
-    <article className="np-ref">
-      <header className="np-ref__key">
-        {entry.title}
-        <code className="np-ref__id">{entry.key}</code>
-        {entry.examples_available && <span className="np-ref__mine">you have an example</span>}
-      </header>
-      <p className="np-ref__body">{contentAt(entry, depth)}</p>
-      {depth !== "expert" && (
-        <details className="np-ref__more">
-          <summary>Expert detail</summary>
-          <p>{entry.expert}</p>
-        </details>
-      )}
-      {entry.related.length > 0 && (
-        <footer className="np-ref__related">
-          {entry.related.map((k) => (
-            <code key={k}>{k}</code>
-          ))}
-        </footer>
-      )}
-    </article>
-  );
-}
+import { useExplorerController } from "../hooks/useExplorerController";
+import { ExplorerSummaryKpis } from "./Explorer/ExplorerSummaryKpis";
+import { ExplorerFilters } from "./Explorer/ExplorerFilters";
+import { ExplorerEntryCard } from "./Explorer/ExplorerEntryCard";
 
 export function Explorer() {
   const { t } = useTranslation(["explorer", "common"]);
   const { depth } = useDisclosure();
-  const [term, setTerm] = useState("");
-  const [entries, setEntries] = useState<ExplorerEntry[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const {
+    term,
+    setTerm,
+    category,
+    setCategory,
+    filteredEntries,
+    loaded,
+    notice,
+    setNotice,
+    metrics,
+    selectRelated,
+    clearSearch,
+    announcement,
+    searchInputRef,
+  } = useExplorerController();
 
+  // Global Keyboard Shortcuts ('/' to focus search, 'Esc' to clear search)
   useEffect(() => {
-    let cancelled = false;
-    const q =
-      term.trim().length > 0
-        ? ({ kind: "explorerSearch", term } as const)
-        : ({ kind: "explorerBrowse" } as const);
-    query(q)
-      .then((res) => {
-        if (!cancelled && res.kind === "explorerEntries") setEntries(res.entries);
-      })
-      .catch((e) => {
-        if (!cancelled) setNotice(toErrorMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "/" && document.activeElement?.tagName !== "INPUT") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === "Escape" && term) {
+        clearSearch();
+      }
     };
-  }, [term]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [term, clearSearch, searchInputRef]);
 
   return (
     <section className="np-explorer" aria-label={t("title")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <input
-        className="np-explorer__search"
-        type="search"
-        placeholder={t("search_placeholder")}
-        value={term}
-        onChange={(e) => setTerm(e.target.value)}
-        aria-label={t("search_placeholder")}
-      />
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+        {t("title")}
+      </h2>
+      <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: "0 0 1.25rem 0" }}>
+        {t("desc")}
+      </p>
+
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      {/* Search Input Bar */}
+      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "1.25rem" }}>
+        <div style={{ flex: 1 }}>
+          <Input
+            ref={searchInputRef}
+            className="np-explorer__search"
+            type="search"
+            placeholder={t("search_placeholder")}
+            value={term}
+            onChange={(e) => setTerm(e.target.value)}
+            aria-label={t("search_placeholder")}
+          />
+        </div>
+        {term && (
+          <Button variant="standard" onClick={clearSearch} style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}>
+            ✕ {t("clear_search")}
+          </Button>
+        )}
+      </div>
+
+      {/* Summary KPI Scorecards */}
+      {loaded && (
+        <ExplorerSummaryKpis
+          total={metrics.total}
+          matching={filteredEntries.length}
+          withExamples={metrics.withExamples}
+          relatedCount={metrics.relatedCount}
+        />
+      )}
+
+      {/* Protocol Category Filters */}
+      <ExplorerFilters category={category} onCategoryChange={setCategory} />
+
+      {/* Entry Cards List or Loading Skeletons or Empty States */}
       {!loaded ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
-          <Skeleton height={90} width="100%" />
-          <Skeleton height={90} width="100%" />
-          <Skeleton height={90} width="100%" />
+          <Skeleton height={110} width="100%" />
+          <Skeleton height={110} width="100%" />
+          <Skeleton height={110} width="100%" />
         </div>
-      ) : entries.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+      ) : filteredEntries.length === 0 ? (
+        <EmptyState>
+          {category !== "all" ? t("no_filter_matches") : t("empty")}
+        </EmptyState>
       ) : (
-        entries.map((entry) => <Entry key={entry.key} entry={entry} depth={depth} />)
+        filteredEntries.map((entry) => (
+          <ExplorerEntryCard
+            key={entry.key}
+            entry={entry}
+            depth={depth}
+            onSelectRelated={selectRelated}
+          />
+        ))
       )}
     </section>
   );

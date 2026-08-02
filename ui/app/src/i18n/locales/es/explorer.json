@@ -1,7 +1,30 @@
 {
   "title": "Explorador de Protocolos",
-  "search_placeholder": "Buscar: candado, RST, NXDOMAIN, 404…",
+  "desc": "Biblioteca de referencia de protocolos interactiva. Busca por términos de principiante o audita campos RFC precisos.",
+  "search_placeholder": "Buscar: candado, RST, NXDOMAIN, 404... (Presiona '/' para enfocar)",
+  "clear_search": "Borrar Búsqueda",
   "empty": "No hay coincidencias — prueba otra palabra.",
-  "expert_detail": "Detalle experto",
-  "example_available": "tienes un ejemplo"
+  "no_filter_matches": "Ninguna entrada de protocolo coincide con el filtro seleccionado.",
+  "kpis": {
+    "total": "Entradas Totales",
+    "matching": "Resultados Coincidentes",
+    "examples": "Con Ejemplos",
+    "related": "Enlaces Relacionados"
+  },
+  "categories": {
+    "all": "Todos los Protocolos",
+    "http": "HTTP",
+    "tls": "TLS",
+    "dns": "DNS",
+    "tcp": "TCP",
+    "udp": "UDP",
+    "quic": "QUIC",
+    "ip": "IP",
+    "icmp": "ICMP"
+  },
+  "card": {
+    "expert_detail": "Detalle Experto",
+    "example_tag": "Tienes un ejemplo",
+    "related_title": "Temas Relacionados"
+  }
 }

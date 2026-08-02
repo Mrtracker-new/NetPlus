@@ -10,3 +10,4 @@ export { useCompareController } from "./useCompareController";
 export { useSecurityController } from "./useSecurityController";
 export { useAssistantController } from "./useAssistantController";
 export { useLearnController } from "./useLearnController";
+export { useExplorerController } from "./useExplorerController";

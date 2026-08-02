@@ -1,7 +1,30 @@
 {
   "title": "Protocol Explorer",
-  "search_placeholder": "Search: padlock, RST, NXDOMAIN, 404…",
+  "desc": "Interactive protocol reference library. Search by beginner terms or audit precise RFC fields.",
+  "search_placeholder": "Search: padlock, RST, NXDOMAIN, 404... (Press '/' to focus)",
+  "clear_search": "Clear Search",
   "empty": "No matching entry — try another word.",
-  "expert_detail": "Expert detail",
-  "example_available": "you have an example"
+  "no_filter_matches": "No protocol entries match the selected category filter.",
+  "kpis": {
+    "total": "Total Entries",
+    "matching": "Matching Results",
+    "examples": "With Examples",
+    "related": "Related Links"
+  },
+  "categories": {
+    "all": "All Protocols",
+    "http": "HTTP",
+    "tls": "TLS",
+    "dns": "DNS",
+    "tcp": "TCP",
+    "udp": "UDP",
+    "quic": "QUIC",
+    "ip": "IP",
+    "icmp": "ICMP"
+  },
+  "card": {
+    "expert_detail": "Expert Detail",
+    "example_tag": "You have an example",
+    "related_title": "Related Topics"
+  }
 }

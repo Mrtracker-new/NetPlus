@@ -1,5 +1,36 @@
 {
   "title": "Lessons from your traffic",
+  "desc": "Interactive lessons grounded in your real network traffic and protocol evidence.",
   "empty": "No lessons yet — browse a few sites and they'll appear here.",
-  "example_tag": "example"
+  "no_filter_matches": "No lessons match the selected level filter.",
+  "no_capture": "No live captures found. Start a capture to generate grounded lessons.",
+  "kpis": {
+    "total": "Total Lessons",
+    "grounded": "Grounded Captures",
+    "examples": "Curated Examples",
+    "grounded_pct": "Grounded %"
+  },
+  "filters": {
+    "all": "All Levels",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "expert": "Expert",
+    "advanced": "Expert",
+    "grounded_only": "Grounded Only",
+    "show_all": "Show All"
+  },
+  "card": {
+    "grounded_tag": "Grounded Capture",
+    "example_tag": "Curated Example",
+    "exercise_title": "Comprehension Check",
+    "check_answer": "Check Answer",
+    "hide_answer": "Hide Answer",
+    "observed_evidence": "Observed Evidence"
+  },
+  "levels": {
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "expert": "Expert",
+    "advanced": "Expert"
+  }
 }

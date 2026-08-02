@@ -1,115 +1,25 @@
-// Learn — the Learning Engine surface (docs/13). NetPulse turns the learner's
-// *own* traffic into lessons: when a teachable moment occurs (a DNS lookup, a
-// TLS handshake), it offers a lesson grounded in that real evidence (docs/13
-// §3.2). Offers are calm and dismissible — an invitation, never a nag (docs/13
-// §6, docs/01 §7.6). Every grounded claim cites the evidence behind it
-// (docs/02 §6.3), and a grounded exercise's answer is derived from the learner's
-// data, so it can never be wrong about what they actually did (docs/13 §11).
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { LessonOffer } from "@netpulse/contract";
-import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
-import { query } from "../ipc";
-import { useDisclosure } from "../modes/DisclosureContext";
-import { useStore } from "../state/store";
-import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-// The distinct session ids referenced by the current feed — the sessions we can
-// ask for grounded lesson offers.
-function sessionIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[] {
-  const ids = new Set<number>();
-  for (const card of feed) {
-    for (const e of card.evidence) {
-      if (e.kind === "session") ids.add(e.id);
-    }
-  }
-  return [...ids];
-}
-
-function Offer({ offer }: { offer: LessonOffer }) {
-  const { navigateToEvidence } = useEvidenceNavigation();
-
-  return (
-    <article className="np-lesson">
-      <header className="np-lesson__title">
-        {offer.title}
-        <span className="np-lesson__level">{offer.level}</span>
-        {/* Honesty: a curated example is labeled, never passed off as the
-            learner's own capture (docs/13 §4.3). */}
-        {!offer.grounded && <span className="np-lesson__example">example</span>}
-      </header>
-
-      {/* Grounding: plain facts pulled from the learner's own traffic (docs/13 §4.2). */}
-      {offer.grounding.length > 0 && (
-        <ul className="np-lesson__grounding">
-          {offer.grounding.map((fact, i) => (
-            <li key={i}>{fact}</li>
-          ))}
-        </ul>
-      )}
-
-      {/* A comprehension check on the learner's real data; the answer is
-          revealed on demand with constructive framing (docs/13 §9). */}
-      {offer.exercise && (
-        <details className="np-lesson__check">
-          <summary>{offer.exercise.prompt}</summary>
-          <p className="np-lesson__answer">{offer.exercise.answer}</p>
-        </details>
-      )}
-
-      <footer className="np-lesson__foot">
-        <EvidenceChips evidence={offer.evidence} onNavigate={navigateToEvidence} />
-      </footer>
-    </article>
-  );
-}
+import { EmptyState, Notice, Skeleton } from "@netpulse/components";
+import { useLearnController } from "../hooks/useLearnController";
+import { LearnSummaryKpis } from "./Learn/LearnSummaryKpis";
+import { LearnFilters } from "./Learn/LearnFilters";
+import { LessonCard } from "./Learn/LessonCard";
 
 export function Learn() {
   const { t } = useTranslation(["learn", "common"]);
-  const { feed } = useStore();
-  const { depth } = useDisclosure();
-  const [offers, setOffers] = useState<LessonOffer[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const sessionIds = sessionIdsFromFeed(feed);
-    Promise.all(
-      sessionIds.map(async (sessionId) => {
-        const res = await query({ kind: "lessonOffers", session_id: sessionId, depth });
-        return res.kind === "lessonOffers" ? res.offers : [];
-      }),
-    )
-      .then((results) => {
-        if (cancelled) return;
-        const seen = new Set<string>();
-        const flat: LessonOffer[] = [];
-        for (const list of results) {
-          for (const offer of list) {
-            if (!seen.has(offer.lesson_id)) {
-              seen.add(offer.lesson_id);
-              flat.push(offer);
-            }
-          }
-        }
-        setOffers(flat);
-      })
-      .catch((e) => {
-        if (!cancelled) setNotice(toErrorMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [feed, depth]);
+  const {
+    lessons,
+    filteredLessons,
+    loaded,
+    notice,
+    setNotice,
+    level,
+    setLevel,
+    groundedOnly,
+    toggleGrounded,
+    metrics,
+    announcement,
+  } = useLearnController();
 
   if (!loaded) {
     return (
@@ -125,11 +35,52 @@ export function Learn() {
 
   return (
     <section className="np-learn" aria-label={t("title")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      {offers.length === 0 ? (
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+        {t("title")}
+      </h2>
+      <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: "0 0 1.25rem 0" }}>
+        {t("desc")}
+      </p>
+
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      {lessons.length === 0 ? (
         <EmptyState>{t("empty")}</EmptyState>
       ) : (
-        offers.map((offer) => <Offer key={offer.lesson_id} offer={offer} />)
+        <>
+          {/* Summary KPI Cards */}
+          <LearnSummaryKpis
+            total={metrics.total}
+            groundedCount={metrics.groundedCount}
+            exampleCount={metrics.exampleCount}
+            groundedPct={metrics.groundedPct}
+          />
+
+          {/* Level & Grounding Filters */}
+          <LearnFilters
+            level={level}
+            onLevelChange={setLevel}
+            groundedOnly={groundedOnly}
+            onToggleGrounded={toggleGrounded}
+            groundedCount={metrics.groundedCount}
+          />
+
+          {/* Lesson Cards List or Filter Empty State */}
+          {filteredLessons.length > 0 ? (
+            filteredLessons.map((offer) => (
+              <LessonCard key={offer.lesson_id} offer={offer} />
+            ))
+          ) : (
+            <EmptyState>
+              {level !== "all" ? t("no_filter_matches") : t("empty")}
+            </EmptyState>
+          )}
+        </>
       )}
     </section>
   );

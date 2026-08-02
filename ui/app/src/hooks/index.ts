@@ -9,3 +9,4 @@ export { useFleetController } from "./useFleetController";
 export { useCompareController } from "./useCompareController";
 export { useSecurityController } from "./useSecurityController";
 export { useAssistantController } from "./useAssistantController";
+export { useLearnController } from "./useLearnController";

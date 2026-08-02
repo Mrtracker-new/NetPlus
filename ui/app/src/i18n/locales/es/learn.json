@@ -1,5 +1,36 @@
 {
   "title": "Lecciones de tu tráfico",
+  "desc": "Lecciones interactivas fundamentadas en tu tráfico de red real y evidencia de protocolo.",
   "empty": "Aún no hay lecciones: navega por algunos sitios y aparecerán aquí.",
-  "example_tag": "ejemplo"
+  "no_filter_matches": "Ninguna lección coincide con el filtro de nivel seleccionado.",
+  "no_capture": "No se encontraron capturas en vivo. Inicia una captura para generar lecciones.",
+  "kpis": {
+    "total": "Lecciones Totales",
+    "grounded": "Capturas Fundamentadas",
+    "examples": "Ejemplos Curados",
+    "grounded_pct": "% Fundamentado"
+  },
+  "filters": {
+    "all": "Todos los Niveles",
+    "beginner": "Principiante",
+    "intermediate": "Intermedio",
+    "expert": "Experto",
+    "advanced": "Experto",
+    "grounded_only": "Solo Fundamentadas",
+    "show_all": "Mostrar Todo"
+  },
+  "card": {
+    "grounded_tag": "Captura Fundamentada",
+    "example_tag": "Ejemplo Curado",
+    "exercise_title": "Comprobación de Comprensión",
+    "check_answer": "Verificar Respuesta",
+    "hide_answer": "Ocultar Respuesta",
+    "observed_evidence": "Evidencia Observada"
+  },
+  "levels": {
+    "beginner": "Principiante",
+    "intermediate": "Intermedio",
+    "expert": "Experto",
+    "advanced": "Experto"
+  }
 }

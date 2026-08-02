@@ -38,7 +38,7 @@ export function Export() {
         </p>
       </div>
 
-      {notice && <Notice message={notice} level={status === "completed" ? "info" : "error"} onDismiss={() => setNotice(null)} />}
+      {notice && <Notice message={notice} level={status === "completed" ? "success" : "error"} onDismiss={() => setNotice(null)} />}
 
       <ZeroEgressBadge />
 

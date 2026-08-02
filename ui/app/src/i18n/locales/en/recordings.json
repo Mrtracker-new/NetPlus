@@ -1,5 +1,38 @@
 {
   "title": "Saved Session Recordings",
-  "desc": "Manage and inspect local PCAP & JSON capture sessions.",
-  "empty": "No saved capture recordings found."
+  "desc": "Package and manage self-contained PCAP & JSON sessions for deterministic replay.",
+  "stub_notice": "Live capture source required: NetPulse fails closed rather than sealing an empty artifact when no active network adapter is streaming. Select a live capture adapter from the top bar to record packets.",
+  "empty": {
+    "title": "No Session Recordings Yet",
+    "subtitle": "Start a recording to capture packets for deterministic replay, teaching, diagnostics, or bug reports."
+  },
+  "status": {
+    "active": "🔴 Recording Active...",
+    "idle": "⏹ Capture Idle"
+  },
+  "kpis": {
+    "total": "Total Recordings",
+    "frames": "Total Frames",
+    "safe_share": "Safe to Share",
+    "payloads": "Payload Captures"
+  },
+  "filters": {
+    "all": "All Levels",
+    "metadata_only": "Metadata Only",
+    "headers": "Headers Only",
+    "full_payload": "Full Payload"
+  },
+  "levels": {
+    "metadata_only": "Metadata Only",
+    "headers": "Headers Only",
+    "full_payload": "Full Payload"
+  },
+  "card": {
+    "title": "Recording #{{id}}",
+    "frames_count": "{{count}} frames",
+    "incomplete": "Incomplete",
+    "safe_notice": "No packet payloads — safe to share for teaching and bug reports.",
+    "payload_notice": "Contains packet payloads.",
+    "version_pins": "Determinism · version pins"
+  }
 }

@@ -1,5 +1,38 @@
 {
   "title": "Grabaciones de Sesión Guardadas",
-  "desc": "Gestiona e inspecciona sesiones de captura locales PCAP y JSON.",
-  "empty": "No se encontraron grabaciones de captura guardadas."
+  "desc": "Empaqueta y gestiona sesiones PCAP y JSON autónomas para reproducción determinista.",
+  "stub_notice": "Se requiere fuente de captura en vivo: NetPulse falla de forma segura en lugar de sellar un archivo vacío cuando no hay un adaptador activo transmitiendo. Selecciona un adaptador de captura en la barra superior.",
+  "empty": {
+    "title": "Aún no hay grabaciones de sesión",
+    "subtitle": "Inicia una grabación para capturar paquetes para reproducción determinista, enseñanza o reportes de errores."
+  },
+  "status": {
+    "active": "🔴 Grabación Activa...",
+    "idle": "⏹ Captura Inactiva"
+  },
+  "kpis": {
+    "total": "Grabaciones Totales",
+    "frames": "Tramas Totales",
+    "safe_share": "Seguro para Compartir",
+    "payloads": "Capturas con Carga Útil"
+  },
+  "filters": {
+    "all": "Todos los Niveles",
+    "metadata_only": "Solo Metadatos",
+    "headers": "Solo Encabezados",
+    "full_payload": "Carga Útil Completa"
+  },
+  "levels": {
+    "metadata_only": "Solo Metadatos",
+    "headers": "Solo Encabezados",
+    "full_payload": "Carga Útil Completa"
+  },
+  "card": {
+    "title": "Grabación #{{id}}",
+    "frames_count": "{{count}} tramas",
+    "incomplete": "Incompleto",
+    "safe_notice": "Sin cargas útiles de paquetes — seguro para compartir en enseñanza y reportes de errores.",
+    "payload_notice": "Contiene cargas útiles de paquetes.",
+    "version_pins": "Determinismo · versiones de componentes"
+  }
 }

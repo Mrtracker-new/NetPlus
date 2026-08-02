@@ -1,119 +1,153 @@
-// Recordings — capturing a session to a durable, self-contained artifact (docs/22).
-// A recording packages the frames plus the version pins and a privacy manifest
-// needed to replay it faithfully (docs/22 §3, §6) and share it safely (docs/22 §5).
-// Recording is deliberate — the user starts it — and honest: the manifest states
-// exactly the payload level captured, so there are no surprises about what's
-// inside (docs/22 §5). In this build there is no live capture source, so starting
-// a recording fails closed rather than sealing an empty artifact (docs/02 §11).
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { RecordingSummary } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
-import { query, command } from "../ipc";
-import { useBusy } from "../hooks/useBusy";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-const LEVEL_LABEL: Record<RecordingSummary["privacy"]["level"], string> = {
-  metadata_only: "Metadata only",
-  headers: "Headers",
-  full_payload: "Full payload",
-};
-
-function seconds(ns: number): string {
-  return `${(ns / 1_000_000_000).toFixed(2)}s`;
-}
-
-function RecordingCard({ rec }: { rec: RecordingSummary }) {
-  return (
-    <article className="np-recording">
-      <header className="np-recording__head">
-        <span className="np-recording__title">Recording #{rec.id}</span>
-        <span className="np-recording__level">{LEVEL_LABEL[rec.privacy.level]}</span>
-      </header>
-
-      <div className="np-recording__meta">
-        <span>{rec.frame_count} frames</span>
-        <span>
-          {seconds(rec.from_mono_nanos)} → {seconds(rec.to_mono_nanos)}
-        </span>
-        {rec.incomplete && (
-          <span className="np-recording__incomplete">incomplete</span>
-        )}
-      </div>
-
-      <p className="np-recording__privacy">
-        {rec.privacy.contains_payloads
-          ? "Contains packet payloads."
-          : "No packet payloads — safe to share for teaching and bug reports."}
-      </p>
-
-      <details className="np-recording__pins">
-        <summary>Determinism · version pins</summary>
-        <ul>
-          <li>engine {rec.version_pins.engine}</li>
-          <li>decode {rec.version_pins.decode}</li>
-          <li>intel {rec.version_pins.intel}</li>
-          <li>ai {rec.version_pins.ai}</li>
-          <li>content {rec.version_pins.content}</li>
-        </ul>
-      </details>
-    </article>
-  );
-}
+import { Button, Notice, Skeleton } from "@netpulse/components";
+import { useRecordingsController } from "../hooks/useRecordingsController";
+import { RecordingsSummaryKpis } from "./Recordings/RecordingsSummaryKpis";
+import { RecordingsFilters } from "./Recordings/RecordingsFilters";
+import { RecordingCard } from "./Recordings/RecordingCard";
 
 export function Recordings() {
   const { t } = useTranslation(["recordings", "common"]);
-  const [recordings, setRecordings] = useState<RecordingSummary[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const {
+    filteredRecordings,
+    summary,
+    isRecording,
+    loaded,
+    busy,
+    notice,
+    setNotice,
+    privacyFilter,
+    setPrivacyFilter,
+    startRecording,
+    stopRecording,
+    announcement,
+  } = useRecordingsController();
 
-  function refresh() {
-    query({ kind: "listRecordings" })
-      .then((res) => setRecordings(res.kind === "recordings" ? res.recordings : []))
-      .catch((e) => {
-        setRecordings([]);
-        setNotice(toErrorMessage(e));
-      })
-      .finally(() => setLoaded(true));
-  }
-
-  useEffect(refresh, []);
-
-  const [busy, record] = useBusy(async (kind: "startRecording" | "stopRecording") => {
-    setNotice(null);
-    try {
-      await command({ kind });
-      refresh();
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    }
-  });
+  const isStubNotice =
+    notice && (notice.toLowerCase().includes("live capture") || notice.toLowerCase().includes("stub"));
 
   return (
     <section className="np-recordings" aria-label={t("title")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <div className="np-recordings__controls">
-        <button className="np-btn" disabled={busy} onClick={() => void record("startRecording")}>
-          {t("common:actions.start_capture")}
-        </button>
-        <button className="np-btn" disabled={busy} onClick={() => void record("stopRecording")}>
-          {t("common:actions.stop_capture")}
-        </button>
-        <span className="np-recordings__hint">
-          {t("desc")}
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+        <div>
+          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+            {t("title")}
+          </h2>
+          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+            {t("desc")}
+          </p>
+        </div>
+
+        {/* Live Recording Status Indicator */}
+        <span
+          role="status"
+          style={{
+            fontSize: "0.85rem",
+            padding: "0.4rem 0.85rem",
+            borderRadius: "16px",
+            background: isRecording ? "rgba(239, 68, 68, 0.2)" : "rgba(148, 163, 184, 0.2)",
+            color: isRecording ? "#ef4444" : "#94a3b8",
+            fontWeight: 600,
+            display: "flex",
+            alignItems: "center",
+            gap: "0.4rem",
+          }}
+        >
+          {isRecording ? t("status.active") : t("status.idle")}
         </span>
       </div>
 
+      {notice && (
+        <Notice
+          message={isStubNotice ? t("stub_notice") : notice}
+          level={isStubNotice ? "warning" : "error"}
+          onDismiss={() => setNotice(null)}
+        />
+      )}
+
+      {/* Start / Stop Recording Control Toolbar */}
+      <div
+        className="np-recordings__controls"
+        style={{
+          display: "flex",
+          gap: "0.75rem",
+          alignItems: "center",
+          marginBottom: "1.5rem",
+          background: "var(--np-surface-1, #131b2a)",
+          border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
+          borderRadius: "var(--np-radius-lg, 12px)",
+          padding: "1rem 1.25rem",
+        }}
+      >
+        <Button
+          variant="primary"
+          disabled={busy || isRecording}
+          busy={busy && isRecording}
+          onClick={() => void startRecording()}
+        >
+          ▶️ {t("common:actions.start_capture")}
+        </Button>
+
+        <Button
+          variant="standard"
+          disabled={busy || !isRecording}
+          busy={busy && !isRecording}
+          onClick={() => void stopRecording()}
+          style={{ border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}
+        >
+          ⏹️ {t("common:actions.stop_capture")}
+        </Button>
+      </div>
+
       {!loaded ? (
-        <Spinner />
-      ) : recordings.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
+          <Skeleton height={140} width="100%" />
+          <Skeleton height={140} width="100%" />
+          <Skeleton height={140} width="100%" />
+        </div>
+      ) : summary.total === 0 ? (
+        <div
+          style={{
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "2.5rem 1.5rem",
+            textAlign: "center",
+            color: "var(--np-subtext, #94a3b8)",
+          }}
+        >
+          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+            📹 {t("empty.title")}
+          </h3>
+          <p style={{ fontSize: "0.9rem", margin: "0 0 1.25rem 0", maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+            {t("empty.subtitle")}
+          </p>
+          <Button variant="primary" disabled={busy} onClick={() => void startRecording()}>
+            ▶️ {t("common:actions.start_capture")}
+          </Button>
+        </div>
       ) : (
-        recordings.map((r) => <RecordingCard key={r.id} rec={r} />)
+        <>
+          {/* Summary KPI Scorecards */}
+          <RecordingsSummaryKpis
+            total={summary.total}
+            totalFrames={summary.totalFrames}
+            safeToShareCount={summary.safeToShareCount}
+            payloadCount={summary.payloadCount}
+          />
+
+          {/* Privacy Level Filters */}
+          <RecordingsFilters filter={privacyFilter} onFilterChange={setPrivacyFilter} />
+
+          {/* Recording Cards */}
+          {filteredRecordings.map((r) => (
+            <RecordingCard key={r.id} rec={r} />
+          ))}
+        </>
       )}
     </section>
   );

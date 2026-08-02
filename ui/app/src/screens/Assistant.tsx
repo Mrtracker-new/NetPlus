@@ -1,119 +1,115 @@
-// Assistant — the grounded AI layer (docs/19). It *explains* your captured data
-// and never invents it: every answer is grounded in your real evidence and cites
-// it (docs/19 §3). The default backend is local, so answering does zero network
-// egress — the privacy posture is shown on every answer (docs/19 §4.1). Before
-// any opt-in remote use, the exact minimized context that *would* be sent is
-// disclosed here — there are no silent uploads (docs/19 §4.3). When the data
-// can't support an answer, the assistant says so rather than fabricating one
-// (docs/19 §3).
-
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AssistantAnswer } from "@netpulse/contract";
-import { Notice } from "@netpulse/components";
-import { query } from "../ipc";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-const SUGGESTIONS = [
-  "Which host used the most bandwidth?",
-  "What protocols am I using?",
-  "Why was it slow?",
-  "Summarize my traffic",
-];
-
-function AnswerView({ answer }: { answer: AssistantAnswer }) {
-  return (
-    <div className="np-assistant__answer">
-      <div className="np-assistant__posture">
-        <span className={answer.is_remote ? "np-posture np-posture--remote" : "np-posture np-posture--local"}>
-          {answer.is_remote ? "Remote" : "Local"} · {answer.backend_id}
-        </span>
-        {answer.grounded ? (
-          <span className="np-grounded">grounded · {answer.citations.length} citation(s)</span>
-        ) : (
-          <span className="np-ungrounded">no evidence to cite</span>
-        )}
-      </div>
-
-      <p className="np-assistant__text">
-        {answer.text}
-      </p>
-
-      <details className="np-assistant__disclosure">
-        <summary>What a remote assistant would be sent</summary>
-        <pre className="np-assistant__disclosure-body">{answer.disclosure}</pre>
-      </details>
-    </div>
-  );
-}
+import { Button, Input, Notice } from "@netpulse/components";
+import { useAssistantController } from "../hooks/useAssistantController";
+import { ConversationTurnCard } from "./Assistant/ConversationTurnCard";
+import { SuggestionChips } from "./Assistant/SuggestionChips";
 
 export function Assistant() {
   const { t } = useTranslation(["assistant", "common"]);
-  const [questionText, setQuestionText] = useState("");
-  const [answer, setAnswer] = useState<AssistantAnswer | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const {
+    prompt,
+    setPrompt,
+    history,
+    busy,
+    notice,
+    setNotice,
+    announcement,
+    actions,
+  } = useAssistantController();
 
-  async function ask(q: string) {
-    if (busy) return;
-    const text = q.trim();
-    if (!text) return;
-    setNotice(null);
-    setBusy(true);
-    try {
-      const res = await query({ kind: "askAssistant", question: text });
-      setAnswer(res.kind === "assistantAnswer" ? res.answer : null);
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    } finally {
-      setBusy(false);
-    }
-  }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void actions.ask();
+  };
 
   return (
-    <section className="np-assistant" aria-label={t("common:navigation.assistant")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <form
-        className="np-assistant__form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void ask(questionText);
-        }}
-      >
-        <input
-          className="np-assistant__input"
-          type="text"
-          value={questionText}
-          placeholder={t("assistant:placeholder")}
-          aria-label={t("common:navigation.assistant")}
-          onChange={(e) => setQuestionText(e.target.value)}
-        />
-        <button className="np-assistant__ask" type="submit" disabled={busy}>
-          {busy ? "Thinking…" : "Ask"}
-        </button>
-      </form>
-
-      <div className="np-assistant__suggestions">
-        {SUGGESTIONS.map((s) => (
-          <button
-            key={s}
-            className="np-suggestion"
-            disabled={busy}
-            onClick={() => {
-              if (busy) return;
-              setQuestionText(s);
-              void ask(s);
-            }}
-          >
-            {s}
-          </button>
-        ))}
+    <section className="np-assistant" aria-label={t("common:navigation.assistant") || t("title")}>
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
       </div>
 
-      {answer && <AnswerView answer={answer} />}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+        <div>
+          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+            {t("title")}
+          </h2>
+          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+            {t("desc")}
+          </p>
+        </div>
+
+        {history.length > 0 && (
+          <button
+            type="button"
+            className="np-btn np-btn--ghost"
+            style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}
+            onClick={actions.clearHistory}
+          >
+            🗑️ {t("clear_history")}
+          </button>
+        )}
+      </div>
+
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      {/* Question Prompt Form */}
+      <form className="np-assistant__form" onSubmit={handleSubmit} noValidate style={{ marginBottom: "1.25rem" }}>
+        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
+          <div style={{ flex: 1 }}>
+            <Input
+              className="np-assistant__input"
+              type="text"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder={t("placeholder")}
+              aria-label={t("placeholder")}
+              disabled={busy}
+            />
+          </div>
+          <Button type="submit" variant="primary" busy={busy} disabled={busy || !prompt.trim()}>
+            {busy ? t("thinking") : t("ask_button")}
+          </Button>
+        </div>
+      </form>
+
+      {/* Suggestion Chips */}
+      <SuggestionChips
+        disabled={busy}
+        onSelectSuggestion={(text) => void actions.askSuggestion(text)}
+      />
+
+      {/* Conversation History Thread or Capability Empty State */}
+      {history.length > 0 ? (
+        <div className="np-assistant__thread" style={{ display: "flex", flexDirection: "column-reverse" }}>
+          {history.slice().reverse().map((turn) => (
+            <ConversationTurnCard
+              key={turn.id}
+              turn={turn}
+              onRetry={() => void actions.retry(turn.id)}
+              onDelete={() => actions.deleteTurn(turn.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div
+          style={{
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "2rem",
+            textAlign: "center",
+            color: "var(--np-subtext, #94a3b8)",
+          }}
+        >
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+            🤖 {t("empty.title")}
+          </h3>
+          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+            {t("empty.subtitle")}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

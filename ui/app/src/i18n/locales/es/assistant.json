@@ -1,7 +1,42 @@
 {
   "title": "Asistente IA",
-  "placeholder": "Haga una pregunta sobre flujos o protocolos activos...",
+  "desc": "Asistente de inteligencia de red fundamentado. Las respuestas se derivan estrictamente de la evidencia capturada.",
+  "placeholder": "Haz una pregunta sobre flujos activos, protocolos o latencia...",
   "ask_button": "Preguntar",
   "thinking": "Analizando almacenamiento local...",
-  "empty_prompt": "Por favor ingrese una pregunta."
+  "clear_history": "Borrar Chat",
+  "copy_answer": "Copiar Respuesta",
+  "copied": "Copiado al portapapeles",
+  "delete_turn": "Eliminar Turno",
+  "retry": "Reintentar",
+  "empty": {
+    "title": "Pregunta al Asistente NetPulse",
+    "subtitle": "Consulta el tráfico capturado, aísla causas de latencia y audita protocolos sin salida de datos.",
+    "capabilities": "Prueba a preguntar:"
+  },
+  "posture": {
+    "local": "🔒 Local (Sin Salida)",
+    "remote": "🌐 Remoto",
+    "grounded_one": "Fundamentado ({{count}} cita)",
+    "grounded_other": "Fundamentado ({{count}} citas)",
+    "ungrounded": "Sin evidencia para citar",
+    "disclosure_summary": "Lo que se enviaría a un asistente remoto"
+  },
+  "disclosure": {
+    "included": "Incluido en el contexto:",
+    "excluded": "Excluido por privacidad:",
+    "inc_flow": "Metadatos de flujo y nombres de proceso",
+    "inc_dns": "Nombres de dominio DNS",
+    "inc_timing": "Marcas de tiempo y latencia de paquetes",
+    "inc_proto": "Estructuras de encabezados de protocolo",
+    "exc_payloads": "Contenido de carga útil de paquetes",
+    "exc_files": "Archivos y documentos transferidos",
+    "exc_creds": "Credenciales y contraseñas"
+  },
+  "suggestions": {
+    "bandwidth": "¿Qué host usó más ancho de banda?",
+    "protocols": "¿Qué protocolos estoy usando?",
+    "latency": "¿Por qué estuvo lento?",
+    "summary": "Resumen de mi tráfico"
+  }
 }

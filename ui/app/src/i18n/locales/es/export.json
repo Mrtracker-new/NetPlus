@@ -1,8 +1,43 @@
 {
   "title": "Exportar Artefactos",
+  "desc": "Exporta datos de sesiones en formatos interoperables abiertos con controles granulares de privacidad.",
+  "zero_egress_badge": "🔒 Solo Archivo Local — NetPulse no transmite automáticamente los archivos exportados.",
+  "zero_egress_notice": "Esta operación de exportación se escribe directamente en tu dispositivo local.",
   "selection_label": "Rango de Selección",
   "format_label": "Formato de Exportación",
+  "level_label": "Nivel de Privacidad de Carga Útil",
   "preview_title": "Vista Previa de Exportación",
-  "start_export": "Iniciar Exportación",
-  "sanitized_notice": "Los datos personales se desinfectarán según la política de privacidad predeterminada."
+  "start_export": "Exportar a Archivo",
+  "exporting": "Exportando...",
+  "exported_success": "Exportación guardada localmente en el disco.",
+  "formats": {
+    "pcapng": "pcapng",
+    "pcapng_blurb": "Tramas brutas para Wireshark y tcpdump",
+    "json": "JSON",
+    "json_blurb": "Flujos y sesiones estructuradas con referencias de evidencia",
+    "csv": "CSV",
+    "csv_blurb": "Métricas de flujo tabulares para hojas de cálculo",
+    "report": "Informe Narrado",
+    "report_blurb": "Resumen ejecutivo legible por humanos"
+  },
+  "levels": {
+    "metadata_only": "Solo Metadatos",
+    "headers": "Solo Encabezados",
+    "full_payload": "Carga Útil Completa"
+  },
+  "kpis": {
+    "flows": "Flujos Totales",
+    "sessions": "Sesiones Totales",
+    "hosts": "Hosts Totales"
+  },
+  "preview": {
+    "title": "Lo que Contiene esta Exportación",
+    "flows": "{{count}} flujos",
+    "sessions": "{{count}} sesiones",
+    "hosts": "{{count}} hosts",
+    "level": "Nivel de carga útil: {{level}}",
+    "contains_payloads": "(incluye cargas útiles de paquetes)",
+    "no_payloads": "(seguro — sin cargas útiles)",
+    "sanitization_title": "Reglas de Desinfección Aplicadas"
+  }
 }

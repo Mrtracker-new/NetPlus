@@ -1,112 +1,63 @@
-// Export — sharing NetPulse's data in open, interoperable formats, always by
-// explicit choice and always privacy-aware (docs/23). Because export produces data
-// that can leave the machine, it carries heavy consent discipline: the user sees
-// exactly what an export will contain *before* it is written (docs/23 §6), the
-// default is the least-revealing form (metadata-only, sanitized, docs/23 §3), and
-// export writes a file — NetPulse never auto-transmits it (docs/23 §6, docs/02 §10).
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ExportFormat, ExportPreview, PayloadLevel } from "@netpulse/contract";
-import { Notice } from "@netpulse/components";
-import { query, command } from "../ipc";
-import { useBusy } from "../hooks/useBusy";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-const FORMATS: Array<{ id: ExportFormat; label: string; blurb: string }> = [
-  { id: "pcapng", label: "pcapng", blurb: "Raw frames for Wireshark/tcpdump" },
-  { id: "json", label: "JSON", blurb: "Structured flows/sessions with evidence refs" },
-  { id: "csv", label: "CSV", blurb: "Tabular flows/metrics for spreadsheets" },
-  { id: "report", label: "Report", blurb: "A narrated, human-readable summary" },
-];
+import { Button, Notice, Skeleton } from "@netpulse/components";
+import { useExportController } from "../hooks/useExportController";
+import { ExportFormatSelector } from "./Export/ExportFormatSelector";
+import { PayloadLevelSelector } from "./Export/PayloadLevelSelector";
+import { ZeroEgressBadge } from "./Export/ZeroEgressBadge";
+import { ExportPreviewCard } from "./Export/ExportPreviewCard";
 
 export function Export() {
   const { t } = useTranslation(["export", "common"]);
-  const [format, setFormat] = useState<ExportFormat>("json");
-  const [preview, setPreview] = useState<ExportPreview | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    query({ kind: "exportPreview", selection: { kind: "all" }, format })
-      .then((res) => {
-        if (!cancelled) setPreview(res.kind === "exportPreview" ? res.preview : null);
-      })
-      .catch((e) => {
-        if (!cancelled) {
-          setPreview(null);
-          setNotice(toErrorMessage(e));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [format]);
-
-  const [busy, doExport] = useBusy(async () => {
-    setNotice(null);
-    const level: PayloadLevel = preview?.level ?? "metadata_only";
-    try {
-      await command({ kind: "startExport", selection: { kind: "all" }, format, level });
-      setNotice("Export written locally. Sharing it is a separate, explicit action.");
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    }
-  });
+  const {
+    format,
+    setFormat,
+    level,
+    setLevel,
+    preview,
+    status,
+    busy,
+    notice,
+    setNotice,
+    startExport,
+    announcement,
+  } = useExportController();
 
   return (
-    <section className="np-export" aria-label={t("common:navigation.export")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <div className="np-export__formats" role="radiogroup" aria-label="Export format">
-        {FORMATS.map((f) => (
-          <button
-            key={f.id}
-            role="radio"
-            aria-checked={f.id === format}
-            className={f.id === format ? "np-btn np-btn--active" : "np-btn"}
-            onClick={() => setFormat(f.id)}
-            title={f.blurb}
-          >
-            {f.label}
-          </button>
-        ))}
+    <section className="np-export" aria-label={t("title")}>
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
       </div>
 
-      {preview && (
-        <div className="np-export__preview">
-          <h3>What this export contains</h3>
-          <ul>
-            <li>{preview.flows} flows · {preview.sessions} sessions · {preview.hosts} hosts</li>
-            <li>
-              Payload level: <strong>{preview.level.replace("_", " ")}</strong>{" "}
-              {preview.contains_payloads ? "(includes payloads)" : "(no payloads)"}
-            </li>
-            <li>{preview.provenance}</li>
-          </ul>
-          {preview.sanitized.length > 0 && (
-            <details className="np-export__sanitized">
-              <summary>Sanitization applied</summary>
-              <ul>
-                {preview.sanitized.map((s, i) => (
-                  <li key={i}>{s}</li>
-                ))}
-              </ul>
-            </details>
-          )}
-        </div>
-      )}
+      <div style={{ marginBottom: "1.25rem" }}>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+          {t("title")}
+        </h2>
+        <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+          {t("desc")}
+        </p>
+      </div>
 
-      <div className="np-export__actions">
-        <button className="np-btn np-btn--primary" disabled={busy} onClick={() => void doExport()}>
-          {busy ? "Exporting…" : "Export to file"}
-        </button>
-        <span className="np-export__egress">
-          Export writes a local file. NetPulse never uploads it — sharing is a
-          separate, explicit action (docs/23 §6).
-        </span>
+      {notice && <Notice message={notice} level={status === "completed" ? "info" : "error"} onDismiss={() => setNotice(null)} />}
+
+      <ZeroEgressBadge />
+
+      <ExportFormatSelector selectedFormat={format} onFormatChange={setFormat} disabled={busy} />
+
+      <PayloadLevelSelector selectedLevel={level} onLevelChange={setLevel} disabled={busy} />
+
+      {status === "loading-preview" && !preview ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
+          <Skeleton height={140} width="100%" />
+        </div>
+      ) : preview ? (
+        <ExportPreviewCard preview={preview} />
+      ) : null}
+
+      <div className="np-export__actions" style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "1.25rem" }}>
+        <Button variant="primary" disabled={busy} busy={busy} onClick={() => void startExport()}>
+          📥 {busy ? t("exporting") : t("start_export")}
+        </Button>
       </div>
     </section>
   );

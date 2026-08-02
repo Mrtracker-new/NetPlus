@@ -1,5 +1,37 @@
 {
   "title": "Deterministic Capture Replay",
   "desc": "Replay PCAP streams offline to observe protocol state machine transitions.",
-  "empty": "Select a recording to initiate offline playback."
+  "empty": {
+    "title": "No Active Recording Loaded",
+    "subtitle": "Select a recorded session to initiate offline deterministic replay."
+  },
+  "status": {
+    "playing": "▶️ Playing",
+    "paused": "⏸️ Paused",
+    "completed": "🏁 Replay Complete",
+    "idle": "⏹ No Recording Loaded"
+  },
+  "kpis": {
+    "frame": "Current Frame",
+    "position": "Playback Position",
+    "duration": "Total Duration",
+    "speed": "Speed Multiplier"
+  },
+  "controls": {
+    "play": "Play",
+    "pause": "Pause",
+    "step": "Step ›",
+    "restart": "Restart"
+  },
+  "speeds": {
+    "teach": "0.1× Teach",
+    "half": "0.5×",
+    "normal": "1× Normal",
+    "fast": "2×",
+    "skim": "10× Skim"
+  },
+  "card": {
+    "frame_index": "frame #{{index}}",
+    "incomplete": "recording incomplete"
+  }
 }

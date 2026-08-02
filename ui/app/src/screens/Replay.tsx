@@ -1,125 +1,160 @@
-// Replay — deterministic re-processing of a recorded session (docs/21). Replay
-// reruns the *same* capture→decode→flow→narrative→intelligence pipeline over
-// stored data to produce identical results every time (docs/21 §1, §4). It
-// decouples processing from wall-clock, so a handshake can be watched at 0.1×,
-// stepped packet-by-packet, or seeked to any instant (docs/21 §5). Determinism is
-// a hard guarantee: timing comes from the recording, never `now()` (docs/21 §6).
-// With no recording loaded, the transport is honest about having nothing to play.
-
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReplayState } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
-import { query, command } from "../ipc";
-import { useBusy } from "../hooks/useBusy";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-const SPEEDS: Array<{ label: string; percent: number }> = [
-  { label: "0.1× (teach)", percent: 10 },
-  { label: "1×", percent: 100 },
-  { label: "10× (skim)", percent: 1000 },
-];
-
-function ms(ns: number): string {
-  return `${(ns / 1_000_000).toFixed(1)} ms`;
-}
+import { Notice, Skeleton } from "@netpulse/components";
+import { useReplayController } from "../hooks/useReplayController";
+import { ReplaySummaryKpis } from "./Replay/ReplaySummaryKpis";
+import { ReplayTransport } from "./Replay/ReplayTransport";
+import { ReplayScrubBar } from "./Replay/ReplayScrubBar";
 
 export function Replay() {
   const { t } = useTranslation(["replay", "common"]);
-  const [state, setState] = useState<ReplayState | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const {
+    state,
+    status,
+    viewModel,
+    loaded,
+    busy,
+    notice,
+    setNotice,
+    play,
+    pause,
+    step,
+    setSpeed,
+    seek,
+    announcement,
+  } = useReplayController();
 
-  function refresh() {
-    query({ kind: "replayState" })
-      .then((res) => setState(res.kind === "replayState" ? res.state : null))
-      .catch((e) => {
-        setState(null);
-        setNotice(toErrorMessage(e));
-      })
-      .finally(() => setIsLoaded(true));
-  }
+  // Keyboard Shortcuts (Space = Play/Pause, ArrowLeft = Step Back / Seek, ArrowRight = Step Forward / Seek)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (document.activeElement?.tagName === "INPUT") return;
 
-  useEffect(refresh, []);
-
-  const [busy, send] = useBusy(async (c: Parameters<typeof command>[0]) => {
-    setNotice(null);
-    try {
-      await command(c);
-      refresh();
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    }
-  });
-
-  const hasRecording = !!state && state.total_nanos > 0;
+      if (e.code === "Space") {
+        e.preventDefault();
+        if (status === "playing") void pause();
+        else if (viewModel.canPlay) void play();
+      } else if (e.code === "ArrowRight") {
+        e.preventDefault();
+        void step();
+      } else if (e.code === "ArrowLeft" && state) {
+        e.preventDefault();
+        const prevNanos = Math.max(0, state.position_nanos - 1_000_000_000);
+        seek(prevNanos);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [status, viewModel.canPlay, play, pause, step, seek, state]);
 
   return (
     <section className="np-replay" aria-label={t("title")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <p className="np-replay__note">
-        {t("desc")}
-      </p>
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
 
-      {!isLoaded ? (
-        <Spinner />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+        <div>
+          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+            {t("title")}
+          </h2>
+          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+            {t("desc")}
+          </p>
+        </div>
+
+        {/* Playback Status Badge */}
+        <span
+          role="status"
+          style={{
+            fontSize: "0.85rem",
+            padding: "0.4rem 0.85rem",
+            borderRadius: "16px",
+            background:
+              status === "playing"
+                ? "rgba(16, 185, 129, 0.2)"
+                : status === "completed"
+                ? "rgba(59, 130, 246, 0.2)"
+                : "rgba(148, 163, 184, 0.2)",
+            color:
+              status === "playing"
+                ? "#10b981"
+                : status === "completed"
+                ? "#60a5fa"
+                : "#94a3b8",
+            fontWeight: 600,
+          }}
+        >
+          {status === "playing"
+            ? t("status.playing")
+            : status === "completed"
+            ? t("status.completed")
+            : status === "paused"
+            ? t("status.paused")
+            : t("status.idle")}
+        </span>
+      </div>
+
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
+
+      {!loaded ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
+          <Skeleton height={120} width="100%" />
+          <Skeleton height={100} width="100%" />
+          <Skeleton height={140} width="100%" />
+        </div>
+      ) : !viewModel.hasRecording ? (
+        <div
+          style={{
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "2.5rem 1.5rem",
+            textAlign: "center",
+            color: "var(--np-subtext, #94a3b8)",
+          }}
+        >
+          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+            📼 {t("empty.title")}
+          </h3>
+          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+            {t("empty.subtitle")}
+          </p>
+        </div>
       ) : (
         <>
-          <div className="np-replay__transport" role="group" aria-label="Playback">
-            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayPause" })}>
-              Pause
-            </button>
-            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayPlay" })}>
-              Play
-            </button>
-            <button className="np-btn" disabled={busy} onClick={() => void send({ kind: "replayStep" })}>
-              Step ›
-            </button>
-            <div className="np-replay__speeds">
-              {SPEEDS.map((s) => (
-                <button
-                  key={s.percent}
-                  disabled={busy}
-                  className={
-                    state?.speed_percent === s.percent ? "np-btn np-btn--active" : "np-btn"
-                  }
-                  onClick={() => void send({ kind: "replaySetSpeed", percent: s.percent })}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <input
-            className="np-replay__seek"
-            type="range"
-            min={0}
-            max={state?.total_nanos ?? 0}
-            value={state?.position_nanos ?? 0}
-            aria-label="Seek"
-            disabled={busy || !hasRecording}
-            onChange={(e) => void send({ kind: "replaySeek", mono_nanos: Number(e.target.value) })}
+          {/* Replay Summary KPI Cards */}
+          <ReplaySummaryKpis
+            frameIndex={viewModel.frameIndex}
+            formattedPosition={viewModel.formattedPosition}
+            formattedTotal={viewModel.formattedTotal}
+            speedLabel={viewModel.speedLabel}
           />
 
-          <div className="np-replay__readout">
-            <span>
-              {ms(state?.position_nanos ?? 0)} / {ms(state?.total_nanos ?? 0)}
-            </span>
-            <span>frame #{state?.frame_index ?? 0}</span>
-            <span>{state?.playing ? "playing" : "paused"}</span>
-            <span>{(state?.speed_percent ?? 100) / 100}×</span>
-            {state?.incomplete && (
-              <span className="np-replay__incomplete">recording incomplete</span>
-            )}
-          </div>
+          {/* Transport Toolbar */}
+          <ReplayTransport
+            playing={status === "playing"}
+            canPlay={viewModel.canPlay}
+            canPause={viewModel.canPause}
+            canStep={viewModel.canStep}
+            busy={busy}
+            activeSpeedPercent={viewModel.activeSpeedPercent}
+            onPlay={() => void play()}
+            onPause={() => void pause()}
+            onStep={() => void step()}
+            onSetSpeed={(pct) => void setSpeed(pct)}
+          />
 
-          {!hasRecording && (
-            <EmptyState>{t("empty")}</EmptyState>
-          )}
+          {/* Scrub Bar Timeline */}
+          <ReplayScrubBar
+            state={state}
+            hasRecording={viewModel.hasRecording}
+            disabled={busy}
+            formattedPosition={viewModel.formattedPosition}
+            formattedTotal={viewModel.formattedTotal}
+            progressPct={viewModel.progressPct}
+            onSeek={seek}
+          />
         </>
       )}
     </section>

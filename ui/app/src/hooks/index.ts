@@ -12,3 +12,5 @@ export { useAssistantController } from "./useAssistantController";
 export { useLearnController } from "./useLearnController";
 export { useExplorerController } from "./useExplorerController";
 export { useRecordingsController } from "./useRecordingsController";
+export { useReplayController } from "./useReplayController";
+export { useExportController } from "./useExportController";

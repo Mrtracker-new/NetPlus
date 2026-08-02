@@ -1,5 +1,37 @@
 {
   "title": "Reproducción Determinista de Capturas",
   "desc": "Reproduce flujos PCAP sin conexión para observar transiciones de la máquina de estados.",
-  "empty": "Selecciona una grabación para iniciar la reproducción sin conexión."
+  "empty": {
+    "title": "No hay grabación activa cargada",
+    "subtitle": "Selecciona una sesión grabada para iniciar la reproducción determinista."
+  },
+  "status": {
+    "playing": "▶️ Reproduciendo",
+    "paused": "⏸️ En Pausa",
+    "completed": "🏁 Reproducción Completa",
+    "idle": "⏹ Sin Grabación Cargada"
+  },
+  "kpis": {
+    "frame": "Trama Actual",
+    "position": "Posición de Reproducción",
+    "duration": "Duración Total",
+    "speed": "Multiplicador de Velocidad"
+  },
+  "controls": {
+    "play": "Reproducir",
+    "pause": "Pausar",
+    "step": "Avanzar ›",
+    "restart": "Reiniciar"
+  },
+  "speeds": {
+    "teach": "0.1× Enseñanza",
+    "half": "0.5×",
+    "normal": "1× Normal",
+    "fast": "2×",
+    "skim": "10× Rápido"
+  },
+  "card": {
+    "frame_index": "trama #{{index}}",
+    "incomplete": "grabación incompleta"
+  }
 }

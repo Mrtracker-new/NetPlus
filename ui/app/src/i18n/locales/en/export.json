@@ -1,8 +1,43 @@
 {
   "title": "Export Artifacts",
+  "desc": "Export session data in open, interoperable formats with granular privacy consent controls.",
+  "zero_egress_badge": "🔒 Local File Only — NetPulse does not automatically transmit exported files.",
+  "zero_egress_notice": "This export operation writes directly to your local device. Files remain on your local machine unless explicitly shared.",
   "selection_label": "Selection Range",
   "format_label": "Export Format",
+  "level_label": "Payload Privacy Level",
   "preview_title": "Export Preview",
-  "start_export": "Start Export",
-  "sanitized_notice": "Personal data will be sanitized according to default privacy policy."
+  "start_export": "Export to File",
+  "exporting": "Exporting...",
+  "exported_success": "Export written locally to disk.",
+  "formats": {
+    "pcapng": "pcapng",
+    "pcapng_blurb": "Raw packet frames for Wireshark & tcpdump",
+    "json": "JSON",
+    "json_blurb": "Structured flows and sessions with evidence refs",
+    "csv": "CSV",
+    "csv_blurb": "Tabular flow metrics for spreadsheets",
+    "report": "Narrated Report",
+    "report_blurb": "Human-readable executive summary"
+  },
+  "levels": {
+    "metadata_only": "Metadata Only",
+    "headers": "Headers Only",
+    "full_payload": "Full Payload"
+  },
+  "kpis": {
+    "flows": "Total Flows",
+    "sessions": "Total Sessions",
+    "hosts": "Total Hosts"
+  },
+  "preview": {
+    "title": "What This Export Contains",
+    "flows": "{{count}} flows",
+    "sessions": "{{count}} sessions",
+    "hosts": "{{count}} hosts",
+    "level": "Payload level: {{level}}",
+    "contains_payloads": "(includes packet payloads)",
+    "no_payloads": "(safe — no packet payloads)",
+    "sanitization_title": "Sanitization Rules Applied"
+  }
 }

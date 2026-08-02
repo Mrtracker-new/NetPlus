@@ -1,10 +1,48 @@
 {
   "title": "Security Findings",
-  "findings_one": "{{count}} security finding detected",
-  "findings_other": "{{count}} security findings detected",
-  "no_findings": "No security anomalies detected in selected window.",
-  "severity_high": "High",
-  "severity_medium": "Medium",
-  "severity_low": "Low",
-  "severity_info": "Info"
+  "desc": "Calm, confidence-scored security findings with benign explanations and suggested actions.",
+  "empty": "No security anomalies detected in selected window. Network activity appears normal.",
+  "no_filter_matches": "No findings match the selected category filter.",
+  "all_suppressed": "All findings in this category are marked expected. Toggle 'Show Suppressed' to view.",
+  "kpis": {
+    "total": "Total Findings",
+    "anomaly": "Anomaly",
+    "suspicious": "Suspicious",
+    "informational": "Informational"
+  },
+  "filters": {
+    "all": "All Categories",
+    "anomaly": "Anomaly",
+    "suspicious": "Suspicious",
+    "informational": "Informational",
+    "show_expected": "Show Suppressed",
+    "hide_expected": "Hide Suppressed"
+  },
+  "card": {
+    "normal_explanation": "Why this might be normal",
+    "also_seen": "Also seen:",
+    "mark_expected": "Mark as expected",
+    "marked_expected": "Marked expected",
+    "unmark_expected": "Unmark expected",
+    "suggested_action": "Suggested Action"
+  },
+  "kinds": {
+    "unexpected_egress": "Unexpected app access",
+    "beaconing": "Regular check-ins",
+    "port_scan": "Port scanning",
+    "dns_anomaly": "DNS burst",
+    "connection_storm": "Connection storm",
+    "bandwidth_anomaly": "Unusual volume",
+    "ml_feature_anomaly": "ML Feature Anomaly",
+    "threat_intel_match": "Threat Intel Match",
+    "app_profile_breach": "Profile Breach",
+    "behavioral_chain": "Multi-Stage Chain"
+  },
+  "severity": {
+    "critical": "Critical",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "info": "Info"
+  }
 }

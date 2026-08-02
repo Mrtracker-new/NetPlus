@@ -7,3 +7,4 @@ export { useDiagnosticsController } from "./useDiagnosticsController";
 export { useSandboxController } from "./useSandboxController";
 export { useFleetController } from "./useFleetController";
 export { useCompareController } from "./useCompareController";
+export { useSecurityController } from "./useSecurityController";

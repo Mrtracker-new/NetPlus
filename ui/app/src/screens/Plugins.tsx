@@ -1,139 +1,97 @@
-// Plugins — the extension seams that let the community add protocols, detectors,
-// enrichments, views, and export formats without forking (docs/24). Each plugin
-// hooks at one layer boundary and is bounded to that seam's capabilities (docs/24
-// §3, §5). The trust model is conservative and visible: every plugin shows its
-// type, granted capabilities, trust/review status, and contract compatibility, so
-// enabling one is an informed, explicit choice (docs/24 §5). Crucially, **no
-// plugin type can acquire network/egress capability** — that variant does not
-// exist in the model, keeping the privacy guarantee auditable (docs/24 §5).
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { PluginDescriptor } from "@netpulse/contract";
-import { EmptyState, Notice, Spinner } from "@netpulse/components";
-import { query, command } from "../ipc";
-
-function toErrorMessage(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-const TYPE_LABEL: Record<PluginDescriptor["plugin_type"], string> = {
-  dissector: "Dissector · decode",
-  enrichment: "Enrichment · local metadata",
-  detector: "Detector · intelligence",
-  view: "View · presentation",
-  export: "Export · output format",
-};
-
-const TRUST_LABEL: Record<PluginDescriptor["trust"], string> = {
-  unreviewed: "Unreviewed",
-  reviewed: "Reviewed",
-  first_party: "First-party",
-};
-
-function PluginRow({
-  p,
-  busy,
-  onToggle,
-}: {
-  p: PluginDescriptor;
-  busy: boolean;
-  onToggle: (enable: boolean) => void;
-}) {
-  const { t } = useTranslation("common");
-  return (
-    <article className={p.enabled ? "np-plugin np-plugin--on" : "np-plugin"}>
-      <header className="np-plugin__head">
-        <span className="np-plugin__name">{p.name}</span>
-        <span className="np-plugin__type">{TYPE_LABEL[p.plugin_type]}</span>
-        <span className={`np-plugin__trust np-plugin__trust--${p.trust}`}>
-          {TRUST_LABEL[p.trust]}
-        </span>
-      </header>
-
-      <div className="np-plugin__caps">
-        {p.capabilities.map((c) => (
-          <span key={c} className="np-plugin__cap">
-            {c.replace(/_/g, " ")}
-          </span>
-        ))}
-      </div>
-
-      <div className="np-plugin__meta">
-        <span>contract v{p.target_contract}</span>
-        <span>{p.compatible ? "compatible" : "incompatible"}</span>
-        {p.disabled_reason && <span className="np-plugin__reason">{p.disabled_reason}</span>}
-      </div>
-
-      <footer className="np-plugin__foot">
-        <span className="np-plugin__source">{p.source}</span>
-        <button
-          className="np-btn"
-          disabled={busy || (!p.compatible && !p.enabled)}
-          onClick={() => onToggle(!p.enabled)}
-        >
-          {busy ? "…" : p.enabled ? t("actions.disable") : t("actions.enable")}
-        </button>
-      </footer>
-    </article>
-  );
-}
+import { Notice, Skeleton } from "@netpulse/components";
+import { usePluginsController } from "../hooks/usePluginsController";
+import { PluginsSummaryKpis } from "./Plugins/PluginsSummaryKpis";
+import { PluginsFilters } from "./Plugins/PluginsFilters";
+import { ZeroEgressBadge } from "./Plugins/ZeroEgressBadge";
+import { PluginCard } from "./Plugins/PluginCard";
 
 export function Plugins() {
   const { t } = useTranslation(["plugins", "common"]);
-  const [plugins, setPlugins] = useState<PluginDescriptor[]>([]);
-  const [loaded, setLoaded] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [busyName, setBusyName] = useState<string | null>(null);
+  const {
+    filteredPlugins = [],
+    summary = { total: 0, activeCount: 0, firstPartyCount: 0, compatibleCount: 0 },
+    counts = { all: 0, dissector: 0, enrichment: 0, detector: 0, view: 0, export: 0 },
+    filter = "all",
+    setFilter,
+    busyName,
+    loaded = false,
+    notice,
+    setNotice,
+    togglePlugin,
+    announcement = "",
+  } = usePluginsController();
 
-  function refresh() {
-    query({ kind: "listPlugins" })
-      .then((res) => setPlugins(res.kind === "plugins" ? res.plugins : []))
-      .catch((e) => {
-        setPlugins([]);
-        setNotice(toErrorMessage(e));
-      })
-      .finally(() => setLoaded(true));
-  }
-
-  useEffect(refresh, []);
-
-  async function toggle(name: string, enable: boolean) {
-    if (busyName !== null) return;
-    setNotice(null);
-    setBusyName(name);
-    try {
-      await command({ kind: enable ? "enablePlugin" : "disablePlugin", name });
-      refresh();
-    } catch (e) {
-      setNotice(toErrorMessage(e));
-    } finally {
-      setBusyName(null);
-    }
-  }
+  const safePlugins = Array.isArray(filteredPlugins) ? filteredPlugins : [];
+  const safeTotal = summary?.total ?? 0;
 
   return (
-    <section className="np-plugins" aria-label={t("common:navigation.plugins")}>
-      <Notice message={notice} onDismiss={() => setNotice(null)} />
-      <p className="np-plugins__note">
-        Plugins extend NetPulse at defined seams. Each is capability-bounded by its
-        type, and no plugin can reach the network — the single egress boundary stays
-        the AI assistant (docs/24 §5).
-      </p>
+    <section className="np-plugins" aria-label={t("title")}>
+      {/* Screen Reader Live Region */}
+      <div className="sr-only" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
+
+      <div style={{ marginBottom: "1.25rem" }}>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+          {t("title")}
+        </h2>
+        <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+          {t("desc")}
+        </p>
+      </div>
+
+      {notice && <Notice message={notice} level="error" onDismiss={() => setNotice?.(null)} />}
+
+      <ZeroEgressBadge />
 
       {!loaded ? (
-        <Spinner />
-      ) : plugins.length === 0 ? (
-        <EmptyState>No plugins registered.</EmptyState>
+        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }} aria-busy="true">
+          <Skeleton height={140} width="100%" />
+          <Skeleton height={140} width="100%" />
+          <Skeleton height={140} width="100%" />
+        </div>
+      ) : safeTotal === 0 ? (
+        <div
+          style={{
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "2.5rem 1.5rem",
+            textAlign: "center",
+            color: "var(--np-subtext, #94a3b8)",
+          }}
+        >
+          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+            🔌 {t("empty.title")}
+          </h3>
+          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+            {t("empty.subtitle")}
+          </p>
+        </div>
       ) : (
-        plugins.map((p) => (
-          <PluginRow
-            key={p.name}
-            p={p}
-            busy={busyName === p.name}
-            onToggle={(enable) => void toggle(p.name, enable)}
+        <>
+          {/* Summary KPI Scorecards */}
+          <PluginsSummaryKpis
+            total={summary?.total ?? 0}
+            activeCount={summary?.activeCount ?? 0}
+            firstPartyCount={summary?.firstPartyCount ?? 0}
+            compatibleCount={summary?.compatibleCount ?? 0}
           />
-        ))
+
+          {/* Type Filter Chips with Counts */}
+          <PluginsFilters filter={filter} counts={counts} onFilterChange={setFilter} />
+
+          {/* Plugin Descriptor Cards */}
+          {safePlugins.map((p, idx) => (
+            <PluginCard
+              key={p?.name || idx}
+              p={p}
+              busy={busyName === p?.name}
+              onToggle={(enable) => void togglePlugin?.(p?.name, enable)}
+            />
+          ))}
+        </>
       )}
     </section>
   );

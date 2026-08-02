@@ -1,5 +1,6 @@
 {
   "title": "Registro de Complementos",
+  "desc": "Extiende la decodificación de protocolos, enriquecimiento e inteligencia de NetPulse en costuras locales.",
   "installed_one": "{{count}} complemento instalado",
   "installed_other": "{{count}} complementos instalados",
   "first_party": "Oficial",
@@ -8,5 +9,45 @@
   "status_enabled": "Habilitado",
   "status_disabled": "Deshabilitado",
   "enable_action": "Habilitar Complemento",
-  "disable_action": "Deshabilitar Complemento"
+  "disable_action": "Deshabilitar Complemento",
+  "zero_egress_badge": "🔒 Costuras de Extensión Limitadas — Los complementos no tienen acceso a la red y no pueden transmitir datos.",
+  "empty": {
+    "title": "No Hay Complementos Disponibles",
+    "subtitle": "Instala complementos para extender la decodificación de protocolos, análisis o capacidades de exportación."
+  },
+  "kpis": {
+    "total": "Complementos Totales",
+    "active": "Complementos Activos",
+    "first_party": "Oficiales",
+    "compatible": "Compatibles"
+  },
+  "filters": {
+    "all": "Todos los Tipos ({{count}})",
+    "dissector": "Decodificadores ({{count}})",
+    "enrichment": "Enriquecimientos ({{count}})",
+    "detector": "Detectores ({{count}})",
+    "view": "Vistas ({{count}})",
+    "export": "Exportaciones ({{count}})"
+  },
+  "types": {
+    "dissector": "Decodificador · decodificar",
+    "enrichment": "Enriquecimiento · metadatos locales",
+    "detector": "Detector · inteligencia",
+    "view": "Vista · presentación",
+    "export": "Exportación · formato de salida"
+  },
+  "trust": {
+    "first_party": "🟢 Oficial",
+    "reviewed": "🔵 Revisado",
+    "unreviewed": "🟠 No Revisado"
+  },
+  "card": {
+    "contract": "contrato v{{version}}",
+    "compatible": "✓ Compatible",
+    "incompatible": "⚠ Actualización Requerida",
+    "status_enabled": "Habilitado",
+    "status_disabled": "Deshabilitado",
+    "enable_action": "Habilitar",
+    "disable_action": "Deshabilitar"
+  }
 }

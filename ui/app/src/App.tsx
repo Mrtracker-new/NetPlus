@@ -4,7 +4,8 @@
 // (docs/09 §6.3). Light neumorphic is the default look; a theme toggle flips to
 // the original deep-observatory dark (tokens.css [data-theme="dark"]).
 
-import { useEffect, useState } from "react";
+import { Component, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { ProjectionDepth, Interface as InterfaceDto } from "@netpulse/contract";
 import { API_VERSION } from "@netpulse/contract";
@@ -500,12 +501,48 @@ function Shell() {
   );
 }
 
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
+  state = { hasError: false, error: "" };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  componentDidCatch(error: unknown, errorInfo: unknown) {
+    console.error("NetPulse UI Error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "2rem", color: "#ef4444", background: "var(--np-bg, #0b1019)", minHeight: "100vh" }}>
+          <h2>⚠️ Something went wrong</h2>
+          <pre style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "8px", color: "#f59e0b" }}>
+            {this.state.error}
+          </pre>
+          <button
+            className="np-btn np-btn--primary"
+            onClick={() => this.setState({ hasError: false, error: "" })}
+            style={{ marginTop: "1rem" }}
+          >
+            Retry Screen
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export function App() {
   return (
     <DisclosureProvider>
       <EvidenceNavigationProvider>
-        <Shell />
+        <ErrorBoundary>
+          <Shell />
+        </ErrorBoundary>
       </EvidenceNavigationProvider>
     </DisclosureProvider>
   );
 }
+

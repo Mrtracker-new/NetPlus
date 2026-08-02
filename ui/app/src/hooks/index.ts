@@ -14,3 +14,4 @@ export { useExplorerController } from "./useExplorerController";
 export { useRecordingsController } from "./useRecordingsController";
 export { useReplayController } from "./useReplayController";
 export { useExportController } from "./useExportController";
+export { usePluginsController } from "./usePluginsController";

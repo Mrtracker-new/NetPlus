@@ -1,5 +1,6 @@
 {
   "title": "Plugin Registry",
+  "desc": "Extend NetPulse protocol decoding, enrichment, and intelligence at capability-bounded local seams.",
   "installed_one": "{{count}} plugin installed",
   "installed_other": "{{count}} plugins installed",
   "first_party": "First Party",
@@ -8,5 +9,45 @@
   "status_enabled": "Enabled",
   "status_disabled": "Disabled",
   "enable_action": "Enable Plugin",
-  "disable_action": "Disable Plugin"
+  "disable_action": "Disable Plugin",
+  "zero_egress_badge": "🔒 Bounded Extension Seams — Plugins have zero network access and cannot transmit data externally.",
+  "empty": {
+    "title": "No Plugins Available",
+    "subtitle": "Install plugins to extend protocol decoding, analysis, or export capabilities."
+  },
+  "kpis": {
+    "total": "Total Plugins",
+    "active": "Active Plugins",
+    "first_party": "First Party",
+    "compatible": "Compatible"
+  },
+  "filters": {
+    "all": "All Types ({{count}})",
+    "dissector": "Dissectors ({{count}})",
+    "enrichment": "Enrichments ({{count}})",
+    "detector": "Detectors ({{count}})",
+    "view": "Views ({{count}})",
+    "export": "Exports ({{count}})"
+  },
+  "types": {
+    "dissector": "Dissector · decode",
+    "enrichment": "Enrichment · local metadata",
+    "detector": "Detector · intelligence",
+    "view": "View · presentation",
+    "export": "Export · output format"
+  },
+  "trust": {
+    "first_party": "🟢 First Party",
+    "reviewed": "🔵 Reviewed",
+    "unreviewed": "🟠 Unreviewed"
+  },
+  "card": {
+    "contract": "contract v{{version}}",
+    "compatible": "✓ Compatible",
+    "incompatible": "⚠ Update Required",
+    "status_enabled": "Enabled",
+    "status_disabled": "Disabled",
+    "enable_action": "Enable",
+    "disable_action": "Disable"
+  }
 }

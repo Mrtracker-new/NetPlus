@@ -59,6 +59,7 @@ export function EvidenceNavigationProvider({ children }: { children: ReactNode }
 
   const navigateToEvidence = useCallback((ref: EvidenceRef, _source?: NavigationSource) => {
     if (!ref || typeof ref !== "object" || !("kind" in ref)) {
+      setScreenState("explorer");
       return;
     }
     switch (ref.kind) {
@@ -73,6 +74,9 @@ export function EvidenceNavigationProvider({ children }: { children: ReactNode }
       case "packet":
         setNavigationTarget({ screen: "timeline", packetId: ref.id });
         setScreenState("timeline");
+        break;
+      default:
+        setScreenState("explorer");
         break;
     }
   }, []);

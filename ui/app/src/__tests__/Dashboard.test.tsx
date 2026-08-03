@@ -39,7 +39,7 @@ describe("Dashboard Screen", () => {
 
     expect(screen.getByText("Hosts Observed")).toBeInTheDocument();
     expect(screen.getByText("Active Flows")).toBeInTheDocument();
-    expect(screen.getByText("Total Bytes Processed")).toBeInTheDocument();
+    expect(screen.getByText("Network Activity")).toBeInTheDocument();
     expect(screen.getByText("Narrative Cards")).toBeInTheDocument();
 
     const zeros = screen.getAllByText("0");

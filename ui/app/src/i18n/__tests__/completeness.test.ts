@@ -1,3 +1,4 @@
+import { describe, it } from "vitest";
 import { resources } from "../resources";
 
 function compareStructure(
@@ -52,3 +53,9 @@ export function validateLocaleCompleteness(): void {
     throw new Error(`Locale completeness validation failed:\n${errors.join("\n")}`);
   }
 }
+
+describe("i18n locale completeness", () => {
+  it("validates locale structure completeness between en and es", () => {
+    validateLocaleCompleteness();
+  });
+});

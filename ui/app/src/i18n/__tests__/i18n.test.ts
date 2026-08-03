@@ -1,3 +1,4 @@
+import { describe, it } from "vitest";
 import {
   DEFAULT_LANGUAGE,
   isSupportedLanguage,
@@ -50,3 +51,9 @@ export function runI18nTests(): void {
     throw new Error(`Pluralization failed for count=1: ${enInstalled}`);
   }
 }
+
+describe("i18n suite", () => {
+  it("runs all i18n validations", () => {
+    runI18nTests();
+  });
+});

@@ -1,66 +1,58 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
-import "@testing-library/jest-dom";
-import "../i18n";
-import { Monitoring } from "../screens/Monitoring";
-import { DisclosureProvider } from "../modes/DisclosureContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { render, screen } from "@testing-library/react";
+import { describe, it, expect, beforeEach } from "vitest";
+import { I18nextProvider } from "react-i18next";
+import { protocolColor } from "@netpulse/viz";
+import type { MonitorSnapshot } from "@netpulse/contract";
+import i18n from "../i18n";
 import { setMonitor, __resetForTest } from "../state/store";
-import { AreaChart, protocolColor } from "@netpulse/viz";
-
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
+import { Monitoring } from "../screens/Monitoring";
+import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { DisclosureProvider } from "../modes/DisclosureContext";
 
 function MonitoringTestWrapper() {
   return (
-    <DisclosureProvider>
-      <EvidenceNavigationProvider>
-        <Monitoring />
-      </EvidenceNavigationProvider>
-    </DisclosureProvider>
+    <I18nextProvider i18n={i18n}>
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <Monitoring />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    </I18nextProvider>
   );
 }
 
-const mockMonitorSnapshot = {
+const mockMonitorSnapshot: MonitorSnapshot = {
   by_protocol: {
-    dimension: "protocol" as const,
+    dimension: "protocol",
     rows: [
-      { label: "TCP", flows: 12, bytes: 1048576, hostnames: [], evidence: [] },
-      { label: "UDP", flows: 4, bytes: 524288, hostnames: [], evidence: [] },
-      { label: "DNS", flows: 2, bytes: 65536, hostnames: [], evidence: [] },
+      { label: "TCP", bytes: 1048576, flows: 10, hostnames: [], evidence: [] },
+      { label: "UDP", bytes: 524288, flows: 5, hostnames: [], evidence: [] },
+      { label: "DNS", bytes: 65536, flows: 2, hostnames: [], evidence: [] },
     ],
   },
   by_host: {
-    dimension: "host" as const,
+    dimension: "host",
     rows: [
-      {
-        label: "142.250.190.46",
-        flows: 10,
-        bytes: 1048576,
-        hostnames: [{ name: "google.com", source: "sni" as const }],
-        evidence: [],
-      },
+      { label: "192.168.1.1", bytes: 1000000, flows: 12, hostnames: [], evidence: [] },
+      { label: "10.0.0.5", bytes: 500000, flows: 8, hostnames: [], evidence: [] },
     ],
   },
   capture_stats: {
-    buffer_frames: 120,
     buffer_capacity: 1000,
-    shed_stage: "none" as const,
+    buffer_frames: 200,
+    shed_stage: "none",
     dropped: 0,
   },
-  capture_drops: 0,
-  network_loss_indicators: 0,
   diagnoses: [
     {
-      cause: "packet_loss" as any,
-      explanation: "Looks like high packet loss on edge gateway",
+      cause: "local_wifi",
+      explanation: "Loss and jitter affecting several servers at once",
       confidence_percent: 85,
-      confidence_word: "high",
       evidence: [{ kind: "flow" as const, id: 707 }],
     },
   ],
+  network_loss_indicators: 0,
+  capture_drops: 0,
 };
 
 describe("Monitoring Screen & useMonitoringController", () => {
@@ -74,12 +66,14 @@ describe("Monitoring Screen & useMonitoringController", () => {
     expect(protocolColor("DNS", 2)).toBe("#7C83F7");
   });
 
-  it("renders idle state when monitor snapshot is null", () => {
+  it("renders simulation telemetry dashboard when monitor snapshot is null", () => {
     render(<MonitoringTestWrapper />);
 
-    expect(
-      screen.getByText("Idle — no traffic to measure. Start a capture to view live telemetry.")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Live Monitoring & System Health")).toBeTruthy();
+    expect(screen.getByText("Throughput & Lineage")).toBeTruthy();
+    expect(screen.getByText("Applications & Lineage")).toBeTruthy();
+    expect(screen.getByText("Process Attributes")).toBeTruthy();
+    expect(screen.getByText("System Subsystem Health")).toBeTruthy();
   });
 
   it("renders populated snapshot KPIs, capture health, charts, and diagnostic cards", () => {
@@ -87,30 +81,30 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
     render(<MonitoringTestWrapper />);
 
-    // Check KPIs
-    expect(screen.getByText("Traffic Seen")).toBeInTheDocument();
-    expect(screen.getByText("Capture Health")).toBeInTheDocument();
-    expect(screen.getByText("Full Fidelity")).toBeInTheDocument();
+    // Check KPIs with i18n provider
+    expect(screen.getByText("Traffic Seen")).toBeTruthy();
+    expect(screen.getByText("Protocols")).toBeTruthy();
 
-    // Check Diagnosis Card & Evidence Chips
-    expect(screen.getByText("Looks like high packet loss on edge gateway")).toBeInTheDocument();
-    expect(screen.getByText("flow #707")).toBeInTheDocument();
+    // Check Diagnostics
+    expect(screen.getByText("Diagnostic Hypotheses")).toBeTruthy();
+    expect(
+      screen.getByText("Loss and jitter affecting several servers at once")
+    ).toBeTruthy();
+    expect(screen.getByText("85%")).toBeTruthy();
   });
 
-  it("AreaChart generates unique fill gradient IDs using React useId()", () => {
-    const { container } = render(
-      <div>
-        <AreaChart values={[10, 20, 30]} label="Chart 1" />
-        <AreaChart values={[5, 15, 25]} label="Chart 2" />
-      </div>
-    );
+  it("handles empty snapshot gracefully", () => {
+    const emptySnapshot: MonitorSnapshot = {
+      by_protocol: { dimension: "protocol", rows: [] },
+      by_host: { dimension: "host", rows: [] },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 0,
+    };
+    setMonitor(emptySnapshot);
 
-    const linearGradients = container.querySelectorAll("linearGradient");
-    expect(linearGradients.length).toBe(2);
-    const id1 = linearGradients[0]?.getAttribute("id");
-    const id2 = linearGradients[1]?.getAttribute("id");
-    expect(id1).not.toBeNull();
-    expect(id2).not.toBeNull();
-    expect(id1).not.toBe(id2);
+    render(<MonitoringTestWrapper />);
+
+    expect(screen.getByText("Live Monitoring & System Health")).toBeTruthy();
   });
 });

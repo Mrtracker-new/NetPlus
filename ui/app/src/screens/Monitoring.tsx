@@ -1,58 +1,85 @@
-// Monitoring — usage breakdowns + "why is it slow?" diagnostics (docs/11).
-// Every diagnosis is a hypothesis with confidence and evidence, phrased
-// "looks like", never a verdict (docs/11 §6.3).
-
 import { useTranslation } from "react-i18next";
-import { EmptyState, Skeleton } from "@netpulse/components";
 import { useMonitoringController } from "../hooks/useMonitoringController";
-import { AreaChart, Donut, humanBytes } from "@netpulse/viz";
 import { CaptureHealthPanel } from "./Monitoring/CaptureHealthPanel";
-import { DiagnosisCard } from "./Monitoring/DiagnosisCard";
-import { HostBars } from "./Monitoring/HostBars";
-import { BreakdownTable } from "./Monitoring/BreakdownTable";
+import { ThroughputLineageCard } from "./Monitoring/ThroughputLineageCard";
+import { ThroughputGainsCard } from "./Monitoring/ThroughputGainsCard";
+import { ApplicationsLineageCard } from "./Monitoring/ApplicationsLineageCard";
+import { ProcessAttributesCard } from "./Monitoring/ProcessAttributesCard";
+import { DiagnosticsSection } from "./Monitoring/DiagnosticsSection";
 
 export function Monitoring() {
   const { t } = useTranslation(["monitoring", "common"]);
   const {
-    monitor,
-    throughput,
     kpis,
-    protocolSlices,
     captureHealth,
     healthAnnouncement,
     diagnoses,
-    networkLoss,
-    captureDrops,
+    viewModel,
+    preferences,
     actions,
   } = useMonitoringController();
 
-  if (!monitor) {
-    return (
-      <section className="np-monitor" aria-label="Loading monitoring telemetry" aria-busy="true">
-        {/* Layout-Matched Skeleton Loading Placeholders */}
-        <div className="np-kpis" style={{ marginBottom: "1.5rem" }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div className="np-kpi" key={i}>
-              <Skeleton variant="text" width="60%" height="12px" style={{ marginBottom: "8px" }} />
-              <Skeleton variant="rounded" width="40%" height="24px" />
-            </div>
-          ))}
-        </div>
-        <Skeleton height={140} width="100%" style={{ marginBottom: "1.5rem", borderRadius: "var(--np-radius-lg)" }} />
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1.5rem" }}>
-          <Skeleton height={160} width="100%" style={{ borderRadius: "var(--np-radius-md)" }} />
-          <Skeleton height={160} width="100%" style={{ borderRadius: "var(--np-radius-md)" }} />
-        </div>
-        <EmptyState>{t("idle")}</EmptyState>
-      </section>
-    );
-  }
+  const badgeClass =
+    viewModel.engineState === "Live"
+      ? "np-monitor-badge--live"
+      : viewModel.engineState === "Simulation"
+      ? "np-monitor-badge--simulation"
+      : viewModel.engineState === "Degraded"
+      ? "np-monitor-badge--warning"
+      : "np-monitor-badge--danger";
+
+  // Provide fallback KPIs from simulation telemetry when monitor is null
+  const displayKpis =
+    kpis.length > 0
+      ? kpis
+      : [
+          { labelKey: "kpi_traffic", value: viewModel.formattedTraffic },
+          { labelKey: "kpi_protocols", value: viewModel.activeProtocolsCount },
+          { labelKey: "kpi_hosts", value: viewModel.activeHostsCount },
+          { labelKey: "kpi_flows", value: viewModel.activeFlowsCount },
+        ];
 
   return (
-    <section className="np-monitor" aria-label={t("title")}>
-      <header style={{ marginBottom: "1.25rem" }}>
-        <h1 className="np-hero__title">{t("title")}</h1>
-        <p className="np-hero__sub">{t("hero_subtitle")}</p>
+    <section className="np-monitor np-monitor-dashboard" aria-label="Live Monitoring & System Health">
+      {/* Header with Title & Engine Status Pill Badge */}
+      <header className="np-monitor-header">
+        <div className="np-monitor-header__titles">
+          <h1 className="np-monitor-header__title">
+            Live Monitoring & System Health
+            <span className={`np-monitor-badge ${badgeClass}`}>
+              ● {viewModel.engineState}
+            </span>
+          </h1>
+          <p className="np-monitor-header__subtitle">
+            Real-time packet telemetry, network flow lineage, throughput metrics & process attribute tracking.
+          </p>
+        </div>
+
+        {/* Time-Range Selection Filter */}
+        <div className="np-monitor-header__controls">
+          {(["5m", "15m", "1h", "24h"] as const).map((tr) => (
+            <button
+              key={tr}
+              className="np-monitor-badge"
+              style={{
+                background:
+                  preferences.timeRange === tr
+                    ? "var(--np-monitor-primary, #00f2fe)"
+                    : "var(--np-surface-2, #1e2636)",
+                color:
+                  preferences.timeRange === tr
+                    ? "#000"
+                    : "var(--np-text-dim, #9ca3af)",
+                fontWeight: preferences.timeRange === tr ? 700 : 500,
+                cursor: "pointer",
+                border: "1px solid var(--np-border-strong, rgba(255,255,255,0.12))",
+              }}
+              onClick={() => actions.setTimeRange(tr)}
+            >
+              {tr}
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* Screen Reader Live Announcement Region */}
@@ -62,7 +89,7 @@ export function Monitoring() {
 
       {/* Headline KPI Metric Cards */}
       <div className="np-kpis">
-        {kpis.map((k) => (
+        {displayKpis.map((k) => (
           <div className="np-kpi" key={k.labelKey}>
             <div className="np-kpi__label">{t(k.labelKey as any)}</div>
             <div className="np-kpi__value">{k.value}</div>
@@ -73,36 +100,34 @@ export function Monitoring() {
       {/* Capture Health Panel */}
       {captureHealth && <CaptureHealthPanel health={captureHealth} />}
 
-      {/* Throughput AreaChart & Protocol Donut */}
-      <div className="np-monitor__top">
-        <section className="np-panel">
-          <h3 className="np-panel__title">{t("throughput")}</h3>
-          <AreaChart values={throughput} label={t("bytes_observed")} format={humanBytes} />
-        </section>
-        <section className="np-panel">
-          <h3 className="np-panel__title">{t("by_protocol")}</h3>
-          <Donut slices={protocolSlices} centerLabel={t("total_protocol")} format={humanBytes} />
-        </section>
+      {/* Perfectly Symmetrical 2x2 Grid */}
+      <div className="np-monitor-grid">
+        <ThroughputLineageCard
+          series={viewModel.throughputSeries}
+          timestamps={viewModel.timestamps}
+        />
+        <ApplicationsLineageCard
+          nodes={viewModel.nodes}
+          edges={viewModel.edges}
+          selectedNodeId={preferences.selectedNodeId}
+          onSelectNode={actions.setSelectedNodeId}
+        />
+        <ThroughputGainsCard
+          series={viewModel.gainsSeries}
+          timestamps={viewModel.timestamps}
+          peakBadgeText={viewModel.peakGainBadge}
+        />
+        <ProcessAttributesCard processes={viewModel.processes} />
       </div>
 
-      {/* Host Bar Rows & Breakdown Table */}
-      <HostBars breakdown={monitor.by_host} />
-      <BreakdownTable breakdown={monitor.by_host} />
-
-      {/* Loss Indicators (Never summed — docs/11 §6.4) */}
-      <div className="np-loss">
-        <span>{t("network_loss", { count: networkLoss })}</span>
-        <span>{t("capture_drops", { count: captureDrops })}</span>
-      </div>
-
-      {/* Diagnostic Hypotheses */}
-      {diagnoses.length === 0 ? (
-        <p className="np-ok">{t("no_issues")}</p>
-      ) : (
-        diagnoses.map((d, i) => (
-          <DiagnosisCard key={i} diagnosis={d} onNavigateEvidence={actions.openEvidence} />
-        ))
-      )}
+      {/* Subsystem Health, Active Alerts, Auto-Recommendations & Hypotheses */}
+      <DiagnosticsSection
+        alerts={viewModel.alerts}
+        subsystems={viewModel.subsystems}
+        recommendations={viewModel.recommendations}
+        diagnoses={diagnoses}
+        onNavigateEvidence={actions.openEvidence}
+      />
     </section>
   );
 }

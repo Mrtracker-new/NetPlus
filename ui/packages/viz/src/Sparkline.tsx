@@ -2,7 +2,8 @@ import { memo } from "react";
 import type { ReactElement } from "react";
 
 export interface SparklineProps {
-  values: number[];
+  values?: number[];
+  data?: number[];
   width?: number;
   height?: number;
   color?: string;
@@ -11,16 +12,18 @@ export interface SparklineProps {
 /** A tiny inline trend line — no axes, no legend (a single series names itself). */
 export const Sparkline = memo(function Sparkline({
   values,
+  data,
   width = 120,
   height = 28,
   color = "var(--np-accent)",
 }: SparklineProps): ReactElement | null {
-  if (values.length < 2) return null;
-  const max = Math.max(...values, 1);
-  const min = Math.min(...values, 0);
+  const chartValues = values || data || [];
+  if (chartValues.length < 2) return null;
+  const max = Math.max(...chartValues, 1);
+  const min = Math.min(...chartValues, 0);
   const span = max - min || 1;
-  const step = width / (values.length - 1);
-  const pts = values
+  const step = width / (chartValues.length - 1);
+  const pts = chartValues
     .map((v, i) => `${(i * step).toFixed(1)},${(height - ((v - min) / span) * height).toFixed(1)}`)
     .join(" ");
   return (

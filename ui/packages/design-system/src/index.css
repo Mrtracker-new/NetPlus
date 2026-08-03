@@ -2916,3 +2916,167 @@ button {
   }
 }
 
+/* ============================ Live Monitoring & System Health Dashboard ============================ */
+.np-monitor-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.np-monitor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+  margin-bottom: var(--np-2);
+}
+
+.np-monitor-header__titles {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-1);
+}
+
+.np-monitor-header__title {
+  font-size: var(--np-fs-xl);
+  font-weight: var(--np-fw-heavy);
+  letter-spacing: -0.02em;
+  color: var(--np-text);
+  display: flex;
+  align-items: center;
+  gap: var(--np-3);
+}
+
+.np-monitor-header__subtitle {
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+}
+
+.np-monitor-header__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--np-3);
+}
+
+.np-monitor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  border-radius: var(--np-radius-pill);
+  font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-medium);
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--np-border-strong);
+  box-shadow: var(--np-neu-sm);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.np-monitor-badge--live {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--np-monitor-success);
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: var(--np-neu-sm), 0 0 10px rgba(16, 185, 129, 0.2);
+}
+
+.np-monitor-badge--simulation {
+  background: rgba(6, 182, 212, 0.12);
+  color: var(--np-monitor-accent);
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: var(--np-neu-sm), 0 0 10px rgba(6, 182, 212, 0.2);
+}
+
+.np-monitor-badge--warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--np-monitor-warning);
+  border-color: rgba(245, 158, 11, 0.3);
+  box-shadow: var(--np-neu-sm), 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.np-monitor-badge--danger {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--np-monitor-danger);
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: var(--np-neu-sm), 0 0 10px rgba(239, 68, 68, 0.2);
+}
+
+.np-monitor-grid {
+  display: grid;
+  gap: 1.25rem;
+  width: 100%;
+}
+
+/* Responsive 4-Tier Grid Breakpoints */
+@media (min-width: 1200px) {
+  .np-monitor-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 1199px) {
+  .np-monitor-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.np-monitor-card {
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border-strong);
+  border-radius: var(--np-radius);
+  padding: var(--np-4);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--np-3);
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--np-neu);
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.np-monitor-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.np-monitor-card__title {
+  font-size: var(--np-fs-md);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+
+/* SVG Line & Edge Pulse Animation */
+svg path {
+  transition: d 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes np-flow-dash {
+  0% {
+    stroke-dashoffset: 24;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.np-flow-line {
+  stroke-dasharray: 6 6;
+  animation: np-flow-dash 1.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-flow-line {
+    animation: none;
+  }
+}
+
+

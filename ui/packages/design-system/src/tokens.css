@@ -129,6 +129,16 @@
    * --np-bp-tablet: 720px
    * --np-bp-mobile: 480px */
 
+  /* ---- Semantic Monitor Theme Tokens ---- */
+  --np-monitor-primary: #00f2fe;
+  --np-monitor-accent: #06b6d4;
+  --np-monitor-warning: #f59e0b;
+  --np-monitor-danger: #ef4444;
+  --np-monitor-success: #10b981;
+  --np-monitor-surface: #151d2a;
+  --np-monitor-surface-elevated: #1e293b;
+  --np-monitor-grid: rgba(0, 0, 0, 0.06);
+
   /* ---- Layout ---- */
   --np-rail: 76px;         /* slim icon rail (ref) */
   --np-rail-right: 300px;  /* right context rail */

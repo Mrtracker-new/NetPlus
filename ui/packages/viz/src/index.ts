@@ -25,6 +25,17 @@ export type { ConstellationProps } from "./Constellation";
 export { IncidentTimelineViz } from "./IncidentTimeline";
 export type { IncidentTimelineVizProps } from "./IncidentTimeline";
 
+export { Chart } from "./components/Chart";
+export type { ChartProps, ChartSeries } from "./components/Chart";
+
+export { TopologyGraph } from "./components/TopologyGraph";
+export type { TopologyGraphProps, TopologyNode, TopologyEdge } from "./components/TopologyGraph";
+
+export { HealthIndicator } from "./components/HealthIndicator";
+export type { HealthIndicatorProps } from "./components/HealthIndicator";
+
+export { buildBezierPath, buildBezierAreaPath } from "./geometry/spline";
+
 export {
   hostSourceRank,
   hostSourceLabel,
@@ -36,3 +47,4 @@ export {
 } from "./utils";
 
 export type { Slice, RibbonEvent } from "./types";
+

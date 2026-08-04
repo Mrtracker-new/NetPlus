@@ -124,7 +124,7 @@ Progressive cards          Confidence scoring          protocol explorer        
 | [`netpulse-ai`](crates/netpulse-ai) | AI Engine | Context retriever, prompt constructor, citation validator, and local/remote LLM backend interface. Holds the sole egress capability. |
 | [`netpulse-learn`](crates/netpulse-learn) | Education | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
 | [`netpulse-api`](crates/netpulse-api) | API | Versioned IPC DTO contract (`v4`), Query/Command definitions, stream message schemas, and TypeScript codegen. |
-| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | Plugin host, capability checking, signature verification, and reference plugin interfaces (dissectors, detectors, enrichment, export). |
+| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | Plugin host, capability checking, signature verification, and reference plugin interfaces (dissectors, detectors, enrichment, views, export). |
 | [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | Main engine binary, live capture execution loop, pipeline assembly, and query execution. |
 
 ---

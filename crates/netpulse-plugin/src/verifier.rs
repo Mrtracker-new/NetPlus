@@ -277,11 +277,11 @@ pub fn canonical_manifest_bytes(manifest: &PluginManifest) -> Vec<u8> {
     buf.extend_from_slice(&CANONICAL_VERSION.to_be_bytes());
     buf.extend_from_slice(&manifest.manifest_version.to_be_bytes());
 
-    let name_bytes = manifest.name.as_bytes();
+    let name_bytes = manifest.metadata.name.as_bytes();
     buf.extend_from_slice(&(name_bytes.len() as u32).to_be_bytes());
     buf.extend_from_slice(name_bytes);
 
-    let type_byte = match manifest.plugin_type {
+    let type_byte = match manifest.metadata.plugin_type {
         PluginType::Dissector => 1u8,
         PluginType::Enrichment => 2u8,
         PluginType::Detector => 3u8,
@@ -289,10 +289,10 @@ pub fn canonical_manifest_bytes(manifest: &PluginManifest) -> Vec<u8> {
         PluginType::Export => 5u8,
     };
     buf.push(type_byte);
-    buf.extend_from_slice(&manifest.target_contract.0.to_be_bytes());
-    buf.push(if manifest.fuzzed { 1 } else { 0 });
-    buf.push(if manifest.has_explanation { 1 } else { 0 });
-    buf.extend_from_slice(&manifest.payload_hash.0);
+    buf.extend_from_slice(&manifest.metadata.target_contract.0.to_be_bytes());
+    buf.push(if manifest.security.fuzzed { 1 } else { 0 });
+    buf.push(if manifest.security.has_explanation { 1 } else { 0 });
+    buf.extend_from_slice(&manifest.security.payload_hash.0);
     buf
 }
 
@@ -333,11 +333,11 @@ impl PluginVerifier {
         payload_bytes: &[u8],
         current_timestamp: u64,
     ) -> VerificationOutcome {
-        let claimed = manifest.trust.status;
+        let claimed = manifest.security.trust.status;
 
         // 1. Verify payload hash
         let computed_digest = Sha256Digest::compute(payload_bytes);
-        let payload_valid = computed_digest == manifest.payload_hash;
+        let payload_valid = computed_digest == manifest.security.payload_hash;
         if !payload_valid {
             return VerificationOutcome {
                 manifest,
@@ -348,7 +348,7 @@ impl PluginVerifier {
             };
         }
 
-        if manifest.signatures.is_empty() {
+        if manifest.security.signatures.is_empty() {
             return VerificationOutcome {
                 manifest,
                 claimed_trust: claimed,
@@ -364,7 +364,7 @@ impl PluginVerifier {
         let mut success = None;
 
         // 2. Evaluate multi-signatures in order, tracking highest derived trust
-        for sig in &manifest.signatures {
+        for sig in &manifest.security.signatures {
             if sig.algorithm != SignatureAlgorithm::Ed25519 {
                 last_error = Some(VerificationError::UnsupportedAlgorithm);
                 continue;

@@ -31,7 +31,14 @@ use netpulse_core::Result;
 
 // Re-export the seam traits plugins implement, so a contributor learns one
 // contract that serves both built-in and plugin work (docs/24 §4).
-pub use netpulse_core::traits::{Detector, Dissector};
+pub use netpulse_core::traits::{Configurable, Detector, Dissector};
+
+pub mod config;
+pub use config::{
+    JsonFileConfigStorage, JsonSchema, MemoryAuditor, MemoryConfigStorage, PluginConfigAction,
+    PluginConfigAuditRecord, PluginConfigAuditor, PluginConfigEvent, PluginConfigManager,
+    PluginConfigStorage, StorageClass,
+};
 
 /// The five plugin seams, one per layer boundary (docs/24 §3). Each hooks only at
 /// its layer's contract and cannot reach around the architecture (docs/02 §4).
@@ -124,16 +131,25 @@ pub struct TrustMetadata {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContractVersion(pub u32);
 
-/// A plugin's self-description (docs/24 §6). Dissector/detector obligations
-/// (fuzzing, explanation content) are declared here and checked at registration —
-/// a dissector without a fuzz target or explanation content is *incomplete*
-/// (docs/24 §4.1, docs/07 §8, §7).
+/// Core identity and targeting metadata for a plugin.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PluginManifest {
-    pub manifest_version: u32,
+pub struct PluginMetadata {
     pub name: String,
     pub plugin_type: PluginType,
     pub target_contract: ContractVersion,
+}
+
+/// Declared configuration metadata for a plugin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginConfigurationMetadata {
+    pub config_version: u32,
+    pub default_config: serde_json::Value,
+    pub config_schema: Option<JsonSchema>,
+}
+
+/// Security, trust, and verification metadata for a plugin.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginSecurityMetadata {
     pub trust: TrustMetadata,
     pub payload_hash: Sha256Digest,
     pub signatures: Vec<PluginSignature>,
@@ -143,29 +159,40 @@ pub struct PluginManifest {
     pub has_explanation: bool,
 }
 
+/// A plugin's self-description (docs/24 §6), decoupled into metadata, config, and security sections.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PluginManifest {
+    pub manifest_version: u32,
+    pub metadata: PluginMetadata,
+    pub config: PluginConfigurationMetadata,
+    pub security: PluginSecurityMetadata,
+}
+
+
 impl PluginManifest {
     /// The capabilities this plugin is granted by its type (docs/24 §5).
     pub fn capabilities(&self) -> &'static [Capability] {
-        capabilities_for(self.plugin_type)
+        capabilities_for(self.metadata.plugin_type)
     }
 
     /// Whether the plugin targets a contract the host can serve (docs/24 §6). The
     /// host refuses newer-than-itself contracts rather than misbehaving silently.
     pub fn is_compatible(&self, host: ContractVersion) -> bool {
-        self.target_contract.0 == host.0
+        self.metadata.target_contract.0 == host.0
     }
 
     /// Whether a dissector plugin meets its mandatory obligations (docs/24 §4.1):
     /// a fuzz target and explanation content. Non-dissectors are unaffected.
     pub fn dissector_obligations_met(&self) -> bool {
-        self.plugin_type != PluginType::Dissector || (self.fuzzed && self.has_explanation)
+        self.metadata.plugin_type != PluginType::Dissector
+            || (self.security.fuzzed && self.security.has_explanation)
     }
 }
 
 /// An enrichment plugin: adds host/process metadata from **local, offline** data
 /// only (docs/24 §4.3). An enrichment that reaches the network violates the
 /// capability model and is rejected — the trait exposes no network access to grant.
-pub trait Enrichment {
+pub trait Enrichment: Configurable {
     /// Stable enrichment identifier, surfaced for auditability.
     fn id(&self) -> &'static str;
     /// Enrich a host from local databases (geo/ASN/org), returning the augmented
@@ -181,7 +208,7 @@ pub trait Enrichment {
 /// built-in UI uses (docs/24 §4.4) — and nothing more (UI sandbox, docs/02 §10.2).
 /// Marker trait: the actual surface runs in the webview; the capability boundary
 /// is what matters here.
-pub trait ViewPlugin {
+pub trait ViewPlugin: Configurable {
     fn id(&self) -> &'static str;
     /// The channels/queries this view reads — declared, so its access is auditable
     /// and bounded to `ApiRead` (docs/02 §10.2).
@@ -191,7 +218,7 @@ pub trait ViewPlugin {
 /// An export plugin: adds an output format (docs/24 §4.5) under the same privacy
 /// discipline as built-ins — preview, sanitization, no implicit egress (docs/23
 /// §6). It writes bytes; it never transmits them.
-pub trait ExportPlugin {
+pub trait ExportPlugin: Configurable {
     fn id(&self) -> &'static str;
     /// The format's short name (e.g. "har", "siem").
     fn format(&self) -> &'static str;
@@ -229,8 +256,10 @@ pub enum DisabledReason {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RegisteredPlugin {
     pub manifest: PluginManifest,
+    pub config_version: u32,
+    pub config: serde_json::Value,
     pub enabled: bool,
-    /// Present when the plugin is not active, explaining why (docs/24 §8).
+    /// Present when inactive, explaining why (docs/24 §8).
     pub disabled_reason: Option<DisabledReason>,
     /// Cryptographically derived effective trust status.
     pub effective_trust: TrustStatus,
@@ -240,10 +269,11 @@ pub struct RegisteredPlugin {
 /// from plugin at runtime except for trust metadata (docs/24 §4); this registry is
 /// where compatibility and capability checks live, so a broken or hostile plugin
 /// is contained (docs/24 §5, §8).
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct PluginRegistry {
     host_contract: u32,
     plugins: Vec<RegisteredPlugin>,
+    config_manager: PluginConfigManager,
 }
 
 impl PluginRegistry {
@@ -252,7 +282,18 @@ impl PluginRegistry {
         Self {
             host_contract,
             plugins: Vec::new(),
+            config_manager: PluginConfigManager::default(),
         }
+    }
+
+    /// Access reference to the internal [`PluginConfigManager`].
+    pub fn config_manager(&self) -> &PluginConfigManager {
+        &self.config_manager
+    }
+
+    /// Access mutable reference to the internal [`PluginConfigManager`].
+    pub fn config_manager_mut(&mut self) -> &mut PluginConfigManager {
+        &mut self.config_manager
     }
 
     /// Register a verified plugin outcome, computing its activation eligibility (docs/24 §6, §8).
@@ -262,7 +303,7 @@ impl PluginRegistry {
     /// default to disabled until explicit user consent or signature fix.
     pub fn register(&mut self, outcome: VerificationOutcome) {
         let mut manifest = outcome.manifest;
-        manifest.trust.status = outcome.effective_trust;
+        manifest.security.trust.status = outcome.effective_trust;
 
         let reason = if !manifest.is_compatible(ContractVersion(self.host_contract)) {
             Some(DisabledReason::IncompatibleContract)
@@ -290,9 +331,18 @@ impl PluginRegistry {
             None
         };
 
+        let initial_config = self.config_manager.initialize_plugin_config(
+            &manifest.metadata.name,
+            manifest.config.config_version,
+            manifest.config.default_config.clone(),
+            manifest.config.config_schema.as_ref(),
+        );
+
         self.plugins.push(RegisteredPlugin {
             enabled: reason.is_none(),
             disabled_reason: reason,
+            config_version: manifest.config.config_version,
+            config: initial_config,
             manifest,
             effective_trust: outcome.effective_trust,
         });
@@ -302,7 +352,7 @@ impl PluginRegistry {
     /// enable one that is structurally ineligible (incompatible/incomplete),
     /// keeping the reason honest (docs/24 §8). Returns whether it is now enabled.
     pub fn enable(&mut self, name: &str) -> bool {
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.name == name) {
+        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
             match p.disabled_reason {
                 // Only a user-consent gate can be lifted by enabling; structural
                 // ineligibility cannot be overridden (docs/24 §8).
@@ -319,13 +369,76 @@ impl PluginRegistry {
 
     /// Disable a plugin by name (docs/24 §6).
     pub fn disable(&mut self, name: &str) -> bool {
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.name == name) {
+        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
             p.enabled = false;
             p.disabled_reason = Some(DisabledReason::NotEnabled);
             return true;
         }
         false
     }
+
+    /// Update a plugin's configuration with schema validation and persistence.
+    pub fn configure_plugin(&mut self, name: &str, new_config: serde_json::Value) -> std::result::Result<(), String> {
+        let (config_version, schema) = {
+            let p = self
+                .plugins
+                .iter()
+                .find(|p| p.manifest.metadata.name == name)
+                .ok_or_else(|| format!("Plugin '{name}' not found"))?;
+            (p.manifest.config.config_version, p.manifest.config.config_schema.clone())
+        };
+
+        self.config_manager.configure(name, config_version, new_config.clone(), schema.as_ref())?;
+
+        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+            p.config = new_config;
+        }
+        Ok(())
+    }
+
+    /// RFC 7396 JSON Merge Patch update for a plugin.
+    pub fn patch_plugin(
+        &mut self,
+        name: &str,
+        expected_version: Option<u32>,
+        patch: serde_json::Value,
+    ) -> std::result::Result<serde_json::Value, String> {
+        let schema = {
+            let p = self
+                .plugins
+                .iter()
+                .find(|p| p.manifest.metadata.name == name)
+                .ok_or_else(|| format!("Plugin '{name}' not found"))?;
+            p.manifest.config.config_schema.clone()
+        };
+
+        let updated_config = self.config_manager.patch(name, expected_version, patch, schema.as_ref())?;
+
+        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+            p.config = updated_config.clone();
+        }
+        Ok(updated_config)
+    }
+
+    /// Reset a plugin's configuration to defaults.
+    pub fn reset_plugin(&mut self, name: &str) -> std::result::Result<(), String> {
+        let default_config = {
+            let p = self
+                .plugins
+                .iter()
+                .find(|p| p.manifest.metadata.name == name)
+                .ok_or_else(|| format!("Plugin '{name}' not found"))?;
+            p.manifest.config.default_config.clone()
+        };
+
+        self.config_manager.reset(name, default_config.clone())?;
+
+        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+            p.config = default_config;
+        }
+        Ok(())
+    }
+
 
     /// All registered plugins with their state (docs/24 §6).
     pub fn plugins(&self) -> &[RegisteredPlugin] {
@@ -380,18 +493,27 @@ mod tests {
     ) -> PluginManifest {
         PluginManifest {
             manifest_version: 1,
-            name: name.into(),
-            plugin_type: ty,
-            target_contract: ContractVersion(4),
-            trust: TrustMetadata {
-                source: "in-tree".into(),
-                signatures: Vec::new(),
-                status,
+            metadata: PluginMetadata {
+                name: name.into(),
+                plugin_type: ty,
+                target_contract: ContractVersion(4),
             },
-            payload_hash: Sha256Digest::compute(payload_bytes),
-            signatures: Vec::new(),
-            fuzzed: true,
-            has_explanation: true,
+            config: PluginConfigurationMetadata {
+                config_version: 1,
+                default_config: serde_json::json!({}),
+                config_schema: None,
+            },
+            security: PluginSecurityMetadata {
+                trust: TrustMetadata {
+                    source: "in-tree".into(),
+                    signatures: Vec::new(),
+                    status,
+                },
+                payload_hash: Sha256Digest::compute(payload_bytes),
+                signatures: Vec::new(),
+                fuzzed: true,
+                has_explanation: true,
+            },
         }
     }
 
@@ -402,7 +524,7 @@ mod tests {
     ) -> VerificationOutcome {
         VerificationOutcome {
             manifest: m.clone(),
-            claimed_trust: m.trust.status,
+            claimed_trust: m.security.trust.status,
             effective_trust: effective,
             verification_result: res,
             payload_hash_valid: true,
@@ -427,7 +549,7 @@ mod tests {
             TrustStatus::FirstParty,
             b"wasm",
         );
-        m.target_contract = ContractVersion(3);
+        m.metadata.target_contract = ContractVersion(3);
         reg.register(outcome(
             m,
             TrustStatus::FirstParty,
@@ -439,7 +561,7 @@ mod tests {
             p.disabled_reason,
             Some(DisabledReason::IncompatibleContract)
         );
-        assert!(!reg.clone().enable("old-diss"));
+        assert!(!reg.enable("old-diss"));
     }
 
     #[test]
@@ -451,7 +573,7 @@ mod tests {
             TrustStatus::FirstParty,
             b"wasm",
         );
-        m.fuzzed = false;
+        m.security.fuzzed = false;
         reg.register(outcome(
             m,
             TrustStatus::FirstParty,
@@ -546,7 +668,7 @@ mod tests {
             payload,
         );
         let sig_bytes = sign_manifest(&m, &kp);
-        m.signatures.push(PluginSignature {
+        m.security.signatures.push(PluginSignature {
             algorithm: SignatureAlgorithm::Ed25519,
             key_id,
             signature: sig_bytes,
@@ -578,7 +700,7 @@ mod tests {
             payload,
         );
         let sig_bytes = sign_manifest(&m, &kp);
-        m.signatures.push(PluginSignature {
+        m.security.signatures.push(PluginSignature {
             algorithm: SignatureAlgorithm::Ed25519,
             key_id,
             signature: sig_bytes,
@@ -619,7 +741,7 @@ mod tests {
             payload,
         );
         let sig_bytes = sign_manifest(&m, &kp);
-        m.signatures.push(PluginSignature {
+        m.security.signatures.push(PluginSignature {
             algorithm: SignatureAlgorithm::Ed25519,
             key_id,
             signature: sig_bytes,
@@ -635,3 +757,4 @@ mod tests {
         );
     }
 }
+

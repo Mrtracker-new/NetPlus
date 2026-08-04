@@ -61,12 +61,21 @@ pub trait SocketTableSource {
     fn process_info(&self, pid: u64) -> Result<Option<Process>>;
 }
 
+/// Trait for components that accept runtime configuration updates.
+pub trait Configurable {
+    /// Update runtime configuration from a JSON value.
+    /// Default implementation is a no-op returning `Ok(())`.
+    fn configure(&mut self, _config: &serde_json::Value) -> Result<()> {
+        Ok(())
+    }
+}
+
 /// Parses one protocol layer from a byte slice into structured events (docs/07).
 ///
 /// Implementors live in netpulse-decode and are the primary attack surface
 /// (hostile input): strict bounds checks, no `unsafe` without review, and a
 /// corresponding fuzz target each (docs/03 §3, docs/04 §3.4).
-pub trait Dissector {
+pub trait Dissector: Configurable {
     /// Stable protocol name used for explanation-key addressing (docs/07 §7).
     fn protocol(&self) -> &'static str;
 
@@ -78,7 +87,7 @@ pub trait Dissector {
 
 /// Evaluates the reconstruction model and emits confidence-scored findings
 /// (docs/17, docs/18, docs/20). Runs off the hot path (docs/02 §5.2).
-pub trait Detector {
+pub trait Detector: Configurable {
     /// Stable detector identifier, surfaced in findings for auditability.
     fn id(&self) -> &'static str;
 
@@ -86,3 +95,4 @@ pub trait Detector {
     /// [`Finding`] must already carry its evidence references (docs/02 §6.3).
     fn evaluate(&self, events: &[ProtoEvent]) -> Result<Vec<Finding>>;
 }
+

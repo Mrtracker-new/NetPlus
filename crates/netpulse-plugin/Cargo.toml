@@ -14,8 +14,10 @@ authors.workspace = true
 [dependencies]
 netpulse-core = { path = "../netpulse-core" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 sha2 = "0.10"
 ed25519-compact = "2.1"
+
 
 [lints]
 workspace = true

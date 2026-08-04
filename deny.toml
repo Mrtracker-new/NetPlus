@@ -12,8 +12,8 @@ targets = [
 yanked = "deny"
 unmaintained = "workspace"
 # paste v1.0.15 unmaintained — transitive dep via netstat2 -> netlink-packet-utils (Linux only).
-# Compile-time procedural macro crate executed exclusively during compilation; not linked into binaries.
-ignore = ["RUSTSEC-2024-0436"]
+# RUSTSEC-2023-0071 (rsa 0.9.10 Marvin Attack sidechannel) — transitive dep via sqlx. No 0.9 patch available.
+ignore = ["RUSTSEC-2024-0436", "RUSTSEC-2023-0071"]
 
 [licenses]
 confidence-threshold = 0.8

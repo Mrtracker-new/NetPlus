@@ -44,6 +44,7 @@ sentry-tracing = "0.34"
 sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
 directories = "6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+parking_lot = "0.12"
 
 # Workspace-wide lints. Memory safety on hostile input is the defining
 # requirement of this codebase, so unsafe is denied by default.

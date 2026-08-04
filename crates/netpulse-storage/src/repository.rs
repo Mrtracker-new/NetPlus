@@ -4,7 +4,8 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
-use std::sync::RwLock;
+
+use parking_lot::RwLock;
 
 use netpulse_core::{
     EvidenceRef, Finding, Flow, Host, HostName, ProtoEvent, ProtoEventKind, Session, Timestamp,
@@ -73,7 +74,7 @@ impl MemoryCaptureStore {
     }
 
     pub fn insert_flow_sync(&self, flow: Flow, events: Vec<ProtoEvent>) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         if !events.is_empty() {
             inner
                 .events_by_flow
@@ -86,19 +87,19 @@ impl MemoryCaptureStore {
     }
 
     pub fn insert_session_sync(&self, session: Session) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         inner.sessions.insert(session.id, session);
         Ok(())
     }
 
     pub fn insert_host_sync(&self, id: u64, host: Host) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         inner.hosts.insert(id, host);
         Ok(())
     }
 
     pub fn set_resolution_sync(&self, ip: IpAddr, names: Vec<HostName>) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         if names.is_empty() {
             inner.resolutions.remove(&ip);
         } else {
@@ -111,7 +112,7 @@ impl MemoryCaptureStore {
         if names.is_empty() {
             return Ok(());
         }
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         let existing = inner.resolutions.entry(ip).or_default();
         for n in names {
             if !existing
@@ -125,7 +126,7 @@ impl MemoryCaptureStore {
     }
 
     pub fn insert_finding_sync(&self, finding: Finding) -> Result<()> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         inner.findings.insert(
             finding.id,
             StoredFinding {
@@ -137,22 +138,22 @@ impl MemoryCaptureStore {
     }
 
     pub fn flow_sync(&self, id: u64) -> Result<Option<Flow>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.flows.get(&id).cloned())
     }
 
     pub fn session_sync(&self, id: u64) -> Result<Option<Session>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.sessions.get(&id).cloned())
     }
 
     pub fn finding_sync(&self, id: u64) -> Result<Option<StoredFinding>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.findings.get(&id).cloned())
     }
 
     pub fn flows_for_session_sync(&self, session_id: u64) -> Result<Vec<Flow>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         match inner.sessions.get(&session_id) {
             Some(s) => Ok(s
                 .flow_ids
@@ -164,7 +165,7 @@ impl MemoryCaptureStore {
     }
 
     pub fn events_for_flow_sync(&self, flow_id: u64) -> Result<Vec<ProtoEvent>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner
             .events_by_flow
             .get(&flow_id)
@@ -173,7 +174,7 @@ impl MemoryCaptureStore {
     }
 
     pub fn flows_in_window_sync(&self, from: u64, to: u64) -> Result<Vec<Flow>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let mut v: Vec<Flow> = inner
             .flows
             .values()
@@ -188,34 +189,34 @@ impl MemoryCaptureStore {
     }
 
     pub fn names_for_sync(&self, ip: &IpAddr) -> Result<Vec<HostName>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.resolutions.get(ip).cloned().unwrap_or_default())
     }
 
     pub fn resolutions_sync(&self) -> Result<HashMap<IpAddr, Vec<HostName>>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.resolutions.clone())
     }
 
     pub fn flow_count_sync(&self) -> Result<usize> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.flows.len())
     }
 
     pub fn session_count_sync(&self) -> Result<usize> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         Ok(inner.sessions.len())
     }
 
     pub fn session_ids_sync(&self) -> Result<Vec<u64>> {
-        let inner = self.inner.read().unwrap();
+        let inner = self.inner.read();
         let mut ids: Vec<u64> = inner.sessions.keys().copied().collect();
         ids.sort_unstable();
         Ok(ids)
     }
 
     pub fn evict_oldest_flows_sync(&self, target_max: usize) -> Result<usize> {
-        let mut inner = self.inner.write().unwrap();
+        let mut inner = self.inner.write();
         if inner.flows.len() <= target_max {
             return Ok(0);
         }
@@ -702,3 +703,105 @@ impl CaptureRepository for SqliteCaptureRepository {
         Ok(0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use netpulse_core::{FiveTuple, FlowMetrics, FlowState, L4Proto, L7Proto};
+    use std::net::{IpAddr, Ipv4Addr};
+    use std::sync::Arc;
+    use std::thread;
+
+    fn make_test_flow(id: u64, mono_ts: u64) -> Flow {
+        let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
+        Flow {
+            id,
+            key: FiveTuple::new(
+                ip,
+                1000 + (id % 50000) as u16,
+                ip,
+                80,
+                L4Proto::Tcp,
+            ),
+            first_ts: Timestamp::new(mono_ts, mono_ts),
+            last_ts: Timestamp::new(mono_ts, mono_ts),
+            l4: L4Proto::Tcp,
+            l7: L7Proto::Tls,
+            stats: FlowMetrics::default(),
+            state: FlowState::Closed,
+        }
+    }
+
+    #[test]
+    fn test_memory_store_panic_resilience() {
+        let store = Arc::new(MemoryCaptureStore::new());
+
+        // Insert initial data
+        store.insert_flow_sync(make_test_flow(1, 100), vec![]).unwrap();
+        assert_eq!(store.flow_count_sync().unwrap(), 1);
+
+        // Spawn a thread that acquires a write lock, inserts data, and panics
+        let store_clone = Arc::clone(&store);
+        let handle = thread::spawn(move || {
+            let mut inner = store_clone.inner.write();
+            inner.flows.insert(99, make_test_flow(99, 999));
+            panic!("intentional panic while holding write lock");
+        });
+
+        // The thread panics, handle.join() returns Err
+        assert!(handle.join().is_err());
+
+        // Verify that subsequent store operations succeed cleanly without panicking
+        assert_eq!(store.flow_count_sync().unwrap(), 2);
+        assert!(store.flow_sync(1).unwrap().is_some());
+        assert!(store.flow_sync(99).unwrap().is_some());
+
+        let new_flow = make_test_flow(2, 200);
+        assert!(store.insert_flow_sync(new_flow, vec![]).is_ok());
+        assert_eq!(store.flow_count_sync().unwrap(), 3);
+        assert_eq!(store.evict_oldest_flows_sync(1).unwrap(), 2);
+        assert_eq!(store.flow_count_sync().unwrap(), 1);
+    }
+
+    #[test]
+    fn test_memory_store_concurrency_stress() {
+        let store = Arc::new(MemoryCaptureStore::new());
+        let mut handles = Vec::new();
+
+        // 4 writer threads
+        for w_idx in 0..4u64 {
+            let store_clone = Arc::clone(&store);
+            handles.push(thread::spawn(move || {
+                for i in 0..1000u64 {
+                    let flow_id = w_idx * 10000 + i;
+                    let flow = make_test_flow(flow_id, flow_id);
+                    let _ = store_clone.insert_flow_sync(flow, vec![]);
+                    if i % 100 == 0 {
+                        let _ = store_clone.evict_oldest_flows_sync(500);
+                    }
+                }
+            }));
+        }
+
+        // 8 reader threads
+        for _r_idx in 0..8 {
+            let store_clone = Arc::clone(&store);
+            handles.push(thread::spawn(move || {
+                for i in 0..1000u64 {
+                    let _ = store_clone.flow_sync(i % 100);
+                    let _ = store_clone.flow_count_sync();
+                    let _ = store_clone.flows_in_window_sync(0, 10000);
+                    let _ = store_clone.session_ids_sync();
+                }
+            }));
+        }
+
+        for handle in handles {
+            assert!(handle.join().is_ok());
+        }
+
+        // Final sanity check: store is valid and readable
+        assert!(store.flow_count_sync().is_ok());
+    }
+}
+

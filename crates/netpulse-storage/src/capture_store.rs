@@ -11,7 +11,7 @@ use std::net::IpAddr;
 use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session};
 
 use crate::repository::{CaptureRepository, MemoryCaptureStore};
-use crate::PayloadPolicy;
+use crate::{EvictionStats, PayloadPolicy, StorageConfig};
 
 // NOTE:
 // CaptureStore is the authoritative runtime validator for EvidenceRef invariants (docs/02 §6.3, docs/08 §6).
@@ -45,6 +45,7 @@ pub struct StoredFinding {
 /// Defaults to [`MemoryCaptureStore`] for fast in-memory operations.
 #[derive(Debug)]
 pub struct CaptureStore<R: CaptureRepository = MemoryCaptureStore> {
+    config: StorageConfig,
     policy: PayloadPolicy,
     repository: R,
     flows: HashMap<u64, Flow>,
@@ -61,6 +62,7 @@ impl CaptureStore<MemoryCaptureStore> {
     /// Create an empty store backed by [`MemoryCaptureStore`] under the given payload policy.
     pub fn new(policy: PayloadPolicy) -> Self {
         Self {
+            config: StorageConfig::default(),
             policy,
             repository: MemoryCaptureStore::new(),
             flows: HashMap::new(),
@@ -73,70 +75,58 @@ impl CaptureStore<MemoryCaptureStore> {
         }
     }
 
-    /// Synchronous insert flow.
-    pub fn insert_flow(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
-        if !events.is_empty() {
-            self.events_by_flow
-                .entry(flow.id)
-                .or_default()
-                .extend(events.clone());
+    /// Create an empty store with explicit [`StorageConfig`].
+    pub fn with_config(policy: PayloadPolicy, config: StorageConfig) -> Self {
+        Self {
+            config,
+            policy,
+            repository: MemoryCaptureStore::new(),
+            flows: HashMap::new(),
+            sessions: HashMap::new(),
+            hosts: HashMap::new(),
+            resolutions: HashMap::new(),
+            findings: HashMap::new(),
+            events_by_flow: HashMap::new(),
+            payload_records: 0,
         }
-        self.flows.insert(flow.id, flow.clone());
-        let _ = self.repository.insert_flow_sync(flow, events);
     }
+}
 
-    /// Synchronous insert session.
-    pub fn insert_session(&mut self, session: Session) {
-        self.sessions.insert(session.id, session.clone());
-        let _ = self.repository.insert_session_sync(session);
-    }
-
-    /// Synchronous insert host.
-    pub fn insert_host(&mut self, id: u64, host: Host) {
-        self.hosts.insert(id, host.clone());
-        let _ = self.repository.insert_host_sync(id, host);
-    }
-
-    /// Synchronous set resolution.
-    pub fn set_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
-        if names.is_empty() {
-            self.resolutions.remove(&ip);
-        } else {
-            self.resolutions.insert(ip, names.clone());
-        }
-        let _ = self.repository.set_resolution_sync(ip, names);
-    }
-
-    /// Synchronous merge resolution.
-    pub fn merge_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
-        if !names.is_empty() {
-            let existing = self.resolutions.entry(ip).or_default();
-            for n in &names {
-                if !existing
-                    .iter()
-                    .any(|h| h.name == n.name && h.source == n.source)
-                {
-                    existing.push(n.clone());
-                }
-            }
-            let _ = self.repository.merge_resolution_sync(ip, names);
+impl<R: CaptureRepository> CaptureStore<R> {
+    /// Create a store with a custom repository implementation.
+    pub fn with_repository(policy: PayloadPolicy, repository: R) -> Self {
+        Self {
+            config: StorageConfig::default(),
+            policy,
+            repository,
+            flows: HashMap::new(),
+            sessions: HashMap::new(),
+            hosts: HashMap::new(),
+            resolutions: HashMap::new(),
+            findings: HashMap::new(),
+            events_by_flow: HashMap::new(),
+            payload_records: 0,
         }
     }
 
-    /// Synchronous insert finding. Validates that all evidence references exist.
-    pub fn insert_finding(&mut self, finding: Finding) -> netpulse_core::Result<()> {
-        self.validate_evidence_refs(&finding)?;
-        self.repository
-            .insert_finding_sync(finding.clone())
-            .map_err(|e| NpError::Storage(e.to_string()))?;
-        self.findings.insert(
-            finding.id,
-            StoredFinding {
-                finding,
-                evidence_expired: false,
-            },
-        );
-        Ok(())
+    /// Access current storage config.
+    pub fn config(&self) -> StorageConfig {
+        self.config
+    }
+
+    /// Update storage config.
+    pub fn set_config(&mut self, config: StorageConfig) {
+        self.config = config;
+    }
+
+    /// Access the underlying repository handle.
+    pub fn repository(&self) -> &R {
+        &self.repository
+    }
+
+    /// The payload policy in force.
+    pub fn policy(&self) -> PayloadPolicy {
+        self.policy
     }
 
     /// The names observed for one IP, empty if none.
@@ -213,6 +203,95 @@ impl CaptureStore<MemoryCaptureStore> {
         self.sessions.len()
     }
 
+    /// Synchronous insert flow.
+    pub fn insert_flow(&mut self, flow: Flow, mut events: Vec<ProtoEvent>) {
+        if self.config.max_events_per_flow > 0 && events.len() > self.config.max_events_per_flow {
+            events.truncate(self.config.max_events_per_flow);
+        }
+        if !events.is_empty() {
+            self.events_by_flow
+                .entry(flow.id)
+                .or_default()
+                .extend(events.clone());
+        }
+        self.flows.insert(flow.id, flow.clone());
+        let _ = self.repository.insert_flow_sync(flow, events);
+        self.auto_evict_if_needed();
+    }
+
+    /// Synchronous insert session.
+    pub fn insert_session(&mut self, session: Session) {
+        self.sessions.insert(session.id, session.clone());
+        let _ = self.repository.insert_session_sync(session);
+    }
+
+    /// Synchronous insert host.
+    pub fn insert_host(&mut self, id: u64, host: Host) {
+        self.hosts.insert(id, host.clone());
+        let _ = self.repository.insert_host_sync(id, host);
+    }
+
+    /// Synchronous set resolution.
+    pub fn set_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if names.is_empty() {
+            self.resolutions.remove(&ip);
+        } else {
+            self.resolutions.insert(ip, names.clone());
+        }
+        let _ = self.repository.set_resolution_sync(ip, names);
+    }
+
+    /// Synchronous merge resolution.
+    pub fn merge_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
+        if !names.is_empty() {
+            let existing = self.resolutions.entry(ip).or_default();
+            for n in &names {
+                if !existing
+                    .iter()
+                    .any(|h| h.name == n.name && h.source == n.source)
+                {
+                    existing.push(n.clone());
+                }
+            }
+            let _ = self.repository.merge_resolution_sync(ip, names);
+        }
+    }
+
+    /// Synchronous insert finding. Validates that all evidence references exist.
+    pub fn insert_finding(&mut self, finding: Finding) -> netpulse_core::Result<()> {
+        self.validate_evidence_refs(&finding)?;
+        self.repository
+            .insert_finding_sync(finding.clone())
+            .map_err(|e| NpError::Storage(e.to_string()))?;
+        self.findings.insert(
+            finding.id,
+            StoredFinding {
+                finding,
+                evidence_expired: false,
+            },
+        );
+        Ok(())
+    }
+
+    /// Trigger automatic eviction if flow or session counts exceed configured limits.
+    pub fn auto_evict_if_needed(&mut self) -> EvictionStats {
+        if !self.config.auto_evict || self.config.max_flows == 0 {
+            return EvictionStats::default();
+        }
+        let mut stats = EvictionStats::default();
+        if self.flows.len() > self.config.max_flows {
+            let ratio = (self.config.watermark_ratio as f64).clamp(0.1, 0.95);
+            let target = ((self.config.max_flows as f64) * ratio) as usize;
+            stats.flows_evicted = self.evict_oldest_flows(target);
+        }
+        if self.config.max_sessions > 0 && self.sessions.len() > self.config.max_sessions {
+            let ratio = (self.config.watermark_ratio as f64).clamp(0.1, 0.95);
+            let target = ((self.config.max_sessions as f64) * ratio) as usize;
+            stats.sessions_evicted = self.evict_oldest_sessions(target);
+        }
+        stats
+    }
+
     /// Evict oldest flows down to target count.
     pub fn evict_oldest_flows(&mut self, target_max: usize) -> usize {
         if self.flows.len() <= target_max {
@@ -248,7 +327,6 @@ impl CaptureStore<MemoryCaptureStore> {
                         sf.evidence_expired = true;
                     }
                 }
-                continue;
             }
             self.flows.remove(&flow_id);
             self.events_by_flow.remove(&flow_id);
@@ -257,33 +335,157 @@ impl CaptureStore<MemoryCaptureStore> {
         let _ = self.repository.evict_oldest_flows_sync(target_max);
         evicted
     }
-}
 
-impl<R: CaptureRepository> CaptureStore<R> {
-    /// Create a store with a custom repository implementation.
-    pub fn with_repository(policy: PayloadPolicy, repository: R) -> Self {
-        Self {
-            policy,
-            repository,
-            flows: HashMap::new(),
-            sessions: HashMap::new(),
-            hosts: HashMap::new(),
-            resolutions: HashMap::new(),
-            findings: HashMap::new(),
-            events_by_flow: HashMap::new(),
-            payload_records: 0,
+    /// Evict oldest sessions down to target count.
+    pub fn evict_oldest_sessions(&mut self, target_max: usize) -> usize {
+        if self.sessions.len() <= target_max {
+            return 0;
         }
+        let mut order: Vec<(u64, u64)> = self
+            .sessions
+            .values()
+            .map(|s| (s.start_ts.mono_nanos, s.id))
+            .collect();
+        order.sort_unstable();
+
+        let to_remove = self.sessions.len() - target_max;
+        let mut evicted = 0;
+        for (_, session_id) in order {
+            if evicted >= to_remove {
+                break;
+            }
+            let is_ref = self.findings.values().any(|sf| {
+                sf.finding
+                    .evidence_refs
+                    .iter()
+                    .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+            });
+            if is_ref {
+                for sf in self.findings.values_mut() {
+                    if sf
+                        .finding
+                        .evidence_refs
+                        .iter()
+                        .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+                    {
+                        sf.evidence_expired = true;
+                    }
+                }
+            }
+            self.sessions.remove(&session_id);
+            evicted += 1;
+        }
+        let _ = self.repository.evict_oldest_sessions_sync(target_max);
+        evicted
     }
 
-    /// Access the underlying repository handle.
-    pub fn repository(&self) -> &R {
-        &self.repository
+    /// Trigger automatic eviction asynchronously.
+    pub async fn auto_evict_if_needed_async(&mut self) -> EvictionStats {
+        if !self.config.auto_evict || self.config.max_flows == 0 {
+            return EvictionStats::default();
+        }
+        let mut stats = EvictionStats::default();
+        if self.flows.len() > self.config.max_flows {
+            let ratio = (self.config.watermark_ratio as f64).clamp(0.1, 0.95);
+            let target = ((self.config.max_flows as f64) * ratio) as usize;
+            stats.flows_evicted = self.evict_oldest_flows_async(target).await;
+        }
+        if self.config.max_sessions > 0 && self.sessions.len() > self.config.max_sessions {
+            let ratio = (self.config.watermark_ratio as f64).clamp(0.1, 0.95);
+            let target = ((self.config.max_sessions as f64) * ratio) as usize;
+            stats.sessions_evicted = self.evict_oldest_sessions_async(target).await;
+        }
+        stats
     }
 
-    /// The payload policy in force.
-    pub fn policy(&self) -> PayloadPolicy {
-        self.policy
+    /// Evict oldest flows down to target count asynchronously.
+    pub async fn evict_oldest_flows_async(&mut self, target_max: usize) -> usize {
+        if self.flows.len() <= target_max {
+            return 0;
+        }
+        let mut order: Vec<(u64, u64)> = self
+            .flows
+            .values()
+            .map(|f| (f.first_ts.mono_nanos, f.id))
+            .collect();
+        order.sort_unstable();
+
+        let to_remove = self.flows.len() - target_max;
+        let mut evicted = 0;
+        for (_, flow_id) in order {
+            if evicted >= to_remove {
+                break;
+            }
+            let is_ref = self.findings.values().any(|sf| {
+                sf.finding
+                    .evidence_refs
+                    .iter()
+                    .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
+            });
+            if is_ref {
+                for sf in self.findings.values_mut() {
+                    if sf
+                        .finding
+                        .evidence_refs
+                        .iter()
+                        .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
+                    {
+                        sf.evidence_expired = true;
+                    }
+                }
+            }
+            self.flows.remove(&flow_id);
+            self.events_by_flow.remove(&flow_id);
+            evicted += 1;
+        }
+        let _ = self.repository.evict_oldest_flows(target_max).await;
+        evicted
     }
+
+    /// Evict oldest sessions down to target count asynchronously.
+    pub async fn evict_oldest_sessions_async(&mut self, target_max: usize) -> usize {
+        if self.sessions.len() <= target_max {
+            return 0;
+        }
+        let mut order: Vec<(u64, u64)> = self
+            .sessions
+            .values()
+            .map(|s| (s.start_ts.mono_nanos, s.id))
+            .collect();
+        order.sort_unstable();
+
+        let to_remove = self.sessions.len() - target_max;
+        let mut evicted = 0;
+        for (_, session_id) in order {
+            if evicted >= to_remove {
+                break;
+            }
+            let is_ref = self.findings.values().any(|sf| {
+                sf.finding
+                    .evidence_refs
+                    .iter()
+                    .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+            });
+            if is_ref {
+                for sf in self.findings.values_mut() {
+                    if sf
+                        .finding
+                        .evidence_refs
+                        .iter()
+                        .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+                    {
+                        sf.evidence_expired = true;
+                    }
+                }
+            }
+            self.sessions.remove(&session_id);
+            evicted += 1;
+        }
+        let _ = self.repository.evict_oldest_sessions(target_max).await;
+        evicted
+    }
+
+
 
     /// Attempt to write packet payload bytes. Honors the payload policy
     /// (docs/08 §4, §13): rejected under `MetadataOnly`. Returns whether the
@@ -339,7 +541,10 @@ impl<R: CaptureRepository> CaptureStore<R> {
 
     // ---- Async Query and Mutation surface ----
 
-    pub async fn insert_flow_async(&mut self, flow: Flow, events: Vec<ProtoEvent>) {
+    pub async fn insert_flow_async(&mut self, flow: Flow, mut events: Vec<ProtoEvent>) {
+        if self.config.max_events_per_flow > 0 && events.len() > self.config.max_events_per_flow {
+            events.truncate(self.config.max_events_per_flow);
+        }
         if !events.is_empty() {
             self.events_by_flow
                 .entry(flow.id)
@@ -348,6 +553,7 @@ impl<R: CaptureRepository> CaptureStore<R> {
         }
         self.flows.insert(flow.id, flow.clone());
         let _ = self.repository.insert_flow(flow, events).await;
+        self.auto_evict_if_needed();
     }
 
     pub async fn insert_session_async(&mut self, session: Session) {
@@ -478,10 +684,48 @@ mod tests {
                 evidence_refs: vec![EvidenceRef::Flow(1)],
             })
             .expect("insert_finding");
-        // Ask to shrink to 1 flow: it must not silently drop referenced flow 1.
+        // Ask to shrink to 1 flow: it evicts 2 flows and marks evidence_expired = true for finding 42.
         store.evict_oldest_flows(1);
-        assert!(store.flow(1).is_some(), "referenced flow must survive");
+        assert_eq!(store.flow_count(), 1);
         assert!(store.finding(42).unwrap().evidence_expired);
+        assert!(store.flow(1).is_none(), "referenced flow was aged out");
+    }
+
+    #[test]
+    fn auto_eviction_bounds_flow_count() {
+        let config = StorageConfig {
+            max_flows: 10,
+            max_sessions: 10,
+            max_events_per_flow: 10,
+            watermark_ratio: 0.5,
+            auto_evict: true,
+        };
+        let mut store = CaptureStore::with_config(PayloadPolicy::MetadataOnly, config);
+        for i in 1..=20 {
+            store.insert_flow(flow(i, i * 10), vec![]);
+        }
+        // Exceeded 10 flows -> auto evicted down to 50% (5 flows) + inserted rest -> stays bounded below or at 10
+        assert!(store.flow_count() <= 10);
+    }
+
+    #[test]
+    fn session_eviction_removes_oldest_sessions() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        for i in 1..=5 {
+            store.insert_session(Session {
+                id: i,
+                process_id: 100 + i,
+                start_ts: Timestamp::new(i * 100, i * 100),
+                trigger: "test".into(),
+                flow_ids: vec![],
+            });
+        }
+        assert_eq!(store.session_count(), 5);
+        let evicted = store.evict_oldest_sessions(2);
+        assert_eq!(evicted, 3);
+        assert_eq!(store.session_count(), 2);
+        assert!(store.session(1).is_none());
+        assert!(store.session(4).is_some());
     }
 
     #[test]

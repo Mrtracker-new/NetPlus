@@ -1,7 +1,7 @@
 //! CaptureRepository trait, MemoryCaptureStore, and SqliteCaptureRepository.
 #![allow(async_fn_in_trait)]
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
 
@@ -18,7 +18,7 @@ use crate::error::Result;
 use crate::migration::MigrationManager;
 use crate::models::{FindingRow, FlowRow, HostResolutionRow, ProtoEventRow, SessionRow};
 
-/// The async storage interface shared by in-memory and SQLite capture stores.
+/// The storage interface shared by in-memory and SQLite capture stores.
 pub trait CaptureRepository: std::fmt::Debug + Send + Sync {
     async fn insert_flow(&self, flow: Flow, events: Vec<ProtoEvent>) -> Result<()>;
     async fn insert_session(&self, session: Session) -> Result<()>;
@@ -39,6 +39,32 @@ pub trait CaptureRepository: std::fmt::Debug + Send + Sync {
     async fn session_count(&self) -> Result<usize>;
     async fn session_ids(&self) -> Result<Vec<u64>>;
     async fn evict_oldest_flows(&self, target_max: usize) -> Result<usize>;
+    async fn evict_oldest_sessions(&self, target_max: usize) -> Result<usize>;
+
+    fn insert_flow_sync(&self, _flow: Flow, _events: Vec<ProtoEvent>) -> Result<()> {
+        Ok(())
+    }
+    fn insert_session_sync(&self, _session: Session) -> Result<()> {
+        Ok(())
+    }
+    fn insert_host_sync(&self, _id: u64, _host: Host) -> Result<()> {
+        Ok(())
+    }
+    fn set_resolution_sync(&self, _ip: IpAddr, _names: Vec<HostName>) -> Result<()> {
+        Ok(())
+    }
+    fn merge_resolution_sync(&self, _ip: IpAddr, _names: Vec<HostName>) -> Result<()> {
+        Ok(())
+    }
+    fn insert_finding_sync(&self, _finding: Finding) -> Result<()> {
+        Ok(())
+    }
+    fn evict_oldest_flows_sync(&self, _target_max: usize) -> Result<usize> {
+        Ok(0)
+    }
+    fn evict_oldest_sessions_sync(&self, _target_max: usize) -> Result<usize> {
+        Ok(0)
+    }
 }
 
 /// Resolve the canonical OS-specific default path for the NetPulse SQLite database.
@@ -66,6 +92,7 @@ struct MemoryData {
     resolutions: HashMap<IpAddr, Vec<HostName>>,
     findings: HashMap<u64, StoredFinding>,
     events_by_flow: HashMap<u64, Vec<ProtoEvent>>,
+    flow_timeline: BTreeSet<(u64, u64)>,
 }
 
 impl MemoryCaptureStore {
@@ -82,7 +109,14 @@ impl MemoryCaptureStore {
                 .or_default()
                 .extend(events);
         }
-        inner.flows.insert(flow.id, flow);
+        if let Some(old) = inner.flows.insert(flow.id, flow.clone()) {
+            inner
+                .flow_timeline
+                .remove(&(old.first_ts.mono_nanos, old.id));
+        }
+        inner
+            .flow_timeline
+            .insert((flow.first_ts.mono_nanos, flow.id));
         Ok(())
     }
 
@@ -220,19 +254,20 @@ impl MemoryCaptureStore {
         if inner.flows.len() <= target_max {
             return Ok(0);
         }
-        let mut order: Vec<(u64, u64)> = inner
-            .flows
-            .values()
-            .map(|f| (f.first_ts.mono_nanos, f.id))
-            .collect();
-        order.sort_unstable();
-
         let to_remove = inner.flows.len() - target_max;
         let mut evicted = 0;
-        for (_, flow_id) in order {
+
+        let candidates: Vec<(u64, u64)> =
+            inner.flow_timeline.iter().copied().take(to_remove * 2).collect();
+        for (mono_ts, flow_id) in candidates {
             if evicted >= to_remove {
                 break;
             }
+            if !inner.flows.contains_key(&flow_id) {
+                inner.flow_timeline.remove(&(mono_ts, flow_id));
+                continue;
+            }
+
             let is_ref = inner.findings.values().any(|sf| {
                 sf.finding
                     .evidence_refs
@@ -250,10 +285,52 @@ impl MemoryCaptureStore {
                         sf.evidence_expired = true;
                     }
                 }
-                continue;
             }
             inner.flows.remove(&flow_id);
             inner.events_by_flow.remove(&flow_id);
+            inner.flow_timeline.remove(&(mono_ts, flow_id));
+            evicted += 1;
+        }
+        Ok(evicted)
+    }
+
+    pub fn evict_oldest_sessions_sync(&self, target_max: usize) -> Result<usize> {
+        let mut inner = self.inner.write();
+        if inner.sessions.len() <= target_max {
+            return Ok(0);
+        }
+        let mut order: Vec<(u64, u64)> = inner
+            .sessions
+            .values()
+            .map(|s| (s.start_ts.mono_nanos, s.id))
+            .collect();
+        order.sort_unstable();
+
+        let to_remove = inner.sessions.len() - target_max;
+        let mut evicted = 0;
+        for (_, session_id) in order {
+            if evicted >= to_remove {
+                break;
+            }
+            let is_ref = inner.findings.values().any(|sf| {
+                sf.finding
+                    .evidence_refs
+                    .iter()
+                    .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+            });
+            if is_ref {
+                for sf in inner.findings.values_mut() {
+                    if sf
+                        .finding
+                        .evidence_refs
+                        .iter()
+                        .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
+                    {
+                        sf.evidence_expired = true;
+                    }
+                }
+            }
+            inner.sessions.remove(&session_id);
             evicted += 1;
         }
         Ok(evicted)
@@ -331,6 +408,10 @@ impl CaptureRepository for MemoryCaptureStore {
 
     async fn evict_oldest_flows(&self, target_max: usize) -> Result<usize> {
         self.evict_oldest_flows_sync(target_max)
+    }
+
+    async fn evict_oldest_sessions(&self, target_max: usize) -> Result<usize> {
+        self.evict_oldest_sessions_sync(target_max)
     }
 }
 
@@ -699,8 +780,42 @@ impl CaptureRepository for SqliteCaptureRepository {
             .collect())
     }
 
-    async fn evict_oldest_flows(&self, _target_max: usize) -> Result<usize> {
-        Ok(0)
+    async fn evict_oldest_flows(&self, target_max: usize) -> Result<usize> {
+        let count = self.flow_count().await?;
+        if count <= target_max {
+            return Ok(0);
+        }
+        let to_remove = count - target_max;
+        let res = sqlx::query(
+            r#"
+            DELETE FROM flows WHERE flow_id IN (
+                SELECT flow_id FROM flows ORDER BY first_ts_mono ASC LIMIT ?1
+            )
+            "#,
+        )
+        .bind(to_remove as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected() as usize)
+    }
+
+    async fn evict_oldest_sessions(&self, target_max: usize) -> Result<usize> {
+        let count = self.session_count().await?;
+        if count <= target_max {
+            return Ok(0);
+        }
+        let to_remove = count - target_max;
+        let res = sqlx::query(
+            r#"
+            DELETE FROM sessions WHERE session_id IN (
+                SELECT session_id FROM sessions ORDER BY start_ts ASC LIMIT ?1
+            )
+            "#,
+        )
+        .bind(to_remove as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(res.rows_affected() as usize)
     }
 }
 

@@ -310,6 +310,9 @@ impl LivePipeline {
         for (ip, names) in self.engine.resolutions() {
             store.set_resolution(ip, names);
         }
+
+        // 5. Enforce storage bounds
+        store.auto_evict_if_needed();
     }
 
     /// Final flush on capture termination to commit all remaining flows and sessions.
@@ -324,6 +327,7 @@ impl LivePipeline {
         for (ip, names) in self.engine.resolutions() {
             store.set_resolution(ip, names);
         }
+        store.auto_evict_if_needed();
     }
 }
 

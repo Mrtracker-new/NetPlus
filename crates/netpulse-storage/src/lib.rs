@@ -33,6 +33,42 @@ pub use timeseries::{Point, SeriesId, TimeSeriesStore};
 
 use netpulse_core::Result;
 
+/// Configuration bounds for [`CaptureStore`] and [`MemoryCaptureStore`] retention.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StorageConfig {
+    /// Maximum flows retained in memory before triggering eviction.
+    pub max_flows: usize,
+    /// Maximum sessions retained in memory before triggering session eviction.
+    pub max_sessions: usize,
+    /// Maximum proto events retained per flow.
+    pub max_events_per_flow: usize,
+    /// Target fraction of `max_flows` to retain after eviction (e.g. 0.8 means evict down to 80%).
+    pub watermark_ratio: f32,
+    /// Whether automatic eviction is enabled on flow insertion.
+    pub auto_evict: bool,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            max_flows: 50_000,
+            max_sessions: 10_000,
+            max_events_per_flow: 100,
+            watermark_ratio: 0.8,
+            auto_evict: true,
+        }
+    }
+}
+
+/// Statistics reported after an eviction pass.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EvictionStats {
+    pub flows_evicted: usize,
+    pub sessions_evicted: usize,
+    pub expired_findings: usize,
+}
+
+
 /// How much of each packet is retained (docs/02 §9). The default trades depth
 /// for privacy and disk; the user may widen it (docs/02 §10.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

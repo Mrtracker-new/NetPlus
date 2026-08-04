@@ -530,21 +530,25 @@ fn disabled_reason_label(r: &DisabledReason) -> String {
 pub fn plugin_descriptor_dto(p: &RegisteredPlugin, host_contract: u32) -> PluginDescriptorDto {
     let m = &p.manifest;
     PluginDescriptorDto {
-        name: m.name.clone(),
-        plugin_type: plugin_type_dto(m.plugin_type),
+        name: m.metadata.name.clone(),
+        plugin_type: plugin_type_dto(m.metadata.plugin_type),
         capabilities: m
             .capabilities()
             .iter()
             .map(|c| capability_dto(*c))
             .collect(),
-        trust: trust_dto(m.trust.status),
-        source: m.trust.source.clone(),
-        target_contract: m.target_contract.0,
+        trust: trust_dto(m.security.trust.status),
+        source: m.security.trust.source.clone(),
+        target_contract: m.metadata.target_contract.0,
         compatible: m.is_compatible(ContractVersion(host_contract)),
         enabled: p.enabled,
         disabled_reason: p.disabled_reason.as_ref().map(disabled_reason_label),
+        config_version: p.config_version,
+        config: p.config.clone(),
+        config_schema: m.config.config_schema.as_ref().map(|s| s.0.clone()),
     }
 }
+
 
 #[cfg(test)]
 mod tests {

@@ -269,6 +269,9 @@ export interface PluginDescriptor {
   compatible: boolean;
   enabled: boolean;
   disabled_reason: string | null;
+  config_version: number;
+  config: any;
+  config_schema: any | null;
 }
 
 export interface HandshakeResponse {

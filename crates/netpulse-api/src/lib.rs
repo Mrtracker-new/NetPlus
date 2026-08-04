@@ -466,7 +466,23 @@ pub enum Command {
     DisablePlugin {
         name: String,
     },
+    /// Fully update a registered plugin's configuration JSON.
+    ConfigurePlugin {
+        name: String,
+        config: serde_json::Value,
+    },
+    /// RFC 7396 JSON merge patch a plugin's configuration with optional optimistic concurrency.
+    PatchPluginConfig {
+        name: String,
+        expected_version: Option<u32>,
+        patch: serde_json::Value,
+    },
+    /// Reset a plugin's configuration back to its manifest default.
+    ResetPluginConfig {
+        name: String,
+    },
 }
+
 
 #[cfg(test)]
 mod tests {

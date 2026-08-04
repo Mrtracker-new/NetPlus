@@ -425,8 +425,12 @@ pub fn typescript_contract() -> String {
             ("compatible", "boolean"),
             ("enabled", "boolean"),
             ("disabled_reason", "string | null"),
+            ("config_version", "number"),
+            ("config", "any"),
+            ("config_schema", "any | null"),
         ],
     ));
+
     s.push_str(&iface(
         "HandshakeResponse",
         &[

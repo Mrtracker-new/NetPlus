@@ -483,6 +483,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-plugin",
+ "serde_json",
 ]
 
 [[package]]
@@ -491,6 +492,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-plugin",
+ "serde_json",
 ]
 
 [[package]]
@@ -499,6 +501,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-plugin",
+ "serde_json",
 ]
 
 [[package]]
@@ -507,6 +510,7 @@ version = "0.1.0"
 dependencies = [
  "netpulse-core",
  "netpulse-plugin",
+ "serde_json",
 ]
 
 [[package]]
@@ -1357,6 +1361,7 @@ dependencies = [
  "ed25519-compact",
  "netpulse-core",
  "serde",
+ "serde_json",
  "sha2",
 ]
 

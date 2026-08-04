@@ -588,9 +588,8 @@ pub enum PluginTrustDto {
 }
 
 /// A plugin as listed for the user (docs/24 §6). Its type, granted capabilities,
-/// trust, contract compatibility, and activation state — everything needed to make
-/// enabling it an informed, explicit choice (docs/24 §5).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// trust, contract compatibility, activation state, and active configuration.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PluginDescriptorDto {
     pub name: String,
     pub plugin_type: PluginTypeDto,
@@ -602,7 +601,11 @@ pub struct PluginDescriptorDto {
     pub enabled: bool,
     /// Present when inactive, explaining why (docs/24 §8) — never a silent disable.
     pub disabled_reason: Option<String>,
+    pub config_version: u32,
+    pub config: serde_json::Value,
+    pub config_schema: Option<serde_json::Value>,
 }
+
 
 /// Individual component check item for health DTO reporting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -913,7 +916,11 @@ mod tests {
             compatible: true,
             enabled: true,
             disabled_reason: None,
+            config_version: 1,
+            config: serde_json::json!({}),
+            config_schema: None,
         });
+
     }
 
     #[test]

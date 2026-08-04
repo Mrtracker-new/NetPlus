@@ -19,7 +19,7 @@ use std::collections::BTreeSet;
 
 use netpulse_capture::{FileCapture, PcapFile, PcapngFile, Recording, RecordingPayloadLevel};
 use netpulse_core::net::L4Proto;
-use netpulse_core::{EvidenceRef, Flow};
+use netpulse_core::{EvidenceRef, Flow, NpError, Result};
 use netpulse_storage::CaptureStore;
 
 use crate::pipeline::{analyze_file, analyze_pcap, OfflineReport};
@@ -227,7 +227,7 @@ fn l4_label(l4: L4Proto) -> &'static str {
 /// (docs/23 §4). Evidence refs are preserved so exported findings stay auditable
 /// and re-importable (docs/23 §12). Deterministic ordering + `to_string_pretty`
 /// so a report/export is reproducible (docs/23 §9).
-pub fn export_json(store: &CaptureStore, selection: &Selection, sanitizer: &Sanitizer) -> String {
+pub fn export_json(store: &CaptureStore, selection: &Selection, sanitizer: &Sanitizer) -> Result<String> {
     let flows = select_flows(store, selection);
     let flow_json: Vec<serde_json::Value> = flows
         .iter()
@@ -248,7 +248,8 @@ pub fn export_json(store: &CaptureStore, selection: &Selection, sanitizer: &Sani
         "level": level_label(sanitizer.level),
         "flows": flow_json,
     });
-    serde_json::to_string_pretty(&value).expect("export json serializes")
+    serde_json::to_string_pretty(&value)
+        .map_err(|e| NpError::Storage(format!("export json serialization failed: {e}")))
 }
 
 /// Export the selection as tabular CSV of flow metrics (docs/23 §4). Metadata
@@ -401,7 +402,7 @@ mod tests {
                 evidence_refs: vec![EvidenceRef::Flow(1)],
             })
             .expect("insert_finding");
-        let json = export_json(&store, &Selection::Finding(9), &Sanitizer::default());
+        let json = export_json(&store, &Selection::Finding(9), &Sanitizer::default()).unwrap();
         assert!(json.contains("\"id\": 1"));
         assert!(
             !json.contains("\"id\": 2"),
@@ -412,7 +413,7 @@ mod tests {
     #[test]
     fn sanitized_export_coarsens_ips_and_carries_no_payloads() {
         let store = seeded();
-        let json = export_json(&store, &Selection::All, &Sanitizer::default());
+        let json = export_json(&store, &Selection::All, &Sanitizer::default()).unwrap();
         // Coarsened to a network label, exact address not present (docs/23 §7).
         assert!(json.contains("net-198"));
         assert!(!json.contains("198.51.100.10"));

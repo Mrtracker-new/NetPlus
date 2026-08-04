@@ -97,7 +97,9 @@ fn corroborate(view: &TrafficView, findings: Vec<SecurityFinding>) -> Vec<Securi
     let mut out = standalone;
     for (host, group) in by_host {
         if group.len() == 1 {
-            out.push(group.into_iter().next().unwrap());
+            if let Some(single) = group.into_iter().next() {
+                out.push(single);
+            }
             continue;
         }
         // Distinct kinds only corroborate; duplicate kinds for one host would be a
@@ -109,16 +111,14 @@ fn corroborate(view: &TrafficView, findings: Vec<SecurityFinding>) -> Vec<Securi
         };
         if distinct_kinds.len() < 2 {
             // Same kind repeated → keep the strongest single card.
-            let best = group
-                .into_iter()
-                .max_by(|a, b| {
-                    a.confidence
-                        .value()
-                        .partial_cmp(&b.confidence.value())
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .unwrap();
-            out.push(best);
+            let best = group.into_iter().max_by(|a, b| {
+                a.confidence
+                    .value()
+                    .total_cmp(&b.confidence.value())
+            });
+            if let Some(best_finding) = best {
+                out.push(best_finding);
+            }
             continue;
         }
         out.push(merge_group(host, group));

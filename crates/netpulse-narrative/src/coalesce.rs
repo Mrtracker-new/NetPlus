@@ -22,7 +22,7 @@ pub fn coalesce(cards: Vec<NarrativeCard>, window_nanos: u64) -> Vec<NarrativeCa
     let Some(mut run_seed) = iter.next() else {
         return out;
     };
-    let mut run: Vec<NarrativeCard> = vec![run_seed.clone()];
+    let mut run: Vec<NarrativeCard> = Vec::new();
 
     for card in iter {
         let same_group = card.headline == run_seed.headline
@@ -30,32 +30,32 @@ pub fn coalesce(cards: Vec<NarrativeCard>, window_nanos: u64) -> Vec<NarrativeCa
         if same_group {
             run.push(card);
         } else {
-            out.push(merge_run(std::mem::take(&mut run)));
-            run_seed = card.clone();
-            run.push(card);
+            out.push(merge_run(run_seed, std::mem::take(&mut run)));
+            run_seed = card;
         }
     }
-    out.push(merge_run(run));
+    out.push(merge_run(run_seed, run));
     out
 }
 
 /// Merge a run of same-headline cards into one. A single-card run is returned
 /// as-is; a multi-card run becomes a summary that counts the burst and unions
 /// all evidence (docs/09 §7).
-fn merge_run(mut run: Vec<NarrativeCard>) -> NarrativeCard {
-    if run.len() == 1 {
-        return run.pop().expect("run has one element");
+fn merge_run(seed: NarrativeCard, mut rest: Vec<NarrativeCard>) -> NarrativeCard {
+    if rest.is_empty() {
+        return seed;
     }
-    let count = run.len();
+    rest.push(seed);
+    let count = rest.len();
     // Anchor on the newest card in the run (runs are newest-first).
-    let newest = &run[0];
+    let newest = &rest[rest.len() - 1];
     let mut evidence = Vec::new();
-    for c in &run {
+    for c in &rest {
         evidence.extend_from_slice(c.evidence());
     }
     // Preserve the loudest severity in the run — a finding in a burst must not be
     // hidden by coalescing (docs/09 §5.2, findings stay visible).
-    let severity = run
+    let severity = rest
         .iter()
         .map(|c| c.severity)
         .max_by_key(|s| severity_rank(*s))

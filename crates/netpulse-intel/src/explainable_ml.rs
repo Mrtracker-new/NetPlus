@@ -265,9 +265,7 @@ pub fn detect_ml_anomalies(view: &TrafficView) -> Vec<SecurityFinding> {
             vec![EvidenceRef::Flow(f.id)],
         ) {
             let top_feat = attribution.contributions.iter().max_by(|a, b| {
-                a.normalized_percent
-                    .partial_cmp(&b.normalized_percent)
-                    .unwrap()
+                a.normalized_percent.total_cmp(&b.normalized_percent)
             });
             let tech = match top_feat {
                 Some(t) => format!(
@@ -325,7 +323,28 @@ mod tests {
         for c in attr.contributions {
             assert!(!c.normalized_percent.is_nan());
             assert!(!c.normalized_percent.is_infinite());
-            assert_eq!(c.normalized_percent, 50.0);
+        assert_eq!(c.normalized_percent, 50.0);
         }
+    }
+
+    #[test]
+    fn nan_and_infinity_in_contributions_handled_safely() {
+        let raw = vec![
+            (FeatureKind::Volume, f32::NAN, "NaN score".to_string()),
+            (FeatureKind::Rate, f32::INFINITY, "Inf score".to_string()),
+            (FeatureKind::DestinationNovelty, 5.0, "Valid score".to_string()),
+        ];
+        let attr = FeatureAttribution::new(0.9, raw);
+
+        for c in &attr.contributions {
+            assert!(!c.normalized_percent.is_nan(), "percent must not be NaN");
+            assert!(!c.normalized_percent.is_infinite(), "percent must not be Inf");
+        }
+
+        // Must sort deterministically with total_cmp without panicking
+        let max_contrib = attr.contributions.iter().max_by(|a, b| {
+            a.normalized_percent.total_cmp(&b.normalized_percent)
+        });
+        assert!(max_contrib.is_some());
     }
 }

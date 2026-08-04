@@ -139,14 +139,15 @@ impl Recording {
     /// Serialize to the framed on-disk form: `magic | manifest_len(u32 LE) |
     /// manifest_json | pcapng_bytes`. The trailing pcapng is a valid capture on
     /// its own (docs/22 §3.1).
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let manifest = serde_json::to_vec(&self.manifest).expect("manifest serializes");
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let manifest = serde_json::to_vec(&self.manifest)
+            .map_err(|e| NpError::Decode(format!("recording manifest serialization failed: {e}")))?;
         let mut out = Vec::with_capacity(8 + manifest.len() + self.pcapng_bytes.len());
         out.extend_from_slice(RECORDING_MAGIC);
         out.extend_from_slice(&(manifest.len() as u32).to_le_bytes());
         out.extend_from_slice(&manifest);
         out.extend_from_slice(&self.pcapng_bytes);
-        out
+        Ok(out)
     }
 
     /// Parse the framed on-disk form. Malformed input yields a clean error, never
@@ -337,7 +338,7 @@ mod tests {
     #[test]
     fn seals_and_round_trips() {
         let recording = recorder_with(3);
-        let bytes = recording.to_bytes();
+        let bytes = recording.to_bytes().unwrap();
         let back = Recording::parse(&bytes).unwrap();
         assert_eq!(back, recording);
         assert_eq!(back.manifest.frame_count, 3);

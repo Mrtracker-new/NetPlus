@@ -139,7 +139,10 @@ pub fn port_scan(view: &TrafficView) -> Vec<SecurityFinding> {
         // Those hits must be clustered in a short window to read as a scan.
         let mut starts: Vec<u64> = flows.iter().map(|f| f.first_ts.mono_nanos).collect();
         starts.sort_unstable();
-        let span = starts.last().unwrap() - starts.first().unwrap();
+        let span = match (starts.first(), starts.last()) {
+            (Some(first), Some(last)) => last - first,
+            _ => continue,
+        };
         if span > thresh::SCAN_WINDOW_NANOS {
             continue;
         }

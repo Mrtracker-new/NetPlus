@@ -227,7 +227,11 @@ fn l4_label(l4: L4Proto) -> &'static str {
 /// (docs/23 §4). Evidence refs are preserved so exported findings stay auditable
 /// and re-importable (docs/23 §12). Deterministic ordering + `to_string_pretty`
 /// so a report/export is reproducible (docs/23 §9).
-pub fn export_json(store: &CaptureStore, selection: &Selection, sanitizer: &Sanitizer) -> Result<String> {
+pub fn export_json(
+    store: &CaptureStore,
+    selection: &Selection,
+    sanitizer: &Sanitizer,
+) -> Result<String> {
     let flows = select_flows(store, selection);
     let flow_json: Vec<serde_json::Value> = flows
         .iter()

@@ -111,11 +111,9 @@ fn corroborate(view: &TrafficView, findings: Vec<SecurityFinding>) -> Vec<Securi
         };
         if distinct_kinds.len() < 2 {
             // Same kind repeated → keep the strongest single card.
-            let best = group.into_iter().max_by(|a, b| {
-                a.confidence
-                    .value()
-                    .total_cmp(&b.confidence.value())
-            });
+            let best = group
+                .into_iter()
+                .max_by(|a, b| a.confidence.value().total_cmp(&b.confidence.value()));
             if let Some(best_finding) = best {
                 out.push(best_finding);
             }

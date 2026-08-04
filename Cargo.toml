@@ -41,7 +41,7 @@ time = { version = "0.3", features = ["formatting", "macros"] }
 httparse = "1.8"
 sentry = "0.34"
 sentry-tracing = "0.34"
-sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio", "migrate"] }
+sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio", "migrate", "macros"] }
 directories = "6"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 parking_lot = "0.12"

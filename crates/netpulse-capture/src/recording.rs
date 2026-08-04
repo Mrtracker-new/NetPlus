@@ -140,8 +140,9 @@ impl Recording {
     /// manifest_json | pcapng_bytes`. The trailing pcapng is a valid capture on
     /// its own (docs/22 §3.1).
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        let manifest = serde_json::to_vec(&self.manifest)
-            .map_err(|e| NpError::Decode(format!("recording manifest serialization failed: {e}")))?;
+        let manifest = serde_json::to_vec(&self.manifest).map_err(|e| {
+            NpError::Decode(format!("recording manifest serialization failed: {e}"))
+        })?;
         let mut out = Vec::with_capacity(8 + manifest.len() + self.pcapng_bytes.len());
         out.extend_from_slice(RECORDING_MAGIC);
         out.extend_from_slice(&(manifest.len() as u32).to_le_bytes());

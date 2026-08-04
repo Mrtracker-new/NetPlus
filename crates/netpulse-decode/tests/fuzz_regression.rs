@@ -18,7 +18,10 @@ impl SeededPrng {
     }
 
     fn next_u32(&mut self) -> u32 {
-        self.state = self.state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        self.state = self
+            .state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
         (self.state >> 32) as u32
     }
 
@@ -108,7 +111,10 @@ fn test_replay_committed_corpus_seeds() {
         }
     }
 
-    assert!(sample_count > 0, "Expected at least 1 committed corpus seed file to be replayed");
+    assert!(
+        sample_count > 0,
+        "Expected at least 1 committed corpus seed file to be replayed"
+    );
 }
 
 #[test]

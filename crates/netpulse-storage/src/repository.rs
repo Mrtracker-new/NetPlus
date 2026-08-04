@@ -716,13 +716,7 @@ mod tests {
         let ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
         Flow {
             id,
-            key: FiveTuple::new(
-                ip,
-                1000 + (id % 50000) as u16,
-                ip,
-                80,
-                L4Proto::Tcp,
-            ),
+            key: FiveTuple::new(ip, 1000 + (id % 50000) as u16, ip, 80, L4Proto::Tcp),
             first_ts: Timestamp::new(mono_ts, mono_ts),
             last_ts: Timestamp::new(mono_ts, mono_ts),
             l4: L4Proto::Tcp,
@@ -737,7 +731,9 @@ mod tests {
         let store = Arc::new(MemoryCaptureStore::new());
 
         // Insert initial data
-        store.insert_flow_sync(make_test_flow(1, 100), vec![]).unwrap();
+        store
+            .insert_flow_sync(make_test_flow(1, 100), vec![])
+            .unwrap();
         assert_eq!(store.flow_count_sync().unwrap(), 1);
 
         // Spawn a thread that acquires a write lock, inserts data, and panics
@@ -804,4 +800,3 @@ mod tests {
         assert!(store.flow_count_sync().is_ok());
     }
 }
-

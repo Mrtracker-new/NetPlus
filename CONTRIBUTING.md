@@ -102,6 +102,21 @@ Whenever upgrading the Rust toolchain version, maintainers must update all synch
 4. Run full local quality gates (`cargo fmt`, `cargo clippy`, `cargo test`)
 5. Regenerate `Cargo.lock` only if dependency resolution changes require it
 
+### Dual Lockfile Architecture & Maintenance Policy
+
+NetPulse maintains two independent Cargo lockfiles:
+1. **Root Workspace**: [`Cargo.lock`](Cargo.lock) (governs `crates/*` and `plugins/*`).
+2. **Desktop Shell**: [`src-tauri/Cargo.lock`](src-tauri/Cargo.lock) (governs `src-tauri`).
+
+#### Why are there two `Cargo.lock` files?
+`src-tauri` is intentionally excluded from the root workspace (`exclude = ["src-tauri", "fuzz"]` in root `Cargo.toml`) so that pure-Rust CI jobs can run fast and headless without requiring platform webview system dependencies.
+
+#### Lockfile Ownership & Update Rules:
+- **Root Dependency Updates**: Modifies root `Cargo.lock`.
+- **Desktop Shell Dependency Updates**: Modifies `src-tauri/Cargo.lock`.
+- **Workspace Path Dependency Interface Changes**: Shared crate changes may legitimately update both `Cargo.lock` and `src-tauri/Cargo.lock` simultaneously.
+- **Immutability Enforcement**: Both lockfiles are tracked in Git, audited independently in CI (`cargo audit` and `cargo deny`), receive weekly Dependabot updates, and must remain committed. Neither lockfile should ever be deleted or untracked.
+
 
 ---
 

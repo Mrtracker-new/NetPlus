@@ -66,7 +66,11 @@ NetPulse minimizes its attack surface through five structural boundaries:
 ## 3. Dependency Management & Supply Chain
 
 Dependencies represent attack surface:
-- Lockfiles (`Cargo.lock`, `pnpm-lock.yaml`) are committed and tracked.
+- **Dual Cargo Dependency Graphs**: NetPulse maintains two independent Cargo dependency graphs:
+  - **Root Workspace**: `Cargo.lock` (core engine crates & reference plugins)
+  - **Desktop Shell**: `src-tauri/Cargo.lock` (Tauri desktop GUI shell)
+  Both are independently audited in CI (`cargo audit` and `cargo deny`), receive automated Dependabot updates, and must remain committed and reproducible in version control.
 - Dependency licenses, bans, and advisories are enforced via [`deny.toml`](deny.toml) (`cargo-deny`).
 - Automated vulnerability scanning runs in CI via `cargo audit` and `pnpm audit`.
+- **Advisory Ignore Policy**: Security advisory ignore rules (e.g., `RUSTSEC-2024-0436`) must be documented with an explicit architectural rationale and periodically re-evaluated; they are not permanent passes.
 - Dependencies introducing mandatory background telemetry or network calls are strictly disqualified.

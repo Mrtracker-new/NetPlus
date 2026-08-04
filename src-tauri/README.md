@@ -8,6 +8,8 @@ The desktop application shell for NetPulse, powered by Tauri v2.
 
 `src-tauri` hosts the native OS window, embeds the Vite React frontend (`ui/app`), and exposes Tauri IPC commands bridging backend queries from `netpulse-engine` to the UI webview.
 
+> **Dependency Graph & Governance Note**: `src-tauri` maintains an independent Cargo dependency graph (`src-tauri/Cargo.lock`) excluded from the root workspace to keep pure-Rust CI builds fast and webview-free. It receives identical security governance in CI (`cargo audit` and `cargo deny`) and weekly automated Dependabot updates under the `desktop-shell` group.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       React Webview                         │

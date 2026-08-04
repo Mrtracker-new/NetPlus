@@ -6,7 +6,17 @@ updates:
       interval: "weekly"
       day: "monday"
     groups:
-      rust-dependencies:
+      root-workspace:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    groups:
+      desktop-shell:
         patterns:
           - "*"
 

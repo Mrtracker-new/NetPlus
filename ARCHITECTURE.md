@@ -61,7 +61,7 @@ NetPulse divides responsibilities across distinct processes to maintain privileg
 
 - **`netpulse-engine` (Binary)**: Runs at standard user privileges. Executes packet decoding, flow/session reconstruction, intelligence detection, narrative generation, persistent storage, and serves the Query/Stream API.
 - **`netpulse-capture-svc` (Binary)**: Deliberately minimal, privileged daemon holding raw packet capture capabilities (e.g., Administrator / `CAP_NET_RAW`). Streams raw frames to the engine over IPC.
-- **Tauri Desktop Shell (`src-tauri`)**: Hosts the native OS window and React webview. Translates webview IPC calls into engine queries and streams live capture events.
+- **Tauri Desktop Shell (`src-tauri`)**: Hosts the native OS window and React webview. Translates webview IPC calls into engine queries and streams live capture events. Maintains an independent Cargo dependency graph (`src-tauri/Cargo.lock`) excluded from workspace compilation to keep pure-Rust CI jobs fast and webview-free, while receiving identical security governance (Dependabot, `cargo audit`, `cargo deny`).
 
 ---
 

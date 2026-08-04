@@ -58,10 +58,13 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Build
-        run: cargo build --workspace
+        run: cargo build --workspace --locked
 
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
+
+      - name: Verify Cargo lockfiles are unchanged
+        run: git diff --exit-code Cargo.lock src-tauri/Cargo.lock
 
       - name: Contract drift
         shell: bash
@@ -136,11 +139,32 @@ jobs:
       - name: Install cargo-audit & cargo-deny
         run: cargo install cargo-audit cargo-deny --locked || true
 
-      - name: Cargo audit (vulnerabilities & advisories)
+      - name: Metadata resolution (workspace)
+        run: cargo metadata --manifest-path Cargo.toml --format-version 1 > /dev/null
+
+      - name: Metadata resolution (desktop shell)
+        run: cargo metadata --manifest-path src-tauri/Cargo.toml --format-version 1 > /dev/null
+
+      - name: Verify workspace lockfile compilation
+        run: cargo check --workspace --locked
+
+      - name: Verify desktop shell lockfile compilation
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Cargo audit - workspace (vulnerabilities & advisories)
         run: cargo audit --deny warnings --ignore RUSTSEC-2024-0436
 
-      - name: Cargo deny (licenses, bans, sources)
-        run: cargo deny check advisories bans licenses sources
+      - name: Cargo audit - desktop shell (vulnerabilities & advisories)
+        run: cargo audit --deny warnings --ignore RUSTSEC-2024-0436 --file src-tauri/Cargo.lock
+
+      - name: Cargo deny - workspace (licenses, bans, sources)
+        run: cargo deny --config deny.toml check --manifest-path Cargo.toml advisories bans licenses sources
+
+      - name: Cargo deny - desktop shell (licenses, bans, sources)
+        run: cargo deny --config deny.toml check --manifest-path src-tauri/Cargo.toml advisories bans licenses sources
+
+      - name: Verify Cargo lockfiles are unchanged
+        run: git diff --exit-code Cargo.lock src-tauri/Cargo.lock
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4

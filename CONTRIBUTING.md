@@ -91,6 +91,18 @@ pnpm --filter @netpulse/contract typecheck
 pnpm --filter @netpulse/app typecheck
 ```
 
+### Toolchain Pinning & Upgrade Policy
+
+NetPulse intentionally pins Rust `1.96.0` to match [`rust-toolchain.toml`](rust-toolchain.toml) and [`Cargo.toml`](Cargo.toml) (`workspace.rust-version`).
+
+Whenever upgrading the Rust toolchain version, maintainers must update all synchronized locations together:
+1. [`rust-toolchain.toml`](rust-toolchain.toml) (`channel = "1.9X.0"`)
+2. [`Cargo.toml`](Cargo.toml) (`workspace.rust-version = "1.9X"`) and [`src-tauri/Cargo.toml`](src-tauri/Cargo.toml)
+3. [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (`toolchain: 1.9X.0` in `rust` and `audit` jobs)
+4. Run full local quality gates (`cargo fmt`, `cargo clippy`, `cargo test`)
+5. Regenerate `Cargo.lock` only if dependency resolution changes require it
+
+
 ---
 
 ## 5. Architectural Rules & Dependency Policy

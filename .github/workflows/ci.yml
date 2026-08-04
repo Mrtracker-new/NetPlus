@@ -31,10 +31,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install pinned toolchain
+      - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
         with:
+          # Keep this version synchronized with:
+          #   rust-toolchain.toml
+          #   Cargo.toml (workspace.rust-version)
+          toolchain: 1.96.0
           components: rustfmt, clippy
+
+      - name: Verify pinned Rust toolchain environment
+        run: |
+          rustc --version
+          cargo --version
+          rustup show active-toolchain
+          rustfmt --version
+          clippy-driver --version
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
@@ -104,8 +116,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
+      - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
+        with:
+          # Keep this version synchronized with:
+          #   rust-toolchain.toml
+          #   Cargo.toml (workspace.rust-version)
+          toolchain: 1.96.0
+
+      - name: Verify pinned Rust toolchain environment
+        run: |
+          rustc --version
+          cargo --version
+          rustup show active-toolchain
 
       - name: Cache cargo & RustSec advisory DB
         uses: Swatinem/rust-cache@v2

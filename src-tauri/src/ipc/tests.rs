@@ -2,7 +2,7 @@ use super::test_support::seeded_state;
 use super::{execute_command, execute_query};
 use netpulse_api::{
     handshake_codes, handshake_error_codes, Command, ExportFormatDto, ExportSelectionDto,
-    ProjectionDepth, Query, QueryResponse,
+    PluginCapabilityDto, PluginTrustDto, PluginTypeDto, ProjectionDepth, Query, QueryResponse,
 };
 
 #[test]
@@ -167,12 +167,49 @@ fn test_query_list_plugins_invariants() {
     let state = seeded_state();
     let res = execute_query(&state, Query::ListPlugins).unwrap();
     if let QueryResponse::Plugins { plugins } = res {
-        assert_eq!(plugins.len(), 4);
+        // 1. Reference plugins presence
         let names: Vec<_> = plugins.iter().map(|p| p.name.as_str()).collect();
         assert!(names.contains(&"example-dissector"));
         assert!(names.contains(&"example-detector"));
         assert!(names.contains(&"example-enrichment"));
         assert!(names.contains(&"example-export"));
+        assert!(names.contains(&"example-view"));
+
+        // 2. Seam-presence invariants across all 5 extension seams
+        let types: Vec<_> = plugins.iter().map(|p| p.plugin_type).collect();
+        assert!(types.contains(&PluginTypeDto::Dissector));
+        assert!(types.contains(&PluginTypeDto::Detector));
+        assert!(types.contains(&PluginTypeDto::Enrichment));
+        assert!(types.contains(&PluginTypeDto::Export));
+        assert!(types.contains(&PluginTypeDto::View));
+
+        // 3. Detailed DTO surface validation for example-view
+        let view_plugin = plugins
+            .iter()
+            .find(|p| p.name == "example-view")
+            .expect("example-view should be registered");
+
+        assert_eq!(view_plugin.plugin_type, PluginTypeDto::View);
+        assert_eq!(
+            view_plugin.capabilities,
+            vec![PluginCapabilityDto::ApiRead]
+        );
+        assert_eq!(view_plugin.trust, PluginTrustDto::FirstParty);
+        assert!(view_plugin.enabled);
+        assert!(view_plugin.compatible);
+        assert_eq!(view_plugin.target_contract, netpulse_api::API_VERSION);
+        assert!(view_plugin.config_schema.is_some());
+
+        // Behavioral invariant assertion: ViewPlugin capability is strictly ApiRead
+        assert!(!view_plugin
+            .capabilities
+            .contains(&PluginCapabilityDto::ParseBytes));
+        assert!(!view_plugin
+            .capabilities
+            .contains(&PluginCapabilityDto::EmitFindings));
+        assert!(!view_plugin
+            .capabilities
+            .contains(&PluginCapabilityDto::WriteOutput));
 
         for p in &plugins {
             assert!(p.compatible);

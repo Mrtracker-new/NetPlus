@@ -2309,6 +2309,7 @@ dependencies = [
  "ed25519-compact",
  "netpulse-core",
  "serde",
+ "serde_json",
  "sha2",
 ]
 

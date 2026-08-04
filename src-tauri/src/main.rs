@@ -530,6 +530,40 @@ fn seed_registry() -> PluginRegistry {
         false,
         false,
     ));
+    reg.register(first_party(
+        "example-view",
+        PluginType::View,
+        serde_json::json!({
+            "refresh_interval_ms": 1000,
+            "max_items": 50,
+            "show_timestamps": true
+        }),
+        Some(netpulse_plugin::JsonSchema(serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "refresh_interval_ms": {
+                    "type": "integer",
+                    "minimum": 100,
+                    "maximum": 60000,
+                    "default": 1000
+                },
+                "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 50
+                },
+                "show_timestamps": {
+                    "type": "boolean",
+                    "default": true
+                }
+            },
+            "required": ["refresh_interval_ms", "max_items", "show_timestamps"]
+        }))),
+        false,
+        false,
+    ));
     reg
 }
 

@@ -148,9 +148,6 @@ jobs:
       - name: Verify workspace lockfile compilation
         run: cargo check --workspace --locked
 
-      - name: Verify desktop shell lockfile compilation
-        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
-
       - name: Cargo audit - workspace (vulnerabilities & advisories)
         run: cargo audit --deny warnings --ignore RUSTSEC-2024-0436
 

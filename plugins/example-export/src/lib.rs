@@ -8,13 +8,15 @@
 
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, ExportPlugin, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
-    TrustStatus,
+    Configurable, ContractVersion, ExportPlugin, PluginConfigurationMetadata, PluginManifest,
+    PluginMetadata, PluginSecurityMetadata, PluginType, Sha256Digest, TrustMetadata, TrustStatus,
 };
 
 /// Emits a minimal newline-delimited representation of the structured export input.
 #[derive(Debug, Default)]
 pub struct FlatExport;
+
+impl Configurable for FlatExport {}
 
 impl ExportPlugin for FlatExport {
     fn id(&self) -> &'static str {
@@ -40,20 +42,30 @@ impl ExportPlugin for FlatExport {
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
-        name: "example-export".into(),
-        plugin_type: PluginType::Export,
-        target_contract: ContractVersion(4),
-        trust: TrustMetadata {
-            source: "in-tree:plugins/example-export".into(),
-            signatures: Vec::new(),
-            status: TrustStatus::FirstParty,
+        metadata: PluginMetadata {
+            name: "example-export".into(),
+            plugin_type: PluginType::Export,
+            target_contract: ContractVersion(4),
         },
-        payload_hash: Sha256Digest([0u8; 32]),
-        signatures: Vec::new(),
-        fuzzed: false,
-        has_explanation: false,
+        config: PluginConfigurationMetadata {
+            config_version: 1,
+            default_config: serde_json::json!({}),
+            config_schema: None,
+        },
+        security: PluginSecurityMetadata {
+            trust: TrustMetadata {
+                source: "in-tree:plugins/example-export".into(),
+                signatures: Vec::new(),
+                status: TrustStatus::FirstParty,
+            },
+            payload_hash: Sha256Digest([0u8; 32]),
+            signatures: Vec::new(),
+            fuzzed: false,
+            has_explanation: false,
+        },
     }
 }
+
 
 #[cfg(test)]
 mod tests {

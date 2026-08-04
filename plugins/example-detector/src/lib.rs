@@ -9,7 +9,9 @@
 use netpulse_core::model::{Confidence, EvidenceRef, Finding, FindingCategory, ProtoEvent};
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Detector, PluginManifest, PluginType, Sha256Digest, TrustMetadata, TrustStatus,
+    Configurable, ContractVersion, Detector, JsonSchema, PluginConfigurationMetadata,
+    PluginManifest, PluginMetadata, PluginSecurityMetadata, PluginType, Sha256Digest,
+    TrustMetadata, TrustStatus,
 };
 
 /// Flags a flow with an unusually chatty stream of protocol landmarks.
@@ -22,6 +24,15 @@ pub struct ChattyFlowDetector {
 impl Default for ChattyFlowDetector {
     fn default() -> Self {
         Self { threshold: 8 }
+    }
+}
+
+impl Configurable for ChattyFlowDetector {
+    fn configure(&mut self, config: &serde_json::Value) -> Result<()> {
+        if let Some(t) = config.get("threshold").and_then(|v| v.as_u64()) {
+            self.threshold = t as usize;
+        }
+        Ok(())
     }
 }
 
@@ -51,23 +62,45 @@ impl Detector for ChattyFlowDetector {
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
-        name: "example-detector".into(),
-        plugin_type: PluginType::Detector,
-        target_contract: ContractVersion(4),
-        trust: TrustMetadata {
-            source: "in-tree:plugins/example-detector".into(),
-            signatures: Vec::new(),
-            status: TrustStatus::FirstParty,
+        metadata: PluginMetadata {
+            name: "example-detector".into(),
+            plugin_type: PluginType::Detector,
+            target_contract: ContractVersion(4),
         },
-        payload_hash: Sha256Digest([0u8; 32]),
-        signatures: Vec::new(),
-        // Not a dissector, so the fuzz/explanation obligations don't gate it; a
-        // detector instead ships positive + benign fixtures (docs/18 §10), which
-        // this crate's tests stand in for.
-        fuzzed: false,
-        has_explanation: false,
+        config: PluginConfigurationMetadata {
+            config_version: 1,
+            default_config: serde_json::json!({ "threshold": 8 }),
+            config_schema: Some(JsonSchema(serde_json::json!({
+                "$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                    "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "default": 8
+                    }
+                },
+                "required": ["threshold"]
+            }))),
+        },
+        security: PluginSecurityMetadata {
+            trust: TrustMetadata {
+                source: "in-tree:plugins/example-detector".into(),
+                signatures: Vec::new(),
+                status: TrustStatus::FirstParty,
+            },
+            payload_hash: Sha256Digest([0u8; 32]),
+            signatures: Vec::new(),
+            // Not a dissector, so the fuzz/explanation obligations don't gate it; a
+            // detector instead ships positive + benign fixtures (docs/18 §10), which
+            // this crate's tests stand in for.
+            fuzzed: false,
+            has_explanation: false,
+        },
     }
 }
+
 
 #[cfg(test)]
 mod tests {

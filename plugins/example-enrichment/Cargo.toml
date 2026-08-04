@@ -11,6 +11,8 @@ authors.workspace = true
 [dependencies]
 netpulse-core = { path = "../../crates/netpulse-core" }
 netpulse-plugin = { path = "../../crates/netpulse-plugin" }
+serde_json = { workspace = true }
+
 
 [lints]
 workspace = true

@@ -11,14 +11,16 @@ use std::net::IpAddr;
 use netpulse_core::model::Host;
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Enrichment, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
-    TrustStatus,
+    Configurable, ContractVersion, Enrichment, PluginConfigurationMetadata, PluginManifest,
+    PluginMetadata, PluginSecurityMetadata, PluginType, Sha256Digest, TrustMetadata, TrustStatus,
 };
 
 /// Resolves hosts to an org label from a local, in-memory table (stands in for an
 /// offline reputation/ASN database).
 #[derive(Debug, Default)]
 pub struct LocalOrgEnrichment;
+
+impl Configurable for LocalOrgEnrichment {}
 
 impl LocalOrgEnrichment {
     /// The local lookup: first-octet → org. Purely offline (docs/24 §4.3).
@@ -57,20 +59,30 @@ impl Enrichment for LocalOrgEnrichment {
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
-        name: "example-enrichment".into(),
-        plugin_type: PluginType::Enrichment,
-        target_contract: ContractVersion(4),
-        trust: TrustMetadata {
-            source: "in-tree:plugins/example-enrichment".into(),
-            signatures: Vec::new(),
-            status: TrustStatus::FirstParty,
+        metadata: PluginMetadata {
+            name: "example-enrichment".into(),
+            plugin_type: PluginType::Enrichment,
+            target_contract: ContractVersion(4),
         },
-        payload_hash: Sha256Digest([0u8; 32]),
-        signatures: Vec::new(),
-        fuzzed: false,
-        has_explanation: false,
+        config: PluginConfigurationMetadata {
+            config_version: 1,
+            default_config: serde_json::json!({}),
+            config_schema: None,
+        },
+        security: PluginSecurityMetadata {
+            trust: TrustMetadata {
+                source: "in-tree:plugins/example-enrichment".into(),
+                signatures: Vec::new(),
+                status: TrustStatus::FirstParty,
+            },
+            payload_hash: Sha256Digest([0u8; 32]),
+            signatures: Vec::new(),
+            fuzzed: false,
+            has_explanation: false,
+        },
     }
 }
+
 
 #[cfg(test)]
 mod tests {

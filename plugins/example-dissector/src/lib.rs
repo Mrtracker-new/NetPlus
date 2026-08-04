@@ -11,15 +11,18 @@ use netpulse_core::model::{ProtoEvent, ProtoEventKind};
 use netpulse_core::time::Timestamp;
 use netpulse_core::Result;
 use netpulse_plugin::{
-    ContractVersion, Dissector, PluginManifest, PluginType, Sha256Digest, TrustMetadata,
-    TrustStatus,
+    Configurable, ContractVersion, Dissector, PluginConfigurationMetadata, PluginManifest,
+    PluginMetadata, PluginSecurityMetadata, PluginType, Sha256Digest, TrustMetadata, TrustStatus,
 };
 
 /// The reference dissector for the toy `PING`/`PONG` line protocol.
 #[derive(Debug, Default)]
 pub struct PingDissector;
 
+impl Configurable for PingDissector {}
+
 impl Dissector for PingDissector {
+
     fn protocol(&self) -> &'static str {
         "example.ping"
     }
@@ -51,20 +54,30 @@ impl Dissector for PingDissector {
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
-        name: "example-dissector".into(),
-        plugin_type: PluginType::Dissector,
-        target_contract: ContractVersion(netpulse_api_version()),
-        trust: TrustMetadata {
-            source: "in-tree:plugins/example-dissector".into(),
-            signatures: Vec::new(),
-            status: TrustStatus::FirstParty,
+        metadata: PluginMetadata {
+            name: "example-dissector".into(),
+            plugin_type: PluginType::Dissector,
+            target_contract: ContractVersion(netpulse_api_version()),
         },
-        payload_hash: Sha256Digest([0u8; 32]),
-        signatures: Vec::new(),
-        fuzzed: true,
-        has_explanation: true,
+        config: PluginConfigurationMetadata {
+            config_version: 1,
+            default_config: serde_json::json!({}),
+            config_schema: None,
+        },
+        security: PluginSecurityMetadata {
+            trust: TrustMetadata {
+                source: "in-tree:plugins/example-dissector".into(),
+                signatures: Vec::new(),
+                status: TrustStatus::FirstParty,
+            },
+            payload_hash: Sha256Digest([0u8; 32]),
+            signatures: Vec::new(),
+            fuzzed: true,
+            has_explanation: true,
+        },
     }
 }
+
 
 /// The contract version this example targets. Kept as a small constant so the
 /// example crate needs no dependency on `netpulse-api` (docs/24 §6 keeps plugins

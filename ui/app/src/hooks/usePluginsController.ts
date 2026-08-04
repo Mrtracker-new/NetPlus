@@ -128,6 +128,46 @@ export function usePluginsController() {
     });
   }, [safePlugins, filter]);
 
+  const configurePlugin = useCallback(
+    async (name: string, config: any) => {
+      if (busyName !== null) return;
+      setNotice(null);
+      setBusyName(name);
+      try {
+        await command({ kind: "configurePlugin", name, config });
+        await fetchPlugins();
+        setAnnouncement(`Updated configuration for plugin ${name}.`);
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        setNotice(errMsg);
+        setAnnouncement(`Failed to configure plugin ${name}: ${errMsg}`);
+      } finally {
+        setBusyName(null);
+      }
+    },
+    [busyName, fetchPlugins]
+  );
+
+  const resetPlugin = useCallback(
+    async (name: string) => {
+      if (busyName !== null) return;
+      setNotice(null);
+      setBusyName(name);
+      try {
+        await command({ kind: "resetPluginConfig", name });
+        await fetchPlugins();
+        setAnnouncement(`Reset configuration for plugin ${name}.`);
+      } catch (e) {
+        const errMsg = e instanceof Error ? e.message : String(e);
+        setNotice(errMsg);
+        setAnnouncement(`Failed to reset plugin ${name}: ${errMsg}`);
+      } finally {
+        setBusyName(null);
+      }
+    },
+    [busyName, fetchPlugins]
+  );
+
   return {
     plugins: safePlugins,
     filteredPlugins,
@@ -140,7 +180,10 @@ export function usePluginsController() {
     notice,
     setNotice,
     togglePlugin,
+    configurePlugin,
+    resetPlugin,
     refresh: fetchPlugins,
     announcement,
   };
 }
+

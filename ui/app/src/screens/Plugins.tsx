@@ -19,6 +19,8 @@ export function Plugins() {
     notice,
     setNotice,
     togglePlugin,
+    configurePlugin,
+    resetPlugin,
     announcement = "",
   } = usePluginsController();
 
@@ -89,6 +91,8 @@ export function Plugins() {
               p={p}
               busy={busyName === p?.name}
               onToggle={(enable) => void togglePlugin?.(p?.name, enable)}
+              onConfigure={(config) => configurePlugin(p.name, config)}
+              onReset={() => resetPlugin(p.name)}
             />
           ))}
         </>
@@ -96,3 +100,4 @@ export function Plugins() {
     </section>
   );
 }
+

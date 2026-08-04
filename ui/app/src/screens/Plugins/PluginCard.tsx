@@ -1,14 +1,17 @@
 import { useTranslation } from "react-i18next";
 import type { PluginDescriptor } from "@netpulse/contract";
 import { Button } from "@netpulse/components";
+import { PluginConfigForm } from "./PluginConfigForm";
 
 export interface PluginCardProps {
   p: PluginDescriptor;
   busy: boolean;
   onToggle: (enable: boolean) => void;
+  onConfigure?: (config: any) => Promise<void>;
+  onReset?: () => Promise<void>;
 }
 
-export function PluginCard({ p, busy, onToggle }: PluginCardProps) {
+export function PluginCard({ p, busy, onToggle, onConfigure, onReset }: PluginCardProps) {
   const { t } = useTranslation(["plugins"]);
 
   const trust = p.trust || "unreviewed";
@@ -124,6 +127,17 @@ export function PluginCard({ p, busy, onToggle }: PluginCardProps) {
           {p.enabled ? t("card.disable_action") : t("card.enable_action")}
         </Button>
       </footer>
+
+      {/* Configuration Form Subsystem */}
+      {onConfigure && onReset && (
+        <PluginConfigForm
+          plugin={p}
+          busy={busy}
+          onSave={(cfg) => onConfigure(cfg)}
+          onReset={() => onReset()}
+        />
+      )}
     </article>
   );
 }
+

@@ -514,6 +514,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "example-view"
+version = "0.1.0"
+dependencies = [
+ "netpulse-core",
+ "netpulse-plugin",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

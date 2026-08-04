@@ -1,0 +1,13 @@
+{
+  "permission": [
+    {
+      "identifier": "allow-command",
+      "description": "Enables the command IPC command.",
+      "commands": {
+        "allow": [
+          "command"
+        ]
+      }
+    }
+  ]
+}

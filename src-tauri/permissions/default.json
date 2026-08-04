@@ -1,0 +1,12 @@
+{
+  "set": [
+    {
+      "identifier": "default",
+      "description": "Default permissions for netpulse-shell application commands.",
+      "permissions": [
+        "allow-query",
+        "allow-command"
+      ]
+    }
+  ]
+}

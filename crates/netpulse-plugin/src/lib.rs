@@ -168,7 +168,6 @@ pub struct PluginManifest {
     pub security: PluginSecurityMetadata,
 }
 
-
 impl PluginManifest {
     /// The capabilities this plugin is granted by its type (docs/24 §5).
     pub fn capabilities(&self) -> &'static [Capability] {
@@ -352,7 +351,11 @@ impl PluginRegistry {
     /// enable one that is structurally ineligible (incompatible/incomplete),
     /// keeping the reason honest (docs/24 §8). Returns whether it is now enabled.
     pub fn enable(&mut self, name: &str) -> bool {
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+        if let Some(p) = self
+            .plugins
+            .iter_mut()
+            .find(|p| p.manifest.metadata.name == name)
+        {
             match p.disabled_reason {
                 // Only a user-consent gate can be lifted by enabling; structural
                 // ineligibility cannot be overridden (docs/24 §8).
@@ -369,7 +372,11 @@ impl PluginRegistry {
 
     /// Disable a plugin by name (docs/24 §6).
     pub fn disable(&mut self, name: &str) -> bool {
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+        if let Some(p) = self
+            .plugins
+            .iter_mut()
+            .find(|p| p.manifest.metadata.name == name)
+        {
             p.enabled = false;
             p.disabled_reason = Some(DisabledReason::NotEnabled);
             return true;
@@ -378,19 +385,31 @@ impl PluginRegistry {
     }
 
     /// Update a plugin's configuration with schema validation and persistence.
-    pub fn configure_plugin(&mut self, name: &str, new_config: serde_json::Value) -> std::result::Result<(), String> {
+    pub fn configure_plugin(
+        &mut self,
+        name: &str,
+        new_config: serde_json::Value,
+    ) -> std::result::Result<(), String> {
         let (config_version, schema) = {
             let p = self
                 .plugins
                 .iter()
                 .find(|p| p.manifest.metadata.name == name)
                 .ok_or_else(|| format!("Plugin '{name}' not found"))?;
-            (p.manifest.config.config_version, p.manifest.config.config_schema.clone())
+            (
+                p.manifest.config.config_version,
+                p.manifest.config.config_schema.clone(),
+            )
         };
 
-        self.config_manager.configure(name, config_version, new_config.clone(), schema.as_ref())?;
+        self.config_manager
+            .configure(name, config_version, new_config.clone(), schema.as_ref())?;
 
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+        if let Some(p) = self
+            .plugins
+            .iter_mut()
+            .find(|p| p.manifest.metadata.name == name)
+        {
             p.config = new_config;
         }
         Ok(())
@@ -412,9 +431,15 @@ impl PluginRegistry {
             p.manifest.config.config_schema.clone()
         };
 
-        let updated_config = self.config_manager.patch(name, expected_version, patch, schema.as_ref())?;
+        let updated_config =
+            self.config_manager
+                .patch(name, expected_version, patch, schema.as_ref())?;
 
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+        if let Some(p) = self
+            .plugins
+            .iter_mut()
+            .find(|p| p.manifest.metadata.name == name)
+        {
             p.config = updated_config.clone();
         }
         Ok(updated_config)
@@ -433,12 +458,15 @@ impl PluginRegistry {
 
         self.config_manager.reset(name, default_config.clone())?;
 
-        if let Some(p) = self.plugins.iter_mut().find(|p| p.manifest.metadata.name == name) {
+        if let Some(p) = self
+            .plugins
+            .iter_mut()
+            .find(|p| p.manifest.metadata.name == name)
+        {
             p.config = default_config;
         }
         Ok(())
     }
-
 
     /// All registered plugins with their state (docs/24 §6).
     pub fn plugins(&self) -> &[RegisteredPlugin] {
@@ -757,4 +785,3 @@ mod tests {
         );
     }
 }
-

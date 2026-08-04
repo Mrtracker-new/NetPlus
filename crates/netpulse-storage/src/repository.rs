@@ -257,8 +257,12 @@ impl MemoryCaptureStore {
         let to_remove = inner.flows.len() - target_max;
         let mut evicted = 0;
 
-        let candidates: Vec<(u64, u64)> =
-            inner.flow_timeline.iter().copied().take(to_remove * 2).collect();
+        let candidates: Vec<(u64, u64)> = inner
+            .flow_timeline
+            .iter()
+            .copied()
+            .take(to_remove * 2)
+            .collect();
         for (mono_ts, flow_id) in candidates {
             if evicted >= to_remove {
                 break;

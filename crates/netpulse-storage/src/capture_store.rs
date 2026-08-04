@@ -485,8 +485,6 @@ impl<R: CaptureRepository> CaptureStore<R> {
         evicted
     }
 
-
-
     /// Attempt to write packet payload bytes. Honors the payload policy
     /// (docs/08 §4, §13): rejected under `MetadataOnly`. Returns whether the
     /// bytes were accepted.

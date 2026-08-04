@@ -483,7 +483,6 @@ pub enum Command {
     },
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -68,7 +68,6 @@ pub struct EvictionStats {
     pub expired_findings: usize,
 }
 
-
 /// How much of each packet is retained (docs/02 §9). The default trades depth
 /// for privacy and disk; the user may widen it (docs/02 §10.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

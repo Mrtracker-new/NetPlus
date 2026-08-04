@@ -199,4 +199,7 @@ export type Command =
   | { kind: "replaySetSpeed"; percent: number }
   | { kind: "startExport"; selection: ExportSelection; format: ExportFormat; level: PayloadLevel }
   | { kind: "enablePlugin"; name: string }
-  | { kind: "disablePlugin"; name: string };
+  | { kind: "disablePlugin"; name: string }
+  | { kind: "configurePlugin"; name: string; config: any }
+  | { kind: "patchPluginConfig"; name: string; expected_version?: number; patch: any }
+  | { kind: "resetPluginConfig"; name: string };

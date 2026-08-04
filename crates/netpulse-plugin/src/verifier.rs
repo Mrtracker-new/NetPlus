@@ -291,7 +291,11 @@ pub fn canonical_manifest_bytes(manifest: &PluginManifest) -> Vec<u8> {
     buf.push(type_byte);
     buf.extend_from_slice(&manifest.metadata.target_contract.0.to_be_bytes());
     buf.push(if manifest.security.fuzzed { 1 } else { 0 });
-    buf.push(if manifest.security.has_explanation { 1 } else { 0 });
+    buf.push(if manifest.security.has_explanation {
+        1
+    } else {
+        0
+    });
     buf.extend_from_slice(&manifest.security.payload_hash.0);
     buf
 }

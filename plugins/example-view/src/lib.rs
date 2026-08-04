@@ -196,7 +196,11 @@ mod tests {
         });
 
         // RFC 7396 partial merge patch: update max_items only
-        let patch_result = reg.patch_plugin("example-view", None, serde_json::json!({ "max_items": 100 }));
+        let patch_result = reg.patch_plugin(
+            "example-view",
+            None,
+            serde_json::json!({ "max_items": 100 }),
+        );
         assert!(patch_result.is_ok(), "partial patch should succeed");
 
         let updated_cfg = patch_result.unwrap();
@@ -222,7 +226,10 @@ mod tests {
             "example-view",
             serde_json::json!({ "max_items": 50, "show_timestamps": true }),
         );
-        assert!(res.is_err(), "missing required field should fail validation");
+        assert!(
+            res.is_err(),
+            "missing required field should fail validation"
+        );
 
         // 2. Invalid type (string for integer)
         let res = reg.configure_plugin(

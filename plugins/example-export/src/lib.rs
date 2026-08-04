@@ -66,7 +66,6 @@ pub fn manifest() -> PluginManifest {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -549,7 +549,6 @@ pub fn plugin_descriptor_dto(p: &RegisteredPlugin, host_contract: u32) -> Plugin
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -95,4 +95,3 @@ pub trait Detector: Configurable {
     /// [`Finding`] must already carry its evidence references (docs/02 §6.3).
     fn evaluate(&self, events: &[ProtoEvent]) -> Result<Vec<Finding>>;
 }
-

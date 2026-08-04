@@ -606,7 +606,6 @@ pub struct PluginDescriptorDto {
     pub config_schema: Option<serde_json::Value>,
 }
 
-
 /// Individual component check item for health DTO reporting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ComponentCheckDto {
@@ -920,7 +919,6 @@ mod tests {
             config: serde_json::json!({}),
             config_schema: None,
         });
-
     }
 
     #[test]

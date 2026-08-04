@@ -39,7 +39,6 @@ impl JsonSchema {
     }
 }
 
-
 /// Categorization for secret and credential configuration fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -77,12 +76,10 @@ pub struct PluginConfigAuditRecord {
     pub error_message: Option<String>,
 }
 
-
 /// Trait for auditing configuration changes.
 pub trait PluginConfigAuditor: std::fmt::Debug + Send + Sync {
     fn record(&self, audit: PluginConfigAuditRecord);
 }
-
 
 /// In-memory auditor collector for testing and observation.
 #[derive(Debug, Default)]
@@ -137,7 +134,12 @@ pub enum PluginConfigEvent {
 /// Persistence contract for storing plugin configuration.
 pub trait PluginConfigStorage: std::fmt::Debug + Send + Sync {
     fn load_config(&self, plugin_name: &str) -> CoreResult<Option<(u32, serde_json::Value)>>;
-    fn save_config(&self, plugin_name: &str, version: u32, config: &serde_json::Value) -> CoreResult<()>;
+    fn save_config(
+        &self,
+        plugin_name: &str,
+        version: u32,
+        config: &serde_json::Value,
+    ) -> CoreResult<()>;
     fn delete_config(&self, plugin_name: &str) -> CoreResult<()>;
 }
 
@@ -159,7 +161,12 @@ impl PluginConfigStorage for MemoryConfigStorage {
         Ok(guard.get(plugin_name).cloned())
     }
 
-    fn save_config(&self, plugin_name: &str, version: u32, config: &serde_json::Value) -> CoreResult<()> {
+    fn save_config(
+        &self,
+        plugin_name: &str,
+        version: u32,
+        config: &serde_json::Value,
+    ) -> CoreResult<()> {
         let mut guard = self.data.lock().unwrap();
         guard.insert(plugin_name.to_string(), (version, config.clone()));
         Ok(())
@@ -202,14 +209,18 @@ impl JsonFileConfigStorage {
     }
 }
 
-
 impl PluginConfigStorage for JsonFileConfigStorage {
     fn load_config(&self, plugin_name: &str) -> CoreResult<Option<(u32, serde_json::Value)>> {
         let data = self.read_all();
         Ok(data.get(plugin_name).cloned())
     }
 
-    fn save_config(&self, plugin_name: &str, version: u32, config: &serde_json::Value) -> CoreResult<()> {
+    fn save_config(
+        &self,
+        plugin_name: &str,
+        version: u32,
+        config: &serde_json::Value,
+    ) -> CoreResult<()> {
         let mut data = self.read_all();
         data.insert(plugin_name.to_string(), (version, config.clone()));
         self.write_all(&data)
@@ -289,7 +300,11 @@ impl PluginConfigManager {
     }
 
     /// Validate JSON configuration against a [`JsonSchema`] (validating properties, types, range bounds).
-    pub fn validate_schema(&self, schema: &JsonSchema, config: &serde_json::Value) -> Result<(), Vec<String>> {
+    pub fn validate_schema(
+        &self,
+        schema: &JsonSchema,
+        config: &serde_json::Value,
+    ) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
         let schema_obj = match schema.0.as_object() {
             Some(obj) => obj,
@@ -309,9 +324,11 @@ impl PluginConfigManager {
         if let Some(properties) = schema_obj.get("properties").and_then(|p| p.as_object()) {
             if let Some(config_obj) = config.as_object() {
                 for (prop_name, prop_val) in config_obj {
-
-                    if let Some(prop_schema) = properties.get(prop_name).and_then(|s| s.as_object()) {
-                        if let Some(expected_type) = prop_schema.get("type").and_then(|t| t.as_str()) {
+                    if let Some(prop_schema) = properties.get(prop_name).and_then(|s| s.as_object())
+                    {
+                        if let Some(expected_type) =
+                            prop_schema.get("type").and_then(|t| t.as_str())
+                        {
                             let type_valid = match expected_type {
                                 "string" => prop_val.is_string(),
                                 "integer" => prop_val.is_i64() || prop_val.is_u64(),
@@ -331,12 +348,16 @@ impl PluginConfigManager {
                         if let Some(num) = prop_val.as_f64() {
                             if let Some(min) = prop_schema.get("minimum").and_then(|m| m.as_f64()) {
                                 if num < min {
-                                    errors.push(format!("Property '{prop_name}' value {num} is below minimum {min}"));
+                                    errors.push(format!(
+                                        "Property '{prop_name}' value {num} is below minimum {min}"
+                                    ));
                                 }
                             }
                             if let Some(max) = prop_schema.get("maximum").and_then(|m| m.as_f64()) {
                                 if num > max {
-                                    errors.push(format!("Property '{prop_name}' value {num} exceeds maximum {max}"));
+                                    errors.push(format!(
+                                        "Property '{prop_name}' value {num} exceeds maximum {max}"
+                                    ));
                                 }
                             }
                         }
@@ -376,7 +397,8 @@ impl PluginConfigManager {
             None => (manifest_version, default_config.clone()),
         };
 
-        self.configs.insert(plugin_name.to_string(), (version, config.clone()));
+        self.configs
+            .insert(plugin_name.to_string(), (version, config.clone()));
         config
     }
 
@@ -400,15 +422,23 @@ impl PluginConfigManager {
         }
 
         let old_state = self.configs.get(plugin_name).cloned();
-        let (old_version, old_config) = old_state.clone().unwrap_or((config_version, serde_json::Value::Null));
+        let (old_version, old_config) = old_state
+            .clone()
+            .unwrap_or((config_version, serde_json::Value::Null));
         let old_checksum = compute_json_checksum(&old_config);
         let new_checksum = compute_json_checksum(&new_config);
 
         // Update in-memory state
-        self.configs.insert(plugin_name.to_string(), (config_version, new_config.clone()));
+        self.configs.insert(
+            plugin_name.to_string(),
+            (config_version, new_config.clone()),
+        );
 
         // Attempt persistence
-        if let Err(err) = self.storage.save_config(plugin_name, config_version, &new_config) {
+        if let Err(err) = self
+            .storage
+            .save_config(plugin_name, config_version, &new_config)
+        {
             // Rollback in-memory state on persistence failure
             if let Some(prev) = old_state {
                 self.configs.insert(plugin_name.to_string(), prev);
@@ -431,7 +461,9 @@ impl PluginConfigManager {
                 error_message: Some(err.to_string()),
             });
 
-            return Err(format!("Failed to persist config to storage (rolled back): {err}"));
+            return Err(format!(
+                "Failed to persist config to storage (rolled back): {err}"
+            ));
         }
 
         self.record_audit(PluginConfigAuditRecord {
@@ -481,7 +513,11 @@ impl PluginConfigManager {
     }
 
     /// Reset plugin configuration back to defaults.
-    pub fn reset(&mut self, plugin_name: &str, default_config: serde_json::Value) -> Result<(), String> {
+    pub fn reset(
+        &mut self,
+        plugin_name: &str,
+        default_config: serde_json::Value,
+    ) -> Result<(), String> {
         let curr_version = self.configs.get(plugin_name).map(|(v, _)| *v).unwrap_or(1);
         self.configure(plugin_name, curr_version, default_config, None)?;
 
@@ -562,7 +598,6 @@ mod tests {
                 Ok(())
             }
         }
-
 
         let mut manager = PluginConfigManager::new(Box::new(FailingStorage), None);
         manager.initialize_plugin_config("p1", 1, serde_json::json!({"x": 1}), None);

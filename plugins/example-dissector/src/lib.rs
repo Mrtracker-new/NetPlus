@@ -22,7 +22,6 @@ pub struct PingDissector;
 impl Configurable for PingDissector {}
 
 impl Dissector for PingDissector {
-
     fn protocol(&self) -> &'static str {
         "example.ping"
     }
@@ -77,7 +76,6 @@ pub fn manifest() -> PluginManifest {
         },
     }
 }
-
 
 /// The contract version this example targets. Kept as a small constant so the
 /// example crate needs no dependency on `netpulse-api` (docs/24 §6 keeps plugins

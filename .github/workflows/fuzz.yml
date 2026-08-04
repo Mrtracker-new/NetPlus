@@ -1,0 +1,44 @@
+# NetPulse Fuzzing Workflow — Bounded Automated Fuzzing & Crash Artifact Upload
+
+name: Protocol Dissector Fuzzing
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # Daily at 02:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  fuzz:
+    name: Cargo Fuzz Protocol Dissectors
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust nightly toolchain
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked || true
+
+      - name: Run Fuzz Targets (Bounded 60s per target)
+        run: |
+          targets=("fuzz_decode_frame" "fuzz_ethernet" "fuzz_ipv4" "fuzz_ipv6" "fuzz_tcp" "fuzz_udp" "fuzz_dns" "fuzz_http" "fuzz_tls")
+          for t in "${targets[@]}"; do
+            echo "::group::Fuzzing $t"
+            cargo fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 || true
+            echo "::endgroup::"
+          done
+
+      - name: Upload Crash Artifacts (if any)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crash-artifacts
+          path: fuzz/artifacts/
+          if-no-files-found: ignore

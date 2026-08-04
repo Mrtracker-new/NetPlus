@@ -1,0 +1,67 @@
+[package]
+name = "netpulse-decode-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+netpulse-decode = { path = "../crates/netpulse-decode" }
+netpulse-core = { path = "../crates/netpulse-core" }
+
+[[bin]]
+name = "fuzz_decode_frame"
+path = "fuzz_targets/fuzz_decode_frame.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_ethernet"
+path = "fuzz_targets/fuzz_ethernet.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_ipv4"
+path = "fuzz_targets/fuzz_ipv4.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_ipv6"
+path = "fuzz_targets/fuzz_ipv6.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_tcp"
+path = "fuzz_targets/fuzz_tcp.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_udp"
+path = "fuzz_targets/fuzz_udp.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_dns"
+path = "fuzz_targets/fuzz_dns.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_http"
+path = "fuzz_targets/fuzz_http.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_tls"
+path = "fuzz_targets/fuzz_tls.rs"
+test = false
+doc = false

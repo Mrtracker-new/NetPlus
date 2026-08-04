@@ -14,7 +14,7 @@ members = ["crates/*", "plugins/*"]
 # system libraries and the Tauri CLI, which the pure-Rust workspace CI job does
 # not provision. Excluding it keeps `cargo build/test --workspace` fast and
 # webview-free; the shell is built by the UI job under the Tauri toolchain.
-exclude = ["src-tauri"]
+exclude = ["src-tauri", "fuzz"]
 
 [workspace.package]
 version = "0.1.0"

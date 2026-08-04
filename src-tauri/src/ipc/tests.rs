@@ -537,3 +537,47 @@ fn test_command_start_export() {
     );
     assert!(res.is_ok());
 }
+
+#[test]
+fn test_ipc_permission_manifests_parse() {
+    use tauri::utils::acl::manifest::PermissionFile;
+
+    let query_json = include_str!("../../permissions/allow-query.json");
+    let cmd_json = include_str!("../../permissions/allow-command.json");
+    let default_json = include_str!("../../permissions/default.json");
+
+    let query_file: PermissionFile =
+        serde_json::from_str(query_json).expect("allow-query.json deserialization");
+    let cmd_file: PermissionFile =
+        serde_json::from_str(cmd_json).expect("allow-command.json deserialization");
+    let default_file: PermissionFile =
+        serde_json::from_str(default_json).expect("default.json deserialization");
+
+    assert_eq!(query_file.permission.len(), 1);
+    assert_eq!(query_file.permission[0].identifier, "allow-query");
+    assert_eq!(query_file.permission[0].commands.allow, vec!["query"]);
+
+    assert_eq!(cmd_file.permission.len(), 1);
+    assert_eq!(cmd_file.permission[0].identifier, "allow-command");
+    assert_eq!(cmd_file.permission[0].commands.allow, vec!["command"]);
+
+    assert_eq!(default_file.set.len(), 1);
+    assert_eq!(default_file.set[0].identifier, "default");
+    assert_eq!(
+        default_file.set[0].permissions,
+        vec!["allow-query", "allow-command"]
+    );
+
+    // Verify capabilities default.json references the application default permission set
+    let cap_json = include_str!("../../capabilities/default.json");
+    let cap_val: serde_json::Value =
+        serde_json::from_str(cap_json).expect("capabilities/default.json should be valid JSON");
+    let perms = cap_val["permissions"]
+        .as_array()
+        .expect("permissions array expected");
+    assert!(
+        perms.iter().any(|p| p.as_str() == Some("default")),
+        "capabilities/default.json must explicitly grant application 'default' permission set"
+    );
+}
+

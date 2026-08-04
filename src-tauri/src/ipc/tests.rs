@@ -15,10 +15,11 @@ fn test_seeded_state_is_deterministic() {
 
     assert_eq!(reg_a.plugins().len(), reg_b.plugins().len());
     for (pa, pb) in reg_a.plugins().iter().zip(reg_b.plugins().iter()) {
-        assert_eq!(pa.manifest.name, pb.manifest.name);
+        assert_eq!(pa.manifest.metadata.name, pb.manifest.metadata.name);
         assert_eq!(pa.enabled, pb.enabled);
         assert_eq!(pa.effective_trust, pb.effective_trust);
     }
+
 
     assert_eq!(*a.depth.lock().unwrap(), *b.depth.lock().unwrap());
     assert_eq!(a.recordings.lock().unwrap().len(), b.recordings.lock().unwrap().len());
@@ -342,18 +343,27 @@ fn test_command_enable_disable_plugin_state_transition() {
     // Register an unreviewed plugin (disabled by default)
     let m = netpulse_plugin::PluginManifest {
         manifest_version: 1,
-        name: "community-plugin".into(),
-        plugin_type: netpulse_plugin::PluginType::Detector,
-        target_contract: netpulse_plugin::ContractVersion(netpulse_api::API_VERSION),
-        trust: netpulse_plugin::TrustMetadata {
-            source: "community".into(),
-            signatures: Vec::new(),
-            status: netpulse_plugin::TrustStatus::Unreviewed,
+        metadata: netpulse_plugin::PluginMetadata {
+            name: "community-plugin".into(),
+            plugin_type: netpulse_plugin::PluginType::Detector,
+            target_contract: netpulse_plugin::ContractVersion(netpulse_api::API_VERSION),
         },
-        payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
-        signatures: Vec::new(),
-        fuzzed: false,
-        has_explanation: false,
+        config: netpulse_plugin::PluginConfigurationMetadata {
+            config_version: 1,
+            default_config: serde_json::json!({ "threshold": 5 }),
+            config_schema: None,
+        },
+        security: netpulse_plugin::PluginSecurityMetadata {
+            trust: netpulse_plugin::TrustMetadata {
+                source: "community".into(),
+                signatures: Vec::new(),
+                status: netpulse_plugin::TrustStatus::Unreviewed,
+            },
+            payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
+            signatures: Vec::new(),
+            fuzzed: false,
+            has_explanation: false,
+        },
     };
     let outcome = netpulse_plugin::VerificationOutcome {
         manifest: m,
@@ -371,7 +381,7 @@ fn test_command_enable_disable_plugin_state_transition() {
     // Verify plugin is registered and disabled
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.name == "community-plugin").unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
         assert!(!p.enabled);
     }
 
@@ -379,7 +389,7 @@ fn test_command_enable_disable_plugin_state_transition() {
     execute_command(&state, Command::EnablePlugin { name: "community-plugin".into() }).unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.name == "community-plugin").unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
         assert!(p.enabled);
     }
 
@@ -387,9 +397,41 @@ fn test_command_enable_disable_plugin_state_transition() {
     execute_command(&state, Command::DisablePlugin { name: "community-plugin".into() }).unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.name == "community-plugin").unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
         assert!(!p.enabled);
     }
+
+    // Test ConfigurePlugin, PatchPluginConfig, and ResetPluginConfig
+    execute_command(&state, Command::ConfigurePlugin {
+        name: "community-plugin".into(),
+        config: serde_json::json!({ "threshold": 10 }),
+    }).unwrap();
+    {
+        let reg = state.registry.lock().unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        assert_eq!(p.config["threshold"], 10);
+    }
+
+    execute_command(&state, Command::PatchPluginConfig {
+        name: "community-plugin".into(),
+        expected_version: Some(1),
+        patch: serde_json::json!({ "threshold": 12 }),
+    }).unwrap();
+    {
+        let reg = state.registry.lock().unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        assert_eq!(p.config["threshold"], 12);
+    }
+
+    execute_command(&state, Command::ResetPluginConfig {
+        name: "community-plugin".into(),
+    }).unwrap();
+    {
+        let reg = state.registry.lock().unwrap();
+        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        assert_eq!(p.config["threshold"], 5);
+    }
+
 }
 
 #[test]

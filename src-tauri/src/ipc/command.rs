@@ -50,6 +50,23 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
                 Err(format!("unknown plugin '{name}'"))
             }
         }
+        Command::ConfigurePlugin { name, config } => {
+            let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
+            registry.configure_plugin(&name, config)
+        }
+        Command::PatchPluginConfig {
+            name,
+            expected_version,
+            patch,
+        } => {
+            let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
+            registry.patch_plugin(&name, expected_version, patch).map(|_| ())
+        }
+        Command::ResetPluginConfig { name } => {
+            let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
+            registry.reset_plugin(&name)
+        }
         _ => Err("unknown command".into()),
     }
 }
+

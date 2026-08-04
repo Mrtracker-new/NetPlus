@@ -451,21 +451,30 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
 fn seed_registry() -> PluginRegistry {
     let mut reg = PluginRegistry::new(netpulse_api::API_VERSION);
     let first_party =
-        |name: &str, ty: PluginType, fuzzed: bool, has_explanation: bool| {
+        |name: &str, ty: PluginType, default_cfg: serde_json::Value, schema: Option<netpulse_plugin::JsonSchema>, fuzzed: bool, has_explanation: bool| {
             let m = PluginManifest {
                 manifest_version: 1,
-                name: name.into(),
-                plugin_type: ty,
-                target_contract: ContractVersion(netpulse_api::API_VERSION),
-                trust: TrustMetadata {
-                    source: format!("in-tree:plugins/{name}"),
-                    signatures: Vec::new(),
-                    status: TrustStatus::FirstParty,
+                metadata: netpulse_plugin::PluginMetadata {
+                    name: name.into(),
+                    plugin_type: ty,
+                    target_contract: ContractVersion(netpulse_api::API_VERSION),
                 },
-                payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
-                signatures: Vec::new(),
-                fuzzed,
-                has_explanation,
+                config: netpulse_plugin::PluginConfigurationMetadata {
+                    config_version: 1,
+                    default_config: default_cfg,
+                    config_schema: schema,
+                },
+                security: netpulse_plugin::PluginSecurityMetadata {
+                    trust: TrustMetadata {
+                        source: format!("in-tree:plugins/{name}"),
+                        signatures: Vec::new(),
+                        status: TrustStatus::FirstParty,
+                    },
+                    payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
+                    signatures: Vec::new(),
+                    fuzzed,
+                    has_explanation,
+                },
             };
             netpulse_plugin::VerificationOutcome {
                 manifest: m,
@@ -480,29 +489,50 @@ fn seed_registry() -> PluginRegistry {
     reg.register(first_party(
         "example-dissector",
         PluginType::Dissector,
+        serde_json::json!({}),
+        None,
         true,
         true,
     ));
     reg.register(first_party(
         "example-detector",
         PluginType::Detector,
+        serde_json::json!({ "threshold": 8 }),
+        Some(netpulse_plugin::JsonSchema(serde_json::json!({
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "properties": {
+                "threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "default": 8
+                }
+            },
+            "required": ["threshold"]
+        }))),
         false,
         false,
     ));
     reg.register(first_party(
         "example-enrichment",
         PluginType::Enrichment,
+        serde_json::json!({}),
+        None,
         false,
         false,
     ));
     reg.register(first_party(
         "example-export",
         PluginType::Export,
+        serde_json::json!({}),
+        None,
         false,
         false,
     ));
     reg
 }
+
 
 pub(crate) fn to_depth(d: ProjectionDepth) -> Depth {
     match d {

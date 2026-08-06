@@ -1,4 +1,4 @@
-// The data pump (docs/09 §7). Nothing else feeds the client store, so this hook
+// The data pump. Nothing else feeds the client store, so this hook
 // is what turns the static screens into live ones: it pulls the narrative feed
 // and the monitoring snapshot from the engine and, when running inside Tauri,
 // subscribes to the engine's live delta events so capture updates appear without
@@ -17,11 +17,11 @@ import { query } from "../ipc";
 import { pushCards, setFeed, setMonitor } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
 
-// Whole-history window; the engine bounds what it returns (docs/09 §7).
+// Whole-history window; the engine bounds what it returns.
 const FROM = 0;
 const TO = Number.MAX_SAFE_INTEGER;
 // A calm cadence — fast enough to feel live, slow enough to stay at 60 fps
-// (docs/09 §13). Event deltas cover the gaps when capture is active.
+//Event deltas cover the gaps when capture is active.
 const POLL_MS = 1500;
 
 /** True when running inside the Tauri webview (vs. the plain browser preview),
@@ -36,7 +36,7 @@ async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promis
     if (!cancelled() && res.kind === "narrativeFeed") setFeed(res.cards);
   } catch {
     // Browser preview (no backend) or a transient IPC error — screens keep their
-    // honest empty states rather than crashing (docs/02 §11).
+    // honest empty states rather than crashing.
   }
   try {
     const res = await query({ kind: "monitorSnapshot", from_mono_nanos: FROM, to_mono_nanos: TO });
@@ -48,7 +48,7 @@ async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promis
 
 /** Mount once near the app root: begins polling and (in Tauri) live event
  *  subscription, re-priming whenever the disclosure depth changes so the feed is
- *  projected at the right level (docs/09 §6.3). */
+ *  projected at the right level. */
 export function useLiveData(): void {
   const { depth } = useDisclosure();
 

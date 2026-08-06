@@ -6,7 +6,7 @@ export interface ConfidenceMeterProps {
   qualitative?: string;
 }
 
-/** A calibrated-confidence meter (docs/17 §5). Neutral accent — confidence is not
+/** A calibrated-confidence meter. Neutral accent — confidence is not
  *  severity, so it never uses an alarm color; the qualitative word carries meaning
  *  alongside the number. */
 export const ConfidenceMeter = memo(function ConfidenceMeter({

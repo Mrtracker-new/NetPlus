@@ -19,9 +19,9 @@ const RIBBON_LANES: Array<{ severity: Severity; label: string }> = [
   { severity: "neutral", label: "Events" },
 ];
 
-/** Events on one shared time axis, laned by severity (docs/10 §4): anything at the
+/** Events on one shared time axis, laned by severity: anything at the
  *  same moment lines up vertically. Interactive native button marks carry severity
- *  by shape+color and support arrow-key navigation (docs/10 §6). */
+ *  by shape+color and support arrow-key navigation. */
 export const TimeRibbon = memo(function TimeRibbon({
   events,
   highlightPacketId,

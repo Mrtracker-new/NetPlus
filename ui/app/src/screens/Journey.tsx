@@ -1,5 +1,5 @@
 // Website Journey — the flagship "what happened after I typed the URL?" view
-// (docs/14). Reconstructs the complete page-load story stage by stage and narrates it.
+//Reconstructs the complete page-load story stage by stage and narrates it.
 
 import { useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";

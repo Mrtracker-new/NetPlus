@@ -1,6 +1,6 @@
 // GENERATED from the netpulse-api crate — do not hand-edit.
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract
-// A CI drift check fails the build if this file is out of sync (docs/04 §7).
+// A CI drift check fails the build if this file is out of sync.
 
 export const API_VERSION = 6 as const;
 export const MIN_SUPPORTED_API_VERSION = 5 as const;

@@ -1,7 +1,7 @@
 // The application shell: slim icon rail, a floating glass header, the active
-// screen, and a right context rail (docs/09 §4). Beginner/Intermediate/Expert is
+// screen, and a right context rail. Beginner/Intermediate/Expert is
 // a global control here, with per-item escape hatches living inside the screens
-// (docs/09 §6.3). Light neumorphic is the default look; a theme toggle flips to
+//Light neumorphic is the default look; a theme toggle flips to
 // the original deep-observatory dark (tokens.css [data-theme="dark"]).
 
 import { Component, useEffect, useState } from "react";
@@ -111,9 +111,9 @@ function ModeSwitch() {
   );
 }
 
-// The live-capture control and its honest, always-visible state (docs/17 §8: a
+// The live-capture control and its honest, always-visible state (: a
 // capture indicator is mandatory). Observe-only: this starts/stops a read-only
-// frame stream, never touching traffic (docs/01 X1). The picker chooses an
+// frame stream, never touching traffic. The picker chooses an
 // adapter; id 0 = "Default adapter", which the platform backend resolves.
 function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) {
   const { t } = useTranslation("common");
@@ -124,7 +124,7 @@ function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) 
   const [ifaceId, setIfaceId] = useState(0);
 
   // Enumerate adapters once on mount. Absent a backend the list is empty and only
-  // "Default adapter" is offered — the real error surfaces on Start (docs/02 §11).
+  // "Default adapter" is offered — the real error surfaces on Start.
   useEffect(() => {
     let cancelled = false;
     query({ kind: "interfaces" })
@@ -153,7 +153,7 @@ function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) 
         setRunning(true);
       }
     } catch (e) {
-      // Fail honestly — Npcap missing, no admin, or browser preview (docs/02 §11).
+      // Fail honestly — Npcap missing, no admin, or browser preview.
       setError(String(e));
     } finally {
       setBusy(false);

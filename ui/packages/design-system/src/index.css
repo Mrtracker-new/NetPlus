@@ -1,6 +1,6 @@
 /* NetPulse global stylesheet — the "Soft Signal" design language applied to every
  * screen. Components across the app already carry consistent `np-*` class names
- * (docs/01 §9: one visual vocabulary); this file gives them form. Import once
+ *this file gives them form. Import once
  * from the app root:  import "@netpulse/design-system/styles.css".
  *
  * Structure: tokens → reset → app shell → primitives → constellation → per-screen → media queries.
@@ -253,7 +253,7 @@ button {
   color: var(--np-text);
   white-space: nowrap;
 }
-/* A breathing pulse dot beside the wordmark — the "live" motif (docs/17 §8). */
+/* A breathing pulse dot beside the wordmark — the "live" motif. */
 .np-brand::before {
   content: "";
   display: inline-block;
@@ -389,7 +389,7 @@ button {
   height: 18px;
 }
 
-/* ---- Live capture control (mandatory visible indicator, docs/17 §8) ---- */
+/* ---- Live capture control (mandatory visible indicator ---- */
 .np-capture {
   display: inline-flex;
   align-items: center;
@@ -493,7 +493,7 @@ button {
 
 /* ============================ Primitives ============================ */
 
-/* Empty / calm-idle states — never a void (docs/09 §11). */
+/* Empty / calm-idle states — never a void. */
 .np-empty {
   display: grid;
   place-items: center;
@@ -1770,7 +1770,7 @@ button {
   white-space: nowrap;
 }
 
-/* ---- Timeline ribbon (docs/10) ---- */
+/* ---- Timeline ribbon ---- */
 .np-ribbon {
   padding: var(--np-5);
   background: var(--np-surface-1);
@@ -1832,7 +1832,7 @@ button {
   color: var(--np-text-mute);
 }
 
-/* ---- Journey flow diagram (docs/14) ---- */
+/* ---- Journey flow diagram ---- */
 .np-jflow {
   padding: var(--np-5);
   background: var(--np-surface-1);
@@ -2391,7 +2391,7 @@ button {
   width: 100%;
 }
 
-/* Respect reduced-motion (docs/16 §perf, accessibility). */
+/* Respect reduced-motion. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

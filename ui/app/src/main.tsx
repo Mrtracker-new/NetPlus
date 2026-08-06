@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import "./i18n";
-// The single source of visual language (docs/01 §9) — styles every np-* class.
+// The single source of visual language — styles every np-* class.
 import "@netpulse/design-system/styles.css";
 
 const root = document.getElementById("root");

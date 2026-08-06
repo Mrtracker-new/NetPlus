@@ -1,9 +1,9 @@
-// Progressive disclosure — the UX backbone of the whole app (docs/09 §6).
+// Progressive disclosure — the UX backbone of the whole app.
 //
 // Mode is a single piece of UI state read by every disclosure-aware component
-// (docs/09 §6.3). It is *also* sent to the engine as a projection depth on
+//It is *also* sent to the engine as a projection depth on
 // queries, so a beginner view never hauls expert detail across the boundary.
-// First run defaults to Beginner and the choice is remembered (docs/09 §6.3).
+// First run defaults to Beginner and the choice is remembered.
 
 import {
   createContext,
@@ -23,7 +23,7 @@ interface DisclosureState {
   depth: ProjectionDepth;
   setDepth: (d: ProjectionDepth) => void;
   /** True when `depth` is deep enough to show content authored for `required` —
-   *  the additive rule (docs/09 §6.1): an expert view also shows beginner text. */
+   *  the additive rule: an expert view also shows beginner text. */
   shows: (required: ProjectionDepth) => boolean;
 }
 

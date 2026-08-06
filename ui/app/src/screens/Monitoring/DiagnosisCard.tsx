@@ -13,7 +13,7 @@ export function DiagnosisCard({ diagnosis, onNavigateEvidence }: DiagnosisCardPr
   return (
     <article className="np-diagnosis">
       <p>{diagnosis.explanation}</p>
-      {/* Confidence is always shown — honest over reassuring (docs/11 §6.3). */}
+      {/* Confidence is always shown — honest over reassuring. */}
       <ConfidenceMeter
         percent={diagnosis.confidence_percent}
         qualitative={confidenceWord}

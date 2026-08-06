@@ -1,12 +1,12 @@
 /* NetPulse design tokens — "Soft Signal": a calm, premium, light neumorphic
  * visual language (Linear / Arc / Nothing OS / Raycast / Vercel lineage).
  *
- * The single source of NetPulse's visual vocabulary (docs/01 §9): one place
+ * The single source of NetPulse's visual vocabulary: one place
  * defines what a surface, an accent, or a severity looks like, so every screen
  * agrees. The motif is still the pulse/waveform — signals traveling, made
  * visible — but expressed now as soft raised light surfaces (neumorphism),
  * frosted glass, a calm mint accent, and CALM (never alarmist) severity colors
- * (docs/09 §5.2, docs/17 §7.1).
+ *
  *
  * Light is the default; the original deep-observatory dark theme is preserved
  * under [data-theme="dark"]. Color is never the sole carrier of meaning (docs/09

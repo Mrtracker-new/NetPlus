@@ -41,7 +41,7 @@ import type {
 export type StreamChannel = "flows" | "metrics" | "findings" | "narratives";
 
 /** Pull requests (mirrors `netpulse_api::Query`). Each carries a depth where the
- *  engine projects at that disclosure level (docs/09 §6.3). */
+ *  engine projects at that disclosure level. */
 export type Query =
   | {
       kind: "narrativeFeed";
@@ -53,16 +53,16 @@ export type Query =
   | { kind: "monitorSnapshot"; from_mono_nanos: number; to_mono_nanos: number }
   | { kind: "attributionOfFlow"; flow_id: number }
   | { kind: "packetsOfFlow"; flow_id: number }
-  // Phase 3 education queries (docs/13–16).
+  // Phase 3 education queries.
   | { kind: "lessonOffers"; session_id: number; depth: ProjectionDepth }
   | { kind: "journeyStagesOfSession"; session_id: number; depth: ProjectionDepth }
   | { kind: "explorerBrowse" }
   | { kind: "explorerSearch"; term: string }
   | { kind: "handshakeAnimationForFlow"; flow_id: number }
-  // Phase 4 intelligence queries (docs/17–20).
+  // Phase 4 intelligence queries.
   | { kind: "securityFindings"; from_mono_nanos: number; to_mono_nanos: number }
   | { kind: "askAssistant"; question: string }
-  // Phase 5 lifecycle queries (docs/21–24).
+  // Phase 5 lifecycle queries.
   | { kind: "listRecordings" }
   | { kind: "replayState" }
   | { kind: "exportPreview"; selection: ExportSelection; format: ExportFormat }
@@ -86,15 +86,15 @@ export type QueryResponse =
   | { kind: "monitorSnapshot"; snapshot: MonitorSnapshot }
   | { kind: "attribution"; attribution: Attribution }
   | { kind: "payloadsUnavailable" }
-  // Phase 3 education answers (docs/13–16).
+  // Phase 3 education answers.
   | { kind: "lessonOffers"; offers: LessonOffer[] }
   | { kind: "pageJourney"; journey: PageJourney }
   | { kind: "explorerEntries"; entries: ExplorerEntry[] }
   | { kind: "animation"; animation: AnimationModel }
-  // Phase 4 intelligence answers (docs/17–20).
+  // Phase 4 intelligence answers.
   | { kind: "findings"; findings: SecurityFinding[] }
   | { kind: "assistantAnswer"; answer: AssistantAnswer }
-  // Phase 5 lifecycle answers (docs/21–24).
+  // Phase 5 lifecycle answers.
   | { kind: "recordings"; recordings: RecordingSummary[] }
   | { kind: "replayState"; state: ReplayState }
   | { kind: "exportPreview"; preview: ExportPreview }
@@ -110,16 +110,16 @@ export type QueryResponse =
   | { kind: "fleetHosts"; hosts: FleetHost[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
- *  nothing here modifies network traffic (docs/02 §10). */
+ *  nothing here modifies network traffic. */
 export type Command =
   | { kind: "startCapture"; iface_id: number }
   | { kind: "stopCapture"; iface_id: number }
   | { kind: "startRecording" }
   | { kind: "stopRecording" }
   | { kind: "setDepth"; depth: ProjectionDepth }
-  // Phase 5 lifecycle commands (docs/21–24). Replay transport (docs/21 §5),
-  // explicit local export (docs/23 §6, never auto-transmitted), and plugin
-  // enable/disable as an explicit user choice (docs/24 §5).
+  // Phase 5 lifecycle commands. Replay transport,
+  // explicit local export, and plugin
+  // enable/disable as an explicit user choice.
   | { kind: "replayPlay" }
   | { kind: "replayPause" }
   | { kind: "replayStep" }

@@ -1,6 +1,6 @@
-// Timeline — "what happened, and when?" (docs/10). One shared time axis with the
+// Timeline — "what happened, and when?". One shared time axis with the
 // reconstructed events laned by severity, so anything at the same moment lines up
-// vertically (docs/10 §4).
+// vertically.
 
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";

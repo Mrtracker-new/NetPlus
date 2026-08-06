@@ -5,6 +5,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 10
     groups:
       root-workspace:
         patterns:
@@ -15,8 +16,20 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 10
     groups:
       desktop-shell:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "cargo"
+    directory: "/fuzz"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      fuzz-harness:
         patterns:
           - "*"
 
@@ -25,18 +38,9 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 10
     groups:
-      npm-root-dependencies:
-        patterns:
-          - "*"
-
-  - package-ecosystem: "npm"
-    directory: "/ui"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    groups:
-      npm-ui-dependencies:
+      pnpm-ui-dependencies:
         patterns:
           - "*"
 
@@ -45,7 +49,9 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
+    open-pull-requests-limit: 5
     groups:
       actions:
         patterns:
           - "*"
+

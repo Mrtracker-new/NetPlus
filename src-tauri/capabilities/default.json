@@ -5,6 +5,8 @@
   "windows": ["main"],
   "permissions": [
     "core:default",
-    "default"
+    "default",
+    "allow-query",
+    "allow-command"
   ]
 }

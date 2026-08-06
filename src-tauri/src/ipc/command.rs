@@ -60,7 +60,9 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
             patch,
         } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            registry.patch_plugin(&name, expected_version, patch).map(|_| ())
+            registry
+                .patch_plugin(&name, expected_version, patch)
+                .map(|_| ())
         }
         Command::ResetPluginConfig { name } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
@@ -69,4 +71,3 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
         _ => Err("unknown command".into()),
     }
 }
-

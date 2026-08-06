@@ -20,9 +20,11 @@ fn test_seeded_state_is_deterministic() {
         assert_eq!(pa.effective_trust, pb.effective_trust);
     }
 
-
     assert_eq!(*a.depth.lock().unwrap(), *b.depth.lock().unwrap());
-    assert_eq!(a.recordings.lock().unwrap().len(), b.recordings.lock().unwrap().len());
+    assert_eq!(
+        a.recordings.lock().unwrap().len(),
+        b.recordings.lock().unwrap().len()
+    );
 }
 
 #[test]
@@ -190,10 +192,7 @@ fn test_query_list_plugins_invariants() {
             .expect("example-view should be registered");
 
         assert_eq!(view_plugin.plugin_type, PluginTypeDto::View);
-        assert_eq!(
-            view_plugin.capabilities,
-            vec![PluginCapabilityDto::ApiRead]
-        );
+        assert_eq!(view_plugin.capabilities, vec![PluginCapabilityDto::ApiRead]);
         assert_eq!(view_plugin.trust, PluginTrustDto::FirstParty);
         assert!(view_plugin.enabled);
         assert!(view_plugin.compatible);
@@ -310,7 +309,10 @@ fn test_query_explorer_browse_and_search() {
     )
     .unwrap();
     if let QueryResponse::ExplorerEntries { entries } = res_search {
-        assert!(entries.is_empty(), "nonexistent term should return empty list rather than error");
+        assert!(
+            entries.is_empty(),
+            "nonexistent term should return empty list rather than error"
+        );
     } else {
         panic!("expected ExplorerEntries response");
     }
@@ -365,12 +367,27 @@ fn test_command_set_depth_state_transition() {
     assert_eq!(*state.depth.lock().unwrap(), netpulse_core::Depth::Beginner);
 
     // Transition to Expert
-    execute_command(&state, Command::SetDepth { depth: ProjectionDepth::Expert }).unwrap();
+    execute_command(
+        &state,
+        Command::SetDepth {
+            depth: ProjectionDepth::Expert,
+        },
+    )
+    .unwrap();
     assert_eq!(*state.depth.lock().unwrap(), netpulse_core::Depth::Expert);
 
     // Transition to Intermediate
-    execute_command(&state, Command::SetDepth { depth: ProjectionDepth::Intermediate }).unwrap();
-    assert_eq!(*state.depth.lock().unwrap(), netpulse_core::Depth::Intermediate);
+    execute_command(
+        &state,
+        Command::SetDepth {
+            depth: ProjectionDepth::Intermediate,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        *state.depth.lock().unwrap(),
+        netpulse_core::Depth::Intermediate
+    );
 }
 
 #[test]
@@ -418,57 +435,104 @@ fn test_command_enable_disable_plugin_state_transition() {
     // Verify plugin is registered and disabled
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert!(!p.enabled);
     }
 
     // Enable plugin -> verify state transition
-    execute_command(&state, Command::EnablePlugin { name: "community-plugin".into() }).unwrap();
+    execute_command(
+        &state,
+        Command::EnablePlugin {
+            name: "community-plugin".into(),
+        },
+    )
+    .unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert!(p.enabled);
     }
 
     // Disable plugin -> verify state transition
-    execute_command(&state, Command::DisablePlugin { name: "community-plugin".into() }).unwrap();
+    execute_command(
+        &state,
+        Command::DisablePlugin {
+            name: "community-plugin".into(),
+        },
+    )
+    .unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert!(!p.enabled);
     }
 
     // Test ConfigurePlugin, PatchPluginConfig, and ResetPluginConfig
-    execute_command(&state, Command::ConfigurePlugin {
-        name: "community-plugin".into(),
-        config: serde_json::json!({ "threshold": 10 }),
-    }).unwrap();
+    execute_command(
+        &state,
+        Command::ConfigurePlugin {
+            name: "community-plugin".into(),
+            config: serde_json::json!({ "threshold": 10 }),
+        },
+    )
+    .unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert_eq!(p.config["threshold"], 10);
     }
 
-    execute_command(&state, Command::PatchPluginConfig {
-        name: "community-plugin".into(),
-        expected_version: Some(1),
-        patch: serde_json::json!({ "threshold": 12 }),
-    }).unwrap();
+    execute_command(
+        &state,
+        Command::PatchPluginConfig {
+            name: "community-plugin".into(),
+            expected_version: Some(1),
+            patch: serde_json::json!({ "threshold": 12 }),
+        },
+    )
+    .unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert_eq!(p.config["threshold"], 12);
     }
 
-    execute_command(&state, Command::ResetPluginConfig {
-        name: "community-plugin".into(),
-    }).unwrap();
+    execute_command(
+        &state,
+        Command::ResetPluginConfig {
+            name: "community-plugin".into(),
+        },
+    )
+    .unwrap();
     {
         let reg = state.registry.lock().unwrap();
-        let p = reg.plugins().iter().find(|p| p.manifest.metadata.name == "community-plugin").unwrap();
+        let p = reg
+            .plugins()
+            .iter()
+            .find(|p| p.manifest.metadata.name == "community-plugin")
+            .unwrap();
         assert_eq!(p.config["threshold"], 5);
     }
-
 }
 
 #[test]
@@ -476,12 +540,22 @@ fn test_command_plugin_idempotency_and_unknown_refusal() {
     let state = seeded_state();
 
     // Enabling an unknown plugin fails honestly
-    let res = execute_command(&state, Command::EnablePlugin { name: "unknown-plugin".into() });
+    let res = execute_command(
+        &state,
+        Command::EnablePlugin {
+            name: "unknown-plugin".into(),
+        },
+    );
     assert!(res.is_err());
     assert_eq!(res.unwrap_err(), "cannot enable plugin 'unknown-plugin'");
 
     // Disabling an unknown plugin fails honestly
-    let res_dis = execute_command(&state, Command::DisablePlugin { name: "unknown-plugin".into() });
+    let res_dis = execute_command(
+        &state,
+        Command::DisablePlugin {
+            name: "unknown-plugin".into(),
+        },
+    );
     assert!(res_dis.is_err());
     assert_eq!(res_dis.unwrap_err(), "unknown plugin 'unknown-plugin'");
 }
@@ -500,11 +574,15 @@ fn test_command_start_stop_recording_honest_refusal() {
 
     let res_start = execute_command(&state, Command::StartRecording);
     assert!(res_start.is_err());
-    assert!(res_start.unwrap_err().contains("recording requires a live capture source"));
+    assert!(res_start
+        .unwrap_err()
+        .contains("recording requires a live capture source"));
 
     let res_stop = execute_command(&state, Command::StopRecording);
     assert!(res_stop.is_err());
-    assert!(res_stop.unwrap_err().contains("recording requires a live capture source"));
+    assert!(res_stop
+        .unwrap_err()
+        .contains("recording requires a live capture source"));
 }
 
 #[test]
@@ -580,4 +658,3 @@ fn test_ipc_permission_manifests_parse() {
         "capabilities/default.json must explicitly grant application 'default' permission set"
     );
 }
-

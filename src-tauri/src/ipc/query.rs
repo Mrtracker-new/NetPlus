@@ -151,7 +151,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             let descriptors = registry
                 .plugins()
                 .iter()
-                .map(|p| netpulse_engine::project::plugin_descriptor_dto(p, netpulse_api::API_VERSION))
+                .map(|p| {
+                    netpulse_engine::project::plugin_descriptor_dto(p, netpulse_api::API_VERSION)
+                })
                 .collect();
             Ok(QueryResponse::Plugins {
                 plugins: descriptors,
@@ -172,7 +174,11 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             Ok(QueryResponse::Interfaces { interfaces })
         }
         Query::HealthCheck => {
-            let capture_running = state.capture.lock().map_err(|_| "state poisoned")?.is_some();
+            let capture_running = state
+                .capture
+                .lock()
+                .map_err(|_| "state poisoned")?
+                .is_some();
             let flow_count = store.flow_count();
             let session_count = store.session_count();
             let check = netpulse_api::ComponentCheckDto {
@@ -198,10 +204,8 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             client_min_version,
             client_max_version,
         } => {
-            let handshake = netpulse_api::negotiate_api_version_range(
-                client_min_version,
-                client_max_version,
-            );
+            let handshake =
+                netpulse_api::negotiate_api_version_range(client_min_version, client_max_version);
             Ok(QueryResponse::Handshake { handshake })
         }
         Query::GetCapabilityRegistry => {
@@ -265,7 +269,8 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             })
         }
         Query::BuildAndDecodePacket { layers } => {
-            let inspection = netpulse_learn::sandbox::PacketBuilderEngine::build_and_inspect(&layers);
+            let inspection =
+                netpulse_learn::sandbox::PacketBuilderEngine::build_and_inspect(&layers);
             Ok(QueryResponse::DecodedPacketInspection {
                 inspection: netpulse_api::PacketInspectionDto {
                     raw_hex: inspection.raw_hex,
@@ -287,7 +292,8 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             session_id_a,
             session_id_b,
         } => {
-            let report = netpulse_flow::diff::SessionDiffEngine::compare(session_id_a, session_id_b);
+            let report =
+                netpulse_flow::diff::SessionDiffEngine::compare(session_id_a, session_id_b);
             Ok(QueryResponse::SessionDiff {
                 diff: netpulse_api::SessionDiffDto {
                     session_id_a: report.session_id_a,
@@ -302,7 +308,10 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             })
         }
         Query::ListFleetHosts => {
-            let agent = netpulse_capture_svc::agent::FleetAgent::new("server-east-01".into(), "Linux".into());
+            let agent = netpulse_capture_svc::agent::FleetAgent::new(
+                "server-east-01".into(),
+                "Linux".into(),
+            );
             Ok(QueryResponse::FleetHosts {
                 hosts: vec![netpulse_api::HostIdentityDto {
                     host_id: agent.identity.host_id,

@@ -59,10 +59,20 @@ fn main() {
         if !found {
             let mut default_paths = Vec::new();
             if let Ok(prog_files) = std::env::var("ProgramFiles") {
-                default_paths.push(PathBuf::from(prog_files).join("Npcap SDK").join("Lib").join("x64"));
+                default_paths.push(
+                    PathBuf::from(prog_files)
+                        .join("Npcap SDK")
+                        .join("Lib")
+                        .join("x64"),
+                );
             }
             if let Ok(prog_files_x86) = std::env::var("ProgramFiles(x86)") {
-                default_paths.push(PathBuf::from(prog_files_x86).join("Npcap SDK").join("Lib").join("x64"));
+                default_paths.push(
+                    PathBuf::from(prog_files_x86)
+                        .join("Npcap SDK")
+                        .join("Lib")
+                        .join("x64"),
+                );
             }
             default_paths.push(PathBuf::from(r"C:\npcap-sdk\Lib\x64"));
             default_paths.push(PathBuf::from(r"C:\npcap-sdk\lib\x64"));

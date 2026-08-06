@@ -199,69 +199,158 @@ impl Drop for HintGuard {
 
 type HintMap = std::collections::BTreeMap<std::net::IpAddr, Vec<netpulse_core::HostName>>;
 
-/// Helper function with narrow responsibility: commit pipeline updates to the store
-/// and update atomic stats and name hints.
-#[allow(clippy::too_many_arguments)]
-fn rebuild_and_commit(
-    pipeline: &mut netpulse_engine::pipeline::LivePipeline,
-    latest_mono: u64,
-    capture_stats: (u64, u64),
-    store: &Arc<Mutex<CaptureStore>>,
-    stats: &Arc<Mutex<CaptureStats>>,
-    hint_cache: &mut HintMap,
-    last_hint_refresh: &mut Option<std::time::Instant>,
-    hint_rx: &std::sync::mpsc::Receiver<HintMap>,
-    hint_tx: &std::sync::mpsc::Sender<HintMap>,
-    hint_in_flight: &Arc<AtomicBool>,
-    stop: &Arc<AtomicBool>,
-    shed_controller: &ShedController,
-    buffer_len: usize,
-    buffer_drops: u64,
-    max_frames: usize,
-    hint_refresh_secs: u64,
-) {
-    // 1. Drain incoming background hints from channel
-    while let Ok(new_hints) = hint_rx.try_recv() {
-        *hint_cache = new_hints;
-        *last_hint_refresh = Some(std::time::Instant::now());
-    }
+/// Measurements recorded for a single capture loop rebuild/commit tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct CaptureCycleMetrics {
+    pub(crate) captured_frames: u64,
+    pub(crate) kernel_dropped_frames: u64,
+}
 
-    // 2. Trigger background hint refresh if due, capture is running, and no worker is in flight
-    let due = last_hint_refresh
-        .map(|t| t.elapsed().as_secs() >= hint_refresh_secs)
-        .unwrap_or(true);
-    if due && !stop.load(Ordering::Relaxed) && !hint_in_flight.swap(true, Ordering::AcqRel) {
-        let flag = hint_in_flight.clone();
-        let tx = hint_tx.clone();
-        let spawn_res = std::thread::Builder::new()
-            .name("dns-hint-refresh".into())
-            .spawn(move || {
-                let _guard = HintGuard(flag);
-                let hints = netpulse_platform::host_name_hints();
-                let _ = tx.send(hints);
-            });
-        if let Err(e) = spawn_res {
-            hint_in_flight.store(false, Ordering::Release);
-            tracing::warn!("Failed to spawn dns-hint-refresh worker: {e}");
+impl From<(u64, u64)> for CaptureCycleMetrics {
+    fn from((captured_frames, kernel_dropped_frames): (u64, u64)) -> Self {
+        Self {
+            captured_frames,
+            kernel_dropped_frames,
+        }
+    }
+}
+
+/// Immutable configuration settings for the background live capture loop.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LiveLoopConfig {
+    pub(crate) max_frames: usize,
+    pub(crate) hint_refresh_secs: u64,
+}
+
+/// Owns the mutable runtime state for a single live capture session.
+///
+/// Architectural Invariants:
+/// - Lock Order: `store` must always be locked before `stats` if both locks are held.
+/// - Concurrency: `hint_in_flight` guarantees at most one DNS refresh worker is spawned at a time.
+/// - Single Ownership: `pipeline` and `shed_controller` are exclusively owned by this context.
+/// - Lifecycle Enforcement: `finish()` consumes `self` to flush remaining buffered pipeline state
+///   and finalize resolutions upon capture loop shutdown.
+pub(crate) struct LiveLoopContext {
+    pub(crate) pipeline: netpulse_engine::pipeline::LivePipeline,
+    pub(crate) store: Arc<Mutex<CaptureStore>>,
+    pub(crate) stats: Arc<Mutex<CaptureStats>>,
+    pub(crate) stop: Arc<AtomicBool>,
+    pub(crate) shed_controller: ShedController,
+    pub(crate) hint_cache: HintMap,
+    pub(crate) last_hint_refresh: Option<std::time::Instant>,
+    pub(crate) hint_rx: std::sync::mpsc::Receiver<HintMap>,
+    pub(crate) hint_tx: std::sync::mpsc::Sender<HintMap>,
+    pub(crate) hint_in_flight: Arc<AtomicBool>,
+    pub(crate) config: LiveLoopConfig,
+}
+
+impl LiveLoopContext {
+    pub(crate) fn new(
+        dlt: u32,
+        store: Arc<Mutex<CaptureStore>>,
+        stats: Arc<Mutex<CaptureStats>>,
+        stop: Arc<AtomicBool>,
+        config: LiveLoopConfig,
+    ) -> Self {
+        let (hint_tx, hint_rx) = std::sync::mpsc::channel::<HintMap>();
+        Self {
+            pipeline: netpulse_engine::pipeline::LivePipeline::new(dlt, 16),
+            store,
+            stats,
+            stop,
+            shed_controller: ShedController::new(config.max_frames),
+            hint_cache: HintMap::new(),
+            last_hint_refresh: None,
+            hint_rx,
+            hint_tx,
+            hint_in_flight: Arc::new(AtomicBool::new(false)),
+            config,
         }
     }
 
-    // 3. Commit pipeline updates & merge hint cache to store
-    if let Ok(mut s) = store.lock() {
-        pipeline.commit_to_store(&mut s, latest_mono);
-        for (ip, names) in hint_cache.iter() {
-            s.merge_resolution(*ip, names.clone());
+    /// Drain incoming background hints from the channel.
+    fn drain_hint_channel(&mut self) {
+        while let Ok(new_hints) = self.hint_rx.try_recv() {
+            self.hint_cache = new_hints;
+            self.last_hint_refresh = Some(std::time::Instant::now());
         }
     }
 
-    let (received, kernel_dropped) = capture_stats;
-    if let Ok(mut st) = stats.lock() {
-        let total_dropped = kernel_dropped.saturating_add(buffer_drops);
-        st.received = st.received.max(received);
-        st.dropped = st.dropped.max(total_dropped);
-        st.shed_stage = shed_controller.current_stage();
-        st.buffer_frames = buffer_len;
-        st.buffer_capacity = max_frames;
+    /// Trigger background DNS hint refresh if due, capture is running, and no worker is in flight.
+    fn refresh_dns_hints(&mut self) {
+        let due = self
+            .last_hint_refresh
+            .map(|t| t.elapsed().as_secs() >= self.config.hint_refresh_secs)
+            .unwrap_or(true);
+        if due
+            && !self.stop.load(Ordering::Relaxed)
+            && !self.hint_in_flight.swap(true, Ordering::AcqRel)
+        {
+            let flag = self.hint_in_flight.clone();
+            let tx = self.hint_tx.clone();
+            let spawn_res = std::thread::Builder::new()
+                .name("dns-hint-refresh".into())
+                .spawn(move || {
+                    let _guard = HintGuard(flag);
+                    let hints = netpulse_platform::host_name_hints();
+                    let _ = tx.send(hints);
+                });
+            if let Err(e) = spawn_res {
+                self.hint_in_flight.store(false, Ordering::Release);
+                tracing::warn!("Failed to spawn dns-hint-refresh worker: {e}");
+            }
+        }
+    }
+
+    /// Commit pipeline updates & merge hint cache to store.
+    fn commit_pipeline(&mut self, latest_mono: u64) {
+        if let Ok(mut s) = self.store.lock() {
+            self.pipeline.commit_to_store(&mut s, latest_mono);
+            for (ip, names) in self.hint_cache.iter() {
+                s.merge_resolution(*ip, names.clone());
+            }
+        }
+    }
+
+    /// Update capture statistics under `stats` lock.
+    fn update_stats(&self, metrics: CaptureCycleMetrics, buffer_len: usize, buffer_drops: u64) {
+        if let Ok(mut st) = self.stats.lock() {
+            let total_dropped = metrics.kernel_dropped_frames.saturating_add(buffer_drops);
+            st.received = st.received.max(metrics.captured_frames);
+            st.dropped = st.dropped.max(total_dropped);
+            st.shed_stage = self.shed_controller.current_stage();
+            st.buffer_frames = buffer_len;
+            st.buffer_capacity = self.config.max_frames;
+        }
+    }
+
+    /// Commit pipeline updates to store and update atomic stats and DNS name hints.
+    pub(crate) fn rebuild_and_commit(
+        &mut self,
+        latest_mono: u64,
+        metrics: CaptureCycleMetrics,
+        buffer_len: usize,
+        buffer_drops: u64,
+    ) {
+        self.drain_hint_channel();
+        self.refresh_dns_hints();
+        self.commit_pipeline(latest_mono);
+        self.update_stats(metrics, buffer_len, buffer_drops);
+    }
+
+    /// Final Flush on shutdown so in-flight frames are never lost. Consumes `self`
+    /// to enforce lifecycle completion and prevent subsequent calls on a finished context.
+    pub(crate) fn finish(
+        mut self,
+        latest_mono: u64,
+        metrics: CaptureCycleMetrics,
+        buffer_len: usize,
+        buffer_drops: u64,
+    ) {
+        self.rebuild_and_commit(latest_mono, metrics, buffer_len, buffer_drops);
+        if let Ok(mut s) = self.store.lock() {
+            self.pipeline.finish(&mut s);
+        }
     }
 }
 
@@ -281,20 +370,16 @@ fn live_loop(
     done_tx: std::sync::mpsc::Sender<()>,
 ) {
     let _completion_guard = CompletionGuard(Some(done_tx));
-    const MAX_FRAMES: usize = 50_000;
-    const HINT_REFRESH_SECS: u64 = 30;
+    let config = LiveLoopConfig {
+        max_frames: 50_000,
+        hint_refresh_secs: 30,
+    };
 
-    let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(dlt, 16);
-    let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(MAX_FRAMES);
-    let mut shed_controller = ShedController::new(MAX_FRAMES);
+    let mut ctx = LiveLoopContext::new(dlt, store, stats, stop.clone(), config);
+    let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(config.max_frames);
     let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
-    let mut hint_cache: HintMap = HintMap::new();
-    let mut last_hint_refresh: Option<std::time::Instant> = None;
-
-    let (hint_tx, hint_rx) = std::sync::mpsc::channel::<HintMap>();
-    let hint_in_flight = Arc::new(AtomicBool::new(false));
 
     while !stop.load(Ordering::Relaxed) {
         let batch = match capture.next_batch() {
@@ -306,23 +391,25 @@ fn live_loop(
                 latest_mono = latest_mono.max(f.mono_nanos);
             }
             let fill_len = buffer.len() + batch.len();
-            let current_stage = shed_controller.update(fill_len);
+            let current_stage = ctx.shed_controller.update(fill_len);
 
             // Pre-insertion eviction (Option A sliding window): drain overflow from head of ring buffer
-            if fill_len > MAX_FRAMES {
-                let overflow = fill_len - MAX_FRAMES;
+            if fill_len > config.max_frames {
+                let overflow = fill_len - config.max_frames;
                 let to_drop = overflow.min(buffer.len());
                 buffer.drain(0..to_drop);
                 buffer_drops = buffer_drops.saturating_add(overflow as u64);
             }
 
-            pipeline.ingest_batch(&batch);
+            ctx.pipeline.ingest_batch(&batch);
 
             for mut frame in batch {
                 if current_stage >= ShedStage::PayloadsOff {
                     frame.bytes.truncate(ETH_IPV4_TCP_HEADERS);
                 }
-                if current_stage == ShedStage::SampleDissection && !shed_controller.should_sample() {
+                if current_stage == ShedStage::SampleDissection
+                    && !ctx.shed_controller.should_sample()
+                {
                     continue;
                 }
                 buffer.push_back(frame);
@@ -331,23 +418,11 @@ fn live_loop(
 
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
-            rebuild_and_commit(
-                &mut pipeline,
+            ctx.rebuild_and_commit(
                 latest_mono,
-                capture.stats(),
-                &store,
-                &stats,
-                &mut hint_cache,
-                &mut last_hint_refresh,
-                &hint_rx,
-                &hint_tx,
-                &hint_in_flight,
-                &stop,
-                &shed_controller,
+                capture.stats().into(),
                 buffer.len(),
                 buffer_drops,
-                MAX_FRAMES,
-                HINT_REFRESH_SECS,
             );
 
             // Poll the OS socket tables and feed the correlator, timestamped in the
@@ -363,27 +438,12 @@ fn live_loop(
     }
 
     // Final Flush on shutdown so in-flight frames are never lost
-    rebuild_and_commit(
-        &mut pipeline,
+    ctx.finish(
         latest_mono,
-        capture.stats(),
-        &store,
-        &stats,
-        &mut hint_cache,
-        &mut last_hint_refresh,
-        &hint_rx,
-        &hint_tx,
-        &hint_in_flight,
-        &stop,
-        &shed_controller,
+        capture.stats().into(),
         buffer.len(),
         buffer_drops,
-        MAX_FRAMES,
-        HINT_REFRESH_SECS,
     );
-    if let Ok(mut s) = store.lock() {
-        pipeline.finish(&mut s);
-    }
     // _completion_guard drops here, signaling done_tx
 }
 
@@ -450,42 +510,46 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
 /// examples under `plugins/`; the registry auto-enables first-party references.
 fn seed_registry() -> PluginRegistry {
     let mut reg = PluginRegistry::new(netpulse_api::API_VERSION);
-    let first_party =
-        |name: &str, ty: PluginType, default_cfg: serde_json::Value, schema: Option<netpulse_plugin::JsonSchema>, fuzzed: bool, has_explanation: bool| {
-            let m = PluginManifest {
-                manifest_version: 1,
-                metadata: netpulse_plugin::PluginMetadata {
-                    name: name.into(),
-                    plugin_type: ty,
-                    target_contract: ContractVersion(netpulse_api::API_VERSION),
-                },
-                config: netpulse_plugin::PluginConfigurationMetadata {
-                    config_version: 1,
-                    default_config: default_cfg,
-                    config_schema: schema,
-                },
-                security: netpulse_plugin::PluginSecurityMetadata {
-                    trust: TrustMetadata {
-                        source: format!("in-tree:plugins/{name}"),
-                        signatures: Vec::new(),
-                        status: TrustStatus::FirstParty,
-                    },
-                    payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
+    let first_party = |name: &str,
+                       ty: PluginType,
+                       default_cfg: serde_json::Value,
+                       schema: Option<netpulse_plugin::JsonSchema>,
+                       fuzzed: bool,
+                       has_explanation: bool| {
+        let m = PluginManifest {
+            manifest_version: 1,
+            metadata: netpulse_plugin::PluginMetadata {
+                name: name.into(),
+                plugin_type: ty,
+                target_contract: ContractVersion(netpulse_api::API_VERSION),
+            },
+            config: netpulse_plugin::PluginConfigurationMetadata {
+                config_version: 1,
+                default_config: default_cfg,
+                config_schema: schema,
+            },
+            security: netpulse_plugin::PluginSecurityMetadata {
+                trust: TrustMetadata {
+                    source: format!("in-tree:plugins/{name}"),
                     signatures: Vec::new(),
-                    fuzzed,
-                    has_explanation,
+                    status: TrustStatus::FirstParty,
                 },
-            };
-            netpulse_plugin::VerificationOutcome {
-                manifest: m,
-                claimed_trust: TrustStatus::FirstParty,
-                effective_trust: TrustStatus::FirstParty,
-                verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
-                    "in-tree-key".into(),
-                )),
-                payload_hash_valid: true,
-            }
+                payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
+                signatures: Vec::new(),
+                fuzzed,
+                has_explanation,
+            },
         };
+        netpulse_plugin::VerificationOutcome {
+            manifest: m,
+            claimed_trust: TrustStatus::FirstParty,
+            effective_trust: TrustStatus::FirstParty,
+            verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
+                "in-tree-key".into(),
+            )),
+            payload_hash_valid: true,
+        }
+    };
     reg.register(first_party(
         "example-dissector",
         PluginType::Dissector,
@@ -566,7 +630,6 @@ fn seed_registry() -> PluginRegistry {
     ));
     reg
 }
-
 
 pub(crate) fn to_depth(d: ProjectionDepth) -> Depth {
     match d {
@@ -687,45 +750,70 @@ mod tests {
     fn test_rebuild_and_commit_flushes_buffered_frames() {
         let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
         let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let stop = Arc::new(AtomicBool::new(false));
         let frame = RawFrame {
             mono_nanos: 1_000_000,
             iface_id: 1,
             bytes: vec![0u8; 54],
         };
 
-        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
-        pipeline.ingest_batch(&[frame]);
-
-        let mut hint_cache = std::collections::BTreeMap::new();
-        let mut last_hint_refresh = Some(std::time::Instant::now());
-        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
-        let hint_in_flight = Arc::new(AtomicBool::new(false));
-        let stop = Arc::new(AtomicBool::new(false));
-        let shed_controller = ShedController::new(1000);
-
-        rebuild_and_commit(
-            &mut pipeline,
-            1_000_000,
-            (1, 0),
-            &store,
-            &stats,
-            &mut hint_cache,
-            &mut last_hint_refresh,
-            &hint_rx,
-            &hint_tx,
-            &hint_in_flight,
-            &stop,
-            &shed_controller,
+        let mut ctx = LiveLoopContext::new(
             1,
-            0,
-            1000,
-            30,
+            store,
+            stats,
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
         );
+        ctx.pipeline.ingest_batch(&[frame]);
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 1, 0);
 
-        let st = stats.lock().unwrap();
+        let st = ctx.stats.lock().unwrap();
         assert_eq!(st.buffer_frames, 1);
         assert_eq!(st.buffer_capacity, 1000);
         assert_eq!(st.received, 1);
+    }
+
+    #[test]
+    fn test_finish_consumes_context_and_flushes_pipeline() {
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let frame = RawFrame {
+            mono_nanos: 2_000_000,
+            iface_id: 1,
+            bytes: vec![0u8; 54],
+        };
+
+        let mut ctx = LiveLoopContext::new(
+            1,
+            store.clone(),
+            stats.clone(),
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
+        );
+        ctx.pipeline.ingest_batch(&[frame]);
+
+        // finish() consumes ownership of ctx
+        ctx.finish(
+            2_000_000,
+            CaptureCycleMetrics {
+                captured_frames: 1,
+                kernel_dropped_frames: 0,
+            },
+            1,
+            0,
+        );
+
+        let st = stats.lock().unwrap();
+        assert_eq!(st.received, 1);
+        let s = store.lock().unwrap();
+        assert_eq!(s.policy(), PayloadPolicy::MetadataOnly);
     }
 
     #[test]
@@ -756,7 +844,9 @@ mod tests {
 
         let res = stop_capture(&state);
         assert!(res.is_err());
-        assert!(res.unwrap_err().contains("did not terminate within 3 seconds"));
+        assert!(res
+            .unwrap_err()
+            .contains("did not terminate within 3 seconds"));
 
         // Verify CaptureControl handle was restored so system honestly reports running
         let guard = state.capture.lock().unwrap();
@@ -796,43 +886,29 @@ mod tests {
             dropped: 10,
             ..Default::default()
         }));
+        let stop = Arc::new(AtomicBool::new(false));
         let frame = RawFrame {
             mono_nanos: 1_000_000,
             iface_id: 1,
             bytes: vec![0u8; 54],
         };
 
-        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
-        pipeline.ingest_batch(&[frame]);
-
-        let mut hint_cache = std::collections::BTreeMap::new();
-        let mut last_hint_refresh = Some(std::time::Instant::now());
-        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
-        let hint_in_flight = Arc::new(AtomicBool::new(false));
-        let stop = Arc::new(AtomicBool::new(false));
-        let shed_controller = ShedController::new(1000);
+        let mut ctx = LiveLoopContext::new(
+            1,
+            store,
+            stats,
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
+        );
+        ctx.pipeline.ingest_batch(&[frame]);
 
         // Attempt update with lower counters (e.g. out of order or transient drop)
-        rebuild_and_commit(
-            &mut pipeline,
-            1_000_000,
-            (400, 5),
-            &store,
-            &stats,
-            &mut hint_cache,
-            &mut last_hint_refresh,
-            &hint_rx,
-            &hint_tx,
-            &hint_in_flight,
-            &stop,
-            &shed_controller,
-            1,
-            0,
-            1000,
-            30,
-        );
+        ctx.rebuild_and_commit(1_000_000, (400, 5).into(), 1, 0);
 
-        let st = stats.lock().unwrap();
+        let st = ctx.stats.lock().unwrap();
         // Assert counters remained monotonic at max values (500, 10)
         assert_eq!(st.received, 500);
         assert_eq!(st.dropped, 10);
@@ -842,37 +918,28 @@ mod tests {
     fn test_dns_hint_only_one_worker_in_flight() {
         let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
         let stats = Arc::new(Mutex::new(CaptureStats::default()));
-        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
-        let mut hint_cache = HintMap::new();
-        let mut last_hint_refresh = None; // Due immediately
-        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
-        let hint_in_flight = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(false));
-        let shed_controller = ShedController::new(1000);
 
-        // First call triggers background worker
-        rebuild_and_commit(
-            &mut pipeline,
-            1_000_000,
-            (1, 0),
-            &store,
-            &stats,
-            &mut hint_cache,
-            &mut last_hint_refresh,
-            &hint_rx,
-            &hint_tx,
-            &hint_in_flight,
-            &stop,
-            &shed_controller,
-            0,
-            0,
-            1000,
-            30,
+        let mut ctx = LiveLoopContext::new(
+            1,
+            store,
+            stats,
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
         );
 
+        // First call triggers background worker
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
+
         // Second call while worker running should not spawn a duplicate
-        let prev_flag = hint_in_flight.swap(true, Ordering::AcqRel);
-        assert!(prev_flag, "Flag must remain in-flight while worker is running");
+        let prev_flag = ctx.hint_in_flight.swap(true, Ordering::AcqRel);
+        assert!(
+            prev_flag,
+            "Flag must remain in-flight while worker is running"
+        );
     }
 
     #[test]
@@ -882,12 +949,29 @@ mod tests {
             let _guard = HintGuard(hint_in_flight.clone());
             // Simulate worker panic inside scoped block
         }
-        assert!(!hint_in_flight.load(Ordering::Acquire), "Guard drop must reset flag even on panic");
+        assert!(
+            !hint_in_flight.load(Ordering::Acquire),
+            "Guard drop must reset flag even on panic"
+        );
     }
 
     #[test]
     fn test_dns_hint_multiple_completed_refreshes_latest_wins() {
-        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
+        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
+        let stats = Arc::new(Mutex::new(CaptureStats::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+
+        let mut ctx = LiveLoopContext::new(
+            1,
+            store,
+            stats,
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
+        );
+
         let mut map1 = HintMap::new();
         map1.insert(
             "1.1.1.1".parse().unwrap(),
@@ -905,39 +989,13 @@ mod tests {
             }],
         );
 
-        hint_tx.send(map1).unwrap();
-        hint_tx.send(map2).unwrap();
+        ctx.hint_tx.send(map1).unwrap();
+        ctx.hint_tx.send(map2).unwrap();
 
-        let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
-        let stats = Arc::new(Mutex::new(CaptureStats::default()));
-        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
-        let mut hint_cache = HintMap::new();
-        let mut last_hint_refresh = Some(std::time::Instant::now());
-        let hint_in_flight = Arc::new(AtomicBool::new(false));
-        let stop = Arc::new(AtomicBool::new(false));
-        let shed_controller = ShedController::new(1000);
-
-        rebuild_and_commit(
-            &mut pipeline,
-            1_000_000,
-            (1, 0),
-            &store,
-            &stats,
-            &mut hint_cache,
-            &mut last_hint_refresh,
-            &hint_rx,
-            &hint_tx,
-            &hint_in_flight,
-            &stop,
-            &shed_controller,
-            0,
-            0,
-            1000,
-            30,
-        );
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
 
         assert_eq!(
-            hint_cache.get(&"1.1.1.1".parse().unwrap()).unwrap()[0].name,
+            ctx.hint_cache.get(&"1.1.1.1".parse().unwrap()).unwrap()[0].name,
             "newest.local"
         );
     }
@@ -950,41 +1008,35 @@ mod tests {
         let flag = Arc::new(AtomicBool::new(false));
         let _guard = HintGuard(flag.clone());
         let res = hint_tx.send(HintMap::new());
-        assert!(res.is_err(), "Send fails on disconnected receiver without crashing worker");
+        assert!(
+            res.is_err(),
+            "Send fails on disconnected receiver without crashing worker"
+        );
     }
 
     #[test]
     fn test_dns_hint_shutdown_prevents_spawn() {
         let store = Arc::new(Mutex::new(CaptureStore::new(PayloadPolicy::MetadataOnly)));
         let stats = Arc::new(Mutex::new(CaptureStats::default()));
-        let mut pipeline = netpulse_engine::pipeline::LivePipeline::new(1, 16);
-        let mut hint_cache = HintMap::new();
-        let mut last_hint_refresh = None; // Due
-        let (hint_tx, hint_rx) = std::sync::mpsc::channel();
-        let hint_in_flight = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(true)); // Stop flag set
-        let shed_controller = ShedController::new(1000);
 
-        rebuild_and_commit(
-            &mut pipeline,
-            1_000_000,
-            (1, 0),
-            &store,
-            &stats,
-            &mut hint_cache,
-            &mut last_hint_refresh,
-            &hint_rx,
-            &hint_tx,
-            &hint_in_flight,
-            &stop,
-            &shed_controller,
-            0,
-            0,
-            1000,
-            30,
+        let mut ctx = LiveLoopContext::new(
+            1,
+            store,
+            stats,
+            stop,
+            LiveLoopConfig {
+                max_frames: 1000,
+                hint_refresh_secs: 30,
+            },
         );
 
-        assert!(!hint_in_flight.load(Ordering::Acquire), "Must not spawn background worker if stop flag set");
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
+
+        assert!(
+            !ctx.hint_in_flight.load(Ordering::Acquire),
+            "Must not spawn background worker if stop flag set"
+        );
     }
 
     #[test]

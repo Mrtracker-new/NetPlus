@@ -8,10 +8,10 @@ export interface PingResultCardProps {
 export function PingResultCard({ result }: PingResultCardProps) {
   const { t } = useTranslation(["diagnostics"]);
 
-  const lossPct = Math.round((result.lossPct ?? result.loss_pct ?? 0) * 10) / 10;
-  const avgRttStr = formatMs(result.avgRttMs ?? result.avg_rtt_ms ?? 0);
-  const minRttStr = formatMs(result.minRttMs ?? result.min_rtt_ms ?? 0);
-  const maxRttStr = formatMs(result.maxRttMs ?? result.max_rtt_ms ?? 0);
+  const lossPct = Math.round((result.lossPct ?? 0) * 10) / 10;
+  const avgRttStr = formatMs(result.avgRttMs ?? 0);
+  const minRttStr = formatMs(result.minRttMs ?? 0);
+  const maxRttStr = formatMs(result.maxRttMs ?? 0);
   const jitterStr = formatMs(result.jitterMs ?? 0);
 
   const isHighLoss = lossPct > 10;

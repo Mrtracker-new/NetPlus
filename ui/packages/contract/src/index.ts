@@ -29,6 +29,12 @@ import type {
   PluginDescriptor,
   Interface,
   HandshakeResponse,
+  PingResult,
+  TracerouteHop,
+  BufferbloatResult,
+  PacketInspection,
+  SessionDiff,
+  FleetHost,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -65,91 +71,13 @@ export type Query =
   | { kind: "handshake"; client_version: number }
   | { kind: "getCapabilityRegistry" }
   | { kind: "runPing"; target: string; count: number }
-  | { kind: "runTraceroute"; target: string; transport: string; max_hops: number; maxHops?: number }
+  | { kind: "runTraceroute"; target: string; transport: string; max_hops: number }
   | { kind: "runBufferbloatTest"; target?: string }
   | { kind: "buildAndDecodePacket"; layers: string[] }
-  | { kind: "compareSessions"; session_id_a: number; session_id_b: number; sessionIdA?: number; sessionIdB?: number }
+  | { kind: "compareSessions"; session_id_a: number; session_id_b: number }
   | { kind: "listFleetHosts" };
 
-export interface PingResult {
-  target: string;
-  sent: number;
-  received: number;
-  loss_pct?: number;
-  lossPct?: number;
-  min_rtt_ms?: number;
-  minRttMs?: number;
-  avg_rtt_ms?: number;
-  avgRttMs?: number;
-  max_rtt_ms?: number;
-  maxRttMs?: number;
-  stddev_rtt_ms?: number;
-  stddevRttMs?: number;
-}
-
-export interface TracerouteHop {
-  ttl: number;
-  ip: string;
-  hostname?: string | null;
-  rtt_ms?: number;
-  rttMs?: number;
-  status?: string;
-}
-
-export interface BufferbloatResult {
-  target: string;
-  idle_rtt_ms?: number;
-  idleRttMs?: number;
-  loaded_rtt_ms?: number;
-  loadedRttMs?: number;
-  delta_rtt_ms?: number;
-  deltaRttMs?: number;
-  grade: string;
-}
-
 export type FleetHostStatus = "Online" | "Offline" | "Degraded" | "Healthy" | "Unknown";
-
-export interface FleetHost {
-  hostId: string;
-  hostname: string;
-  friendlyName?: string | null;
-  os: string;
-  platform: string;
-  agentVersion: string;
-  status: FleetHostStatus;
-}
-
-export type DiagnosticSeverity = "info" | "warning" | "error";
-
-export interface FieldDiagnostic {
-  severity: DiagnosticSeverity;
-  field: string;
-  rfcReference: string;
-  explanation: string;
-}
-
-export interface PacketInspection {
-  rawHex: string;
-  layers: readonly string[];
-  diagnostics: readonly FieldDiagnostic[];
-}
-
-export interface SessionDiff {
-  session_id_a?: number;
-  sessionIdA: number;
-  session_id_b?: number;
-  sessionIdB: number;
-  rtt_delta_ms?: number;
-  rttDeltaMs: number;
-  ttfb_delta_ms?: number;
-  ttfbDeltaMs: number;
-  protocolShift: string;
-  protocol_shift?: string;
-  semanticExplanation: string;
-  semantic_explanation?: string;
-  confidence: string;
-  evidence: string[];
-}
 
 /** Typed answers to a {@link Query} (mirrors `netpulse_api::QueryResponse`). */
 export type QueryResponse =

@@ -284,3 +284,66 @@ export interface HandshakeResponse {
   error_code: string | null;
   error: string | null;
 }
+
+export type DiagnosticSeverity = "info" | "warning" | "error";
+
+export interface PingResult {
+  target: string;
+  sent: number;
+  received: number;
+  lossPct?: number;
+  minRttMs?: number;
+  avgRttMs?: number;
+  maxRttMs?: number;
+  stddevRttMs?: number;
+}
+
+export interface TracerouteHop {
+  ttl: number;
+  ip: string;
+  hostname?: string | null;
+  rttMs?: number;
+  status?: string;
+}
+
+export interface BufferbloatResult {
+  target: string;
+  idleRttMs?: number;
+  loadedRttMs?: number;
+  deltaRttMs?: number;
+  grade: string;
+}
+
+export interface FieldDiagnostic {
+  severity: DiagnosticSeverity;
+  field: string;
+  rfcReference: string;
+  explanation: string;
+}
+
+export interface PacketInspection {
+  rawHex: string;
+  layers: readonly string[];
+  diagnostics: readonly FieldDiagnostic[];
+}
+
+export interface SessionDiff {
+  sessionIdA: number;
+  sessionIdB: number;
+  rttDeltaMs: number;
+  ttfbDeltaMs: number;
+  protocolShift: string;
+  semanticExplanation: string;
+  confidence: string;
+  evidence: string[];
+}
+
+export interface FleetHost {
+  hostId: string;
+  hostname: string;
+  friendlyName?: string | null;
+  os: string;
+  platform: string;
+  agentVersion: string;
+  status: string;
+}

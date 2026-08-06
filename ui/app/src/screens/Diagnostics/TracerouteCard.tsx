@@ -37,7 +37,7 @@ export function TracerouteCard({ target, hops }: TracerouteCardProps) {
         </thead>
         <tbody>
           {hops.map((h, i) => {
-            const rttStr = formatMs(h.rttMs ?? h.rtt_ms ?? 0);
+            const rttStr = formatMs(h.rttMs ?? 0);
             return (
               <tr key={i}>
                 <td style={{ fontWeight: 600 }}>{h.ttl}</td>

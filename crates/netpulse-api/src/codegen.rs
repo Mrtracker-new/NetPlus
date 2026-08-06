@@ -445,6 +445,88 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
+    s.push_str(&union(
+        "DiagnosticSeverity",
+        &["info", "warning", "error"],
+    ));
+
+    // --- Active Diagnostic and Inspection IPC Interfaces ---
+    s.push_str(&iface(
+        "PingResult",
+        &[
+            ("target", "string"),
+            ("sent", "number"),
+            ("received", "number"),
+            ("lossPct?", "number"),
+            ("minRttMs?", "number"),
+            ("avgRttMs?", "number"),
+            ("maxRttMs?", "number"),
+            ("stddevRttMs?", "number"),
+        ],
+    ));
+    s.push_str(&iface(
+        "TracerouteHop",
+        &[
+            ("ttl", "number"),
+            ("ip", "string"),
+            ("hostname?", "string | null"),
+            ("rttMs?", "number"),
+            ("status?", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "BufferbloatResult",
+        &[
+            ("target", "string"),
+            ("idleRttMs?", "number"),
+            ("loadedRttMs?", "number"),
+            ("deltaRttMs?", "number"),
+            ("grade", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "FieldDiagnostic",
+        &[
+            ("severity", "DiagnosticSeverity"),
+            ("field", "string"),
+            ("rfcReference", "string"),
+            ("explanation", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "PacketInspection",
+        &[
+            ("rawHex", "string"),
+            ("layers", "readonly string[]"),
+            ("diagnostics", "readonly FieldDiagnostic[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "SessionDiff",
+        &[
+            ("sessionIdA", "number"),
+            ("sessionIdB", "number"),
+            ("rttDeltaMs", "number"),
+            ("ttfbDeltaMs", "number"),
+            ("protocolShift", "string"),
+            ("semanticExplanation", "string"),
+            ("confidence", "string"),
+            ("evidence", "string[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "FleetHost",
+        &[
+            ("hostId", "string"),
+            ("hostname", "string"),
+            ("friendlyName?", "string | null"),
+            ("os", "string"),
+            ("platform", "string"),
+            ("agentVersion", "string"),
+            ("status", "string"),
+        ],
+    ));
+
     s
 }
 
@@ -529,6 +611,14 @@ mod tests {
             "ExportPreview",
             "PluginDescriptor",
             "HandshakeResponse",
+            "PingResult",
+            "TracerouteHop",
+            "BufferbloatResult",
+            "DiagnosticSeverity",
+            "FieldDiagnostic",
+            "PacketInspection",
+            "SessionDiff",
+            "FleetHost",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

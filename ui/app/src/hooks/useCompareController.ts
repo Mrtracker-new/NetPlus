@@ -95,31 +95,23 @@ export function useCompareController() {
           kind: "compareSessions",
           session_id_a: a,
           session_id_b: b,
-          sessionIdA: a,
-          sessionIdB: b,
         });
 
         if (res.kind === "sessionDiff") {
-          const raw = res.diff as any;
-          const rawRtt = Number(raw.rtt_delta_ms ?? raw.rttDeltaMs ?? -38.4);
-          const rawTtfb = Number(raw.ttfb_delta_ms ?? raw.ttfbDeltaMs ?? -22.0);
-          const rawProto = raw.protocol_shift || raw.protocolShift || "HTTP/1.1 (TCP) → HTTP/3 (QUIC)";
+          const raw = res.diff;
+          const rawRtt = Number(raw.rttDeltaMs ?? -38.4);
+          const rawTtfb = Number(raw.ttfbDeltaMs ?? -22.0);
+          const rawProto = raw.protocolShift || "HTTP/1.1 (TCP) → HTTP/3 (QUIC)";
 
           const computed = computeDirectionalDiff(a, b, rawRtt, rawTtfb, rawProto);
 
           const normalizedDiff: SessionDiff = {
             sessionIdA: a,
-            session_id_a: a,
             sessionIdB: b,
-            session_id_b: b,
             rttDeltaMs: computed.rttDeltaMs,
-            rtt_delta_ms: computed.rttDeltaMs,
             ttfbDeltaMs: computed.ttfbDeltaMs,
-            ttfb_delta_ms: computed.ttfbDeltaMs,
             protocolShift: computed.protocolShift,
-            protocol_shift: computed.protocolShift,
             semanticExplanation: computed.semanticExplanation,
-            semantic_explanation: computed.semanticExplanation,
             confidence: String(raw.confidence || "MEDIUM").toUpperCase(),
             evidence: Array.isArray(raw.evidence) ? raw.evidence : [],
           };

@@ -80,11 +80,11 @@ export function useDiagnosticsController() {
     try {
       const res = await query({ kind: "runPing", target: normalized, count: 4 });
       if (res.kind === "pingResult") {
-        const raw = res.result as any;
-        const minRttMs = Number(raw.min_rtt_ms ?? raw.minRttMs ?? 0);
-        const avgRttMs = Number(raw.avg_rtt_ms ?? raw.avgRttMs ?? 0);
-        const maxRttMs = Number(raw.max_rtt_ms ?? raw.maxRttMs ?? 0);
-        const lossPct = Number(raw.loss_pct ?? raw.lossPct ?? 0);
+        const raw = res.result;
+        const minRttMs = Number(raw.minRttMs ?? 0);
+        const avgRttMs = Number(raw.avgRttMs ?? 0);
+        const maxRttMs = Number(raw.maxRttMs ?? 0);
+        const lossPct = Number(raw.lossPct ?? 0);
         const jitterMs = Math.round(Math.max(0, maxRttMs - minRttMs) * 10) / 10;
 
         const extendedResult: ExtendedPingResult = {
@@ -92,13 +92,10 @@ export function useDiagnosticsController() {
           sent: Number(raw.sent ?? 0),
           received: Number(raw.received ?? 0),
           lossPct,
-          loss_pct: lossPct,
           minRttMs,
-          min_rtt_ms: minRttMs,
           avgRttMs,
-          avg_rtt_ms: avgRttMs,
           maxRttMs,
-          max_rtt_ms: maxRttMs,
+          stddevRttMs: Number(raw.stddevRttMs ?? 0),
           jitterMs,
         };
 
@@ -129,14 +126,13 @@ export function useDiagnosticsController() {
     setAnnouncement(`Running traceroute to ${normalized}...`);
 
     try {
-      const res = await query({ kind: "runTraceroute", target: normalized, transport: "icmp", max_hops: 10, maxHops: 10 });
+      const res = await query({ kind: "runTraceroute", target: normalized, transport: "icmp", max_hops: 10 });
       if (res.kind === "tracerouteResult") {
-        const normalizedHops: TracerouteHop[] = res.hops.map((h: any) => ({
+        const normalizedHops: TracerouteHop[] = res.hops.map((h: TracerouteHop) => ({
           ttl: Number(h.ttl ?? 0),
           ip: String(h.ip ?? ""),
           hostname: h.hostname || null,
-          rttMs: Number(h.rtt_ms ?? h.rttMs ?? 0),
-          rtt_ms: Number(h.rtt_ms ?? h.rttMs ?? 0),
+          rttMs: Number(h.rttMs ?? 0),
           status: h.status,
         }));
 
@@ -169,19 +165,16 @@ export function useDiagnosticsController() {
     try {
       const res = await query({ kind: "runBufferbloatTest", target: normalized });
       if (res.kind === "bufferbloatResult") {
-        const raw = res.result as any;
-        const idleRttMs = Number(raw.idle_rtt_ms ?? raw.idleRttMs ?? 0);
-        const loadedRttMs = Number(raw.loaded_rtt_ms ?? raw.loadedRttMs ?? 0);
-        const deltaRttMs = Number(raw.delta_rtt_ms ?? raw.deltaRttMs ?? 0);
+        const raw = res.result;
+        const idleRttMs = Number(raw.idleRttMs ?? 0);
+        const loadedRttMs = Number(raw.loadedRttMs ?? 0);
+        const deltaRttMs = Number(raw.deltaRttMs ?? 0);
 
         const normalizedResult: BufferbloatResult = {
           target: String(raw.target || normalized),
           idleRttMs,
-          idle_rtt_ms: idleRttMs,
           loadedRttMs,
-          loaded_rtt_ms: loadedRttMs,
           deltaRttMs,
-          delta_rtt_ms: deltaRttMs,
           grade: String(raw.grade || "A+"),
         };
 

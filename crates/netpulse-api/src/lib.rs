@@ -346,6 +346,7 @@ pub enum QueryResponse {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PingResultDto {
     pub target: String,
     pub sent: u32,
@@ -358,6 +359,7 @@ pub struct PingResultDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TracerouteHopDto {
     pub ttl: u8,
     pub ip: String,
@@ -367,6 +369,7 @@ pub struct TracerouteHopDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BufferbloatResultDto {
     pub target: String,
     pub idle_rtt_ms: f32,
@@ -376,6 +379,7 @@ pub struct BufferbloatResultDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FieldDiagnosticDto {
     pub severity: String,
     pub field: String,
@@ -384,6 +388,7 @@ pub struct FieldDiagnosticDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PacketInspectionDto {
     pub raw_hex: String,
     pub layers: Vec<String>,
@@ -391,6 +396,7 @@ pub struct PacketInspectionDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SessionDiffDto {
     pub session_id_a: u64,
     pub session_id_b: u64,
@@ -403,6 +409,7 @@ pub struct SessionDiffDto {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostIdentityDto {
     pub host_id: String,
     pub hostname: String,
@@ -691,5 +698,67 @@ mod tests {
         let back1: QueryResponse = serde_json::from_str(&json1).unwrap();
         assert_eq!(r1, back1);
         assert!(json1.contains("\"kind\":\"pingResult\""));
+    }
+
+    #[test]
+    fn ping_result_dto_serializes_to_camel_case_snapshot() {
+        let dto = PingResultDto {
+            target: "1.1.1.1".into(),
+            sent: 4,
+            received: 4,
+            loss_pct: 0.0,
+            min_rtt_ms: 10.0,
+            avg_rtt_ms: 12.0,
+            max_rtt_ms: 15.0,
+            stddev_rtt_ms: 0.5,
+        };
+        let json = serde_json::to_value(&dto).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "target": "1.1.1.1",
+                "sent": 4,
+                "received": 4,
+                "lossPct": 0.0,
+                "minRttMs": 10.0,
+                "avgRttMs": 12.0,
+                "maxRttMs": 15.0,
+                "stddevRttMs": 0.5
+            })
+        );
+        assert!(json.get("loss_pct").is_none());
+        assert!(json.get("min_rtt_ms").is_none());
+        assert!(json.get("avg_rtt_ms").is_none());
+    }
+
+    #[test]
+    fn session_diff_dto_serializes_to_camel_case_snapshot() {
+        let dto = SessionDiffDto {
+            session_id_a: 10,
+            session_id_b: 20,
+            rtt_delta_ms: -15.5,
+            ttfb_delta_ms: -8.0,
+            protocol_shift: "HTTP/1.1 -> HTTP/3".into(),
+            semantic_explanation: "Faster connection setup".into(),
+            confidence: "HIGH".into(),
+            evidence: vec!["packet_1".into()],
+        };
+        let json = serde_json::to_value(&dto).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "sessionIdA": 10,
+                "sessionIdB": 20,
+                "rttDeltaMs": -15.5,
+                "ttfbDeltaMs": -8.0,
+                "protocolShift": "HTTP/1.1 -> HTTP/3",
+                "semanticExplanation": "Faster connection setup",
+                "confidence": "HIGH",
+                "evidence": ["packet_1"]
+            })
+        );
+        assert!(json.get("session_id_a").is_none());
+        assert!(json.get("rtt_delta_ms").is_none());
+        assert!(json.get("protocol_shift").is_none());
     }
 }

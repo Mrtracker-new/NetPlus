@@ -21,9 +21,9 @@ export function BufferbloatCard({ target, result }: BufferbloatCardProps) {
   const { t } = useTranslation(["diagnostics"]);
   const { shows } = useDisclosure();
 
-  const idleRttStr = formatMs(result.idleRttMs ?? result.idle_rtt_ms ?? 0);
-  const loadedRttStr = formatMs(result.loadedRttMs ?? result.loaded_rtt_ms ?? 0);
-  const deltaRttStr = formatMs(result.deltaRttMs ?? result.delta_rtt_ms ?? 0);
+  const idleRttStr = formatMs(result.idleRttMs ?? 0);
+  const loadedRttStr = formatMs(result.loadedRttMs ?? 0);
+  const deltaRttStr = formatMs(result.deltaRttMs ?? 0);
 
   const gradeColor = GRADE_COLORS[result.grade] ?? "#10b981";
 

@@ -1,8 +1,8 @@
-//! Plaintext HTTP/1.1 dissection (docs/07 §6.7). Most HTTP rides inside TLS;
+//! Plaintext HTTP/1.1 dissection. Most HTTP rides inside TLS;
 //! this fires only on cleartext (port 80 or an opt-in decrypt path). It extracts
 //! the request line (method/path/host) or the status line — feeding the website
-//! journey (docs/14). Header-body reassembly across TCP segments is out of scope
-//! for the per-packet pass (docs/07 §4.3, stream pass); we read what a single
+//! journey. Header-body reassembly across TCP segments is out of scope
+//! for the per-packet pass; we read what a single
 //! packet's leading bytes reveal.
 
 use crate::frame::HttpInfo;

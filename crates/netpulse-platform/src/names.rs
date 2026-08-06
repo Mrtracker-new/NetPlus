@@ -1,4 +1,4 @@
-//! Host-environment name hints (docs/08 §5.1, docs/02 §10.3): recovering names
+//! Host-environment name hints: recovering names
 //! for IPs from *local machine state* to complement the engine's wire-only
 //! resolution (DNS answers + TLS SNI). Two local sources, both read-only and
 //! egress-free:
@@ -9,18 +9,18 @@
 //!   the system already resolved, including lookups that happened *before* capture
 //!   started (the common reason a public IP shows no on-wire name) and any mDNS
 //!   `.local` names the resolver has cached. It is read from OS state, never by
-//!   issuing a query, so it introduces no network egress (docs/02 §10.3).
+//!   issuing a query, so it introduces no network egress.
 //!
 //! This lives in `netpulse-platform` because it reads host-specific OS state, and
 //! it is deliberately kept *out* of the engine pipeline: these names depend on the
 //! machine NetPulse runs on, not on the captured bytes, so folding them into the
-//! deterministic reconstruction would break live-vs-replay parity (docs/21 §10).
+//! deterministic reconstruction would break live-vs-replay parity.
 //! The shell applies them as an overlay via
 //! [`CaptureStore::merge_resolution`](netpulse_storage) after each rebuild.
 //!
 //! Everything here fails *soft*: any source that is unavailable, unreadable, or
 //! unparsable yields no hints rather than an error — a missing name is honest, a
-//! fabricated one is not (docs/02 §11).
+//! fabricated one is not.
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;

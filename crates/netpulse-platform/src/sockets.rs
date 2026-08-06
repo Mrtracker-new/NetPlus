@@ -1,14 +1,14 @@
-//! Socket-table attribution backend (docs/12 §4), behind
+//! Socket-table attribution backend, behind
 //! `#[cfg(all(windows, feature = "live-capture"))]`.
 //!
 //! Maps each connection's 5-tuple to the OS process that owns it, by snapshotting
 //! the socket tables (`GetExtendedTcpTable`/`UdpTable` on Windows) via the safe
 //! `netstat2` wrapper — so this crate stays `#![forbid(unsafe_code)]` like the
 //! capture path. Richer PID identity (name, exe) comes from `sysinfo`, looked up
-//! lazily only for PIDs that actually own observed flows (docs/12 §6).
+//! lazily only for PIDs that actually own observed flows.
 //!
 //! Observe-only and read-only: enumerating socket tables inspects OS state; it
-//! never touches traffic (docs/01 X1).
+//! never touches traffic.
 
 use std::sync::Mutex;
 
@@ -58,7 +58,7 @@ impl SocketTableSource for WindowsSockets {
         let mut owners = Vec::new();
         for si in sockets {
             // A socket with no owning PID (e.g. a system pseudo-socket) can't be
-            // attributed — skip rather than invent an owner (docs/12 §8).
+            // attributed — skip rather than invent an owner.
             let Some(&pid) = si.associated_pids.first() else {
                 continue;
             };
@@ -72,7 +72,7 @@ impl SocketTableSource for WindowsSockets {
                 ),
                 // UDP is connectionless: the "remote" is unspecified in the table,
                 // so we record the local side; the correlator matches on the
-                // local (src) endpoint (docs/12 §5.2).
+                // local (src endpoint.
                 ProtocolSocketInfo::Udp(u) => {
                     FiveTuple::new(u.local_addr, u.local_port, u.local_addr, 0, L4Proto::Udp)
                 }
@@ -81,7 +81,7 @@ impl SocketTableSource for WindowsSockets {
                 tuple,
                 pid: pid as u64,
                 // The socket table exposes no per-socket start time; PID-reuse
-                // safety leans on process_info's start time instead (docs/12 §5.3).
+                // safety leans on process_info's start time instead.
                 start_mono_nanos: 0,
             });
         }

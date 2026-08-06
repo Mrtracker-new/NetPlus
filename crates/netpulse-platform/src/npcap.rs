@@ -1,14 +1,14 @@
 //! Windows live capture backend, via Npcap (libpcap-compatible) behind the
-//! `pcap` crate (docs/05 §5, docs/03 §13). Compiled only under
+//! `pcap` crate. Compiled only under
 //! `#[cfg(all(windows, feature = "live-capture"))]`.
 //!
-//! Observe-only (docs/01 X1): the capture handle is a read-only frame stream —
+//! Observe-only: the capture handle is a read-only frame stream —
 //! it is wired to no injection API. All FFI `unsafe` is encapsulated by the
 //! `pcap` crate, so this module (and the crate) stay `#![forbid(unsafe_code)]`.
 //!
 //! Prerequisites at runtime: Npcap installed (WinPcap-compatible mode) and the
 //! process running elevated. Missing either surfaces as a
-//! [`NpError::Capability`] from [`open_capture`], never a panic (docs/02 §11).
+//! [`NpError::Capability`] from [`open_capture`], never a panic.
 
 use netpulse_core::error::NpError;
 use netpulse_core::traits::{CaptureSource, RawFrame};
@@ -40,14 +40,14 @@ fn default_score(d: &Device) -> u8 {
 }
 
 /// Frames pulled per `next_batch` before yielding, bounding the batch so a busy
-/// link can't starve the stop check in the live loop (docs/05 §4.2).
+/// link can't starve the stop check in the live loop.
 const MAX_BATCH: usize = 512;
 /// Kernel→user read timeout. With immediate mode on, packets arrive promptly;
 /// the timeout bounds how long an idle capture blocks before the caller can
-/// re-check its stop flag (docs/05 §4).
+/// re-check its stop flag.
 const READ_TIMEOUT_MS: i32 = 500;
 /// Full frames — we snaplen to the max Ethernet-ish frame; the pipeline's own
-/// shedding, not truncation here, governs payload retention (docs/05 §9).
+/// shedding, not truncation here, governs payload retention.
 const SNAPLEN: i32 = 65_535;
 
 fn cap_err(context: &str, e: PcapError) -> NpError {
@@ -134,15 +134,15 @@ struct CachedStats {
 }
 
 /// A live [`CaptureSource`] over an open Npcap handle. Yields [`RawFrame`]s in
-/// the same shape the file source does (docs/05 §12) — capture-time monotonic
+/// the same shape the file source does — capture-time monotonic
 /// timestamp derived from the first frame's wall clock — so the *identical*
-/// downstream pipeline reconstructs live and offline traffic alike (docs/21 §4).
+/// downstream pipeline reconstructs live and offline traffic alike.
 pub struct LiveCapture {
     capture: Capture<Active>,
     dlt: u32,
     iface_id: u16,
     /// Wall-clock ns of the first frame, so monotonic readings start at 0 and
-    /// durations are correct regardless of the absolute epoch (docs/05 §6).
+    /// durations are correct regardless of the absolute epoch.
     base_wall_nanos: Option<u64>,
     last_stats: CachedStats,
 }
@@ -159,13 +159,13 @@ impl std::fmt::Debug for LiveCapture {
 
 impl LiveCapture {
     /// The libpcap link-layer type (DLT) of this interface, so the caller can
-    /// configure the decoder (docs/07 §4.2). 1 = Ethernet, the common case.
+    /// configure the decoder. 1 = Ethernet, the common case.
     pub fn link_dlt(&self) -> u32 {
         self.dlt
     }
 
     /// Honest capture accounting as `(received, dropped)` since the handle opened
-    /// (docs/05 §3, §9): kernel-ring drops are truth loss and must be surfaced.
+    ///kernel-ring drops are truth loss and must be surfaced.
     /// Retains cached stats monotonically so transient FFI failures or driver regressions
     /// never reset reported values to zero.
     pub fn stats(&mut self) -> (u64, u64) {
@@ -182,7 +182,7 @@ impl CaptureSource for LiveCapture {
         let mut batch = Vec::new();
         // Blocking drain: the first read blocks up to the timeout; once frames
         // flow, subsequent reads return promptly until the ring drains, then one
-        // read times out and we yield the batch (docs/05 §4.2).
+        // read times out and we yield the batch.
         while batch.len() < MAX_BATCH {
             match self.capture.next_packet() {
                 Ok(packet) => {

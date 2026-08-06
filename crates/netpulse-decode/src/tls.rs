@@ -1,10 +1,10 @@
-//! TLS handshake dissection (docs/07 §6.6) — where the "explain encryption"
+//! TLS handshake dissection — where the "explain encryption"
 //! mandate lives. Everything here is read **in the clear**: TLS never decrypts
-//! (docs/01 X2). From the ClientHello we extract SNI (which site) and ALPN
+//!From the ClientHello we extract SNI (which site and ALPN
 //! (which HTTP version); from the ServerHello we note the handshake progressing.
 //!
 //! The parser is strictly bounded via [`Reader`] and additionally caps the
-//! extension walk, so a malformed record cannot loop or over-read (docs/07 §8).
+//! extension walk, so a malformed record cannot loop or over-read.
 
 use netpulse_core::Result;
 

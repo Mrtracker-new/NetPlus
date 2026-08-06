@@ -1,14 +1,14 @@
 //! # netpulse-capture-svc
 //!
-//! The small, privileged capture process (docs/02 §5.1). It holds elevated
+//! The small, privileged capture process. It holds elevated
 //! capture capability (`CAP_NET_RAW` / BPF / admin) and *nothing else*,
 //! exposing only a narrow frame-handoff interface to the analysis engine.
 //! Confining privilege here keeps the trusted computing base small: if the
 //! large analysis/UI code is compromised, it does not inherently hold capture
-//! privileges (docs/02 §5.1, §10.2).
+//! privileges.
 //!
 //! Observe-only: the capture backend is a read-only frame stream, wired to no
-//! injection API (docs/01 X1, docs/03 §4).
+//! injection API.
 //!
 //! **Status: foundation stub.** Real capture lands in Phase 1, docs/05.
 #![forbid(unsafe_code)]

@@ -2,14 +2,14 @@
 //!
 //! Every captured artifact carries a nanosecond timestamp with both a monotonic
 //! reading (for ordering and duration math, immune to wall-clock jumps) and a
-//! wall-clock reading (for human display and correlation). See docs/02 §6.2.
+//! wall-clock reading (for human display and correlation . See.
 
 use serde::{Deserialize, Serialize};
 
 /// A capture instant: monotonic for ordering, wall-clock for display.
 ///
 /// The pipeline timestamps by *capture time*, not processing time, so the
-/// timeline stays truthful even when analysis lags a burst (docs/02 §11).
+/// timeline stays truthful even when analysis lags a burst.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Timestamp {
     /// Nanoseconds from a monotonic clock. Use for ordering and deltas.

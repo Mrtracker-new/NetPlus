@@ -1,13 +1,13 @@
 //! A minimal, dependency-free reader for the classic **pcap** file format
-//! (docs/05 §12: replayable fixtures; §13: the file-based path also powers pcap
+//! (: replayable fixtures; §13: the file-based path also powers pcap
 //! import). This is the byte source for the file-based [`crate::FileCapture`],
 //! which lets the *entire* pipeline run deterministically in CI without live
-//! capture or privileges (docs/05 §12, docs/03 §12).
+//! capture or privileges.
 //!
 //! Only the parts NetPulse needs are parsed: the global header (to learn the
 //! link type and timestamp precision) and per-record headers (to recover
-//! capture-time timestamps, docs/05 §6). Malformed input yields a clean error,
-//! never a panic — this file, too, is fuzz-worthy input (docs/05 §12).
+//! capture-time timestamps . Malformed input yields a clean error,
+//! never a panic — this file, too, is fuzz-worthy input.
 
 use netpulse_core::{NpError, Result};
 use netpulse_decode::LinkType;
@@ -33,7 +33,7 @@ pub struct PcapRecord {
     /// The captured frame (possibly snap-length truncated).
     pub data: Vec<u8>,
     /// Original on-wire length; if greater than `data.len()`, the frame was
-    /// truncated by the snap length (docs/05 §10 truncated frames).
+    /// truncated by the snap length.
     pub orig_len: u32,
 }
 
@@ -46,7 +46,7 @@ pub struct PcapFile {
 
 impl PcapFile {
     /// Parse a whole pcap file from memory. Handles both byte orders and both
-    /// microsecond and nanosecond timestamp precisions (docs/05 §6).
+    /// microsecond and nanosecond timestamp precisions.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 24 {
             return Err(NpError::Decode(

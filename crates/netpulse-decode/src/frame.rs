@@ -1,16 +1,16 @@
-//! Structured dissection output (docs/07 §4). Dissection is **stateless per
-//! packet** (docs/07 §4.3): each parse depends only on the bytes and lower-layer
+//! Structured dissection output. Dissection is **stateless per
+//! packet**: each parse depends only on the bytes and lower-layer
 //! context, never on history — that is what lets the decode pool parallelize
 //! freely. Cross-packet state (flows, reassembly) belongs to docs/06.
 //!
-//! **Partial success is valid** (docs/07 §3.5): if a deeper layer fails, the
+//! **Partial success is valid**: if a deeper layer fails, the
 //! layers that parsed are retained and [`Decoded::partial`] is set; the packet
 //! is never discarded.
 //!
 //! Two currencies flow out of here: the coarse [`netpulse_core::ProtoEventKind`]
 //! landmarks (the storage/narrative currency, stamped with a flow id + timestamp
 //! by docs/06) and the richer [`L7Detail`] the flow engine needs for causal
-//! session lineage (DNS name→IP, TLS SNI — docs/06 §6.1).
+//! session lineage (DNS name→IP, TLS SNI — .
 
 use std::net::IpAddr;
 
@@ -39,7 +39,7 @@ pub struct NetworkHeader {
     pub version: u8,
 }
 
-/// TCP control bits (docs/07 §6.3). Feed the flow state machine (docs/06 §4.1).
+/// TCP control bits. Feed the flow state machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TcpFlags {
     pub syn: bool,
@@ -50,7 +50,7 @@ pub struct TcpFlags {
     pub urg: bool,
 }
 
-/// Parsed TCP header fields relevant to reconstruction (docs/07 §6.3).
+/// Parsed TCP header fields relevant to reconstruction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TcpHeader {
     pub src_port: u16,
@@ -63,7 +63,7 @@ pub struct TcpHeader {
     pub payload_len: u32,
 }
 
-/// Parsed UDP header fields (docs/07 §6.4).
+/// Parsed UDP header fields.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UdpHeader {
     pub src_port: u16,
@@ -73,7 +73,7 @@ pub struct UdpHeader {
 }
 
 /// The transport layer, or an unmodelled IP protocol number kept verbatim for
-/// honest reporting (docs/07 §6.2).
+/// honest reporting.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
     Tcp(TcpHeader),
@@ -91,7 +91,7 @@ impl Transport {
     }
 }
 
-/// One DNS question (docs/07 §6.5).
+/// One DNS question.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DnsQuestion {
     pub name: String,
@@ -99,7 +99,7 @@ pub struct DnsQuestion {
 }
 
 /// One DNS answer record — the raw material for DNS→connection lineage
-/// (docs/06 §6.1). Only the record kinds that carry causal weight are modelled.
+///Only the record kinds that carry causal weight are modelled.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DnsAnswer {
     pub name: String,
@@ -110,7 +110,7 @@ pub struct DnsAnswer {
     pub ttl: u32,
 }
 
-/// Extracted DNS fields (docs/07 §6.5).
+/// Extracted DNS fields.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DnsInfo {
     pub is_response: bool,
@@ -119,8 +119,8 @@ pub struct DnsInfo {
     pub answers: Vec<DnsAnswer>,
 }
 
-/// Extracted TLS handshake fields, all read in the clear (docs/07 §6.6). No
-/// decryption is ever performed (docs/01 X2).
+/// Extracted TLS handshake fields, all read in the clear. No
+/// decryption is ever performed.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TlsInfo {
     pub is_client_hello: bool,
@@ -131,7 +131,7 @@ pub struct TlsInfo {
     pub alpn: Vec<String>,
 }
 
-/// Extracted plaintext HTTP/1.1 fields (docs/07 §6.7). Most HTTP rides inside
+/// Extracted plaintext HTTP/1.1 fields. Most HTTP rides inside
 /// TLS; this only fires on cleartext.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct HttpInfo {
@@ -142,7 +142,7 @@ pub struct HttpInfo {
     pub status: Option<u16>,
 }
 
-/// Richer L7 detail for the flow engine's causal reasoning (docs/06 §6).
+/// Richer L7 detail for the flow engine's causal reasoning.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum L7Detail {
     Dns(DnsInfo),
@@ -162,7 +162,7 @@ pub struct Decoded {
     /// capture timestamp to form a [`netpulse_core::ProtoEvent`].
     pub events: Vec<ProtoEventKind>,
     /// True when a deeper layer failed to parse but shallower layers succeeded
-    /// (docs/07 §3.5).
+    ///
     pub partial: bool,
 }
 

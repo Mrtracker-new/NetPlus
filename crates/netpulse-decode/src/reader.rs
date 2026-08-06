@@ -1,10 +1,10 @@
 //! A strictly-bounded, zero-copy byte reader — the safety floor for every
-//! dissector (docs/07 §8). Dissectors parse bytes controlled by remote parties,
+//! dissector. Dissectors parse bytes controlled by remote parties,
 //! so *no read may ever advance past the input slice*. This type makes that the
 //! only possible behavior: every accessor returns [`Result`] and a short read is
 //! a clean [`NpError::Decode`], never a panic or an over-read.
 //!
-//! It borrows the underlying slice (no allocation on the hot path, docs/07 §10)
+//! It borrows the underlying slice (no allocation on the hot path
 //! and tracks a cursor. All multi-byte integers are read big-endian, the network
 //! byte order used by every protocol NetPulse dissects.
 

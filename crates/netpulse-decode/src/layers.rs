@@ -1,8 +1,8 @@
-//! Link, network, and transport dissectors (docs/07 §6.1–6.4). Each parses one
+//! Link, network, and transport dissectors. Each parses one
 //! layer from a byte slice and hands the remaining payload to the next, chosen
-//! by the identification signal of the layer below (docs/07 §4.2). Every read
+//! by the identification signal of the layer below. Every read
 //! goes through [`Reader`], so truncated or hostile input yields a clean partial
-//! parse, never an over-read (docs/07 §8).
+//! parse, never an over-read.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -33,7 +33,7 @@ pub enum EtherPayload {
 }
 
 /// Parse an Ethernet II frame, transparently stripping 802.1Q / 802.1ad VLAN
-/// tags (docs/05 §10, VLAN/QinQ preserved and passed through). Returns the
+/// tags. Returns the
 /// selected network protocol and the remaining payload.
 pub fn ethernet<'a>(r: &mut Reader<'a>) -> Result<(EtherPayload, &'a [u8])> {
     let _dst = r.take(6)?;
@@ -59,7 +59,7 @@ pub fn ethernet<'a>(r: &mut Reader<'a>) -> Result<(EtherPayload, &'a [u8])> {
 
 /// Parse a BSD loopback / null header (`DLT_NULL`): a 4-byte host-order address
 /// family. The captured host's byte order is unknown from the file alone, so we
-/// accept the family in either endianness (docs/05 §10 loopback).
+/// accept the family in either endianness.
 pub fn loopback<'a>(r: &mut Reader<'a>) -> Result<(EtherPayload, &'a [u8])> {
     let raw = r.take(4)?;
     let le = u32::from_le_bytes([raw[0], raw[1], raw[2], raw[3]]);
@@ -74,7 +74,7 @@ pub fn loopback<'a>(r: &mut Reader<'a>) -> Result<(EtherPayload, &'a [u8])> {
     Ok((kind, r.rest()))
 }
 
-/// Parse an IPv4 header (docs/07 §6.2). Honors IHL for options and clamps the
+/// Parse an IPv4 header. Honors IHL for options and clamps the
 /// payload to the header's total-length field so trailing padding is excluded.
 pub fn ipv4<'a>(r: &mut Reader<'a>) -> Result<(NetworkHeader, u8, &'a [u8])> {
     let start = r.position();
@@ -116,7 +116,7 @@ pub fn ipv4<'a>(r: &mut Reader<'a>) -> Result<(NetworkHeader, u8, &'a [u8])> {
 }
 
 /// Parse an IPv6 header and walk a bounded chain of extension headers to the
-/// upper-layer protocol (docs/07 §6.2).
+/// upper-layer protocol.
 pub fn ipv6<'a>(r: &mut Reader<'a>) -> Result<(NetworkHeader, u8, &'a [u8])> {
     let ver_class = r.u8()?;
     if ver_class >> 4 != 6 {
@@ -174,7 +174,7 @@ fn l4_from(proto: u8) -> L4Proto {
     }
 }
 
-/// Parse a TCP header and return it with the application payload (docs/07 §6.3).
+/// Parse a TCP header and return it with the application payload.
 pub fn tcp<'a>(r: &mut Reader<'a>) -> Result<(TcpHeader, &'a [u8])> {
     let start = r.position();
     let src_port = r.u16()?;
@@ -216,7 +216,7 @@ pub fn tcp<'a>(r: &mut Reader<'a>) -> Result<(TcpHeader, &'a [u8])> {
     Ok((hdr, payload))
 }
 
-/// Parse a UDP header and return it with the application payload (docs/07 §6.4).
+/// Parse a UDP header and return it with the application payload.
 pub fn udp<'a>(r: &mut Reader<'a>) -> Result<(UdpHeader, &'a [u8])> {
     let src_port = r.u16()?;
     let dst_port = r.u16()?;

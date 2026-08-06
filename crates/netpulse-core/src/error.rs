@@ -13,7 +13,7 @@ use thiserror::Error;
 #[non_exhaustive]
 pub enum NpError {
     /// A packet or message could not be parsed. Partial results may still be
-    /// retained at the level that *did* parse (docs/02 §11: fail open on detail).
+    /// retained at the level that *did* parse.
     #[error("decode error: {0}")]
     Decode(String),
 
@@ -23,7 +23,7 @@ pub enum NpError {
 
     /// The operation requires a capability (e.g. raw capture) that is missing.
     /// The app degrades to a clear, actionable state rather than crashing
-    /// (docs/02 §11: fail closed on privilege).
+    ///
     #[error("missing capability: {0}")]
     Capability(String),
 

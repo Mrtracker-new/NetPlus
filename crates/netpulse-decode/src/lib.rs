@@ -1,13 +1,13 @@
 //! # netpulse-decode — the parser (security-critical)
 //!
-//! All protocol dissectors (docs/07): Ethernet/IP, TCP, UDP, DNS, TLS, and
+//! All protocol dissectors: Ethernet/IP, TCP, UDP, DNS, TLS, and
 //! plaintext HTTP/1.1 — parsed into structured [`Decoded`] output and coarse
 //! [`netpulse_core::ProtoEventKind`] landmarks. Also owns the per-field
-//! *explanation keys* (docs/07 §7) that unify the education system.
+//! *explanation keys* that unify the education system.
 //!
 //! **This crate is the primary attack surface.** It parses bytes controlled by
 //! remote parties, so it depends only on `netpulse-core` and is treated as
-//! hostile-input code (docs/03 §3, docs/07 §8):
+//! hostile-input code:
 //! - every read goes through the bounds-checked [`reader::Reader`] — no
 //!   over-reads, no panics on truncated input;
 //! - recursive/repetitive structures (DNS name compression, TLS extensions) have
@@ -15,13 +15,13 @@
 //! - no `unsafe`; the crate is `#![forbid(unsafe_code)]`.
 //!
 //! The top-level entry point is [`decode_frame`]; it never fails, returning a
-//! partial [`Decoded`] when a deeper layer cannot parse (docs/07 §3.5).
+//! partial [`Decoded`] when a deeper layer cannot parse.
 //!
 //! ## Scope of the Phase 1 slice
 //! Implemented: link (Ethernet/loopback), IPv4/IPv6, TCP, UDP, DNS, TLS
 //! ClientHello/ServerHello (SNI + ALPN), plaintext HTTP/1.1. Deep TLS records
 //! beyond the handshake, HTTP/2, HTTP/3, and QUIC framing are honestly hinted
-//! but left for later passes (docs/07 §6.8–6.10).
+//! but left for later passes.
 #![forbid(unsafe_code)]
 
 pub mod dns;
@@ -34,7 +34,7 @@ pub mod reader;
 pub mod tls;
 
 // Re-export the contract implementors use, so downstream crates depend on the
-// trait through its owning layer (docs/04 §3.4).
+// trait through its owning layer.
 pub use netpulse_core::traits::Dissector;
 
 pub use explain::{explain, DisclosureDepth, Explanation, ExplanationKey, ALL_KEYS};

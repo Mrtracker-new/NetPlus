@@ -4,10 +4,10 @@
 //! [`docs/0-foundation/02_System_Architecture.md`] §6 plus the core role-noun
 //! traits every higher layer implements.
 //!
-//! This crate is the base of the dependency graph (docs/04 §3.1): it depends on
+//! This crate is the base of the dependency graph: it depends on
 //! nothing internal, so every other crate can speak the same language. There is
 //! exactly one `Flow`, one `Session`, one `Finding` — defined here and nowhere
-//! else — which is what keeps the model from diverging (docs/04 §6).
+//! else — which is what keeps the model from diverging.
 //!
 //! Nothing in this crate captures, parses, or stores anything. It only defines
 //! *shapes* and *contracts*.

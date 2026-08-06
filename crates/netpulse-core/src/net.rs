@@ -1,5 +1,5 @@
 //! Network addressing primitives: the 5-tuple that identifies a flow, and the
-//! transport/application protocol enumerations. See docs/02 §6 and docs/06.
+//! transport/application protocol enumerations. See and docs/06.
 
 use std::net::IpAddr;
 
@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 /// The bidirectional conversation key: (src ip, src port, dst ip, dst port, L4).
 ///
-/// A `Flow` is identified by this tuple (docs/00 glossary). The flow engine
+/// A `Flow` is identified by this tuple. The flow engine
 /// shards state by a hash of this key so a given flow is always handled by the
-/// same thread, needing no locks (docs/02 §5.2).
+/// same thread, needing no locks.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FiveTuple {
     pub src_ip: IpAddr,

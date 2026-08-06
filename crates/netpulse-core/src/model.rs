@@ -1,8 +1,8 @@
-//! The core entities (docs/02 §6.1). These are *logical* structures; physical
-//! encodings live in netpulse-storage (docs/08).
+//! The core entities. These are *logical* structures; physical
+//! encodings live in netpulse-storage.
 //!
 //! One foundational rule threads through everything here — the
-//! **evidence-reference invariant** (docs/02 §6.3): every derived artifact
+//! **evidence-reference invariant**: every derived artifact
 //! points back to the exact data that justifies it. A [`Finding`] carries
 //! [`EvidenceRef`]s; a narrative sentence references its [`ProtoEvent`]s. This
 //! is what makes the whole system auditable, and it is not optional.
@@ -18,7 +18,7 @@ use crate::time::Timestamp;
 ///
 /// `headers_ref` / `payload_ref` are indirections, not inline bytes: payloads
 /// may be truncated or omitted entirely under the default metadata-only storage
-/// policy (docs/02 §9, docs/08).
+/// policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Packet {
     pub id: u64,
@@ -44,7 +44,7 @@ pub struct Flow {
     pub state: FlowState,
 }
 
-/// Aggregated per-flow measurements (docs/06). Populated by the flow engine.
+/// Aggregated per-flow measurements. Populated by the flow engine.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct FlowMetrics {
     pub bytes: u64,
@@ -70,7 +70,7 @@ pub enum FlowState {
     Datagram,
 }
 
-/// A discrete protocol-level occurrence within a flow (docs/02 §6.2). This is
+/// A discrete protocol-level occurrence within a flow. This is
 /// the unit the narrative builder and learning engine consume most.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtoEvent {
@@ -80,7 +80,7 @@ pub struct ProtoEvent {
 }
 
 /// The kind of protocol event. Extended per-protocol by the decode layer
-/// (docs/07); foundation stage seeds the common landmarks.
+///foundation stage seeds the common landmarks.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum ProtoEventKind {
@@ -106,16 +106,16 @@ pub struct Session {
     pub flow_ids: Vec<u64>,
 }
 
-/// The user-facing narrative projection of a [`Session`] (docs/14). A thin
-/// placeholder at foundation stage; the narrative builder fills it (docs/09).
+/// The user-facing narrative projection of a [`Session`]. A thin
+/// placeholder at foundation stage; the narrative builder fills it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Journey {
     pub session_id: u64,
-    /// Ordered narrative sentences; each will reference its evidence (docs/14).
+    /// Ordered narrative sentences; each will reference its evidence.
     pub sentences: Vec<String>,
 }
 
-/// The attributed application behind a flow (docs/12).
+/// The attributed application behind a flow.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Process {
     pub pid: u64,
@@ -124,15 +124,15 @@ pub struct Process {
     /// Code-signing identity where the OS exposes it.
     pub signer: Option<String>,
     /// Process start time (monotonic ns), used to distinguish a reused PID from
-    /// the original process (docs/12 §5.3). `0` when the OS did not expose it.
+    /// the original process. `0` when the OS did not expose it.
     #[serde(default)]
     pub start_mono_nanos: u64,
 }
 
 /// A snapshot row mapping one socket (its 5-tuple) to its owning process, as read
-/// from the OS socket tables (docs/12 §4). Attribution correlates these snapshots
+/// from the OS socket tables. Attribution correlates these snapshots
 /// against the packet/flow stream over time — it is not a per-packet lookup
-/// (docs/12 §3).
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SocketOwner {
     /// The socket's 5-tuple as the OS reports it.
@@ -140,27 +140,27 @@ pub struct SocketOwner {
     /// The owning process's PID.
     pub pid: u64,
     /// The process's start time (monotonic ns) for PID-reuse safety
-    /// (docs/12 §5.3).
+    ///
     pub start_mono_nanos: u64,
 }
 
-/// How confident an attribution is (docs/12 §5.4). Attribution is a
+/// How confident an attribution is. Attribution is a
 /// time-sensitive correlation, so its certainty is graded, and "unknown" is a
 /// first-class, correct answer — a wrong PID is worse than an admitted unknown
-/// (docs/12 §8).
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AttributionConfidence {
     /// A direct snapshot match whose validity window contained the flow start.
     High,
-    /// A retro-matched or inferred match near a window edge (docs/12 §5.2).
+    /// A retro-matched or inferred match near a window edge.
     Low,
-    /// The OS gave no clear owner; surfaced honestly (docs/12 §5.2, §8).
+    /// The OS gave no clear owner; surfaced honestly.
     Unknown,
 }
 
 /// A remote endpoint, enriched from *local* databases only — NetPulse never
-/// phones home to resolve a host (docs/02 §10.3).
+/// phones home to resolve a host.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Host {
     pub ip: IpAddr,
@@ -176,12 +176,12 @@ pub struct Host {
 /// How a hostname for an IP was learned — always from traffic we *observed*,
 /// never an active lookup. NetPulse resolves names passively (a DNS answer it
 /// saw, a TLS SNI the client sent) so naming stays offline and deterministic; it
-/// never issues a reverse-DNS/PTR query, which would be egress (docs/02 §10.3).
+/// never issues a reverse-DNS/PTR query, which would be egress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum NameSource {
     /// A DNS A/AAAA answer that resolved this name to the IP — the authoritative
-    /// name→address mapping, seen on the wire *this session* (docs/06 §6.1).
+    /// name→address mapping, seen on the wire *this session*.
     Dns,
     /// A TLS SNI the client sent when opening a connection to this IP — the
     /// hostname the user's software *asked for*, often the real site behind a
@@ -195,7 +195,7 @@ pub enum NameSource {
     /// cache). This is how a name is recovered for a connection whose DNS lookup
     /// happened *before* capture started, and it includes any mDNS `.local` names
     /// the resolver already cached. It is read from local OS state only — NetPulse
-    /// never issues a query to populate it, so no egress occurs (docs/02 §10.3).
+    /// never issues a query to populate it, so no egress occurs.
     OsResolver,
 }
 
@@ -211,7 +211,7 @@ pub struct HostName {
 
 /// A security or anomaly observation.
 ///
-/// Per the honesty principle (docs/01 §7.2), a finding is never a bare verdict:
+/// Per the honesty principle, a finding is never a bare verdict:
 /// it always carries a calibrated [`Confidence`] and [`EvidenceRef`]s pointing
 /// back at the data that produced it.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -223,13 +223,13 @@ pub struct Finding {
 }
 
 /// Broad classification of a [`Finding`]. Detectors refine within a category
-/// (docs/17, docs/18, docs/20).
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum FindingCategory {
-    /// Statistical/ML deviation from this machine's learned normal (docs/20).
+    /// Statistical/ML deviation from this machine's learned normal.
     Anomaly,
-    /// A rule- or heuristic-matched suspicious behavior (docs/17, docs/18).
+    /// A rule- or heuristic-matched suspicious behavior.
     Suspicious,
     /// Informational observation worth surfacing without alarm.
     Informational,
@@ -237,7 +237,7 @@ pub enum FindingCategory {
 
 /// A calibrated confidence in `0.0..=1.0`. Constructed only via [`Confidence::new`],
 /// which clamps out-of-range input, so an invalid confidence cannot exist — the
-/// type itself enforces "honest over reassuring" (docs/01 §7.2).
+/// type itself enforces "honest over reassuring".
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct Confidence(f32);
 
@@ -254,8 +254,8 @@ impl Confidence {
 }
 
 /// A pointer from a derived artifact back to its supporting evidence — the
-/// physical form of the evidence-reference invariant (docs/02 §6.3). Storage
-/// carries these as first-class foreign keys (docs/08).
+/// physical form of the evidence-reference invariant. Storage
+/// carries these as first-class foreign keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum EvidenceRef {

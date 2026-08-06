@@ -1,12 +1,12 @@
-//! The file-based [`CaptureSource`] (docs/05 §12–13). Recorded `pcap` fixtures
+//! The file-based [`CaptureSource`]. Recorded `pcap` fixtures
 //! feed the *exact same pipeline* as live capture, so the whole engine is
-//! testable deterministically without privileges (docs/05 §12) — and the same
-//! path powers importing external pcap files for offline analysis (docs/05 §13).
+//! testable deterministically without privileges — and the same
+//! path powers importing external pcap files for offline analysis.
 //! "Capture from wire and capture from file converge immediately after this
 //! layer."
 //!
 //! It yields [`RawFrame`]s in the same shape a live backend would, carrying the
-//! **capture-time** monotonic timestamp (docs/05 §6): frames retain when they
+//! **capture-time** monotonic timestamp: frames retain when they
 //! were captured, so replay timelines are truthful.
 
 use netpulse_core::traits::{CaptureSource, RawFrame};
@@ -17,7 +17,7 @@ use crate::pcap::PcapFile;
 
 /// A [`CaptureSource`] backed by a parsed pcap file. Hands frames out in
 /// count-bounded batches, mirroring how a live drain hands off batches to the
-/// engine (docs/05 §4.2).
+/// engine.
 #[derive(Debug)]
 pub struct FileCapture {
     link_type: LinkType,
@@ -25,7 +25,7 @@ pub struct FileCapture {
     cursor: usize,
     batch_size: usize,
     /// Wall-clock ns of each frame, parallel to `frames`, exposed for the engine
-    /// to pair with the monotonic reading (docs/05 §6).
+    /// to pair with the monotonic reading.
     wall_nanos: Vec<u64>,
 }
 
@@ -39,7 +39,7 @@ impl FileCapture {
     /// Build from an already-parsed [`PcapFile`].
     pub fn from_pcap(pcap: PcapFile, iface_id: u16) -> Result<Self> {
         // Derive a monotonic clock from the first record's wall time, so
-        // durations are correct regardless of the absolute epoch (docs/05 §6).
+        // durations are correct regardless of the absolute epoch.
         let base = pcap
             .records
             .first()
@@ -65,12 +65,12 @@ impl FileCapture {
         })
     }
 
-    /// The link type of the capture (feeds the decoder, docs/07 §4.2).
+    /// The link type of the capture (feeds the decoder .
     pub fn link_type(&self) -> LinkType {
         self.link_type
     }
 
-    /// Wall-clock ns for the frame at absolute index `i` (docs/05 §6).
+    /// Wall-clock ns for the frame at absolute index `i`.
     pub fn wall_nanos_at(&self, i: usize) -> Option<u64> {
         self.wall_nanos.get(i).copied()
     }

@@ -1,18 +1,18 @@
 //! Recording — capturing a session to a durable, self-contained artifact that
-//! Replay (docs/21) can reproduce deterministically and Export (docs/23) can
-//! share, honoring the privacy-first payload policy (docs/22).
+//! Replay can reproduce deterministically and Export can
+//! share, honoring the privacy-first payload policy.
 //!
-//! A recording is **more than raw packets** (docs/22 §3): to replay faithfully it
+//! A recording is **more than raw packets**: to replay faithfully it
 //! packages the frames (as pcapng, [`crate::pcapng`]), the version pins that
 //! produced the original run, a privacy manifest stating exactly what payload
-//! level was captured, and periodic checkpoints for fast seek (docs/21 §5). The
+//! level was captured, and periodic checkpoints for fast seek. The
 //! on-disk form is a tiny framed container — magic, a JSON sidecar
 //! ([`RecordingManifest`]), then the pcapng frame data — so the *frame portion is
-//! itself a valid pcapng file* and export is nearly free (docs/22 §3.1, docs/23).
+//! itself a valid pcapng file* and export is nearly free.
 //!
 //! Recording is deliberate (a user/CI chooses to record) and honest: the manifest
 //! never claims a payload level the frames don't carry, and a truncated artifact
-//! recovers to its last valid record rather than lying (docs/22 §8).
+//! recovers to its last valid record rather than lying.
 
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +22,7 @@ use netpulse_decode::LinkType;
 use crate::pcap::PcapRecord;
 use crate::pcapng;
 
-/// The payload level a recording captured (docs/22 §5). Mirrors
+/// The payload level a recording captured. Mirrors
 /// `netpulse_storage::PayloadPolicy` but is restated locally so the capture layer
 /// gains no upward dependency (the same reason the API DTOs restate core types).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -41,17 +41,17 @@ pub enum RecordingPayloadLevel {
 
 impl RecordingPayloadLevel {
     /// Whether this level permits any packet payload bytes to be recorded. Only
-    /// [`RecordingPayloadLevel::FullPayload`] does (docs/22 §5).
+    /// [`RecordingPayloadLevel::FullPayload`] does.
     pub fn allows_payloads(self) -> bool {
         matches!(self, RecordingPayloadLevel::FullPayload)
     }
 }
 
 /// The engine/model/content versions in force when the recording was made
-/// (docs/22 §6). Faithful replay reproduces the *processing*, not just the
+///Faithful replay reproduces the *processing*, not just the
 /// packets: if these match at replay time results are byte-identical, and if they
 /// differ replay discloses the drift rather than silently changing findings
-/// (docs/21 §6, §8).
+///
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VersionPins {
     pub engine: String,
@@ -75,43 +75,43 @@ impl VersionPins {
     }
 
     /// Whether replaying under `now` would reproduce identical results, i.e. every
-    /// pinned version still matches (docs/21 §6). When false, replay must disclose
-    /// the drift (docs/21 §8).
+    /// pinned version still matches. When false, replay must disclose
+    /// the drift.
     pub fn matches(&self, now: &VersionPins) -> bool {
         self == now
     }
 }
 
 /// What payload level the recording actually holds, made explicit so a consumer
-/// (or the user) knows exactly what's inside — no surprises (docs/22 §5).
+/// (or the user knows exactly what's inside — no surprises.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrivacyManifest {
     pub level: RecordingPayloadLevel,
     /// True only if full packet payload bytes are present; a tested invariant for
-    /// metadata-only recordings (docs/22 §5, §10).
+    /// metadata-only recordings.
     pub contains_payloads: bool,
-    /// Redactions applied when sealing a shareable recording (docs/22 §5).
+    /// Redactions applied when sealing a shareable recording.
     pub redactions: Vec<String>,
 }
 
 /// A state checkpoint enabling fast seek in replay without replaying from the
-/// very start every time (docs/21 §5). Foundation slice records frame-index/time
-/// pairs; the same format extends to reconstruction snapshots (docs/06 §9).
+/// very start every time. Foundation slice records frame-index/time
+/// pairs; the same format extends to reconstruction snapshots.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Checkpoint {
     pub frame_index: u64,
     pub mono_nanos: u64,
 }
 
-/// The self-describing metadata sidecar of a recording (docs/22 §3). Everything
+/// The self-describing metadata sidecar of a recording. Everything
 /// replay and export need *besides* the frames themselves.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecordingManifest {
-    /// The message-contract version at recording time (docs/22 §6).
+    /// The message-contract version at recording time.
     pub api_version: u32,
     /// Interfaces the recording scoped to (ids); empty means "all observed".
     pub interfaces: Vec<u16>,
-    /// The capture filter applied, if any (docs/05 §8.2).
+    /// The capture filter applied, if any.
     pub filter: Option<String>,
     pub from_mono_nanos: u64,
     pub to_mono_nanos: u64,
@@ -121,14 +121,14 @@ pub struct RecordingManifest {
     pub checkpoints: Vec<Checkpoint>,
 }
 
-/// A sealed, self-contained recording artifact (docs/22 §3): its metadata sidecar
+/// A sealed, self-contained recording artifact: its metadata sidecar
 /// plus the pcapng frame data. [`Recording::to_bytes`]/[`Recording::parse`] frame
 /// the two together; the pcapng portion is independently a valid capture file
-/// (docs/22 §3.1).
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct Recording {
     pub manifest: RecordingManifest,
-    /// The frames, as a standalone pcapng blob (docs/22 §3.1).
+    /// The frames, as a standalone pcapng blob.
     pub pcapng_bytes: Vec<u8>,
 }
 
@@ -138,7 +138,7 @@ const RECORDING_MAGIC: &[u8; 4] = b"NPR1";
 impl Recording {
     /// Serialize to the framed on-disk form: `magic | manifest_len(u32 LE) |
     /// manifest_json | pcapng_bytes`. The trailing pcapng is a valid capture on
-    /// its own (docs/22 §3.1).
+    /// its own.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
         let manifest = serde_json::to_vec(&self.manifest).map_err(|e| {
             NpError::Decode(format!("recording manifest serialization failed: {e}"))
@@ -152,7 +152,7 @@ impl Recording {
     }
 
     /// Parse the framed on-disk form. Malformed input yields a clean error, never
-    /// a panic (docs/22 §11).
+    /// a panic.
     pub fn parse(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 8 || &bytes[0..4] != RECORDING_MAGIC {
             return Err(NpError::Decode("recording: bad magic".into()));
@@ -171,9 +171,9 @@ impl Recording {
         })
     }
 
-    /// The recorded frames, parsed back from the pcapng portion (docs/21 §4 — the
+    /// The recorded frames, parsed back from the pcapng portion ( — the
     /// replay source reads these). A truncated artifact returns the frames up to
-    /// its boundary (docs/22 §8).
+    /// its boundary.
     pub fn frames(&self) -> Result<Vec<PcapRecord>> {
         Ok(pcapng::parse(&self.pcapng_bytes)?.records)
     }
@@ -184,14 +184,14 @@ impl Recording {
     }
 }
 
-/// Scope chosen for a recording (docs/22 §4): which interfaces, an optional
+/// Scope chosen for a recording: which interfaces, an optional
 /// filter, and the payload level — independent of the always-on storage mode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RecordingScope {
     pub interfaces: Vec<u16>,
     pub filter: Option<String>,
     pub level: RecordingPayloadLevel,
-    /// Emit a checkpoint every N frames for fast seek (docs/21 §5); 0 disables.
+    /// Emit a checkpoint every N frames for fast seek; 0 disables.
     pub checkpoint_every: u64,
 }
 
@@ -200,17 +200,17 @@ impl Default for RecordingScope {
         Self {
             interfaces: Vec::new(),
             filter: None,
-            // Private by default (docs/22 §5).
+            // Private by default.
             level: RecordingPayloadLevel::MetadataOnly,
             checkpoint_every: 64,
         }
     }
 }
 
-/// The recording lifecycle (docs/22 §4): start with a scope, ingest frames, then
+/// The recording lifecycle: start with a scope, ingest frames, then
 /// finalize into a sealed [`Recording`]. Recording writes only what the scope's
 /// payload level permits — the privacy manifest is a tested invariant, not a
-/// convention (docs/22 §5, §10).
+/// convention.
 #[derive(Debug)]
 pub struct Recorder {
     link_type: LinkType,
@@ -222,7 +222,7 @@ pub struct Recorder {
 }
 
 impl Recorder {
-    /// Begin a recording of `link_type` frames under `scope` (docs/22 §4).
+    /// Begin a recording of `link_type` frames under `scope`.
     pub fn start(link_type: LinkType, scope: RecordingScope) -> Self {
         Self {
             link_type,
@@ -235,16 +235,16 @@ impl Recorder {
     }
 
     /// Append one captured frame, at its capture-time monotonic timestamp
-    /// (docs/05 §6). `record` carries the wall-clock timestamp for the pcapng
+    ///`record` carries the wall-clock timestamp for the pcapng
     /// timeline; `mono_nanos` drives checkpoints and the replay clock.
     pub fn push(&mut self, mono_nanos: u64, mut record: PcapRecord) {
         // Honor the payload level: above metadata-only would keep bytes; this
         // metadata slice records header-length frames, so nothing above the level
-        // is ever written (docs/22 §5, tested invariant).
+        // is ever written.
         if !self.scope.level.allows_payloads() {
             // Keep the frame's length honest but retain no payload beyond what a
             // metadata/header capture would — the frame bytes here are already the
-            // header-bearing prefix the decoder needs (docs/08 §4).
+            // header-bearing prefix the decoder needs.
             record.orig_len = record.orig_len.max(record.data.len() as u32);
         }
         let index = self.records.len() as u64;
@@ -265,8 +265,8 @@ impl Recorder {
     }
 
     /// Seal the recording into a self-contained artifact with version pins and a
-    /// privacy manifest (docs/22 §4 finalize, §6). A recording without them can't
-    /// be faithfully replayed or safely shared (docs/22 §11).
+    /// privacy manifest. A recording without them can't
+    /// be faithfully replayed or safely shared.
     pub fn finalize(self, api_version: u32) -> Recording {
         let contains_payloads = self.scope.level.allows_payloads();
         let manifest = RecordingManifest {
@@ -292,10 +292,10 @@ impl Recorder {
 }
 
 /// Retroactively seal the most recent `window_nanos` of a rolling capture buffer
-/// into a recording — the "record the last N seconds" capability (docs/22 §4.1).
+/// into a recording — the "record the last N seconds" capability.
 /// `rolling` holds `(mono_nanos, record)` pairs oldest-first; only what the buffer
 /// still holds can be sealed, so the available window is bounded honestly
-/// (docs/22 §4.1, §8). Returns `None` if the buffer is empty.
+///Returns `None` if the buffer is empty.
 pub fn record_last_n(
     link_type: LinkType,
     rolling: &[(u64, PcapRecord)],
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn metadata_only_manifest_declares_no_payloads() {
         // The default level is metadata-only; the manifest must say so, and the
-        // invariant that no payloads are present must hold (docs/22 §5, §10).
+        // invariant that no payloads are present must hold.
         let recording = recorder_with(2);
         assert_eq!(
             recording.manifest.privacy.level,

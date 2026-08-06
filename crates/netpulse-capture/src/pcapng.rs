@@ -1,16 +1,16 @@
 //! A minimal, dependency-free reader **and writer** for the modern **pcapng**
-//! file format (docs/22 §3.1). Recordings (docs/22) and pcapng export (docs/23)
+//! file format. Recordings and pcapng export
 //! build on pcapng because it is the interop gold standard: a recording's frame
 //! data *is* a valid pcapng file, so export is nearly free and external captures
-//! can be imported and replayed (docs/21 §8, docs/23 §5).
+//! can be imported and replayed.
 //!
 //! Only the blocks NetPulse needs are handled — the Section Header Block (SHB,
 //! to learn byte order), the Interface Description Block (IDB, to learn link type
 //! and timestamp resolution), and the Enhanced Packet Block (EPB, the frames with
-//! their capture-time timestamps, docs/05 §6). Simple Packet Blocks are tolerated;
+//! their capture-time timestamps . Simple Packet Blocks are tolerated;
 //! everything else is skipped by block length. Like [`crate::pcap`], malformed
 //! input yields a clean error or an honest truncation boundary, never a panic —
-//! a recording, too, is fuzz-worthy input (docs/22 §11).
+//! a recording, too, is fuzz-worthy input.
 
 use netpulse_core::{NpError, Result};
 use netpulse_decode::LinkType;
@@ -35,14 +35,14 @@ const LINKTYPE_ETHERNET: u16 = 1;
 const LINKTYPE_RAW: u16 = 101;
 
 /// A parsed pcapng file: its link type and all records, plus whether parsing hit
-/// a truncation boundary (docs/22 §8 corrupt/truncated recovery).
+/// a truncation boundary.
 #[derive(Debug, Clone)]
 pub struct PcapngFile {
     pub link_type: LinkType,
     pub records: Vec<PcapRecord>,
     /// True when a block ran past the end of the buffer and parsing stopped at
     /// the last valid record rather than erroring — an honest boundary, not a
-    /// silent loss (docs/22 §8, mirrors docs/08 §9 recovery).
+    /// silent loss.
     pub truncated: bool,
 }
 
@@ -66,9 +66,9 @@ fn linktype_from_num(n: u16) -> Result<LinkType> {
 }
 
 /// Serialize `records` as a little-endian pcapng file with nanosecond timestamp
-/// resolution (docs/22 §3.1). The output is a single section: SHB, one IDB for
+/// resolution. The output is a single section: SHB, one IDB for
 /// `link_type`, then one EPB per record — a valid capture other tools can open
-/// (docs/23 §11 interop).
+///
 pub fn write(link_type: LinkType, records: &[PcapRecord]) -> Vec<u8> {
     let mut out = Vec::new();
     write_shb(&mut out);
@@ -130,10 +130,10 @@ fn write_epb(out: &mut Vec<u8>, r: &PcapRecord) {
     push_block(out, BT_EPB, &body);
 }
 
-/// Parse a whole pcapng file from memory (docs/22 §3.1). Handles both byte orders
+/// Parse a whole pcapng file from memory. Handles both byte orders
 /// and the `if_tsresol` timestamp resolution; unknown blocks are skipped by their
 /// length. A block that overruns the buffer stops parsing at the last valid record
-/// with `truncated = true` (docs/22 §8).
+/// with `truncated = true`.
 pub fn parse(bytes: &[u8]) -> Result<PcapngFile> {
     if bytes.len() < 12 {
         return Err(NpError::Decode("pcapng: shorter than one block".into()));

@@ -1,19 +1,19 @@
-//! The explanation model (docs/07 §7) — what distinguishes NetPulse's dissection
+//! The explanation model — what distinguishes NetPulse's dissection
 //! from a plain analyzer. Every field and protocol state a dissector emits is
 //! tagged with a stable **explanation key** (`tcp.flags.syn`,
 //! `dns.rcode.nxdomain`, …). Detection (emitting a key) is decoupled from
 //! content (stored here), so the same parse serves beginner, intermediate, and
-//! expert — and one key wires the whole education system together (docs/07 §7.3).
+//! expert — and one key wires the whole education system together.
 //!
-//! Keys are an API surface (docs/07 §12): renaming one breaks lessons, the
+//! Keys are an API surface: renaming one breaks lessons, the
 //! explorer, and AI grounding, so they are stable and versioned. A CI-style test
-//! (`every_key_has_content_at_all_depths`) enforces "no dead ends" (docs/01 E1):
+//! (`every_key_has_content_at_all_depths` enforces "no dead ends":
 //! any key a dissector can emit must resolve to content at all three depths.
 
 /// A stable identifier for a protocol field or state, e.g. `tcp.flags.syn`.
 ///
 /// Interned as a `&'static str` so it is cheap to pass on the hot path
-/// (docs/07 §10); content is fetched only when the UI actually displays it.
+///content is fetched only when the UI actually displays it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ExplanationKey(pub &'static str);
 
@@ -30,7 +30,7 @@ impl std::fmt::Display for ExplanationKey {
     }
 }
 
-/// Progressive-disclosure depth (docs/01 §7.3, docs/07 §7.2). The UI picks one
+/// Progressive-disclosure depth. The UI picks one
 /// by mode; the same key resolves to appropriate content at each.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DisclosureDepth {
@@ -90,7 +90,7 @@ pub const ALL_KEYS: &[ExplanationKey] = &[
 
 /// Resolve a key to its content, or `None` if the key is unknown.
 ///
-/// Content lives inline here for the vertical slice; docs/07 §7.3 has it move to
+/// Content lives inline here for the vertical slice; has it move to
 /// a reviewable, localizable data store, addressed by these same keys.
 pub fn explain(key: ExplanationKey) -> Option<Explanation> {
     let e = |b, i, x| Explanation {
@@ -162,7 +162,7 @@ pub fn explain(key: ExplanationKey) -> Option<Explanation> {
         "dns.query" => e(
             "You asked 'what's the address of this website?'",
             "A DNS query resolves a name to records (A/AAAA/CNAME/…); it usually precedes a connection.",
-            "DNS query (RFC 1035); QNAME/QTYPE/QCLASS. Feeds the DNS→connection lineage (docs/06 §6.1).",
+            "DNS query (RFC 1035); QNAME/QTYPE/QCLASS. Feeds the DNS→connection lineage.",
         ),
         "dns.response" => e(
             "You got back the website's address.",
@@ -191,7 +191,7 @@ pub fn explain(key: ExplanationKey) -> Option<Explanation> {
         ),
         "http.request" => e(
             "Your browser asks the server for a page or file.",
-            "An HTTP request has a method, path, and headers; it maps to the website journey (docs/14).",
+            "An HTTP request has a method, path, and headers; it maps to the website journey.",
             "HTTP/1.1 request-line + headers (RFC 9110/9112); plaintext only, else inside TLS.",
         ),
         "http.response" => e(
@@ -209,7 +209,7 @@ mod tests {
 
     #[test]
     fn every_key_has_content_at_all_depths() {
-        // Enforces "no dead ends" (docs/01 E1, docs/07 §11): any key a dissector
+        // Enforces "no dead ends": any key a dissector
         // can emit must resolve to non-empty content at all three depths.
         for &key in ALL_KEYS {
             let ex = explain(key).unwrap_or_else(|| panic!("no content for key {key}"));

@@ -1,10 +1,10 @@
-//! DNS dissection (docs/07 §6.5). DNS is the "what happened after I typed a
+//! DNS dissection. DNS is the "what happened after I typed a
 //! name" starting point, so it gets careful treatment: queries, responses,
 //! answers (A/AAAA/CNAME), and the response code — the raw material for the
-//! flow engine's DNS→connection lineage (docs/06 §6.1).
+//! flow engine's DNS→connection lineage.
 //!
 //! Name decompression is the classic DoS trap (a pointer loop). The reader is
-//! bounds-checked and pointer following is hard-capped (docs/07 §8), so a
+//! bounds-checked and pointer following is hard-capped, so a
 //! crafted packet stops and is flagged rather than looping.
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
@@ -109,7 +109,7 @@ pub fn dissect(msg: &[u8]) -> Result<Option<DnsInfo>> {
 /// Decode a (possibly compressed) DNS name starting at `start`. Returns the
 /// dotted name and the offset just past the name *in the original stream*
 /// (following the first pointer, per RFC 1035). Pointer following is capped to
-/// defuse compression-loop DoS (docs/07 §8). Returns `None` on malformed input.
+/// defuse compression-loop DoS. Returns `None` on malformed input.
 fn read_name(msg: &[u8], start: usize) -> Option<(String, usize)> {
     let mut labels: Vec<&str> = Vec::new();
     let mut pos = start;

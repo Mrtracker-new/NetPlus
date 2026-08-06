@@ -1,8 +1,8 @@
-//! The layered decode pipeline (docs/07 §4.2) and protocol identification
-//! (docs/07 §5). This ties the per-layer parsers together: link → network →
+//! The layered decode pipeline and protocol identification
+//!This ties the per-layer parsers together: link → network →
 //! transport → application, selecting the next dissector from the identification
 //! signal of the layer below. Ports are only a hint; payload heuristics confirm
-//! or override them (docs/07 §5), and identification stays honest — an
+//! or override them, and identification stays honest — an
 //! unrecognized payload leaves [`L7Proto::Unknown`] rather than guessing.
 
 use netpulse_core::net::{L4Proto, L7Proto};
@@ -13,7 +13,7 @@ use crate::reader::Reader;
 use crate::{dns, http, layers, tls};
 
 /// Which link layer a capture's frames use, from the pcap link type
-/// (docs/05 §5). Chosen once per capture source.
+///Chosen once per capture source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LinkType {
     Ethernet,
@@ -25,7 +25,7 @@ pub enum LinkType {
 
 /// Decode one frame end-to-end. Never fails at the top level: a deeper-layer
 /// error yields a [`Decoded`] with `partial = true` holding whatever parsed
-/// (docs/07 §3.5). The frame is never discarded.
+///The frame is never discarded.
 pub fn decode_frame(link: LinkType, bytes: &[u8]) -> Decoded {
     let (link_kind, l3) = match link {
         LinkType::Ethernet => {
@@ -86,7 +86,7 @@ pub fn decode_frame(link: LinkType, bytes: &[u8]) -> Decoded {
         L4Proto::Other(n) => {
             out.transport = Some(Transport::Other(n));
         }
-        // L4Proto is #[non_exhaustive] (docs/02 §6): a future transport falls
+        // L4Proto is #[non_exhaustive]: a future transport falls
         // through as an unmodelled protocol rather than breaking the build.
         _ => {}
     }
@@ -131,7 +131,7 @@ fn parse_ip(ip: IpBytes<'_>) -> netpulse_core::Result<(crate::frame::NetworkHead
     }
 }
 
-/// Identify the L7 protocol (docs/07 §5) and run the matching dissector,
+/// Identify the L7 protocol and run the matching dissector,
 /// populating `out.l7`, `out.l7_detail`, and coarse events. `is_tcp` picks the
 /// stream vs datagram candidate set.
 fn identify_and_dissect(out: &mut Decoded, src_port: u16, dst_port: u16, app: &[u8], is_tcp: bool) {
@@ -180,7 +180,7 @@ fn identify_and_dissect(out: &mut Decoded, src_port: u16, dst_port: u16, app: &[
             }
         }
         // QUIC identification (long-header form) is left to Phase 1 deepening
-        // (docs/07 §6.9); for now UDP/443 is hinted, not dissected.
+        //for now UDP/443 is hinted, not dissected.
     }
 
     out.l7 = port_hint(src_port, dst_port, is_tcp);

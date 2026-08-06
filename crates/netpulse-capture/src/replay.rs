@@ -1,15 +1,15 @@
-//! The Replay data source and time control (docs/21). Replay's core design rule
+//! The Replay data source and time control. Replay's core design rule
 //! is that it **reuses the exact same pipeline as live capture** — the only thing
-//! that changes is the source of frames (docs/21 §4). [`ReplaySource`] is that
-//! source: another [`CaptureSource`] (docs/05 §5) that reads a recording's frames
+//! that changes is the source of frames. [`ReplaySource`] is that
+//! source: another [`CaptureSource`] that reads a recording's frames
 //! instead of a NIC, preserving their **original capture timestamps** so replay
-//! timelines are truthful (docs/21 §6).
+//! timelines are truthful.
 //!
 //! [`ReplayController`] adds the time control the live view can't offer (docs/21
 //! §5): play/pause, speed, step, and seek. Seeking uses the recording's
-//! checkpoints (docs/22 §3) so it need not replay from the very start each time
-//! (docs/21 §5). All timing derives from recorded timestamps against a virtual
-//! clock — **never `now()` or RNG** (docs/21 §6, §11) — which is what makes a
+//! checkpoints so it need not replay from the very start each time
+//!All timing derives from recorded timestamps against a virtual
+//! clock — **never `now( ` or RNG** — which is what makes a
 //! recording replay byte-identically every run.
 
 use netpulse_core::traits::{CaptureSource, RawFrame};
@@ -21,21 +21,21 @@ use crate::recording::{Checkpoint, Recording};
 /// A read-only frame feed the offline pipeline can drive, exposing the capture
 /// timestamps it needs. Both [`crate::FileCapture`] (live-import) and
 /// [`ReplaySource`] (replay) implement it, so one pipeline serves both sources
-/// (docs/21 §4 — "one pipeline, two sources").
+///
 pub trait FrameFeed {
-    /// The link type of the frames, feeding the decoder (docs/07 §4.2).
+    /// The link type of the frames, feeding the decoder.
     fn link_type(&self) -> LinkType;
     /// Wall-clock ns for the frame at absolute index `i`, paired with the frame's
-    /// monotonic reading downstream (docs/05 §6).
+    /// monotonic reading downstream.
     fn wall_nanos_at(&self, i: usize) -> Option<u64>;
     /// Pull the next count-bounded batch of frames, empty at end-of-stream.
     fn next_frames(&mut self) -> Result<Vec<RawFrame>>;
 }
 
-/// A [`CaptureSource`] backed by a recording (docs/21 §4). It hands frames out in
+/// A [`CaptureSource`] backed by a recording. It hands frames out in
 /// recorded order with their original monotonic timestamps derived exactly as the
-/// file-import source does (docs/05 §6), so replaying a recording reproduces the
-/// same reconstruction the original capture produced (docs/21 §10 parity).
+/// file-import source does, so replaying a recording reproduces the
+/// same reconstruction the original capture produced.
 #[derive(Debug)]
 pub struct ReplaySource {
     link_type: LinkType,
@@ -43,18 +43,18 @@ pub struct ReplaySource {
     wall_nanos: Vec<u64>,
     cursor: usize,
     batch_size: usize,
-    /// True when the underlying recording was truncated (docs/22 §8): replay
-    /// reproduces up to the boundary honestly (docs/21 §8).
+    /// True when the underlying recording was truncated: replay
+    /// reproduces up to the boundary honestly.
     incomplete: bool,
 }
 
 impl ReplaySource {
-    /// Build a replay source from a sealed recording (docs/21 §4).
+    /// Build a replay source from a sealed recording.
     pub fn from_recording(recording: &Recording) -> Result<Self> {
         let parsed = crate::pcapng::parse(&recording.pcapng_bytes)?;
         // Derive a monotonic clock from the first frame's wall time, identically
-        // to the file-import source (docs/05 §6), so replay and live-import agree
-        // to the nanosecond and reconstruction is byte-identical (docs/21 §6).
+        // to the file-import source, so replay and live-import agree
+        // to the nanosecond and reconstruction is byte-identical.
         let base = parsed
             .records
             .first()
@@ -86,7 +86,7 @@ impl ReplaySource {
         self.frames.len()
     }
 
-    /// Whether the recording was truncated (docs/21 §8 honest incompleteness).
+    /// Whether the recording was truncated.
     pub fn is_incomplete(&self) -> bool {
         self.incomplete
     }
@@ -121,7 +121,7 @@ impl CaptureSource for ReplaySource {
     }
 }
 
-/// The playback state a UI renders (docs/21 §5). `speed_percent` is 100 for 1×,
+/// The playback state a UI renders. `speed_percent` is 100 for 1×,
 /// 10 for slow-motion 0.1× (teaching, docs/16), 1000 for 10× review — an integer
 /// so it stays exact on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -132,17 +132,17 @@ pub struct ReplayState {
     pub playing: bool,
     pub frame_index: u64,
     /// The recording was truncated; reconstruction is marked incomplete where the
-    /// recording was (docs/21 §8).
+    /// recording was.
     pub incomplete: bool,
 }
 
-/// Interactive time control over a recording (docs/21 §5). It decouples
+/// Interactive time control over a recording. It decouples
 /// *position* from wall-clock: play/pause/speed/step/seek move a virtual cursor
 /// over the recorded frame timeline. Seeking snaps to the nearest checkpoint at or
-/// before the target (docs/22 §3) so it need not scan from the start (docs/21 §5).
+/// before the target so it need not scan from the start.
 ///
 /// It holds no `now()`/RNG state — position advances only by recorded frame times,
-/// keeping replay deterministic (docs/21 §6, §11).
+/// keeping replay deterministic.
 #[derive(Debug, Clone)]
 pub struct ReplayController {
     /// Monotonic time of each frame, ascending (the virtual-clock keyframes).
@@ -156,7 +156,7 @@ pub struct ReplayController {
 }
 
 impl ReplayController {
-    /// Build a controller for a recording (docs/21 §5). Reads the frame timeline
+    /// Build a controller for a recording. Reads the frame timeline
     /// and checkpoints from the recording's frames and manifest.
     pub fn from_recording(recording: &Recording) -> Result<Self> {
         let frames = recording.frames()?;
@@ -180,24 +180,24 @@ impl ReplayController {
         })
     }
 
-    /// Start playback (docs/21 §5).
+    /// Start playback.
     pub fn play(&mut self) {
         self.playing = true;
     }
 
-    /// Pause playback (docs/21 §5).
+    /// Pause playback.
     pub fn pause(&mut self) {
         self.playing = false;
     }
 
     /// Set playback speed as a percentage of real time (100 = 1×). Clamped to a
-    /// sane, non-zero range so time never stops or runs backwards (docs/21 §5).
+    /// sane, non-zero range so time never stops or runs backwards.
     pub fn set_speed(&mut self, percent: u32) {
         self.speed_percent = percent.clamp(1, 10_000);
     }
 
     /// Advance exactly one frame/event — ideal for lessons ("now the SYN, now the
-    /// SYN-ACK…", docs/21 §5). Saturates at the last frame.
+    /// SYN-ACK…" . Saturates at the last frame.
     pub fn step(&mut self) {
         if self.cursor + 1 < self.frame_times.len() {
             self.cursor += 1;
@@ -209,7 +209,7 @@ impl ReplayController {
     /// over frames — so a seek is bounded by the checkpoint spacing, not O(n) from
     /// the start.
     pub fn seek(&mut self, mono_nanos: u64) {
-        // Start from the newest checkpoint whose time is <= target (docs/22 §3).
+        // Start from the newest checkpoint whose time is <= target.
         let mut idx = self
             .checkpoints
             .iter()
@@ -225,7 +225,7 @@ impl ReplayController {
         self.cursor = idx;
     }
 
-    /// The current playback state to render (docs/21 §5).
+    /// The current playback state to render.
     pub fn state(&self) -> ReplayState {
         ReplayState {
             position_nanos: self.frame_times.get(self.cursor).copied().unwrap_or(0),
@@ -263,7 +263,7 @@ mod tests {
 
     #[test]
     fn replay_is_deterministic() {
-        // The determinism meta-test (docs/21 §10): two replays of the same
+        // The determinism meta-test: two replays of the same
         // recording yield byte-identical frame sequences and timestamps.
         let rec = recording(20);
         let drain = |mut s: ReplaySource| {
@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn seek_matches_linear_scan() {
-        // Seek correctness (docs/21 §10): seeking to T lands on the same frame a
+        // Seek correctness: seeking to T lands on the same frame a
         // linear play-to-T would.
         let rec = recording(200); // checkpoints at 0, 64, 128, 192
         let mut ctrl = ReplayController::from_recording(&rec).unwrap();

@@ -1,19 +1,19 @@
 //! # netpulse-platform
 //!
-//! The single home for OS-specific code (docs/03 §13, docs/04 §3.2). Everything
+//! The single home for OS-specific code. Everything
 //! above this crate — decode, flow, session, storage, intelligence, UI — is
 //! platform-neutral. Porting to a new OS touches only this crate.
 //!
 //! Capture backends (`AF_PACKET`/Npcap/BPF) and attribution sources
 //! (`/proc`+netlink, `iphlpapi`, `libproc`) are gated by `#[cfg(target_os)]`
-//! and reached only through the traits below. A CI lint (docs/04 §7) flags any
+//! and reached only through the traits below. A CI lint flags any
 //! `cfg(target_os)` that leaks into another crate.
 //!
 //! **Live capture** is implemented for Windows via Npcap behind the
 //! `live-capture` feature (off by default, so the standard build stays
-//! dependency-free — docs/03 §14). When the feature is off, or on an OS without
+//! dependency-free — . When the feature is off, or on an OS without
 //! a backend yet, the functions fail closed with a [`NpError::Capability`]
-//! rather than pretend (docs/02 §11).
+//! rather than pretend.
 #![forbid(unsafe_code)]
 
 use netpulse_core::Result;
@@ -59,9 +59,9 @@ pub use npcap::LiveCapture;
 #[cfg(all(windows, feature = "live-capture"))]
 mod sockets;
 
-/// A shared, live socket→process attribution source (docs/12 §4), or `None` where
+/// A shared, live socket→process attribution source, or `None` where
 /// no backend is available (feature off / unsupported OS) — attribution then
-/// stays honestly `Unknown` rather than guessing (docs/12 §8).
+/// stays honestly `Unknown` rather than guessing.
 #[cfg(all(windows, feature = "live-capture"))]
 pub fn socket_table() -> Option<Arc<dyn SocketTableSource + Send + Sync>> {
     Some(Arc::new(sockets::WindowsSockets::new()))
@@ -87,7 +87,7 @@ pub fn open_capture(iface_id: u16) -> Result<LiveCapture> {
 
 // ---- Fallback: feature off, or an OS without a backend yet. ----
 // The same public surface exists so the engine/shell compile unchanged; every
-// entry point fails closed honestly (docs/02 §11).
+// entry point fails closed honestly.
 #[cfg(not(all(windows, feature = "live-capture")))]
 pub use disabled::LiveCapture;
 
@@ -138,8 +138,8 @@ mod disabled {
 pub use disabled::{list_interfaces, open_capture};
 
 // Per-OS attribution/capture modules land here behind `#[cfg(target_os)]` so no
-// cfg leaks above this crate (docs/04 §7). Linux (`AF_PACKET`/`/proc`) and macOS
-// (`BPF`/`libproc`) module declarations are cross-platform OS expansion scaffolding (docs/03 §13).
+// cfg leaks above this crate. Linux (`AF_PACKET`/`/proc` and macOS
+// (`BPF`/`libproc` module declarations are cross-platform OS expansion scaffolding.
 #[cfg(target_os = "linux")]
 mod linux {}
 #[cfg(target_os = "macos")]
@@ -153,7 +153,7 @@ mod tests {
     }
 
     // Without the live-capture feature the entry points must fail closed, never
-    // panic (docs/02 §11).
+    // panic.
     #[cfg(not(all(windows, feature = "live-capture")))]
     #[test]
     fn disabled_fails_closed() {

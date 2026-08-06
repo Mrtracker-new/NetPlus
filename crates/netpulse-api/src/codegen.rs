@@ -445,10 +445,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    s.push_str(&union(
-        "DiagnosticSeverity",
-        &["info", "warning", "error"],
-    ));
+    s.push_str(&union("DiagnosticSeverity", &["info", "warning", "error"]));
 
     // --- Active Diagnostic and Inspection IPC Interfaces ---
     s.push_str(&iface(

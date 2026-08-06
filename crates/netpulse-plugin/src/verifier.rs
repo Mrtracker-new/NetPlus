@@ -1,4 +1,4 @@
-//! Cryptographic verification engine for NetPulse plugins (docs/24).
+//! Cryptographic verification engine for NetPulse plugins.
 //!
 //! Trust status (`FirstParty`, `Reviewed`, `Unreviewed`) is **derived from verified
 //! Ed25519 signatures and payload hashes**, never self-declared by manifest text.

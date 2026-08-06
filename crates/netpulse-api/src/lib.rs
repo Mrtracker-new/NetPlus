@@ -1,22 +1,22 @@
 //! # netpulse-api — the contract (source of truth)
 //!
 //! The single versioned Query/Stream/Command message schema for the
-//! backend↔frontend IPC boundary (docs/02 §7). Both the Rust engine and the
+//! backend↔frontend IPC boundary. Both the Rust engine and the
 //! generated TypeScript types derive from this one crate, so the two sides
-//! cannot drift (docs/03 §7, docs/04 §3.11).
+//! cannot drift.
 //!
-//! Three interaction shapes (docs/02 §7.1):
+//! Three interaction shapes:
 //! - **Streams (push):** live channels the UI subscribes to; the backend pushes
-//!   deltas (docs/09 §7).
+//!   deltas.
 //! - **Queries (pull):** historical/aggregated requests, paginated and bounded,
 //!   each carrying a [`dto::ProjectionDepth`] so a beginner query never hauls raw
-//!   payloads across the boundary (docs/09 §6.3).
+//!   payloads across the boundary.
 //! - **Commands (control):** the *only* write paths from UI to engine — few and
-//!   enumerable, so the observe-only guarantee is easy to audit (docs/02 §10).
+//!   enumerable, so the observe-only guarantee is easy to audit.
 //!
 //! The concrete wire shapes live in [`dto`]; their TypeScript mirror is emitted
 //! by [`codegen`] into `ui/packages/contract`, kept in sync by a drift test
-//! (docs/04 §7).
+//!
 #![forbid(unsafe_code)]
 
 use serde::{Deserialize, Serialize};
@@ -38,12 +38,12 @@ pub use dto::{
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
-/// and engine can negotiate compatibility (docs/02 §7.2). v6 adds passive
+/// and engine can negotiate compatibility. v6 adds passive
 /// hostname enrichment on host breakdown rows (`HostNameDto`/`NameSourceDto`,
-/// docs/08 §5), on top of v5's interface picker and Phase 5's lifecycle DTOs.
+///  , on top of v5's interface picker and Phase 5's lifecycle DTOs.
 pub const API_VERSION: u32 = 6;
 
-/// Minimum API version supported by the host (v-1 backward compatibility, docs/02 §7.2).
+/// Minimum API version supported by the host (v-1 backward compatibility .
 pub const MIN_SUPPORTED_API_VERSION: u32 = 5;
 
 /// Negotiate API version given a client version range.
@@ -130,89 +130,89 @@ pub fn negotiate_api_version(client_version: u32) -> HandshakeResponseDto {
     negotiate_api_version_range(client_version, client_version)
 }
 
-/// A live channel the UI can subscribe to (docs/02 §7.1, docs/09 §7). The engine
+/// A live channel the UI can subscribe to. The engine
 /// pushes deltas on these; the UI updates a normalized store rather than polling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum StreamChannel {
     /// `live.flows` — flow lifecycle deltas.
     Flows,
-    /// `live.metrics` — throughput/latency/loss meter deltas (docs/11 §7).
+    /// `live.metrics` — throughput/latency/loss meter deltas.
     Metrics,
-    /// `live.findings` — security/anomaly findings as they occur (docs/17).
+    /// `live.findings` — security/anomaly findings as they occur.
     Findings,
-    /// `live.narratives` — new narrative feed cards (docs/09 §5). Protocol scaffolding for live push streaming.
+    /// `live.narratives` — new narrative feed cards. Protocol scaffolding for live push streaming.
     Narratives,
 }
 
-/// A historical/aggregated pull request (docs/02 §7.1). Each variant is
+/// A historical/aggregated pull request. Each variant is
 /// paginated and bounded, and carries the [`ProjectionDepth`] at which the
-/// engine should project its answer (docs/09 §6.3).
+/// engine should project its answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // Internally tagged on `kind`, camelCased variant names — the single wire shape
 // the TypeScript contract (`ui/packages/contract`) speaks. `rename_all` renames
 // the *variants* only; the snake_case field names (`from_mono_nanos`, …) are
-// unchanged and already match the contract (docs/02 §7, docs/03 §9).
+// unchanged and already match the contract.
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum Query {
-    /// The narrative feed for a time window (docs/09 §5), newest first.
+    /// The narrative feed for a time window, newest first.
     NarrativeFeed {
         from_mono_nanos: u64,
         to_mono_nanos: u64,
         depth: ProjectionDepth,
     },
-    /// The narrative journey for one session (docs/14).
+    /// The narrative journey for one session.
     JourneyOfSession {
         session_id: u64,
         depth: ProjectionDepth,
     },
-    /// A monitoring snapshot over a window (docs/11 §5).
+    /// A monitoring snapshot over a window.
     MonitorSnapshot {
         from_mono_nanos: u64,
         to_mono_nanos: u64,
     },
-    /// The process attribution for a flow (docs/12 §7).
+    /// The process attribution for a flow.
     AttributionOfFlow { flow_id: u64 },
-    /// Fetch packets belonging to a flow — the deepest drill-down (docs/09 §8).
+    /// Fetch packets belonging to a flow — the deepest drill-down.
     PacketsOfFlow { flow_id: u64 },
-    /// Grounded lesson offers for a session's teachable moments (docs/13 §4).
+    /// Grounded lesson offers for a session's teachable moments.
     LessonOffers {
         session_id: u64,
         depth: ProjectionDepth,
     },
-    /// The staged website journey for a session (docs/14).
+    /// The staged website journey for a session.
     JourneyStagesOfSession {
         session_id: u64,
         depth: ProjectionDepth,
     },
-    /// Browse the whole protocol reference (docs/15 §4).
+    /// Browse the whole protocol reference.
     ExplorerBrowse,
-    /// Search the protocol reference by term/symptom (docs/15 §8).
+    /// Search the protocol reference by term/symptom.
     ExplorerSearch { term: String },
-    /// The data-driven handshake animation model for a flow (docs/16 §4.2).
+    /// The data-driven handshake animation model for a flow.
     HandshakeAnimationForFlow { flow_id: u64 },
-    /// Security/anomaly findings over a window (docs/17 §6), most-confident first.
+    /// Security/anomaly findings over a window, most-confident first.
     SecurityFindings {
         from_mono_nanos: u64,
         to_mono_nanos: u64,
     },
-    /// Ask the grounded AI assistant a natural-language question (docs/19). The
+    /// Ask the grounded AI assistant a natural-language question. The
     /// answer is grounded in the committed capture and cites its evidence.
     AskAssistant { question: String },
-    // ---- Phase 5 lifecycle queries (docs/21–24) ----
-    /// List the recordings available for replay/export (docs/22 §3).
+    // ---- Phase 5 lifecycle queries ----
+    /// List the recordings available for replay/export.
     ListRecordings,
-    /// The current replay playback state (docs/21 §5).
+    /// The current replay playback state.
     ReplayState,
-    /// Preview exactly what an export would contain, before writing it (docs/23 §6).
+    /// Preview exactly what an export would contain, before writing it.
     ExportPreview {
         selection: ExportSelectionDto,
         format: ExportFormatDto,
     },
-    /// List the registered plugins with their capabilities and trust (docs/24 §6).
+    /// List the registered plugins with their capabilities and trust.
     ListPlugins,
-    /// List the capture-capable network interfaces to choose from (docs/05).
+    /// List the capture-capable network interfaces to choose from.
     Interfaces,
     /// Fetch health, readiness, and liveness status of the backend.
     HealthCheck,
@@ -245,13 +245,13 @@ pub enum Query {
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
-/// matches exhaustively and the TS contract is fully typed (docs/03 §9).
+/// matches exhaustively and the TS contract is fully typed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 // Internally tagged on `kind`, camelCased variants — the wire shape the TS
 // `QueryResponse` union expects (`{ kind: "narrativeFeed", cards: [...] }`).
 // serde's internal tagging cannot wrap a newtype-of-`Vec`, so each variant names
 // its single payload field explicitly; the field name matches the TS contract
-// (docs/03 §9). Regenerating the contract is not required — these envelopes are
+//Regenerating the contract is not required — these envelopes are
 // hand-authored in `ui/packages/contract/index.ts`, not emitted by codegen.
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[non_exhaustive]
@@ -268,13 +268,13 @@ pub enum QueryResponse {
     Attribution {
         attribution: AttributionDto,
     },
-    /// Honest empty answer when payloads were not stored (docs/09 §8).
+    /// Honest empty answer when payloads were not stored.
     PayloadsUnavailable,
-    /// Grounded lesson offers (docs/13 §4).
+    /// Grounded lesson offers.
     LessonOffers {
         offers: Vec<LessonOfferDto>,
     },
-    /// The staged website journey (docs/14).
+    /// The staged website journey.
     PageJourney {
         journey: PageJourneyDto,
     },
@@ -282,35 +282,35 @@ pub enum QueryResponse {
     ExplorerEntries {
         entries: Vec<ExplorerEntryDto>,
     },
-    /// A data-driven animation model (docs/16).
+    /// A data-driven animation model.
     Animation {
         animation: AnimationModelDto,
     },
-    /// Security/anomaly findings (docs/17–20), corroborated and ranked.
+    /// Security/anomaly findings, corroborated and ranked.
     Findings {
         findings: Vec<SecurityFindingDto>,
     },
-    /// A grounded, cited AI answer (docs/19).
+    /// A grounded, cited AI answer.
     AssistantAnswer {
         answer: AssistantAnswerDto,
     },
-    /// The recordings available for replay/export (docs/22).
+    /// The recordings available for replay/export.
     Recordings {
         recordings: Vec<RecordingSummaryDto>,
     },
-    /// The current replay playback state (docs/21 §5).
+    /// The current replay playback state.
     ReplayState {
         state: ReplayStateDto,
     },
-    /// A preview of what an export would contain (docs/23 §6).
+    /// A preview of what an export would contain.
     ExportPreview {
         preview: ExportPreviewDto,
     },
-    /// The registered plugins (docs/24 §6).
+    /// The registered plugins.
     Plugins {
         plugins: Vec<PluginDescriptorDto>,
     },
-    /// The capture-capable interfaces to choose from (docs/05).
+    /// The capture-capable interfaces to choose from.
     Interfaces {
         interfaces: Vec<InterfaceDto>,
     },
@@ -318,7 +318,7 @@ pub enum QueryResponse {
     Health {
         status: HealthStatusDto,
     },
-    /// API version negotiation result (docs/02 §7.2).
+    /// API version negotiation result.
     Handshake {
         handshake: HandshakeResponseDto,
     },
@@ -420,12 +420,12 @@ pub struct HostIdentityDto {
     pub status: String,
 }
 
-/// A user-initiated control write — the only write path UI→engine (docs/02 §7.1).
+/// A user-initiated control write — the only write path UI→engine.
 /// The set is deliberately small and enumerable for auditability. Observe-only:
 /// nothing here modifies network traffic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // Same wire discipline as `Query`: internally tagged on `kind`, camelCased
-// variants, snake_case fields unchanged (matches the TS contract, docs/03 §9).
+// variants, snake_case fields unchanged (matches the TS contract .
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum Command {
@@ -438,38 +438,38 @@ pub enum Command {
     StartRecording,
     StopRecording,
     /// Change the UI's global disclosure mode; travels to the engine as a
-    /// projection-depth default (docs/09 §6.3).
+    /// projection-depth default.
     SetDepth {
         depth: ProjectionDepth,
     },
-    // ---- Phase 5 lifecycle commands (docs/21–24) ----
-    /// Start replay playback of the selected recording (docs/21 §5).
+    // ---- Phase 5 lifecycle commands ----
+    /// Start replay playback of the selected recording.
     ReplayPlay,
-    /// Pause replay playback (docs/21 §5).
+    /// Pause replay playback.
     ReplayPause,
-    /// Advance replay by one frame/event (docs/21 §5).
+    /// Advance replay by one frame/event.
     ReplayStep,
-    /// Seek replay to a monotonic timestamp (docs/21 §5).
+    /// Seek replay to a monotonic timestamp.
     ReplaySeek {
         mono_nanos: u64,
     },
-    /// Set replay speed as a percentage of real time (100 = 1×) (docs/21 §5).
+    /// Set replay speed as a percentage of real time (100 = 1× .
     ReplaySetSpeed {
         percent: u32,
     },
-    /// Produce an export to a local file (docs/23). Explicit, user-initiated, and
+    /// Produce an export to a local file. Explicit, user-initiated, and
     /// never auto-transmitted — the single egress boundary stays `netpulse-ai`
-    /// (docs/23 §6, docs/02 §10).
+    ///
     StartExport {
         selection: ExportSelectionDto,
         format: ExportFormatDto,
         level: PayloadLevelDto,
     },
-    /// Enable a registered plugin — an explicit, disclosed user choice (docs/24 §5).
+    /// Enable a registered plugin — an explicit, disclosed user choice.
     EnablePlugin {
         name: String,
     },
-    /// Disable a registered plugin (docs/24 §6).
+    /// Disable a registered plugin.
     DisablePlugin {
         name: String,
     },
@@ -497,8 +497,8 @@ mod tests {
     #[test]
     fn version_advanced_for_hostname_enrichment() {
         // v6 adds passive hostname enrichment on host breakdown rows
-        // (`HostNameDto`/`NameSourceDto`, docs/08 §5), on top of v5's interface
-        // picker and Phase 5's lifecycle DTOs (docs/21–24).
+        // (`HostNameDto`/`NameSourceDto` , on top of v5's interface
+        // picker and Phase 5's lifecycle DTOs.
         assert_eq!(API_VERSION, 6);
     }
 
@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn query_carries_projection_depth() {
-        // A narrative-feed query round-trips with its depth (docs/09 §6.3).
+        // A narrative-feed query round-trips with its depth.
         let q = Query::NarrativeFeed {
             from_mono_nanos: 0,
             to_mono_nanos: 1_000,

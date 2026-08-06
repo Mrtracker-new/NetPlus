@@ -1,14 +1,14 @@
-//! The Phase 2 wire types (docs/02 §7, docs/09–§12). These are the *contract
+//! The Phase 2 wire types. These are the *contract
 //! DTOs*: the exact shapes that cross the Tauri IPC boundary between engine and
 //! UI. They are deliberately separate from the internal domain types in
 //! `netpulse-narrative` / `netpulse-engine` (which sit *above* this crate in the
-//! layer graph, docs/04 §3) — the engine maps its rich types down into these
+//! layer graph — the engine maps its rich types down into these
 //! stable, serializable projections when it answers a query or pushes a delta.
 //!
 //! Keeping wire types distinct from domain types means the UI contract can stay
 //! stable while internal representations evolve, and it keeps this crate's
 //! dependency set tiny (core + serde only) — the contract is security-sensitive
-//! surface (docs/03 §7), so it carries no heavy dependencies.
+//! surface, so it carries no heavy dependencies.
 //!
 //! Every serde representation here is mirrored, field-for-field, by the
 //! TypeScript emitter in [`crate::codegen`]; a test asserts the two agree, and a
@@ -16,7 +16,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// The disclosure/projection depth carried on a query (docs/09 §6.3). Mirrors
+/// The disclosure/projection depth carried on a query. Mirrors
 /// `netpulse_core::Depth`, restated here so the contract crate is self-contained
 /// and the TS emitter has a single local source.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -29,7 +29,7 @@ pub enum ProjectionDepth {
     Expert,
 }
 
-/// A pointer back to the evidence a projection rests on (docs/02 §6.3), as a
+/// A pointer back to the evidence a projection rests on, as a
 /// tagged union: `{ "kind": "flow", "id": 12 }`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "id", rename_all = "lowercase")]
@@ -40,7 +40,7 @@ pub enum EvidenceRefDto {
     Session(u64),
 }
 
-/// A narrative card's affect (docs/09 §5.2).
+/// A narrative card's affect.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
@@ -51,7 +51,7 @@ pub enum SeverityDto {
     Finding,
 }
 
-/// One narrative feed card, already rendered at the query's depth (docs/09 §5).
+/// One narrative feed card, already rendered at the query's depth.
 /// `lines` is the depth-appropriate detail; `summary` is those lines joined for
 /// the one-line under-headline view.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ pub struct NarrativeCardDto {
     pub at_mono_nanos: u64,
 }
 
-/// The dimension a usage breakdown decomposes along (docs/11 §5).
+/// The dimension a usage breakdown decomposes along.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
@@ -74,7 +74,7 @@ pub enum DimensionDto {
     Interface,
 }
 
-/// How a hostname for an IP was learned (docs/06 §6.1, docs/08 §5). Mirrors
+/// How a hostname for an IP was learned. Mirrors
 /// `netpulse_core::NameSource`. Always egress-free — a name we *saw* on the wire
 /// or read from *local* OS state, never a lookup we made — so the UI can label the
 /// provenance honestly.
@@ -94,7 +94,7 @@ pub enum NameSourceDto {
 }
 
 /// One passively-observed name for a breakdown row's endpoint, tagged with how it
-/// was learned (docs/08 §5). Several may travel for one IP; the UI picks what to
+/// was learned. Several may travel for one IP; the UI picks what to
 /// show and can surface the source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HostNameDto {
@@ -102,9 +102,9 @@ pub struct HostNameDto {
     pub source: NameSourceDto,
 }
 
-/// One row of a usage breakdown (docs/11 §5). `label` is the raw key (an IP for
+/// One row of a usage breakdown. `label` is the raw key (an IP for
 /// the host dimension); `hostnames` enriches it with any names seen for that IP,
-/// empty when none — the label is never replaced by a name (docs/02 §10.3).
+/// empty when none — the label is never replaced by a name.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BreakdownRowDto {
     pub label: String,
@@ -114,14 +114,14 @@ pub struct BreakdownRowDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
-/// A ranked usage breakdown (docs/11 §5).
+/// A ranked usage breakdown.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BreakdownDto {
     pub dimension: DimensionDto,
     pub rows: Vec<BreakdownRowDto>,
 }
 
-/// The likely cause a diagnosis settles on (docs/11 §6.1).
+/// The likely cause a diagnosis settles on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -132,9 +132,9 @@ pub enum CauseDto {
     Congestion,
 }
 
-/// A "why is it slow?" diagnosis (docs/11 §6). `confidence_percent` is the
+/// A "why is it slow?" diagnosis. `confidence_percent` is the
 /// calibrated confidence as a 0–100 integer for display; `explanation` is the
-/// ready-to-show "looks like …" text (never a verdict, docs/11 §6.3).
+/// ready-to-show "looks like …" text (never a verdict .
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiagnosisDto {
     pub cause: CauseDto,
@@ -143,9 +143,9 @@ pub struct DiagnosisDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
-/// A monitoring snapshot over a window (docs/11 §5, §7). Note the two loss
+/// A monitoring snapshot over a window. Note the two loss
 /// figures are separate fields — capture loss is never network loss
-/// (docs/11 §6.4).
+///
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MonitorSnapshotDto {
     pub by_protocol: BreakdownDto,
@@ -155,7 +155,7 @@ pub struct MonitorSnapshotDto {
     pub capture_drops: u64,
 }
 
-/// How confident a flow's process attribution is (docs/12 §5.4).
+/// How confident a flow's process attribution is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
@@ -165,8 +165,8 @@ pub enum AttributionConfidenceDto {
     Unknown,
 }
 
-/// The attributed owner of a flow (docs/12 §7). `pid` is absent when honestly
-/// unattributed (docs/12 §8).
+/// The attributed owner of a flow. `pid` is absent when honestly
+/// unattributed.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AttributionDto {
     pub pid: Option<u64>,
@@ -174,7 +174,7 @@ pub struct AttributionDto {
     pub process_name: Option<String>,
 }
 
-/// A capture-capable network interface offered for selection (docs/05). `id` is
+/// A capture-capable network interface offered for selection. `id` is
 /// the handle passed back in `StartCapture`; `0` means "let the platform pick the
 /// default adapter".
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,16 +184,16 @@ pub struct InterfaceDto {
     pub description: Option<String>,
 }
 
-// ===== Phase 3 — Education (docs/13–16) ====================================
+// ===== Phase 3 — Education ====================================
 //
 // The wire projections of the education surfaces. Like the Phase 2 DTOs above,
 // these are deliberately distinct from the rich domain types in `netpulse-learn`
 // / `netpulse-narrative`; the engine maps down into these stable shapes. Every
 // one that asserts something about the learner's traffic carries `evidence`
-// (docs/02 §6.3). The `level` field reuses [`ProjectionDepth`] because a lesson's
-// level and the UI disclosure mode share one ladder (docs/13 §3.1, docs/09 §6).
+//The `level` field reuses [`ProjectionDepth`] because a lesson's
+// level and the UI disclosure mode share one ladder.
 
-/// The kind of comprehension check (docs/13 §5.1).
+/// The kind of comprehension check.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -204,9 +204,9 @@ pub enum ExerciseKindDto {
     Diagnose,
 }
 
-/// A comprehension check derived from the learner's own capture (docs/13 §5.1).
+/// A comprehension check derived from the learner's own capture.
 /// The `answer` is computed from real evidence, so it cannot be wrong about the
-/// learner's data (docs/13 §11) — kept local, never uploaded (docs/13 §6).
+/// learner's data — kept local, never uploaded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GroundedExerciseDto {
     pub kind: ExerciseKindDto,
@@ -214,9 +214,9 @@ pub struct GroundedExerciseDto {
     pub answer: String,
 }
 
-/// A lesson offered because a real teachable moment occurred (docs/13 §3.2).
-/// Calm and dismissible in the UI (docs/13 §6). `grounded` is false only for a
-/// curated-example fallback, shown honestly as such (docs/13 §4.3).
+/// A lesson offered because a real teachable moment occurred.
+/// Calm and dismissible in the UI. `grounded` is false only for a
+/// curated-example fallback, shown honestly as such.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LessonOfferDto {
     pub lesson_id: String,
@@ -228,9 +228,9 @@ pub struct LessonOfferDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
-/// One reference entry in the Protocol Explorer (docs/15 §4, §6): layered
+/// One reference entry in the Protocol Explorer: layered
 /// content plus navigation. `examples_available` reflects a real storage lookup
-/// (docs/15 §5), never a guess.
+///never a guess.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExplorerEntryDto {
     pub key: String,
@@ -242,7 +242,7 @@ pub struct ExplorerEntryDto {
     pub examples_available: bool,
 }
 
-/// A stage of a website journey (docs/14 §4).
+/// A stage of a website journey.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -256,8 +256,8 @@ pub enum StageKindDto {
     Completion,
 }
 
-/// One narrated journey stage (docs/14 §4, §6). `detail` is the intermediate+
-/// technical line, disclosed progressively (docs/14 §7).
+/// One narrated journey stage. `detail` is the intermediate+
+/// technical line, disclosed progressively.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct JourneyStageDto {
     pub kind: StageKindDto,
@@ -267,7 +267,7 @@ pub struct JourneyStageDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
-/// One node of the CDN/organization fan-out (docs/14 §5).
+/// One node of the CDN/organization fan-out.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct FanoutNodeDto {
     pub label: String,
@@ -276,7 +276,7 @@ pub struct FanoutNodeDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
-/// The complete website journey for one session (docs/14 §3).
+/// The complete website journey for one session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PageJourneyDto {
     pub session_id: u64,
@@ -284,7 +284,7 @@ pub struct PageJourneyDto {
     pub fanout: Vec<FanoutNodeDto>,
 }
 
-/// Which way a visual element moves (docs/16 §3).
+/// Which way a visual element moves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -293,7 +293,7 @@ pub enum DirectionDto {
     ServerToClient,
 }
 
-/// The concept an animation makes legible (docs/16 §4).
+/// The concept an animation makes legible.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -305,9 +305,9 @@ pub enum AnimationKindDto {
     Degradation,
 }
 
-/// One timed, typed visual event on the real timeline (docs/16 §5). `key` ties
-/// the element to its explanation (docs/07 §7). Colour is deliberately absent —
-/// styling lives in the design system (docs/16 §6), not the wire model.
+/// One timed, typed visual event on the real timeline. `key` ties
+/// the element to its explanation. Colour is deliberately absent —
+/// styling lives in the design system, not the wire model.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VisualEventDto {
     pub at_nanos: u64,
@@ -316,8 +316,8 @@ pub struct VisualEventDto {
     pub key: Option<String>,
 }
 
-/// A complete animation model (docs/16 §5). `reduced_motion` is the mandatory
-/// static/step-through equivalent (docs/16 §8) — always present, so a
+/// A complete animation model. `reduced_motion` is the mandatory
+/// static/step-through equivalent — always present, so a
 /// reduced-motion or screen-reader user gets the same events as text.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AnimationModelDto {
@@ -327,7 +327,7 @@ pub struct AnimationModelDto {
     pub reduced_motion: Vec<String>,
 }
 
-// ===== Phase 4 — Intelligence (docs/17–20) =================================
+// ===== Phase 4 — Intelligence =================================
 //
 // The wire projections of the Security Engine and AI Assistant. Like every DTO
 // above, these are distinct from the rich domain types in `netpulse-intel` /
@@ -335,24 +335,24 @@ pub struct AnimationModelDto {
 // the wire, not just in the backend: a finding carries its confidence, its
 // qualitative word, its *benign* explanations, and its evidence — so the UI
 // physically cannot render an unexplained, evidence-free, or over-certain alert
-// (docs/17 §3–5). The assistant answer carries its citations and privacy posture
-// (docs/19 §4, §6).
+//The assistant answer carries its citations and privacy posture
+//
 
-/// The broad category a [`SecurityFindingDto`] rolls up to (docs/17 §4). Mirrors
+/// The broad category a [`SecurityFindingDto`] rolls up to. Mirrors
 /// `netpulse_core::FindingCategory`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum FindingCategoryDto {
-    /// Statistical/ML deviation from this machine's learned normal (docs/20).
+    /// Statistical/ML deviation from this machine's learned normal.
     Anomaly,
-    /// A rule/heuristic-matched suspicious behavior (docs/18).
+    /// A rule/heuristic-matched suspicious behavior.
     Suspicious,
-    /// Informational observation worth surfacing without alarm (docs/17 §4).
+    /// Informational observation worth surfacing without alarm.
     Informational,
 }
 
-/// The specific behavior a finding describes (docs/17 §4, docs/18 catalog) — the
+/// The specific behavior a finding describes — the
 /// named, bounded set, never a vague "threat". Mirrors `netpulse_intel::FindingKind`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -371,13 +371,13 @@ pub enum FindingKindDto {
 }
 
 /// A security/anomaly finding, ready to render as a calm, confidence-labeled card
-/// (docs/17 §7.1). Every field encodes an honesty guarantee: `confidence_percent`
-/// is calibrated and never 100 for an inference (docs/17 §5); `qualitative` is the
+///Every field encodes an honesty guarantee: `confidence_percent`
+/// is calibrated and never 100 for an inference; `qualitative` is the
 /// plain word a beginner reads instead of a percentage; `benign_explanations` names
-/// why the behavior might be innocent (docs/18 §3); `suggested_action` is always
-/// non-destructive (docs/17 §7.3); `evidence` makes every claim auditable
-/// (docs/02 §6.3); `corroboration` lists the other signals that combined into this
-/// one (docs/18 §5). `technical` is disclosed only at Intermediate+ (docs/09 §6.3).
+/// why the behavior might be innocent; `suggested_action` is always
+/// non-destructive; `evidence` makes every claim auditable
+///`corroboration` lists the other signals that combined into this
+/// one. `technical` is disclosed only at Intermediate+.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SecurityFindingDto {
     pub kind: FindingKindDto,
@@ -413,11 +413,11 @@ pub struct IncidentTimelineDto {
     pub suggested_actions: Vec<String>,
 }
 
-/// A grounded AI answer (docs/19 §6). `citations` are validated to exist before
-/// send (docs/19 §12); `grounded` is false for an honest "can't answer from your
-/// data" (docs/19 §3). `is_remote`/`backend_id` keep the privacy posture visible
-/// (docs/19 §4), and `disclosure` is exactly what a remote backend *would* be sent
-/// — shown before any opt-in so there are no silent uploads (docs/19 §4.3).
+/// A grounded AI answer. `citations` are validated to exist before
+/// send; `grounded` is false for an honest "can't answer from your
+/// data". `is_remote`/`backend_id` keep the privacy posture visible
+///and `disclosure` is exactly what a remote backend *would* be sent
+/// — shown before any opt-in so there are no silent uploads.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AssistantAnswerDto {
     pub text: String,
@@ -428,18 +428,18 @@ pub struct AssistantAnswerDto {
     pub disclosure: String,
 }
 
-// ===== Phase 5 — Lifecycle & Extensibility (docs/21–24) ====================
+// ===== Phase 5 — Lifecycle & Extensibility ====================
 //
 // The wire projections of Recording, Replay, Export, and Plugins. As with every
 // DTO above, these are distinct from the rich domain types in `netpulse-capture`
 // / `netpulse-engine` / `netpulse-plugin`; the engine maps down into these stable
 // shapes. Honesty travels on the wire: a recording states its exact payload level
-// and version pins (docs/22 §5–6); a replay reports incompleteness (docs/21 §8);
+// and version pins; a replay reports incompleteness;
 // an export preview names exactly what it contains before any bytes are written
-// (docs/23 §6); a plugin descriptor exposes its capabilities and trust so enabling
-// one is an informed act (docs/24 §5).
+//a plugin descriptor exposes its capabilities and trust so enabling
+// one is an informed act.
 
-/// The payload level a recording/export carries (docs/22 §5, docs/23 §7). Mirrors
+/// The payload level a recording/export carries. Mirrors
 /// `netpulse_capture::RecordingPayloadLevel`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -451,8 +451,8 @@ pub enum PayloadLevelDto {
     FullPayload,
 }
 
-/// The engine/model/content versions pinned into a recording (docs/22 §6), so
-/// replay can reproduce the same processing or honestly disclose drift (docs/21 §8).
+/// The engine/model/content versions pinned into a recording, so
+/// replay can reproduce the same processing or honestly disclose drift.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VersionPinsDto {
     pub engine: String,
@@ -462,7 +462,7 @@ pub struct VersionPinsDto {
     pub content: String,
 }
 
-/// What a recording actually holds, made explicit (docs/22 §5). `contains_payloads`
+/// What a recording actually holds, made explicit. `contains_payloads`
 /// is a tested invariant for metadata-only recordings.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PrivacyManifestDto {
@@ -471,7 +471,7 @@ pub struct PrivacyManifestDto {
     pub redactions: Vec<String>,
 }
 
-/// A recording listed for the user (docs/22 §3). Everything needed to understand
+/// A recording listed for the user. Everything needed to understand
 /// and choose a recording without opening it: its window, size, privacy level, and
 /// determinism metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -483,12 +483,12 @@ pub struct RecordingSummaryDto {
     pub api_version: u32,
     pub version_pins: VersionPinsDto,
     pub privacy: PrivacyManifestDto,
-    /// True when the recording was truncated/recovered (docs/22 §8) — surfaced so
-    /// review knows the reconstruction is incomplete (docs/21 §8).
+    /// True when the recording was truncated/recovered — surfaced so
+    /// review knows the reconstruction is incomplete.
     pub incomplete: bool,
 }
 
-/// The playback state of a replay (docs/21 §5). `speed_percent` is 100 for 1×, 10
+/// The playback state of a replay. `speed_percent` is 100 for 1×, 10
 /// for slow-motion teaching, 1000 for 10× review — an integer so it stays exact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ReplayStateDto {
@@ -500,12 +500,12 @@ pub struct ReplayStateDto {
     pub incomplete: bool,
 }
 
-/// An open export format (docs/23 §4).
+/// An open export format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ExportFormatDto {
-    /// Raw frames for Wireshark/tcpdump (the interop gold standard, docs/03 §5).
+    /// Raw frames for Wireshark/tcpdump (the interop gold standard .
     Pcapng,
     /// The structured model — flows/sessions/events/findings with evidence refs.
     Json,
@@ -515,27 +515,27 @@ pub enum ExportFormatDto {
     Report,
 }
 
-/// What to export — a selection, not just "everything" (docs/23 §8). Tagged union:
+/// What to export — a selection, not just "everything". Tagged union:
 /// `{ "kind": "session", "id": 7 }`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum ExportSelectionDto {
-    /// A time window (from Timeline range-select, docs/10 §5).
+    /// A time window (from Timeline range-select .
     Window {
         from_mono_nanos: u64,
         to_mono_nanos: u64,
     },
-    /// A single session/journey (docs/14).
+    /// A single session/journey.
     Session { id: u64 },
-    /// A finding + its evidence (docs/17).
+    /// A finding + its evidence.
     Finding { id: u64 },
     /// The entire committed capture.
     All,
 }
 
 /// A preview of exactly what an export will contain, shown before it is written or
-/// shared (docs/23 §6). Default least-revealing; the user sees payload level,
+/// shared. Default least-revealing; the user sees payload level,
 /// counts, the sanitizations applied, and provenance before any bytes exist.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExportPreviewDto {
@@ -545,13 +545,13 @@ pub struct ExportPreviewDto {
     pub sessions: u32,
     pub hosts: u32,
     pub contains_payloads: bool,
-    /// The sanitizations applied to this export (docs/23 §7), each named.
+    /// The sanitizations applied to this export, each named.
     pub sanitized: Vec<String>,
-    /// Provenance line: producing version + payload level (docs/23 §6).
+    /// Provenance line: producing version + payload level.
     pub provenance: String,
 }
 
-/// A plugin extension seam (docs/24 §3). Mirrors `netpulse_plugin::PluginType`.
+/// A plugin extension seam. Mirrors `netpulse_plugin::PluginType`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -563,8 +563,8 @@ pub enum PluginTypeDto {
     Export,
 }
 
-/// A capability granted to a plugin (docs/24 §5). Note there is **no** network or
-/// system variant — no plugin can acquire egress (docs/02 §10.1).
+/// A capability granted to a plugin. Note there is **no** network or
+/// system variant — no plugin can acquire egress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -577,7 +577,7 @@ pub enum PluginCapabilityDto {
     WriteOutput,
 }
 
-/// A plugin's trust/review status (docs/24 §5, §6).
+/// A plugin's trust/review status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -587,7 +587,7 @@ pub enum PluginTrustDto {
     FirstParty,
 }
 
-/// A plugin as listed for the user (docs/24 §6). Its type, granted capabilities,
+/// A plugin as listed for the user. Its type, granted capabilities,
 /// trust, contract compatibility, activation state, and active configuration.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PluginDescriptorDto {
@@ -599,7 +599,7 @@ pub struct PluginDescriptorDto {
     pub target_contract: u32,
     pub compatible: bool,
     pub enabled: bool,
-    /// Present when inactive, explaining why (docs/24 §8) — never a silent disable.
+    /// Present when inactive, explaining why — never a silent disable.
     pub disabled_reason: Option<String>,
     pub config_version: u32,
     pub config: serde_json::Value,
@@ -626,7 +626,7 @@ pub mod handshake_error_codes {
     pub const INVALID_VERSION_RANGE: &str = "INVALID_VERSION_RANGE";
 }
 
-/// API handshake result DTO returned directly by version negotiation (docs/02 §7.2).
+/// API handshake result DTO returned directly by version negotiation.
 /// The client MUST execute a handshake query upon connection before issuing other queries.
 /// The `negotiated_version` is authoritative for all subsequent communication.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -849,7 +849,7 @@ mod tests {
     #[test]
     fn intelligence_enums_use_expected_reprs() {
         // The TS emitter mirrors these exact wire strings; a mismatch fails the
-        // drift gate (docs/04 §7).
+        // drift gate.
         assert_eq!(
             serde_json::to_string(&FindingKindDto::PortScan).unwrap(),
             r#""port_scan""#
@@ -924,7 +924,7 @@ mod tests {
     #[test]
     fn lifecycle_enums_use_expected_reprs() {
         // The TS emitter mirrors these exact wire strings; a mismatch fails the
-        // drift gate (docs/04 §7).
+        // drift gate.
         assert_eq!(
             serde_json::to_string(&PayloadLevelDto::MetadataOnly).unwrap(),
             r#""metadata_only""#
@@ -955,7 +955,7 @@ mod tests {
     #[test]
     fn education_enums_use_snake_case() {
         // The TS emitter mirrors these exact wire strings; a mismatch fails the
-        // drift gate (docs/04 §7).
+        // drift gate.
         assert_eq!(
             serde_json::to_string(&ExerciseKindDto::ExplainBack).unwrap(),
             r#""explain_back""#

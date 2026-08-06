@@ -1,18 +1,18 @@
-//! The Security Engine assembler (docs/17 §6): it unifies the two reasoning
-//! styles — named rules (docs/18) and deviation-from-normal (docs/20) — under one
+//! The Security Engine assembler: it unifies the two reasoning
+//! styles — named rules and deviation-from-normal — under one
 //! finding framework, then *corroborates* related signals into single coherent
-//! findings before ranking them (docs/18 §5).
+//! findings before ranking them.
 //!
-//! Corroboration is the anti-fatigue mechanism (docs/17 §7.2): three weak signals
+//! Corroboration is the anti-fatigue mechanism: three weak signals
 //! about the same host ("new unsigned app" + "beaconing" + "odd volume") become
 //! *one* higher-confidence finding that tells a clearer story, rather than three
 //! noisy cards. Multiple *independent* signals raise confidence honestly (a
 //! noisy-OR combination), and the merged explanation lists every contributing
-//! signal — so the raise is auditable, never a black box (docs/17 §5).
+//! signal — so the raise is auditable, never a black box.
 //!
-//! Everything runs off the hot path on committed data (docs/02 §5.2): assessing
+//! Everything runs off the hot path on committed data: assessing
 //! traffic never back-pressures capture and cannot alter it (observe-only,
-//! docs/01 X1).
+//!  .
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;
@@ -29,8 +29,8 @@ use crate::stix::StixThreatFeed;
 use crate::view::TrafficView;
 
 /// Assess a window of committed traffic and return the corroborated, ranked
-/// findings (docs/17 §6). Most-confident first; an empty result is the honest
-/// "nothing looks unusual" (docs/17, never a fabricated alarm).
+/// findings. Most-confident first; an empty result is the honest
+/// "nothing looks unusual".
 pub fn assess(view: &TrafficView) -> Vec<SecurityFinding> {
     // 1. Statistical detectors (rules)
     let mut findings = rules::detect_all(view);
@@ -47,7 +47,7 @@ pub fn assess(view: &TrafficView) -> Vec<SecurityFinding> {
     findings.extend(anomaly::bandwidth_anomaly(view));
     findings.extend(explainable_ml::detect_ml_anomalies(view));
 
-    // 5. Corroborate signals concerning the same host (docs/18 §5)
+    // 5. Corroborate signals concerning the same host
     let mut merged = corroborate(view, findings);
 
     // 6. Behavioral chain detection (consumes corroborated findings)
@@ -80,7 +80,7 @@ fn host_of(view: &TrafficView, finding: &SecurityFinding) -> Option<IpAddr> {
 }
 
 /// Merge findings that concern the same host into one coherent, higher-confidence
-/// finding (docs/18 §5). A single finding for a host passes through unchanged;
+/// finding. A single finding for a host passes through unchanged;
 /// two or more of *different* kinds combine.
 fn corroborate(view: &TrafficView, findings: Vec<SecurityFinding>) -> Vec<SecurityFinding> {
     // Group by host; findings with no resolvable host (e.g. a DNS-volume finding
@@ -124,9 +124,9 @@ fn corroborate(view: &TrafficView, findings: Vec<SecurityFinding>) -> Vec<Securi
     out
 }
 
-/// Combine a group of same-host findings into one (docs/18 §5). Independent
+/// Combine a group of same-host findings into one. Independent
 /// signals raise confidence via noisy-OR (`1 - Π(1 - cᵢ)`), capped below
-/// certainty (docs/17 §5, docs/01 X4). The primary kind is the most-confident;
+/// certainty. The primary kind is the most-confident;
 /// the rest are recorded as `contributing`, and the explanation lists them all.
 fn merge_group(host: IpAddr, mut group: Vec<SecurityFinding>) -> SecurityFinding {
     group.sort_by(|a, b| {
@@ -156,8 +156,8 @@ fn merge_group(host: IpAddr, mut group: Vec<SecurityFinding>) -> SecurityFinding
         }
     }
 
-    // A combined explanation that names each contributing signal (docs/17 §5:
-    // the raise is auditable). Reads as a clearer single story (docs/18 §5).
+    // A combined explanation that names each contributing signal (:
+    // the raise is auditable . Reads as a clearer single story.
     let signals: Vec<&str> = group.iter().map(|f| f.kind.title()).collect();
     let explanation = format!(
         "Several signals point at {host} together: {}. Independently each is mild, but seeing \
@@ -215,7 +215,7 @@ mod tests {
 
     #[test]
     fn healthy_traffic_yields_no_findings() {
-        // A couple of ordinary flows → nothing unusual, no fabrication (docs/17).
+        // A couple of ordinary flows → nothing unusual, no fabrication.
         let procs = HashMap::new();
         let flows = vec![flow(1, host(1), 0, 1000), flow(2, host(2), 1000, 1200)];
         let view = TrafficView {
@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn beaconing_and_unsigned_egress_corroborate_into_one() {
         // Same host: a steady beacon AND an unsigned app behind it → merged into a
-        // single, more-confident finding listing both signals (docs/18 §5).
+        // single, more-confident finding listing both signals.
         let h = host(9);
         let flows: Vec<Flow> = (0..5)
             .map(|i| flow(i, h, i * 60_000_000_000, 200))

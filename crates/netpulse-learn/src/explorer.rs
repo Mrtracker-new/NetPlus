@@ -1,16 +1,16 @@
-//! The Protocol Explorer (docs/15): an interactive reference for every protocol
+//! The Protocol Explorer: an interactive reference for every protocol
 //! field NetPulse dissects, wired to the learner's real observations both ways.
 //!
-//! The Explorer holds **no protocol knowledge of its own** (docs/15 §12): it is
-//! a *presenter* of the `netpulse-decode` explanation-key content (docs/07 §7).
+//! The Explorer holds **no protocol knowledge of its own**: it is
+//! a *presenter* of the `netpulse-decode` explanation-key content.
 //! New protocols and fields appear here automatically the moment their keys and
 //! content exist — there is no parallel catalog to maintain, and nothing here
 //! can drift from what the dissectors actually emit (single source of truth,
-//! docs/15 §12).
+//!  .
 //!
-//! Its distinguishing feature is bidirectionality (docs/15 §5): a field in the
+//! Its distinguishing feature is bidirectionality: a field in the
 //! learner's capture opens its entry, and an entry can list the learner's own
-//! flows that exhibit it — the grounding principle (docs/01 E2) made navigable.
+//! flows that exhibit it — the grounding principle made navigable.
 //! The "your examples" side is a storage query the caller supplies
 //! ([`examples_for`]); the reference side ([`entry`]/[`browse`]/[`search`]) is a
 //! pure function of the key vocabulary.
@@ -19,9 +19,9 @@ use netpulse_core::net::L7Proto;
 use netpulse_core::{Depth, EvidenceRef, Flow};
 use netpulse_decode::{explain, DisclosureDepth, ExplanationKey, ALL_KEYS};
 
-/// A reference entry for one explanation key (docs/15 §4, §6), presenting the
+/// A reference entry for one explanation key, presenting the
 /// layered content plus navigation to related keys. `examples_available` is set
-/// by the caller after a storage lookup (docs/15 §5) — the pure presenter cannot
+/// by the caller after a storage lookup — the pure presenter cannot
 /// know the learner's data, and must not pretend to.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ExplorerEntry {
@@ -31,14 +31,14 @@ pub struct ExplorerEntry {
     pub beginner: &'static str,
     pub intermediate: &'static str,
     pub expert: &'static str,
-    /// Sibling keys under the same protocol, for cross-navigation (docs/15 §4).
+    /// Sibling keys under the same protocol, for cross-navigation.
     pub related: Vec<&'static str>,
     /// True once the caller has confirmed the learner has a real example
-    /// (docs/15 §5); false by default so we never imply data we haven't checked.
+    ///false by default so we never imply data we haven't checked.
     pub examples_available: bool,
 }
 
-/// One annotated field in the "explore my own packet" view (docs/15 §7): a real
+/// One annotated field in the "explore my own packet" view: a real
 /// field, its real value, and its explanation at the chosen depth — every field
 /// labeled, the progressive-disclosure thesis at its purest.
 #[derive(Debug, Clone, PartialEq)]
@@ -49,7 +49,7 @@ pub struct AnnotatedField {
 }
 
 /// Resolve one key to its reference entry, or `None` for an unknown key
-/// (docs/15 §4). A pure projection of the docs/07 §7 content.
+///A pure projection of the content.
 pub fn entry(key: ExplanationKey) -> Option<ExplorerEntry> {
     let e = explain(key)?;
     Some(ExplorerEntry {
@@ -64,18 +64,18 @@ pub fn entry(key: ExplanationKey) -> Option<ExplorerEntry> {
 }
 
 /// Browse the whole reference — one entry per key the dissectors can emit
-/// (docs/15 §4), sorted by key for a stable, navigable index. This shares the
-/// docs/07 §11 coverage guarantee: if a key exists, it is browsable here.
+///sorted by key for a stable, navigable index. This shares the
+///  coverage guarantee: if a key exists, it is browsable here.
 pub fn browse() -> Vec<ExplorerEntry> {
     let mut entries: Vec<ExplorerEntry> = ALL_KEYS.iter().filter_map(|&k| entry(k)).collect();
     entries.sort_by(|a, b| a.key.cmp(b.key));
     entries
 }
 
-/// Search the reference by a learner's words (docs/15 §8): matches the key
+/// Search the reference by a learner's words: matches the key
 /// vocabulary, the humanized title, and a small synonym/symptom map so a
 /// beginner's phrase ("padlock", "connection refused", "not found") reaches the
-/// precise entry — avoiding gatekeeping (docs/01 §10). Results are de-duplicated
+/// precise entry — avoiding gatekeeping. Results are de-duplicated
 /// and stably ordered.
 pub fn search(term: &str) -> Vec<ExplorerEntry> {
     let needle = term.trim().to_lowercase();
@@ -89,7 +89,7 @@ pub fn search(term: &str) -> Vec<ExplorerEntry> {
         }
     };
 
-    // Symptom/synonym mapping — a beginner's word → the exact keys (docs/15 §8).
+    // Symptom/synonym mapping — a beginner's word → the exact keys.
     for &k in synonyms(&needle) {
         push(k, &mut hits);
     }
@@ -109,24 +109,24 @@ pub fn search(term: &str) -> Vec<ExplorerEntry> {
     entries
 }
 
-/// Render an entry's content at a disclosure depth (docs/15 §6). The mode sets
+/// Render an entry's content at a disclosure depth. The mode sets
 /// the default, but the additive ladder means an expert view also shows the
-/// beginner line — nothing is withheld that cannot be reached (docs/09 §6.1).
+/// beginner line — nothing is withheld that cannot be reached.
 pub fn content_at(entry: &ExplorerEntry, depth: Depth) -> &str {
     match depth {
         Depth::Beginner => entry.beginner,
         Depth::Intermediate => entry.intermediate,
         Depth::Expert => entry.expert,
         // A future depth we don't model yet: fall back to the fullest content
-        // rather than the tersest, so nothing is hidden (docs/09 §6.3).
+        // rather than the tersest, so nothing is hidden.
         _ => entry.expert,
     }
 }
 
-/// The "explore my own packet" annotation (docs/15 §7): given the fields a
+/// The "explore my own packet" annotation: given the fields a
 /// dissector observed (key + real value), label each with its explanation at
 /// `depth`. Reuses the exact dissector output — never a second parser (single
-/// source of truth, docs/15 §12). Unknown keys are dropped rather than faked.
+/// source of truth . Unknown keys are dropped rather than faked.
 pub fn annotate(fields: &[(ExplanationKey, String)], depth: Depth) -> Vec<AnnotatedField> {
     fields
         .iter()
@@ -141,9 +141,9 @@ pub fn annotate(fields: &[(ExplanationKey, String)], depth: Depth) -> Vec<Annota
         .collect()
 }
 
-/// The learner's own flows that exhibit a field/value (docs/15 §5, "show me
+/// The learner's own flows that exhibit a field/value (, "show me
 /// mine"). A modest matcher over the protocol family a key belongs to; a real
-/// backend indexes storage by protocol/field (docs/08 §8). Returns evidence
+/// backend indexes storage by protocol/field. Returns evidence
 /// refs, honoring the reference↔reality wiring both ways.
 pub fn examples_for(key: ExplanationKey, flows: &[Flow]) -> Vec<EvidenceRef> {
     let family = key.as_str().split('.').next().unwrap_or("");
@@ -169,7 +169,7 @@ fn key_matches_flow(family: &str, flow: &Flow) -> bool {
 }
 
 /// Sibling keys sharing the first (protocol) segment — the "related states/
-/// values" of docs/15 §4/§6, e.g. all `tcp.*`. Excludes the key itself; capped
+/// values" of /§6, e.g. all `tcp.*`. Excludes the key itself; capped
 /// for a tidy panel.
 fn related_keys(key: &str) -> Vec<&'static str> {
     let family = key.split('.').next().unwrap_or("");
@@ -181,7 +181,7 @@ fn related_keys(key: &str) -> Vec<&'static str> {
         .collect()
 }
 
-/// A tiny synonym/symptom map (docs/15 §8). Beginner words and error symptoms
+/// A tiny synonym/symptom map. Beginner words and error symptoms
 /// resolve to the precise keys.
 fn synonyms(needle: &str) -> &'static [&'static str] {
     match needle {
@@ -214,7 +214,7 @@ fn humanize(key: &str) -> String {
 }
 
 /// Map the core disclosure depth to the decode-layer depth (they share the
-/// three-rung ladder, docs/09 §6).
+/// three-rung ladder .
 fn to_disclosure(depth: Depth) -> DisclosureDepth {
     match depth {
         Depth::Beginner => DisclosureDepth::Beginner,
@@ -247,7 +247,7 @@ mod tests {
 
     #[test]
     fn every_emitted_key_is_browsable_at_all_depths() {
-        // Key coverage (docs/15 §11): every dissector key has an entry with
+        // Key coverage: every dissector key has an entry with
         // non-empty content at all three depths.
         let entries = browse();
         assert_eq!(entries.len(), ALL_KEYS.len());
@@ -275,7 +275,7 @@ mod tests {
 
     #[test]
     fn symptom_search_reaches_precise_entries() {
-        // A beginner's words map to the right entries (docs/15 §8).
+        // A beginner's words map to the right entries.
         assert!(search("padlock").iter().any(|e| e.key == "tls.sni"));
         assert!(search("connection refused")
             .iter()
@@ -289,14 +289,14 @@ mod tests {
 
     #[test]
     fn explore_my_own_packet_annotates_real_values() {
-        // "Explore my own packet" (docs/15 §7): each field → its explanation.
+        // "Explore my own packet": each field → its explanation.
         let fields = vec![
             (ExplanationKey("tcp.flags.syn"), "set".to_string()),
             (ExplanationKey("ip.ttl"), "64".to_string()),
             (ExplanationKey("bogus.key"), "x".to_string()),
         ];
         let annotated = annotate(&fields, Depth::Beginner);
-        // The unknown key is dropped, not fabricated (docs/15 §12).
+        // The unknown key is dropped, not fabricated.
         assert_eq!(annotated.len(), 2);
         let ttl = annotated.iter().find(|a| a.key == "ip.ttl").unwrap();
         assert_eq!(ttl.value, "64");

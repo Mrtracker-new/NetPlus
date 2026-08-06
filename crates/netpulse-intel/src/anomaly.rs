@@ -1,34 +1,34 @@
-//! Anomaly detection (docs/20): learning each machine's *normal* and flagging
-//! deviation from it — catching the unknown that the named rules (docs/18) can't.
+//! Anomaly detection: learning each machine's *normal* and flagging
+//! deviation from it — catching the unknown that the named rules can't.
 //!
 //! Two honesty rules from docs/20 are load-bearing here:
-//! - **Deviation ≠ danger** (docs/20 §5): a finding says "different from your
-//!   normal, worth a look", never a verdict (docs/01 X4). Its confidence reflects
+//! - **Deviation ≠ danger**: a finding says "different from your
+//!   normal, worth a look", never a verdict. Its confidence reflects
 //!   *both* how far outside normal the point is *and* how well-established the
-//!   baseline is — a shaky baseline yields low confidence (docs/20 §5, §6).
-//! - **Anomaly is meaningless without the normal** (docs/20 §8): every finding
+//!   baseline is — a shaky baseline yields low confidence.
+//! - **Anomaly is meaningless without the normal**: every finding
 //!   states *both* the baseline and the departure as its explanation, so the user
 //!   sees what "usual" was, not just the outlier.
 //!
-//! The statistical floor is deliberately interpretable (docs/20 §4.1): an
-//! incremental Welford mean/variance (O(1) per point, docs/20 §10) gives a robust
+//! The statistical floor is deliberately interpretable: an
+//! incremental Welford mean/variance (O(1 per point gives a robust
 //! z-score whose explanation writes itself ("8× your usual"). Optional ONNX
-//! models (docs/20 §4.2) are a future enhancement layered *above* this floor,
+//! models are a future enhancement layered *above* this floor,
 //! never a replacement — the floor always works offline and unexplained-oracle-
-//! free (docs/03 §16 graceful degradation).
+//! free.
 
 use netpulse_core::EvidenceRef;
 
 use crate::finding::{FindingKind, SecurityFinding};
 use crate::view::TrafficView;
 
-/// How well-established a baseline is (docs/20 §6 cold-start). Confidence and
+/// How well-established a baseline is. Confidence and
 /// sensitivity rise with maturity; a cold baseline never pretends to know your
-/// normal (docs/20 §6 "no fabricated normals").
+/// normal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Maturity {
-    /// Too few samples to judge anything (docs/20 §6). No findings emitted.
+    /// Too few samples to judge anything. No findings emitted.
     Cold,
     /// Some normal observed; conservative thresholds, capped confidence.
     Warming,
@@ -36,15 +36,15 @@ pub enum Maturity {
     Established,
 }
 
-/// Sample counts that separate the maturity bands (docs/20 §6 progressive
+/// Sample counts that separate the maturity bands ( progressive
 /// confidence). Deliberately small so the offline slice can demonstrate warming
 /// up within one capture, while staying honest about a thin baseline.
 const WARMING_MIN: u64 = 4;
 const ESTABLISHED_MIN: u64 = 12;
 
-/// An incremental one-dimensional baseline (docs/20 §4.1): Welford's online
-/// mean/variance, O(1) per update and tiny memory (docs/20 §10). Robust enough
-/// for the interpretable floor; ML augments it later (docs/20 §4.2), never
+/// An incremental one-dimensional baseline: Welford's online
+/// mean/variance, O(1 per update and tiny memory. Robust enough
+/// for the interpretable floor; ML augments it later, never
 /// replaces it.
 #[derive(Debug, Clone, Default)]
 pub struct Baseline {
@@ -60,8 +60,8 @@ impl Baseline {
         Self::default()
     }
 
-    /// Fold one observation into the baseline (docs/20 §4.1). Incremental, so
-    /// there is never a re-scan (docs/20 §10).
+    /// Fold one observation into the baseline. Incremental, so
+    /// there is never a re-scan.
     pub fn observe(&mut self, value: f64) {
         self.count += 1;
         let delta = value - self.mean;
@@ -84,7 +84,7 @@ impl Baseline {
         }
     }
 
-    /// How well-established this baseline is (docs/20 §6).
+    /// How well-established this baseline is.
     pub fn maturity(&self) -> Maturity {
         if self.count < WARMING_MIN {
             Maturity::Cold
@@ -96,8 +96,8 @@ impl Baseline {
     }
 
     /// A robust z-score for `value`: how many standard deviations it sits from
-    /// the mean (docs/20 §4.1). Returns 0 when the baseline has no spread yet,
-    /// so a flat history never manufactures a deviation (docs/20 §6).
+    /// the mean. Returns 0 when the baseline has no spread yet,
+    /// so a flat history never manufactures a deviation.
     pub fn deviation(&self, value: f64) -> f64 {
         let sd = self.std_dev();
         if sd <= f64::EPSILON {
@@ -109,24 +109,24 @@ impl Baseline {
 }
 
 /// The z-score past which a point is "worth a look" once the baseline is
-/// [`Maturity::Established`] (docs/20 §5). Conservative — anomaly confidence is
-/// inherently fuzzier than a rule match, so the bar is set high (docs/20 §5).
+/// [`Maturity::Established`]. Conservative — anomaly confidence is
+/// inherently fuzzier than a rule match, so the bar is set high.
 const ESTABLISHED_Z: f64 = 3.0;
-/// A higher bar while still Warming (docs/20 §6 conservative early behaviour).
+/// A higher bar while still Warming.
 const WARMING_Z: f64 = 4.0;
 
 /// Flag flows whose byte volume deviates sharply from this window's learned
-/// normal (docs/20 §3 per-app bandwidth, §8 emitting findings). Only *upward*
+/// normal. Only *upward*
 /// deviations are surfaced — a quiet flow is never alarming — and only when the
-/// baseline is mature enough to mean something (docs/20 §6).
+/// baseline is mature enough to mean something.
 ///
 /// The baseline here is learned across the flows in view; a persistent per-app
-/// baseline (docs/20 §7) is the same machinery fed from storage over time. Both
-/// state the normal *and* the departure in the explanation (docs/20 §8).
+/// baseline is the same machinery fed from storage over time. Both
+/// state the normal *and* the departure in the explanation.
 pub fn bandwidth_anomaly(view: &TrafficView) -> Vec<SecurityFinding> {
     if view.flows.len() < WARMING_MIN as usize {
         // Cold start: not enough normal to judge. Stay quiet and honest
-        // (docs/20 §6) rather than flag on a blank slate.
+        // rather than flag on a blank slate.
         return Vec::new();
     }
 
@@ -147,7 +147,7 @@ pub fn bandwidth_anomaly(view: &TrafficView) -> Vec<SecurityFinding> {
     for f in view.flows {
         let value = f.stats.bytes as f64;
         // Only upward departures are notable for exfiltration-shaped concerns
-        // (docs/18 §4.3); a below-average flow is normal quiet.
+        //a below-average flow is normal quiet.
         if value <= mean {
             continue;
         }
@@ -157,7 +157,7 @@ pub fn bandwidth_anomaly(view: &TrafficView) -> Vec<SecurityFinding> {
         }
 
         // Confidence blends how-far-out (z) with how-established the baseline is
-        // (docs/20 §5): a Warming baseline caps lower, so a thin history never
+        //a Warming baseline caps lower, so a thin history never
         // shouts. Scaled into a calm band and capped below certainty by `observe`.
         let z_component = ((z - z_bar) / z_bar).clamp(0.0, 1.0) as f32;
         let base = match maturity {
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn flat_history_never_flags() {
-        // Every flow identical → zero spread → no deviation invented (docs/20 §6).
+        // Every flow identical → zero spread → no deviation invented.
         let empty = HashMap::new();
         let flows: Vec<Flow> = (0..20).map(|i| flow(i, 1000)).collect();
         assert!(bandwidth_anomaly(&view(&flows, &empty)).is_empty());
@@ -249,7 +249,7 @@ mod tests {
 
     #[test]
     fn a_clear_outlier_is_flagged_with_baseline_stated() {
-        // A stable normal of ~1 KB flows, then one 500 KB flow (docs/20 §11).
+        // A stable normal of ~1 KB flows, then one 500 KB flow.
         let empty = HashMap::new();
         let mut flows: Vec<Flow> = (0..15).map(|i| flow(i, 1000 + i * 10)).collect();
         flows.push(flow(99, 500_000));
@@ -259,17 +259,17 @@ mod tests {
             .find(|f| f.evidence.contains(&EvidenceRef::Flow(99)))
             .expect("the 500 KB outlier is flagged");
         assert_eq!(hit.kind, FindingKind::BandwidthAnomaly);
-        // The explanation states BOTH the normal and the departure (docs/20 §8).
+        // The explanation states BOTH the normal and the departure.
         assert!(hit.explanation.contains("usual"));
         assert!(hit.explanation.contains("500000"));
-        // Deviation is never phrased as danger (docs/01 X4).
+        // Deviation is never phrased as danger.
         assert!(!hit.explanation.contains("malic"));
         assert!(hit.confidence.value() < 1.0);
     }
 
     #[test]
     fn cold_start_stays_quiet() {
-        // Fewer than WARMING_MIN flows → no baseline yet → no findings (docs/20 §6).
+        // Fewer than WARMING_MIN flows → no baseline yet → no findings.
         let empty = HashMap::new();
         let flows = vec![flow(1, 1000), flow(2, 900_000)];
         assert!(bandwidth_anomaly(&view(&flows, &empty)).is_empty());

@@ -1,42 +1,42 @@
-//! Teachable-moment detection and grounded-lesson generation (docs/13 §3–§4).
+//! Teachable-moment detection and grounded-lesson generation.
 //!
-//! This is the engine's core loop (docs/13 §3.2): watch the committed stream of
+//! This is the engine's core loop: watch the committed stream of
 //! flows/sessions/events for **teachable moments** — recognizable, pedagogically
 //! valuable patterns — and offer the matching lesson *grounded in the learner's
 //! own data*. "Here's the TLS handshake **you** just made to the site **you**
-//! visited" beats any textbook (docs/01 E2).
+//! visited" beats any textbook.
 //!
 //! Two rules are structural, not aspirational:
 //! - A grounded offer **cites real evidence** ([`EvidenceRef`]s) — the same
-//!   evidence-reference invariant the narrative obeys (docs/02 §6.3). An offer
-//!   that asserts something the capture cannot show is a bug (docs/13 §12).
+//!   evidence-reference invariant the narrative obeys. An offer
+//!   that asserts something the capture cannot show is a bug.
 //! - Detection runs **off the hot path** over already-committed data (docs/13
-//!   §10, docs/02 §5.2), so it never affects capture.
+//!   §10 , so it never affects capture.
 //!
 //! When the learner has produced no example of a concept, an offer can fall back
-//! to a curated example, clearly flagged `grounded = false` (docs/13 §4.3) so the
+//! to a curated example, clearly flagged `grounded = false` so the
 //! honesty principle is preserved — we never pass off a canned capture as theirs.
 
 use netpulse_core::{EvidenceRef, Flow, ProtoEvent, ProtoEventKind, Session};
 
 use crate::content::{self, ExerciseKind, Lesson, Level, Trigger};
 
-/// The committed traffic the detector reads (docs/13 §10). Gathered by the
-/// caller from storage (docs/08 §8) and handed in, so this crate stays a pure
+/// The committed traffic the detector reads. Gathered by the
+/// caller from storage and handed in, so this crate stays a pure
 /// projection with no storage dependency — the same pattern as the narrative's
-/// `SessionView` (docs/04 §3.6).
+/// `SessionView`.
 #[derive(Debug, Clone)]
 pub struct TrafficView<'a> {
     /// The session these flows belong to, if any (its id anchors evidence and
-    /// its trigger names the host — read back, never re-derived, docs/14 §11).
+    /// its trigger names the host — read back, never re-derived .
     pub session: Option<&'a Session>,
     pub flows: &'a [Flow],
     pub events: &'a [ProtoEvent],
 }
 
-/// A comprehension check derived from the learner's real capture (docs/13 §5.1).
+/// A comprehension check derived from the learner's real capture.
 /// The `answer` is *computed from the fixture's data*, not authored — which is
-/// what makes grounded exercises trustworthy and testable (docs/13 §11).
+/// what makes grounded exercises trustworthy and testable.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroundedExercise {
     pub kind: ExerciseKind,
@@ -46,29 +46,29 @@ pub struct GroundedExercise {
 }
 
 /// A lesson offered to the learner, grounded in a real teachable moment
-/// (docs/13 §3.2). Calm and dismissible by construction — the UI presents it as
-/// an invitation, never a nag (docs/13 §6, docs/01 §7.6).
+///Calm and dismissible by construction — the UI presents it as
+/// an invitation, never a nag.
 #[derive(Debug, Clone, PartialEq)]
 pub struct LessonOffer {
     pub lesson_id: &'static str,
     pub title: &'static str,
     pub level: Level,
     pub trigger: Trigger,
-    /// Plain-language facts pulled from the learner's own capture (docs/13 §4.2).
+    /// Plain-language facts pulled from the learner's own capture.
     pub grounding: Vec<String>,
-    /// A check whose answer is derived from the real data (docs/13 §5.1).
+    /// A check whose answer is derived from the real data.
     pub exercise: Option<GroundedExercise>,
-    /// The exact evidence this offer rests on (docs/02 §6.3). Non-empty when
-    /// `grounded`; empty only for a curated-example fallback (docs/13 §4.3).
+    /// The exact evidence this offer rests on. Non-empty when
+    /// `grounded`; empty only for a curated-example fallback.
     pub evidence: Vec<EvidenceRef>,
     /// True when grounded in the learner's own traffic; false for a curated
-    /// example shown honestly as such (docs/13 §4.3).
+    /// example shown honestly as such.
     pub grounded: bool,
 }
 
 /// Detect every teachable moment in one traffic view and return the grounded
-/// lesson offers (docs/13 §4.1), most-fundamental first. Deterministic: the same
-/// view always yields the same offers, in the same order (docs/13 §11).
+/// lesson offers, most-fundamental first. Deterministic: the same
+/// view always yields the same offers, in the same order.
 pub fn detect_offers(view: &TrafficView) -> Vec<LessonOffer> {
     let mut offers = Vec::new();
     for trigger in detect_triggers(view) {
@@ -81,7 +81,7 @@ pub fn detect_offers(view: &TrafficView) -> Vec<LessonOffer> {
     offers
 }
 
-/// The teachable moments present in a view (docs/13 §4.1), deduplicated. Order
+/// The teachable moments present in a view, deduplicated. Order
 /// is the natural page-load order so the flagship journey reads top-to-bottom.
 fn detect_triggers(view: &TrafficView) -> Vec<Trigger> {
     let mut triggers = Vec::new();
@@ -93,7 +93,7 @@ fn detect_triggers(view: &TrafficView) -> Vec<Trigger> {
 
     // A DNS lookup is evidenced either by a DNS event on these flows or by the
     // session's very existence: the reconstructor only forms a "resolved and
-    // connected to X" session on DNS lineage (docs/06 §6.1), so that trigger is
+    // connected to X" session on DNS lineage, so that trigger is
     // itself honest proof the lookup happened — the connection flow is grouped,
     // the resolver flow lives elsewhere.
     let resolved_lineage = view
@@ -148,7 +148,7 @@ fn detect_triggers(view: &TrafficView) -> Vec<Trigger> {
         push(Trigger::FanOut, &mut triggers);
     }
     // The flagship: a navigation that resolved a name and then connected — the
-    // whole "what happens when I type a URL?" story (docs/13 §7 B2, docs/14).
+    // whole "what happens when I type a URL?" story.
     if has_dns && has_tcp_conn {
         push(Trigger::PageLoad, &mut triggers);
     }
@@ -156,7 +156,7 @@ fn detect_triggers(view: &TrafficView) -> Vec<Trigger> {
 }
 
 /// Ground a catalog lesson in the view's real data: pull the facts and derive
-/// the exercise answer from evidence (docs/13 §4.2, §5.1).
+/// the exercise answer from evidence.
 fn ground(lesson: &Lesson, trigger: Trigger, view: &TrafficView) -> LessonOffer {
     let evidence = collect_evidence(view);
     let grounded = !evidence.is_empty();
@@ -176,7 +176,7 @@ fn ground(lesson: &Lesson, trigger: Trigger, view: &TrafficView) -> LessonOffer 
     }
 }
 
-/// Evidence for an offer: the session plus each flow it groups (docs/02 §6.3).
+/// Evidence for an offer: the session plus each flow it groups.
 fn collect_evidence(view: &TrafficView) -> Vec<EvidenceRef> {
     let mut ev = Vec::new();
     if let Some(s) = view.session {
@@ -188,7 +188,7 @@ fn collect_evidence(view: &TrafficView) -> Vec<EvidenceRef> {
     ev
 }
 
-/// Plain-language facts drawn from the learner's own capture (docs/13 §4.2).
+/// Plain-language facts drawn from the learner's own capture.
 fn grounding_facts(trigger: Trigger, view: &TrafficView, host: Option<&str>) -> Vec<String> {
     let mut facts = Vec::new();
     match trigger {
@@ -243,7 +243,7 @@ fn grounding_facts(trigger: Trigger, view: &TrafficView, host: Option<&str>) -> 
     facts
 }
 
-/// Derive the exercise answer from the real evidence (docs/13 §5.1, §11). This
+/// Derive the exercise answer from the real evidence. This
 /// is the crux: the answer is *computed*, so a grounded check cannot be wrong
 /// about the learner's own data.
 fn grounded_exercise(
@@ -289,7 +289,7 @@ fn grounded_exercise(
 }
 
 /// The setup delay of the first connecting flow in milliseconds, from its RTT
-/// estimate when observable (docs/06 §5).
+/// estimate when observable.
 fn handshake_millis(flows: &[Flow]) -> Option<u64> {
     flows
         .iter()
@@ -305,7 +305,7 @@ fn first_server(flows: &[Flow]) -> Option<std::net::IpAddr> {
     ips.into_iter().next()
 }
 
-/// Distinct destination servers across the flows (docs/14 §5 fan-out).
+/// Distinct destination servers across the flows.
 fn distinct_servers(flows: &[Flow]) -> usize {
     let mut ips: Vec<std::net::IpAddr> = flows.iter().map(|f| f.key.dst_ip).collect();
     ips.sort();
@@ -315,7 +315,7 @@ fn distinct_servers(flows: &[Flow]) -> usize {
 
 /// Read the host name back out of a session trigger ("resolved and connected to
 /// {name}"). We *read* it rather than re-deriving it, keeping one source of truth
-/// (docs/14 §11) — the same helper the narrative uses.
+/// — the same helper the narrative uses.
 fn triggering_host(trigger: &str) -> Option<String> {
     trigger
         .rsplit(" to ")
@@ -389,7 +389,7 @@ mod tests {
             .expect("TLS handshake detected");
         assert_eq!(tls.lesson_id, "b5.encryption");
         assert!(tls.grounded, "grounded in the user's own flow");
-        // The offer cites the real session and flow (docs/02 §6.3).
+        // The offer cites the real session and flow.
         assert!(tls.evidence.contains(&EvidenceRef::Session(7)));
         assert!(tls.evidence.contains(&EvidenceRef::Flow(10)));
         // Grounding names the site from the user's own capture.

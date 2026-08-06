@@ -1,4 +1,4 @@
-//! Incident Timeline Stitching (docs/17 §13, docs/18 §11).
+//! Incident Timeline Stitching.
 //!
 //! Correlates discrete security findings over time across apps and hosts into structured
 //! multi-finding narrative timelines (`IncidentTimeline`).

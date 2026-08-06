@@ -1,7 +1,7 @@
-//! A first-party **detector plugin** reference (docs/24 §4.2). It implements the
+//! A first-party **detector plugin** reference. It implements the
 //! same [`Detector`] trait the built-ins use and emits [`Finding`]s through the
 //! core model, which **structurally requires evidence** — a detector plugin
-//! cannot emit a bare verdict (docs/24 §5, docs/17 §4). This toy detector flags a
+//! cannot emit a bare verdict. This toy detector flags a
 //! flow that saw an unusually large number of "Other" protocol landmarks, purely
 //! to demonstrate the shape; it always carries its evidence reference.
 #![forbid(unsafe_code)]
@@ -43,12 +43,12 @@ impl Detector for ChattyFlowDetector {
 
     fn evaluate(&self, events: &[ProtoEvent]) -> Result<Vec<Finding>> {
         if events.len() < self.threshold {
-            // Nothing unusual — no fabricated alarm (docs/17).
+            // Nothing unusual — no fabricated alarm.
             return Ok(Vec::new());
         }
         let flow_id = events[0].flow_id;
         // The finding is un-constructible without evidence: it carries the flow it
-        // rests on (docs/02 §6.3, docs/17 §4). Informational, never a verdict.
+        // rests on. Informational, never a verdict.
         Ok(vec![Finding {
             id: flow_id,
             category: FindingCategory::Informational,
@@ -58,7 +58,7 @@ impl Detector for ChattyFlowDetector {
     }
 }
 
-/// The plugin's self-description (docs/24 §6): a first-party detector reference.
+/// The plugin's self-description: a first-party detector reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
@@ -93,7 +93,7 @@ pub fn manifest() -> PluginManifest {
             payload_hash: Sha256Digest([0u8; 32]),
             signatures: Vec::new(),
             // Not a dissector, so the fuzz/explanation obligations don't gate it; a
-            // detector instead ships positive + benign fixtures (docs/18 §10), which
+            // detector instead ships positive + benign fixtures, which
             // this crate's tests stand in for.
             fuzzed: false,
             has_explanation: false,
@@ -118,7 +118,7 @@ mod tests {
 
     #[test]
     fn finding_always_carries_evidence() {
-        // Honesty by construction (docs/24 §5): a plugin finding cannot exist
+        // Honesty by construction: a plugin finding cannot exist
         // without its evidence reference.
         let d = ChattyFlowDetector::default();
         let findings = d.evaluate(&vec![event(42); 10]).unwrap();

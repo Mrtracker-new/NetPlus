@@ -1,4 +1,4 @@
-//! STIX 2.1 JSON parser (docs/18 §4.9).
+//! STIX 2.1 JSON parser.
 //!
 //! Parses offline STIX 2.1 JSON bundle files without network egress.
 //! Ignores unsupported STIX object types (Malware, Campaign, AttackPattern) as metadata

@@ -1,12 +1,12 @@
-//! Progress tracking and adaptivity (docs/13 §6). Learning is a loop: after a
+//! Progress tracking and adaptivity. Learning is a loop: after a
 //! lesson checks understanding, the engine updates a per-concept **mastery**
 //! estimate and uses it to decide what to offer next, and at what depth.
 //!
 //! Two principles are load-bearing:
-//! - **Local-first** (docs/01 X3): progress lives in the learner's own store
-//!   (docs/08) and is *never uploaded*. These types are `serde`-serializable so
+//! - **Local-first**: progress lives in the learner's own store
+//! and is *never uploaded*. These types are `serde`-serializable so
 //!   the engine can persist them alongside settings — nothing more.
-//! - **Non-nagging** (docs/13 §6, docs/01 §7.6): the adaptive next-offer is
+//! - **Non-nagging**: the adaptive next-offer is
 //!   calm and *optional*. Mastered concepts are not re-taught; when nothing is
 //!   worth offering, the answer is honestly `None`, not a manufactured prompt.
 
@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::LessonOffer;
 
-/// A learner's status on one lesson (docs/13 §5 PROGRESS).
+/// A learner's status on one lesson.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum LessonStatus {
@@ -26,7 +26,7 @@ pub enum LessonStatus {
     Mastered,
 }
 
-/// Per-lesson progress with a `mastery` estimate in `0.0..=1.0` (docs/13 §6).
+/// Per-lesson progress with a `mastery` estimate in `0.0.=1.0`.
 /// Mastery drives adaptivity; it is an *estimate*, updated by exercise
 /// performance, never a grade.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -45,11 +45,11 @@ impl Default for Progress {
 }
 
 /// Mastery at or above this is considered "mastered" and no longer offered
-/// unprompted (docs/13 §6, non-nagging).
+/// unprompted.
 pub const MASTERY_THRESHOLD: f32 = 0.8;
 
-/// The learner's progress across lessons (docs/13 §6). Local-only; serialized
-/// into the capture/settings store (docs/08), never transmitted.
+/// The learner's progress across lessons. Local-only; serialized
+/// into the capture/settings store, never transmitted.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProgressStore {
     /// Keyed by lesson id.
@@ -67,13 +67,13 @@ impl ProgressStore {
         self.by_lesson.get(lesson_id).copied().unwrap_or_default()
     }
 
-    /// Whether a lesson is mastered (docs/13 §6): at/above the threshold.
+    /// Whether a lesson is mastered: at/above the threshold.
     pub fn is_mastered(&self, lesson_id: &str) -> bool {
         self.get(lesson_id).mastery >= MASTERY_THRESHOLD
     }
 
     /// Record an exercise result, updating the mastery estimate and status
-    /// (docs/13 §6). Mastery moves as an exponential moving average toward 1.0
+    ///Mastery moves as an exponential moving average toward 1.0
     /// on a correct answer and toward 0.0 on an incorrect one, so a single slip
     /// does not erase progress and a single fluke does not confer mastery.
     pub fn record_result(&mut self, lesson_id: &str, correct: bool) {
@@ -102,13 +102,13 @@ impl ProgressStore {
     }
 
     /// Choose the next offer to surface, or `None` when nothing is worth
-    /// surfacing (docs/13 §6). Adaptive and non-nagging: mastered lessons are
+    /// surfacing. Adaptive and non-nagging: mastered lessons are
     /// filtered out, and among the rest the most foundational (lowest level,
     /// then least mastered) is preferred, nudging the learner along the spine
     /// "DNS → connect → encrypt" rather than repeating what they know.
     ///
     /// Returns a reference into `offers`; the caller decides whether to show it,
-    /// and the learner can always dismiss it (calm, docs/01 §7.6).
+    /// and the learner can always dismiss it (calm .
     pub fn next_offer<'a>(&self, offers: &'a [LessonOffer]) -> Option<&'a LessonOffer> {
         offers
             .iter()
@@ -148,7 +148,7 @@ mod tests {
     fn mastery_requires_repeated_success_not_one_fluke() {
         let mut store = ProgressStore::new();
         store.record_result("b3.dns", true);
-        // One correct answer must not confer mastery (docs/13 §6).
+        // One correct answer must not confer mastery.
         assert!(!store.is_mastered("b3.dns"));
         for _ in 0..6 {
             store.record_result("b3.dns", true);
@@ -193,13 +193,13 @@ mod tests {
             store.record_result("b3.dns", true);
         }
         let offers = [offer("b3.dns", Level::Beginner)];
-        // The only offer is mastered → no nag (docs/13 §6).
+        // The only offer is mastered → no nag.
         assert!(store.next_offer(&offers).is_none());
     }
 
     #[test]
     fn progress_round_trips_through_serde() {
-        // Progress persists locally across restart (docs/13 §11).
+        // Progress persists locally across restart.
         let mut store = ProgressStore::new();
         store.record_result("b4.handshake", true);
         store.mark_started("b5.encryption");

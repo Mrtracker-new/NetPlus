@@ -1,15 +1,15 @@
-//! The grounded assistant (docs/19 §3, §5): retrieve the user's real evidence
+//! The grounded assistant: retrieve the user's real evidence
 //! first, distill it into a compact context, ask a backend to explain *that*, and
 //! **validate the citations** before returning. Grounding is enforced by
-//! retrieval + citation validation, not by trusting the model (docs/19 §12):
+//! retrieval + citation validation, not by trusting the model:
 //! a claim whose cited evidence doesn't exist in the store is suppressed.
 //!
 //! The assistant reasons over storage *primitives* (flows, sessions, protocol
 //! events, metrics) because this crate sits below the engine in the layer graph
-//! (docs/04 §3) — it grounds in the same committed model everything else uses, so
-//! its answers can never invent data the app doesn't have (docs/19 §7 "won't
+//! — it grounds in the same committed model everything else uses, so
+//! its answers can never invent data the app doesn't have ( "won't
 //! invent data"). It explains observed data; it never makes a security *verdict*
-//! (docs/19 §7, docs/01 X4) and never acts on the system (observe-only, docs/01 X1).
+//! and never acts on the system (observe-only .
 
 use netpulse_core::net::L7Proto;
 use netpulse_core::{EvidenceRef, Flow};
@@ -18,31 +18,31 @@ use netpulse_storage::CaptureStore;
 use crate::backend::{AiBackend, LocalTemplateBackend};
 use crate::context::{DistilledContext, Fact, Intent};
 
-/// A grounded, cited answer (docs/19 §6). Every substantive claim traces to a
-/// citation that was verified to exist (docs/19 §3, §12). When `grounded` is
+/// A grounded, cited answer. Every substantive claim traces to a
+/// citation that was verified to exist. When `grounded` is
 /// false the answer is an honest "I can't answer that from your data" — never a
-/// fabrication (docs/19 §3).
+/// fabrication.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroundedAnswer {
     /// The answer text, composed by the backend from grounded facts only.
     pub text: String,
-    /// The evidence the answer rests on, validated against the store (docs/19 §12).
+    /// The evidence the answer rests on, validated against the store.
     pub citations: Vec<EvidenceRef>,
     /// True when the answer is backed by evidence; false for an honest decline.
     pub grounded: bool,
-    /// Which backend answered (docs/19 §4), so the posture is always visible.
+    /// Which backend answered, so the posture is always visible.
     pub backend_id: &'static str,
-    /// Whether answering caused any network egress (docs/19 §4).
+    /// Whether answering caused any network egress.
     pub is_remote: bool,
     /// Exactly what a remote backend *would* be sent, for per-request disclosure
-    /// (docs/19 §4.3). Present even on the local path so the UI can show the user
+    ///Present even on the local path so the UI can show the user
     /// what going remote would disclose, before they ever opt in.
     pub disclosure: String,
 }
 
-/// The grounded Q&A service (docs/19). Generic over the [`AiBackend`] so the
+/// The grounded Q&A service. Generic over the [`AiBackend`] so the
 /// local-default and an opt-in remote share one grounding + citation-validation
-/// path — the privacy-sensitive logic lives here, once (docs/19 §4).
+/// path — the privacy-sensitive logic lives here, once.
 #[derive(Debug, Clone)]
 pub struct Assistant<B: AiBackend> {
     backend: B,
@@ -57,7 +57,7 @@ impl Default for Assistant<LocalTemplateBackend> {
 }
 
 impl Assistant<LocalTemplateBackend> {
-    /// The local-default assistant: zero egress, fully offline (docs/19 §4.1).
+    /// The local-default assistant: zero egress, fully offline.
     pub fn local() -> Self {
         Self::default()
     }
@@ -69,20 +69,20 @@ impl<B: AiBackend> Assistant<B> {
         Self { backend }
     }
 
-    /// Answer `question` grounded in `store` (docs/19 §5). The pipeline is:
+    /// Answer `question` grounded in `store`. The pipeline is:
     /// classify → retrieve+distill → explain → validate citations. A hallucinated
     /// citation (one not in the store) is dropped, and if that leaves the answer
-    /// unsupported it degrades to an honest decline (docs/19 §12).
+    /// unsupported it degrades to an honest decline.
     pub fn answer(&self, store: &CaptureStore, question: &str) -> GroundedAnswer {
         let intent = Intent::classify(question);
         let context = distill(store, question, intent);
         let disclosure = context.disclosure_preview();
 
-        // The backend explains ONLY the distilled facts (docs/19 §3).
+        // The backend explains ONLY the distilled facts.
         let text = self.backend.explain(&context);
 
         // Grounding is checked, not trusted: keep only citations that really exist
-        // in the store (docs/19 §12).
+        // in the store.
         let citations: Vec<EvidenceRef> = context
             .citations()
             .into_iter()
@@ -101,8 +101,8 @@ impl<B: AiBackend> Assistant<B> {
     }
 }
 
-/// Whether a citation points at a record that actually exists (docs/19 §12).
-/// Packets are never citable under the metadata-only default (docs/08 §4), so a
+/// Whether a citation points at a record that actually exists.
+/// Packets are never citable under the metadata-only default, so a
 /// packet citation is treated as unsupported rather than dangling.
 fn citation_exists(store: &CaptureStore, e: &EvidenceRef) -> bool {
     match e {
@@ -112,8 +112,8 @@ fn citation_exists(store: &CaptureStore, e: &EvidenceRef) -> bool {
     }
 }
 
-/// Retrieve and distill the evidence relevant to `intent` (docs/19 §5 steps 2–3).
-/// Bounded and compact — a handful of facts, never a capture dump (docs/19 §10).
+/// Retrieve and distill the evidence relevant to `intent`.
+/// Bounded and compact — a handful of facts, never a capture dump.
 fn distill(store: &CaptureStore, question: &str, intent: Intent) -> DistilledContext {
     let flows: Vec<&Flow> = store.flows_in_window(0, u64::MAX);
     let facts = match intent {
@@ -131,9 +131,9 @@ fn distill(store: &CaptureStore, question: &str, intent: Intent) -> DistilledCon
     }
 }
 
-// ---- Per-intent retrieval over storage primitives (docs/19 §5) --------------
+// ---- Per-intent retrieval over storage primitives --------------
 
-/// Human-readable byte size — small helper so facts read plainly (docs/19 §6).
+/// Human-readable byte size — small helper so facts read plainly.
 fn human_bytes(n: u64) -> String {
     const KB: f64 = 1024.0;
     const MB: f64 = KB * 1024.0;
@@ -160,7 +160,7 @@ fn l7_label(l7: L7Proto) -> &'static str {
     }
 }
 
-/// Top talkers by destination host, ranked (docs/19 §6.1 worked example).
+/// Top talkers by destination host, ranked.
 fn top_bandwidth(flows: &[&Flow]) -> Vec<Fact> {
     use std::collections::BTreeMap;
     let mut by_host: BTreeMap<String, (u64, Vec<EvidenceRef>)> = BTreeMap::new();
@@ -188,7 +188,7 @@ fn top_bandwidth(flows: &[&Flow]) -> Vec<Fact> {
         .collect()
 }
 
-/// Protocol composition of the capture (docs/19 §6.1).
+/// Protocol composition of the capture.
 fn protocol_mix(flows: &[&Flow]) -> Vec<Fact> {
     use std::collections::BTreeMap;
     let mut by_proto: BTreeMap<&'static str, (u64, Vec<EvidenceRef>)> = BTreeMap::new();
@@ -216,7 +216,7 @@ fn protocol_mix(flows: &[&Flow]) -> Vec<Fact> {
         .collect()
 }
 
-/// Who the traffic reached, and how much of it (docs/19 §6.1).
+/// Who the traffic reached, and how much of it.
 fn connectivity(flows: &[&Flow]) -> Vec<Fact> {
     use std::collections::BTreeSet;
     if flows.is_empty() {
@@ -235,14 +235,14 @@ fn connectivity(flows: &[&Flow]) -> Vec<Fact> {
 }
 
 /// What the data shows about slowness — grounded in real loss/retransmit metrics,
-/// carrying the honest limits of metadata-only insight (docs/19 §6.1, §9).
+/// carrying the honest limits of metadata-only insight.
 fn degradation(flows: &[&Flow]) -> Vec<Fact> {
     let lossy: Vec<&&Flow> = flows
         .iter()
         .filter(|f| f.stats.loss_indicators > 0 || f.stats.retransmits > 0)
         .collect();
     if lossy.is_empty() {
-        // Honestly nothing to point at — not a fabricated cause (docs/11 §9).
+        // Honestly nothing to point at — not a fabricated cause.
         return Vec::new();
     }
     let total_loss: u32 = lossy.iter().map(|f| f.stats.loss_indicators).sum();
@@ -258,7 +258,7 @@ fn degradation(flows: &[&Flow]) -> Vec<Fact> {
     }]
 }
 
-/// A grounded overview of the capture (docs/19 §6.1 "explain my day").
+/// A grounded overview of the capture.
 fn summary(store: &CaptureStore, flows: &[&Flow]) -> Vec<Fact> {
     if flows.is_empty() {
         return Vec::new();
@@ -346,7 +346,7 @@ mod tests {
         assert!(a.text.contains("203.0.113.9")); // the 6 MB host, ranked first
         assert!(a.text.contains("5.7 MB")); // 6,000,000 B / 1024² ≈ 5.7 MiB
         assert!(!a.citations.is_empty());
-        assert!(!a.is_remote); // local-default, zero egress (docs/19 §4.1)
+        assert!(!a.is_remote); // local-default, zero egress
     }
 
     #[test]
@@ -379,7 +379,7 @@ mod tests {
     #[test]
     fn disclosure_preview_is_always_available() {
         // Even on the local path, the user can see what going remote would send
-        // (docs/19 §4.3) — and it never includes payloads.
+        // — and it never includes payloads.
         let store = store_with_traffic();
         let a = Assistant::local().answer(&store, "summarize my traffic");
         assert!(a.disclosure.contains("No packet payloads"));

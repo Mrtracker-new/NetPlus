@@ -34,7 +34,7 @@ Packets ──► Dissector ──► Enrichment ──► Detector ──► En
 *View plugins consume engine state but cannot modify capture, analysis, or export pipelines, ensuring presentation logic remains isolated from packet processing.*
 
 - **Target Trait**: `ViewPlugin` (combined with `Configurable`)
-- **Granted Capability**: `Capability::ApiRead` (docs/02 §10.2)
+- **Granted Capability**: `Capability::ApiRead`
 - **Architectural Prohibitions**:
   - MUST NOT parse raw bytes (`Capability::ParseBytes`)
   - MUST NOT emit security findings (`Capability::EmitFindings`)

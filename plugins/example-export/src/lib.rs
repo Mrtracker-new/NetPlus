@@ -1,8 +1,8 @@
-//! A first-party **export plugin** reference (docs/24 §4.5). It adds an output
+//! A first-party **export plugin** reference. It adds an output
 //! format under the *same* privacy discipline as built-in exports — it operates on
 //! already-scoped, already-sanitized structured input and **writes bytes; it never
-//! transmits them** (docs/23 §6, docs/24 §4.5). No implicit egress: the single
-//! egress boundary stays `netpulse-ai` (docs/02 §10.1). This toy emits a trivial
+//! transmits them**. No implicit egress: the single
+//! egress boundary stays `netpulse-ai`. This toy emits a trivial
 //! line-oriented "flat" format to demonstrate the seam.
 #![forbid(unsafe_code)]
 
@@ -28,7 +28,7 @@ impl ExportPlugin for FlatExport {
     }
 
     fn export(&self, structured_json: &str) -> Result<Vec<u8>> {
-        // Deterministic transform of the already-sanitized input (docs/23 §6): the
+        // Deterministic transform of the already-sanitized input: the
         // preview the user approved must match this output exactly, so no non-
         // determinism (clock/RNG) is allowed here.
         let mut out = String::from("# NetPulse flat export (example plugin)\n");
@@ -38,7 +38,7 @@ impl ExportPlugin for FlatExport {
     }
 }
 
-/// The plugin's self-description (docs/24 §6): a first-party export reference.
+/// The plugin's self-description: a first-party export reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
@@ -74,7 +74,7 @@ mod tests {
     #[test]
     fn export_is_deterministic() {
         // Two runs over the same input produce identical bytes — required so the
-        // approved preview matches the written file (docs/23 §6).
+        // approved preview matches the written file.
         let e = FlatExport;
         let a = e.export(r#"{"flows":1}"#).unwrap();
         let b = e.export(r#"{"flows":1}"#).unwrap();
@@ -85,7 +85,7 @@ mod tests {
     #[test]
     fn export_capability_writes_output_only() {
         // The seam grants output-writing only — no egress capability exists to
-        // grant (docs/24 §4.5, §5).
+        // grant.
         assert_eq!(
             capabilities_for(PluginType::Export),
             &[Capability::WriteOutput]

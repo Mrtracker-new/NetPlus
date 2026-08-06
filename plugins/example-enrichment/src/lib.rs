@@ -1,6 +1,6 @@
-//! A first-party **enrichment plugin** reference (docs/24 §4.3). It adds host
+//! A first-party **enrichment plugin** reference. It adds host
 //! metadata from a **local, offline** table only — an enrichment that phones home
-//! violates the capability model and is rejected (docs/24 §4.3, §5). The seam
+//! violates the capability model and is rejected. The seam
 //! trait exposes no network access to grant, so "local only" is structural, not a
 //! promise. This toy resolves a couple of well-known IP ranges to an organization
 //! label from a hard-coded local map.
@@ -23,7 +23,7 @@ pub struct LocalOrgEnrichment;
 impl Configurable for LocalOrgEnrichment {}
 
 impl LocalOrgEnrichment {
-    /// The local lookup: first-octet → org. Purely offline (docs/24 §4.3).
+    /// The local lookup: first-octet → org. Purely offline.
     fn org_for(ip: &IpAddr) -> Option<&'static str> {
         match ip {
             IpAddr::V4(v4) => match v4.octets()[0] {
@@ -43,7 +43,7 @@ impl Enrichment for LocalOrgEnrichment {
 
     fn enrich_host(&self, host: &Host) -> Result<Option<Host>> {
         // Honest absence: if the local table has nothing, return None rather than
-        // inventing an org (docs/12 §8).
+        // inventing an org.
         match Self::org_for(&host.ip) {
             Some(org) => {
                 let mut enriched = host.clone();
@@ -55,7 +55,7 @@ impl Enrichment for LocalOrgEnrichment {
     }
 }
 
-/// The plugin's self-description (docs/24 §6): a first-party enrichment reference.
+/// The plugin's self-description: a first-party enrichment reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,
@@ -106,7 +106,7 @@ mod tests {
             .enrich_host(&host(IpAddr::V4(Ipv4Addr::new(198, 51, 100, 5))))
             .unwrap();
         assert_eq!(known.unwrap().org.as_deref(), Some("Example CDN"));
-        // Unknown host → honest None, never fabricated (docs/12 §8).
+        // Unknown host → honest None, never fabricated.
         let unknown = e
             .enrich_host(&host(IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1))))
             .unwrap();
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn enrichment_capability_is_local_only() {
         // The seam grants only local-data reads — there is no network capability
-        // in the model to grant (docs/24 §4.3, §5).
+        // in the model to grant.
         assert_eq!(
             capabilities_for(PluginType::Enrichment),
             &[Capability::ReadLocalData]

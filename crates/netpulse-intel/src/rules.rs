@@ -1,18 +1,18 @@
-//! Rule/heuristic threat detectors (docs/18) — the recognisable *shapes* of
-//! suspicious behaviour. Each obeys the detector contract (docs/18 §3): it cites
-//! the exact flows/events that triggered it (docs/02 §6.3), produces calibrated
-//! confidence rather than a verdict (docs/17 §5), and — the recurring discipline
+//! Rule/heuristic threat detectors — the recognisable *shapes* of
+//! suspicious behaviour. Each obeys the detector contract: it cites
+//! the exact flows/events that triggered it, produces calibrated
+//! confidence rather than a verdict, and — the recurring discipline
 //! — carries a benign explanation, because most of the time the behaviour is
-//! innocent (the benign list lives on [`FindingKind`], docs/18 §3).
+//! innocent (the benign list lives on [`FindingKind`] .
 //!
 //! These catch *known* patterns over the committed model; the anomaly engine
-//! (docs/20, [`crate::anomaly`]) catches deviation-from-normal. Both feed one
-//! finding framework (docs/17 §6), so the UI sees a consistent, comparable set.
+//! catches deviation-from-normal. Both feed one
+//! finding framework, so the UI sees a consistent, comparable set.
 //!
-//! Every threshold is explicit and versioned in [`thresh`] (docs/18 §10 "prefer
+//! Every threshold is explicit and versioned in [`thresh`] ( "prefer
 //! baseline-relative signals over hardcoded thresholds" — where a baseline
 //! exists it is used; the fixed floors here are conservative and honestly capped
-//! in confidence, docs/18 §6).
+//! in confidence .
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;
@@ -22,7 +22,7 @@ use netpulse_core::{EvidenceRef, Flow, FlowState, ProtoEventKind};
 use crate::finding::{FindingKind, SecurityFinding};
 use crate::view::TrafficView;
 
-/// Explicit, versioned detector thresholds (docs/18 §10). Nanoseconds for time.
+/// Explicit, versioned detector thresholds. Nanoseconds for time.
 mod thresh {
     /// Minimum flows to one host before a regular cadence looks like beaconing.
     pub const BEACON_MIN_FLOWS: usize = 4;
@@ -37,7 +37,7 @@ mod thresh {
     pub const SCAN_WINDOW_NANOS: u64 = 5_000_000_000;
 
     /// Flows to a single host beyond which the count itself looks like a storm.
-    /// Set high because browsers legitimately fan out (docs/18 §4.8, §7).
+    /// Set high because browsers legitimately fan out.
     pub const STORM_MIN_FLOWS: usize = 20;
 
     /// DNS queries in the window beyond which the volume looks like a burst.
@@ -57,7 +57,7 @@ pub fn detect_all(view: &TrafficView) -> Vec<SecurityFinding> {
 }
 
 /// Group the view's flows by destination host IP, preserving a deterministic
-/// order (docs/18 §8 indexed lookups; BTreeMap keeps output stable to test).
+/// order.
 fn by_dst_host<'a>(view: &'a TrafficView) -> BTreeMap<IpAddr, Vec<&'a Flow>> {
     let mut map: BTreeMap<IpAddr, Vec<&Flow>> = BTreeMap::new();
     for f in view.flows {
@@ -66,7 +66,7 @@ fn by_dst_host<'a>(view: &'a TrafficView) -> BTreeMap<IpAddr, Vec<&'a Flow>> {
     map
 }
 
-/// **Beaconing** (docs/18 §4.2): highly regular connections to one host at a
+/// **Beaconing**: highly regular connections to one host at a
 /// fixed interval — a classic C2 shape, and equally a classic *telemetry* shape,
 /// so confidence stays measured and the benign case is always named.
 pub fn beaconing(view: &TrafficView) -> Vec<SecurityFinding> {
@@ -97,7 +97,7 @@ pub fn beaconing(view: &TrafficView) -> Vec<SecurityFinding> {
         }
 
         // Confidence: more repetitions and a tighter cadence raise it; capped so
-        // a beacon is never asserted as C2 (docs/01 X4). Telemetry looks identical.
+        // a beacon is never asserted as C2. Telemetry looks identical.
         let regularity = (1.0 - cv / thresh::BEACON_MAX_CV) as f32; // 0..1
         let repetition = ((flows.len() - thresh::BEACON_MIN_FLOWS) as f32 / 8.0).min(1.0);
         let confidence = 0.45 + 0.15 * regularity + 0.15 * repetition;
@@ -122,10 +122,10 @@ pub fn beaconing(view: &TrafficView) -> Vec<SecurityFinding> {
     out
 }
 
-/// **Port scanning** (docs/18 §4.7): connections fanned across many ports of one
+/// **Port scanning**: connections fanned across many ports of one
 /// host in a short window. Failed (SYN-only) attempts raise confidence; a network
 /// tool the user ran is the benign case. NetPulse *detects* scans, never performs
-/// them (docs/17 §8).
+/// them.
 pub fn port_scan(view: &TrafficView) -> Vec<SecurityFinding> {
     let mut out = Vec::new();
     for (host, flows) in by_dst_host(view) {
@@ -147,7 +147,7 @@ pub fn port_scan(view: &TrafficView) -> Vec<SecurityFinding> {
             continue;
         }
 
-        // Half-open / never-established attempts corroborate a scan (docs/18 §4.7).
+        // Half-open / never-established attempts corroborate a scan.
         let failed = flows
             .iter()
             .filter(|f| matches!(f.state, FlowState::SynSeen))
@@ -176,9 +176,9 @@ pub fn port_scan(view: &TrafficView) -> Vec<SecurityFinding> {
     out
 }
 
-/// **Connection storm** (docs/18 §4.8): an unusually large number of connections
+/// **Connection storm**: an unusually large number of connections
 /// to one host. Browsers and P2P legitimately fan out, so this is set high and
-/// phrased tentatively; a category-aware baseline (docs/20) sharpens it later.
+/// phrased tentatively; a category-aware baseline sharpens it later.
 pub fn connection_storm(view: &TrafficView) -> Vec<SecurityFinding> {
     let mut out = Vec::new();
     for (host, flows) in by_dst_host(view) {
@@ -206,10 +206,10 @@ pub fn connection_storm(view: &TrafficView) -> Vec<SecurityFinding> {
     out
 }
 
-/// **Unexpected application Internet access** (docs/18 §4.1): a process reaching
+/// **Unexpected application Internet access**: a process reaching
 /// the network, weighted by signing. An *unsigned* binary raises confidence; a
 /// known publisher lowers it. Requires attribution — with none, we stay silent
-/// rather than blame a flow on the wrong app (docs/12 §8).
+/// rather than blame a flow on the wrong app.
 pub fn unexpected_egress(view: &TrafficView) -> Vec<SecurityFinding> {
     // One finding per distinct unsigned process, aggregating its flows.
     let mut per_pid: BTreeMap<u64, (String, Vec<EvidenceRef>)> = BTreeMap::new();
@@ -230,7 +230,7 @@ pub fn unexpected_egress(view: &TrafficView) -> Vec<SecurityFinding> {
     for (pid, (name, evidence)) in per_pid {
         // Unsigned + reaching out. Confidence is modest: a new unsigned app is
         // very often benign (a fresh install, an updater), so this leans on
-        // corroboration (docs/18 §5) to become notable.
+        // corroboration to become notable.
         let explanation = format!(
             "\"{name}\" is not code-signed and was seen reaching the Internet. That's common for \
              a freshly installed app or a background service, but an unsigned program you don't \
@@ -245,10 +245,10 @@ pub fn unexpected_egress(view: &TrafficView) -> Vec<SecurityFinding> {
     out
 }
 
-/// **Suspicious DNS volume** (docs/18 §4.4): a burst of DNS queries far above the
+/// **Suspicious DNS volume**: a burst of DNS queries far above the
 /// usual rate. Entropy/DGA analysis needs query names the metadata model doesn't
 /// carry yet, so this honest subset flags *volume* only and says so — noisy
-/// heuristics stay tentative (docs/18 §4.4 edge, §6).
+/// heuristics stay tentative.
 pub fn dns_anomaly(view: &TrafficView) -> Vec<SecurityFinding> {
     let mut dns_flow_ids: Vec<u64> = view
         .events
@@ -350,7 +350,7 @@ mod tests {
         let f = beaconing(&view(&flows, &[], &procs));
         assert_eq!(f.len(), 1);
         assert_eq!(f[0].kind, FindingKind::Beaconing);
-        // Names the benign telemetry reading and never asserts C2 (docs/18 §4.2).
+        // Names the benign telemetry reading and never asserts C2.
         assert!(f[0].explanation.contains("telemetry"));
         assert!(f[0].confidence.value() < 1.0);
     }
@@ -401,7 +401,7 @@ mod tests {
     fn unsigned_app_egress_needs_attribution() {
         let host = ip(34);
         let flows = vec![flow_to(1, host, 443, 0, FlowState::Closed, 100)];
-        // No attribution → no claim (docs/12 §8).
+        // No attribution → no claim.
         let empty = empty_procs();
         assert!(unexpected_egress(&view(&flows, &[], &empty)).is_empty());
 

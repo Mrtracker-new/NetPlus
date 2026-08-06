@@ -1,4 +1,4 @@
-//! STIX offline threat indicator matcher (docs/18 §4.9).
+//! STIX offline threat indicator matcher.
 
 use netpulse_core::EvidenceRef;
 use std::collections::HashMap;

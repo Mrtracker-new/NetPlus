@@ -1,4 +1,4 @@
-//! Declarative behavioral chain detection (docs/18 §11).
+//! Declarative behavioral chain detection.
 //!
 //! Evaluated against corroborated findings to detect multi-stage attack patterns
 //! across sliding time windows (e.g. Reconnaissance -> Initial Access -> C2 Beaconing).
@@ -94,7 +94,7 @@ impl BehavioralChainEngine {
         self.rules.push(rule);
     }
 
-    /// Evaluate rules against corroborated findings (docs/18 §11).
+    /// Evaluate rules against corroborated findings.
     pub fn detect_chains(&self, findings: &[SecurityFinding]) -> Vec<SecurityFinding> {
         if findings.len() < 2 {
             return Vec::new();

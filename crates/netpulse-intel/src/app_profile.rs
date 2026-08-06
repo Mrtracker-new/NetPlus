@@ -1,4 +1,4 @@
-//! Application security profiles and baselines (docs/20 §3).
+//! Application security profiles and baselines.
 //!
 //! Separates learned observed baselines ([`ObservedProfile`]) from user-configured security policies
 //! ([`ConfiguredPolicy`]). Compares active traffic against both to spot profile breaches.

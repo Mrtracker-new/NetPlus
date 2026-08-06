@@ -1,12 +1,12 @@
-//! The education content model (docs/13 §5, docs/15 §12) — authored as **data**,
+//! The education content model — authored as **data**,
 //! not code. A technical writer can add a module, lesson, step, or exercise
 //! without touching the engine, exactly as the explanation-key content is
-//! authorable in docs/07 §7.3. The engine (`super::engine`) *selects* this
+//! authorable in. The engine (`super::engine` *selects* this
 //! content when the user's real traffic warrants it; it never invents it.
 //!
-//! Every step is wired to an [`ExplanationKey`] (docs/07 §7): the same
+//! Every step is wired to an [`ExplanationKey`]: the same
 //! identifier the dissectors emit, the explorer browses, and the animations
-//! key off — one vocabulary unifies the whole education system (docs/07 §7.3).
+//! key off — one vocabulary unifies the whole education system.
 //! That wiring is what keeps a lesson from ever drifting from the engine's
 //! reality: a lesson about the handshake cites `tcp.flags.syn`, and the value
 //! it shows is pulled from the learner's captured packet, not a textbook.
@@ -14,9 +14,9 @@
 use netpulse_decode::ExplanationKey;
 use serde::{Deserialize, Serialize};
 
-/// A learner-progression level (docs/13 §3.1). Mirrors [`netpulse_core::Depth`]
+/// A learner-progression level. Mirrors [`netpulse_core::Depth`]
 /// so a lesson's level and the UI's disclosure mode speak the same ladder — a
-/// Beginner-mode learner is offered Beginner lessons first (docs/13 §6).
+/// Beginner-mode learner is offered Beginner lessons first.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash, Serialize, Deserialize,
 )]
@@ -30,7 +30,7 @@ pub enum Level {
 
 impl Level {
     /// Map to the equivalent core disclosure depth, so content authored for a
-    /// level renders at the matching mode (docs/13 §6, docs/09 §6).
+    /// level renders at the matching mode.
     pub fn as_depth(self) -> netpulse_core::Depth {
         match self {
             Level::Beginner => netpulse_core::Depth::Beginner,
@@ -41,10 +41,10 @@ impl Level {
 }
 
 /// What real-traffic moment can launch a lesson *grounded* in the learner's own
-/// data (docs/13 §4.1). The engine watches the event stream for these and offers
-/// the matching lesson citing the real evidence (docs/13 §3.2 loop). A lesson
+/// data. The engine watches the event stream for these and offers
+/// the matching lesson citing the real evidence. A lesson
 /// with [`Trigger::None`] is always available but never *grounded* on its own —
-/// it falls back to a curated example (docs/13 §4.3).
+/// it falls back to a curated example.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Trigger {
@@ -60,16 +60,16 @@ pub enum Trigger {
     LossBurst,
     /// A fan-out across many hosts — "why one website talks to many servers".
     FanOut,
-    /// A full page-load session — the flagship journey (docs/13 §7 B2, docs/14).
+    /// A full page-load session — the flagship journey.
     PageLoad,
-    /// No live trigger; conceptual lesson, curated-example grounded (docs/13 §4.3).
+    /// No live trigger; conceptual lesson, curated-example grounded.
     None,
 }
 
-/// A reference to an animation (docs/16) embedded in a step. It is only the
+/// A reference to an animation embedded in a step. It is only the
 /// *identifier*; the animation model itself is built from real events by
 /// [`super::anim`], keyed the same way so lesson and animation stay in sync
-/// (docs/16 §11).
+///
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum AnimationRef {
@@ -80,7 +80,7 @@ pub enum AnimationRef {
     Degradation,
 }
 
-/// A comprehension-check kind (docs/13 §5.1). Grounded checks operate on the
+/// A comprehension-check kind. Grounded checks operate on the
 /// learner's *own* captured evidence, which only NetPulse can generate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
@@ -91,14 +91,14 @@ pub enum ExerciseKind {
     ExplainBack,
     /// Predict what happens next ("what follows this SYN?").
     Predict,
-    /// Given a real slow session, identify the likely cause (ties to docs/11 §6).
+    /// Given a real slow session, identify the likely cause (ties to .
     Diagnose,
 }
 
-/// One comprehension check within a lesson (docs/13 §5). `answer_key` names the
+/// One comprehension check within a lesson. `answer_key` names the
 /// explanation key whose real value in the learner's capture is the correct
 /// answer, so the engine can *derive* the answer from the fixture rather than
-/// hard-coding it (docs/13 §11 exercise-correctness).
+/// hard-coding it.
 ///
 /// Authored as static data (it holds `&'static` content), so it is `Clone` but
 /// not `Deserialize` — the catalog is compiled in, never received over the wire.
@@ -111,20 +111,20 @@ pub struct Exercise {
     pub answer_key: Option<ExplanationKey>,
 }
 
-/// One unit of explanation within a lesson (docs/13 §5). It carries no prose of
+/// One unit of explanation within a lesson. It carries no prose of
 /// its own: `body_key` addresses the [`netpulse_decode::explain`] content store,
 /// so the same authored text serves the lesson, the explorer, and the tooltip —
-/// no duplication, no drift (docs/13 §12, docs/07 §7.3).
+/// no duplication, no drift.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Step {
     pub id: &'static str,
-    /// The explanation-key providing this step's layered content (docs/07 §7).
+    /// The explanation-key providing this step's layered content.
     pub body_key: ExplanationKey,
-    /// Optional animation to embed (docs/16), driven by the learner's real data.
+    /// Optional animation to embed, driven by the learner's real data.
     pub anim: Option<AnimationRef>,
 }
 
-/// A single teachable concept (docs/13 §5). Its `trigger` says what real-traffic
+/// A single teachable concept. Its `trigger` says what real-traffic
 /// moment can ground it; its steps reference explanation keys; its exercises
 /// check understanding on the learner's own data.
 #[derive(Debug, Clone, PartialEq)]
@@ -137,8 +137,8 @@ pub struct Lesson {
     pub exercises: &'static [Exercise],
 }
 
-/// A themed group of lessons (docs/13 §5) — the unit of the curriculum map
-/// (docs/13 §7).
+/// A themed group of lessons — the unit of the curriculum map
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct Module {
     pub id: &'static str,
@@ -147,13 +147,13 @@ pub struct Module {
     pub lessons: &'static [Lesson],
 }
 
-// ---- The authored curriculum (docs/13 §7) --------------------------------
+// ---- The authored curriculum --------------------------------
 //
 // A minimal-but-honest realization of the curriculum map: the beginner spine
 // (DNS → connect → encrypt), the flagship page-load journey, and one
 // intermediate diagnostic lesson. Each lesson's steps cite keys that
 // `netpulse-decode` actually emits, so `curriculum_keys_all_resolve` (tests)
-// proves "no dead ends" (docs/01 E1) across the whole curriculum.
+// proves "no dead ends" across the whole curriculum.
 
 const DNS_STEPS: &[Step] = &[Step {
     id: "dns.what",
@@ -290,7 +290,7 @@ const I4_LOSS: Lesson = Lesson {
 const BEGINNER_LESSONS: &[Lesson] = &[B3_DNS, B4_HANDSHAKE, B5_ENCRYPTION, B2_PAGELOAD];
 const INTERMEDIATE_LESSONS: &[Lesson] = &[I4_LOSS];
 
-/// The authored curriculum (docs/13 §7). Grouped into modules by level; the
+/// The authored curriculum. Grouped into modules by level; the
 /// engine and explorer read it, never mutate it.
 pub const CURRICULUM: &[Module] = &[
     Module {
@@ -307,7 +307,7 @@ pub const CURRICULUM: &[Module] = &[
     },
 ];
 
-/// Look up a lesson by id across the whole curriculum (docs/13 §5).
+/// Look up a lesson by id across the whole curriculum.
 pub fn lesson(id: &str) -> Option<&'static Lesson> {
     CURRICULUM
         .iter()
@@ -316,7 +316,7 @@ pub fn lesson(id: &str) -> Option<&'static Lesson> {
 }
 
 /// The first lesson whose trigger matches an observed teachable moment
-/// (docs/13 §4.1). Returned to the engine so an observation maps to a grounded
+///Returned to the engine so an observation maps to a grounded
 /// offer.
 pub fn lesson_for_trigger(trigger: Trigger) -> Option<&'static Lesson> {
     CURRICULUM
@@ -333,8 +333,8 @@ mod tests {
     #[test]
     fn curriculum_keys_all_resolve_at_all_depths() {
         // Every step's explanation key must resolve to content at all three
-        // depths — the "no dead ends" invariant (docs/01 E1) applied to the
-        // curriculum, sharing the docs/07 §11 coverage guarantee.
+        // depths — the "no dead ends" invariant applied to the
+        // curriculum, sharing the coverage guarantee.
         for module in CURRICULUM {
             for lesson in module.lessons {
                 for step in lesson.steps {

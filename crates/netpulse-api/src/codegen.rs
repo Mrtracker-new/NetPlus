@@ -1,11 +1,11 @@
-//! TypeScript contract emitter (docs/03 §7, docs/04 §4).
+//! TypeScript contract emitter.
 //!
 //! The design calls for the UI's TypeScript view of the message schema to be
 //! **generated from the Rust source of truth** so the two sides cannot drift
-//! (docs/03 §7). The canonical way to do that is a derive like `ts-rs`; NetPulse
+//!The canonical way to do that is a derive like `ts-rs`; NetPulse
 //! deliberately hand-rolls a tiny emitter instead, for the same reason Phase 1
 //! hand-rolled the pcap reader: to keep the Rust dependency set at zero new
-//! crates (docs/03 §14 "dependencies are attack surface"), which also keeps the
+//! crates, which also keeps the
 //! deferred `audit` / `egress-boundary` CI gates trivially green.
 //!
 //! The tradeoff is honest: a derive macro guarantees the emitted TS matches the
@@ -141,7 +141,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 3 education enums (docs/13–16) ---
+    // --- Phase 3 education enums ---
     s.push_str(&union(
         "ExerciseKind",
         &["identify", "explain_back", "predict", "diagnose"],
@@ -173,7 +173,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 3 education interfaces (docs/13–16) ---
+    // --- Phase 3 education interfaces ---
     s.push_str(&iface(
         "GroundedExercise",
         &[
@@ -252,7 +252,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 4 intelligence enums (docs/17–20) ---
+    // --- Phase 4 intelligence enums ---
     s.push_str(&union(
         "FindingCategory",
         &["anomaly", "suspicious", "informational"],
@@ -273,7 +273,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 4 intelligence interfaces (docs/17–20) ---
+    // --- Phase 4 intelligence interfaces ---
     s.push_str(&iface(
         "SecurityFinding",
         &[
@@ -322,7 +322,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 5 lifecycle enums (docs/21–24) ---
+    // --- Phase 5 lifecycle enums ---
     s.push_str(&union(
         "PayloadLevel",
         &["metadata_only", "headers", "full_payload"],
@@ -357,7 +357,7 @@ pub fn typescript_contract() -> String {
          | { kind: \"all\" };\n",
     );
 
-    // --- Phase 5 lifecycle interfaces (docs/21–24) ---
+    // --- Phase 5 lifecycle interfaces ---
     s.push_str(&iface(
         "VersionPins",
         &[
@@ -529,7 +529,7 @@ pub fn typescript_contract() -> String {
 
 const HEADER: &str = "// GENERATED from the netpulse-api crate — do not hand-edit.\n\
 // Regenerate with: cargo test -p netpulse-api -- --ignored write_contract\n\
-// A CI drift check fails the build if this file is out of sync (docs/04 §7).\n";
+// A CI drift check fails the build if this file is out of sync.\n";
 
 /// A TS string-literal union: `export type Name = \"a\" | \"b\";`.
 fn union(name: &str, variants: &[&str]) -> String {
@@ -634,10 +634,10 @@ mod tests {
         "/../../ui/packages/contract/src/generated.ts"
     );
 
-    /// The `contract-drift` gate (docs/04 §7): the committed TypeScript must
+    /// The `contract-drift` gate: the committed TypeScript must
     /// equal what the emitter produces now. If a DTO changed without
     /// regenerating, this fails — the UI and engine can never silently diverge
-    /// (docs/03 §7). Fix by running the `write_contract` test below.
+    ///Fix by running the `write_contract` test below.
     #[test]
     fn committed_contract_is_in_sync() {
         let committed = std::fs::read_to_string(CONTRACT_PATH)

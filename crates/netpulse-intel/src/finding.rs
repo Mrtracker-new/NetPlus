@@ -1,62 +1,62 @@
-//! The Security Engine finding model (docs/17 §4) — the atomic, honest unit the
+//! The Security Engine finding model — the atomic, honest unit the
 //! whole intelligence layer produces. Where `netpulse-core`'s [`Finding`] is the
 //! compact *storage* record (id + category + confidence + evidence), this is the
-//! rich *domain* type the detectors (docs/18) and anomaly engine (docs/20) build
+//! rich *domain* type the detectors and anomaly engine build
 //! and the engine projects to the UI — exactly as `netpulse-engine`'s `Diagnosis`
-//! sits above core's model (docs/11 §6, docs/04 §3.6).
+//! sits above core's model.
 //!
-//! The structure *encodes* the honesty guarantees (docs/17 §3):
+//! The structure *encodes* the honesty guarantees:
 //! - A [`SecurityFinding`] is constructed only by [`SecurityFinding::observe`],
 //!   which requires an explanation and at least one [`EvidenceRef`] — so an
 //!   "unexplained alert" or an evidence-free verdict is impossible to build
-//!   (docs/17 §4, docs/02 §6.3).
-//! - Every finding names *benign explanations* (docs/18 §3): a detector that
+//!
+//! - Every finding names *benign explanations*: a detector that
 //!   cannot say why the behaviour might be innocent is a false-positive factory.
 //! - Confidence is a calibrated [`Confidence`] that is **never 1.0** for an
-//!   inference (docs/17 §5): [`observe`](SecurityFinding::observe) caps it below
-//!   certainty, because NetPulse detects *suspicion, not certainty* (docs/01 X4).
-//! - Language is disciplined: "unusual/notable", never "malicious" (docs/17 §12).
+//!   inference: [`observe`](SecurityFinding::observe caps it below
+//!   certainty, because NetPulse detects *suspicion, not certainty*.
+//! - Language is disciplined: "unusual/notable", never "malicious".
 
 use netpulse_core::{Confidence, EvidenceRef, FindingCategory};
 
-/// The maximum confidence any inferred finding may carry (docs/17 §5): a
+/// The maximum confidence any inferred finding may carry: a
 /// confidence-scored observation is never a certainty, so we cap strictly below
-/// 1.0. A rule match can be *strong*; it is never *proof* (docs/01 X4).
+/// 1.0. A rule match can be *strong*; it is never *proof*.
 pub const MAX_INFERRED_CONFIDENCE: f32 = 0.95;
 
 /// The specific behaviour a finding describes — the named, bounded set (docs/17
 /// §4, "no vague 'threat'"). Each maps up to a broad [`FindingCategory`] for
-/// storage and carries its own human title and benign-explanation list (docs/18).
+/// storage and carries its own human title and benign-explanation list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum FindingKind {
     /// A process not seen before reaching the network, especially unsigned
-    /// (docs/18 §4.1). Rule/heuristic.
+    ///Rule/heuristic.
     UnexpectedEgress,
-    /// Highly regular check-ins to one host — a beaconing shape (docs/18 §4.2).
+    /// Highly regular check-ins to one host — a beaconing shape.
     Beaconing,
-    /// Connections fanned across many ports of one host (docs/18 §4.7).
+    /// Connections fanned across many ports of one host.
     PortScan,
-    /// A burst of DNS queries far above the usual rate (docs/18 §4.4).
+    /// A burst of DNS queries far above the usual rate.
     DnsAnomaly,
     /// One host contacted by an unusually large number of connections
-    /// (docs/18 §4.8).
+    ///
     ConnectionStorm,
     /// A flow whose volume deviates sharply from this machine's learned normal
-    /// (docs/20 §3). Statistical anomaly.
+    ///Statistical anomaly.
     BandwidthAnomaly,
-    /// Multi-dimensional anomaly flagged with explainable feature attribution (docs/20 §4.2).
+    /// Multi-dimensional anomaly flagged with explainable feature attribution.
     MlFeatureAnomaly,
-    /// Match against local offline STIX 2.1 threat intelligence indicators (docs/18 §4.9).
+    /// Match against local offline STIX 2.1 threat intelligence indicators.
     ThreatIntelMatch,
-    /// An application's behavior breached its observed baseline or configured policy (docs/20 §3).
+    /// An application's behavior breached its observed baseline or configured policy.
     AppProfileBreach,
-    /// Multi-stage attack pattern detected across corroborated findings (docs/18 §11).
+    /// Multi-stage attack pattern detected across corroborated findings.
     BehavioralChain,
 }
 
 impl FindingKind {
-    /// The broad storage category this kind rolls up to (docs/17 §4).
+    /// The broad storage category this kind rolls up to.
     pub fn category(self) -> FindingCategory {
         match self {
             FindingKind::BandwidthAnomaly | FindingKind::MlFeatureAnomaly => {
@@ -73,7 +73,7 @@ impl FindingKind {
         }
     }
 
-    /// A short, calm, non-accusatory title (docs/17 §7.1, docs/18 §10 language
+    /// A short, calm, non-accusatory title (, language
     /// discipline — describes *behaviour*, never judges a person or declares
     /// malware).
     pub fn title(self) -> &'static str {
@@ -97,7 +97,7 @@ impl FindingKind {
         }
     }
 
-    /// Innocent readings the finding must weigh (docs/18 §3, §4). Surfaced to the
+    /// Innocent readings the finding must weigh. Surfaced to the
     /// user so a benign-but-unusual event never reads as an accusation (docs/17
     /// §9). A non-empty list is required by [`SecurityFinding::observe`].
     pub fn benign_explanations(self) -> &'static [&'static str] {
@@ -145,7 +145,7 @@ impl FindingKind {
         }
     }
 
-    /// A non-destructive, observe-only suggestion (docs/17 §7.3, docs/01 X1).
+    /// A non-destructive, observe-only suggestion.
     /// Always framed as "you might look", never "block/kill/quarantine".
     pub fn suggested_action(self) -> &'static str {
         match self {
@@ -183,37 +183,37 @@ impl FindingKind {
     }
 }
 
-/// A confidence-scored, evidence-backed security *observation* (docs/17 §4).
+/// A confidence-scored, evidence-backed security *observation*.
 ///
 /// Public fields for reading, but constructible only through
 /// [`SecurityFinding::observe`], so the evidence + explanation + calibrated-
 /// confidence invariants hold by construction — mirroring how `Diagnosis` is
-/// built only by `diagnose` (docs/11 §6).
+/// built only by `diagnose`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SecurityFinding {
     pub kind: FindingKind,
-    /// Calibrated, capped below 1.0 for inferences (docs/17 §5).
+    /// Calibrated, capped below 1.0 for inferences.
     pub confidence: Confidence,
     /// Plain-language "why this is notable", including the honest limits of what
-    /// we can tell (docs/17 §3.3). Never a verdict.
+    /// we can tell. Never a verdict.
     pub explanation: String,
-    /// Optional deeper/technical line, disclosed at Intermediate+ (docs/09 §6.3).
+    /// Optional deeper/technical line, disclosed at Intermediate+.
     pub technical: Option<String>,
-    /// The exact data that triggered this — always non-empty (docs/02 §6.3).
+    /// The exact data that triggered this — always non-empty.
     pub evidence: Vec<EvidenceRef>,
-    /// Other kinds that corroborated into this one (docs/18 §5). Empty for a
+    /// Other kinds that corroborated into this one. Empty for a
     /// standalone finding; populated when the assembler merges signals.
     pub contributing: Vec<FindingKind>,
 }
 
 impl SecurityFinding {
-    /// Build a finding, enforcing the honesty invariants (docs/17 §4):
+    /// Build a finding, enforcing the honesty invariants:
     /// - `evidence` must be non-empty — a claim with nothing behind it cannot
-    ///   exist (docs/02 §6.3);
+    ///   exist;
     /// - `explanation` must be non-empty — every warning explains itself
-    ///   (docs/01 §7);
+    ///
     /// - confidence is clamped to at most [`MAX_INFERRED_CONFIDENCE`] so an
-    ///   inference is never laundered into certainty (docs/01 X4).
+    ///   inference is never laundered into certainty.
     ///
     /// Returns `None` if the evidence or explanation is missing, so a detector
     /// physically cannot emit a bare verdict (the callers in [`crate::rules`] and
@@ -238,21 +238,21 @@ impl SecurityFinding {
         })
     }
 
-    /// Attach a technical detail line, disclosed only at deeper modes (docs/14 §7).
+    /// Attach a technical detail line, disclosed only at deeper modes.
     pub fn with_technical(mut self, technical: impl Into<String>) -> Self {
         self.technical = Some(technical.into());
         self
     }
 
-    /// The calibrated confidence as a plain qualitative word (docs/17 §5), so a
+    /// The calibrated confidence as a plain qualitative word, so a
     /// beginner isn't forced to interpret a raw percentage. Deliberately tentative
-    /// — never "malicious", always "unusual" (docs/17 §12).
+    /// — never "malicious", always "unusual".
     pub fn qualitative(&self) -> &'static str {
         qualitative(self.confidence)
     }
 
     /// Project to the compact core [`netpulse_core::Finding`] storage record with
-    /// a stable id (docs/08 §6). The rich text lives in the domain type / DTO; the
+    /// a stable id. The rich text lives in the domain type / DTO; the
     /// stored record keeps only what retention and the evidence invariant need.
     pub fn to_core(&self, id: u64) -> netpulse_core::Finding {
         netpulse_core::Finding {
@@ -264,9 +264,9 @@ impl SecurityFinding {
     }
 }
 
-/// Map a calibrated confidence to a calm qualitative word (docs/17 §5). The
+/// Map a calibrated confidence to a calm qualitative word. The
 /// bands are deliberately conservative — a weak signal stays weak, and nothing
-/// here ever reads as certainty (docs/01 X4).
+/// here ever reads as certainty.
 pub fn qualitative(c: Confidence) -> &'static str {
     let v = c.value();
     if v < 0.4 {
@@ -284,9 +284,9 @@ mod tests {
 
     #[test]
     fn observe_requires_evidence_and_explanation() {
-        // No evidence → cannot construct (docs/02 §6.3).
+        // No evidence → cannot construct.
         assert!(SecurityFinding::observe(FindingKind::Beaconing, 0.6, "regular", vec![]).is_none());
-        // No explanation → cannot construct (docs/01 §7).
+        // No explanation → cannot construct.
         assert!(SecurityFinding::observe(
             FindingKind::Beaconing,
             0.6,
@@ -306,7 +306,7 @@ mod tests {
 
     #[test]
     fn confidence_is_never_certainty() {
-        // Even a detector shouting 1.0 is capped below certainty (docs/01 X4).
+        // Even a detector shouting 1.0 is capped below certainty.
         let f = SecurityFinding::observe(
             FindingKind::PortScan,
             1.0,
@@ -320,7 +320,7 @@ mod tests {
 
     #[test]
     fn every_kind_names_a_benign_explanation() {
-        // docs/18 §3: a detector that can't model innocence is a false-positive
+        // a detector that can't model innocence is a false-positive
         // factory. Enforce that structurally for the whole catalog.
         for k in [
             FindingKind::UnexpectedEgress,

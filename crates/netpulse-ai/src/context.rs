@@ -1,15 +1,15 @@
-//! Context construction (docs/19 §5): turning a question into the *right*
+//! Context construction: turning a question into the *right*
 //! evidence, distilled compactly. A [`DistilledContext`] is the structured,
 //! minimized bundle a backend reasons over — a few facts, each tied to the exact
-//! records that justify it (docs/19 §5, docs/02 §6.3). It is deliberately **not**
+//! records that justify it. It is deliberately **not**
 //! a raw capture dump: it is small, fast, cheap, and privacy-preserving, which is
-//! also exactly what makes a remote send safe to disclose (docs/19 §4.3, §10).
+//! also exactly what makes a remote send safe to disclose.
 
 use netpulse_core::EvidenceRef;
 
-/// The kind of question, inferred from the user's words (docs/19 §5 step 1). Each
+/// The kind of question, inferred from the user's words. Each
 /// intent knows how to frame its answer and how to decline honestly when there is
-/// nothing to say (docs/19 §3).
+/// nothing to say.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Intent {
@@ -24,14 +24,14 @@ pub enum Intent {
     /// "What happened / summarize."
     Summary,
     /// Unrecognised — the assistant asks for a rephrase rather than guessing
-    /// (docs/19 §9 ambiguous question).
+    ///
     Unknown,
 }
 
 impl Intent {
-    /// Classify a free-text question by keyword (docs/19 §5 step 1). Deliberately
+    /// Classify a free-text question by keyword. Deliberately
     /// simple and deterministic so answers are reproducible for regression tests
-    /// (docs/19 §11 determinism).
+    ///
     pub fn classify(question: &str) -> Intent {
         let q = question.to_lowercase();
         let has = |words: &[&str]| words.iter().any(|w| q.contains(w));
@@ -79,7 +79,7 @@ impl Intent {
         }
     }
 
-    /// The opening line the backend uses to frame a grounded answer (docs/19 §6).
+    /// The opening line the backend uses to frame a grounded answer.
     pub fn lead_in(self) -> &'static str {
         match self {
             Intent::TopBandwidth => "Looking at your captured flows, ranked by volume:",
@@ -94,7 +94,7 @@ impl Intent {
         }
     }
 
-    /// The honest reply when there is no evidence to answer (docs/19 §3, §9). Never
+    /// The honest reply when there is no evidence to answer. Never
     /// a fabricated answer — a limit turned into guidance.
     pub fn insufficient_reply(self) -> &'static str {
         match self {
@@ -118,22 +118,22 @@ pub struct Fact {
     pub evidence: Vec<EvidenceRef>,
 }
 
-/// The distilled, minimized context a backend explains (docs/19 §5). Compact by
-/// design: a handful of facts, not a capture dump (docs/19 §10).
+/// The distilled, minimized context a backend explains. Compact by
+/// design: a handful of facts, not a capture dump.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DistilledContext {
     /// The user's original question, carried for the backend's framing.
     pub question: String,
     pub intent: Intent,
     /// The grounded facts, most-relevant first. May be empty → honest "can't
-    /// answer" (docs/19 §3).
+    /// answer".
     pub facts: Vec<Fact>,
 }
 
 impl DistilledContext {
     /// The union of every fact's evidence, de-duplicated in order — the citations
-    /// an answer must reference (docs/19 §3). The assistant validates these
-    /// against the store before returning (docs/19 §12).
+    /// an answer must reference. The assistant validates these
+    /// against the store before returning.
     pub fn citations(&self) -> Vec<EvidenceRef> {
         let mut out: Vec<EvidenceRef> = Vec::new();
         for fact in &self.facts {
@@ -147,8 +147,8 @@ impl DistilledContext {
     }
 
     /// Exactly what would be transmitted if a remote backend were used, in plain
-    /// terms (docs/19 §4.3 per-request disclosure). It is the distilled facts —
-    /// **never** raw packets (docs/19 §4.3, docs/02 §10.3) — so the user can see
+    /// terms. It is the distilled facts —
+    /// **never** raw packets — so the user can see
     /// and approve the full payload before any send. Nothing else leaves.
     pub fn disclosure_preview(&self) -> String {
         let mut out = String::new();
@@ -200,7 +200,7 @@ mod tests {
         };
         let preview = ctx.disclosure_preview();
         assert!(preview.contains("203.0.113.9 moved 5.0 MB"));
-        // The guarantee: no raw payloads ever (docs/19 §4.3).
+        // The guarantee: no raw payloads ever.
         assert!(preview.contains("No packet payloads"));
     }
 

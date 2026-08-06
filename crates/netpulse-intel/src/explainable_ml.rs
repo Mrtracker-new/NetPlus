@@ -1,4 +1,4 @@
-//! Explainable ML Anomaly Detection (docs/20 §4.2).
+//! Explainable ML Anomaly Detection.
 //!
 //! Multi-dimensional feature attribution layer that breaks down anomaly scores
 //! into explicit, normalized feature contributions (e.g. 72% destination novelty,

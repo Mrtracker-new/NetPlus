@@ -1,39 +1,39 @@
-//! The pluggable explanation backend (docs/19 §4, docs/03 §11). The default is
+//! The pluggable explanation backend. The default is
 //! **local** and does zero egress; a remote endpoint is an explicit, disclosed
-//! opt-in (docs/19 §4.1–4.2). Whichever backend, it is handed a *distilled,
+//! opt-in. Whichever backend, it is handed a *distilled,
 //! grounded* [`DistilledContext`] and must explain **only** that — it may add no
-//! facts of its own (docs/19 §3, the iron rule).
+//! facts of its own.
 //!
 //! Confining egress to this crate makes the privacy guarantee auditable (docs/02
 //! §10.1): the only type that could ever leave the device is a
 //! [`DistilledContext`], and exactly what it discloses is inspectable via
-//! [`DistilledContext::disclosure_preview`] before any send (docs/19 §4.3).
+//! [`DistilledContext::disclosure_preview`] before any send.
 
 use crate::context::DistilledContext;
 
-/// A pluggable explanation backend (docs/19 §4). Local by default; remote is an
+/// A pluggable explanation backend. Local by default; remote is an
 /// explicit, disclosed opt-in.
 pub trait AiBackend: std::fmt::Debug {
     /// Stable backend identifier (e.g. "local-template", "remote-openai"),
-    /// surfaced to the user so the active posture is always visible (docs/19 §4).
+    /// surfaced to the user so the active posture is always visible.
     fn id(&self) -> &'static str;
 
     /// True if using this backend causes any network egress. The UI discloses the
-    /// privacy posture before a query runs (docs/19 §4).
+    /// privacy posture before a query runs.
     fn is_remote(&self) -> bool;
 
     /// Produce a grounded explanation for `context`. The backend must explain the
     /// provided facts and cite their evidence, adding nothing of its own (docs/19
     /// §3). Returns the answer text; the assistant validates its citations against
-    /// the store afterwards (docs/19 §12), so grounding is *checked, not trusted*.
+    /// the store afterwards, so grounding is *checked, not trusted*.
     fn explain(&self, context: &DistilledContext) -> String;
 }
 
-/// The default, zero-egress backend (docs/19 §4.1, §9). It composes the distilled
+/// The default, zero-egress backend. It composes the distilled
 /// facts into a plain-language answer deterministically — no model, no network —
-/// so NetPulse is fully explanatory offline (docs/03 §16 graceful degradation).
+/// so NetPulse is fully explanatory offline.
 /// Eloquence is modest; honesty and grounding are intact, which is the trade the
-/// design chooses (docs/19 §9 "degraded eloquence, intact honesty").
+/// design chooses.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct LocalTemplateBackend;
 
@@ -43,17 +43,17 @@ impl AiBackend for LocalTemplateBackend {
     }
 
     fn is_remote(&self) -> bool {
-        false // zero egress by construction (docs/19 §4.1)
+        false // zero egress by construction
     }
 
     fn explain(&self, context: &DistilledContext) -> String {
         if context.facts.is_empty() {
-            // Honest "can't answer" rather than a fabricated one (docs/19 §3, §9).
+            // Honest "can't answer" rather than a fabricated one.
             return context.intent.insufficient_reply().to_string();
         }
         // Lead with the intent's framing, then each grounded fact on its own line.
         // Every line here traces to a fact that carries evidence, so the answer is
-        // cited by construction (docs/19 §6, §3).
+        // cited by construction.
         let mut out = String::new();
         out.push_str(context.intent.lead_in());
         for fact in &context.facts {

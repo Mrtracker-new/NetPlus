@@ -1,10 +1,10 @@
-//! A first-party **dissector plugin** reference (docs/24 §4.1, the flagship seam).
-//! It implements the *same* [`Dissector`] trait the built-ins use (docs/24 §4) —
+//! A first-party **dissector plugin** reference.
+//! It implements the *same* [`Dissector`] trait the built-ins use —
 //! no second-class API — parsing a toy line-oriented "PING/PONG" protocol into
 //! [`ProtoEvent`]s. It exists to show contributors the shape of a dissector and to
-//! serve as a living conformance reference (docs/24 §10): strict bounds, no panic
-//! on hostile bytes (docs/07 §8), and an accompanying manifest declaring the
-//! mandatory fuzz target + explanation content (docs/24 §4.1).
+//! serve as a living conformance reference: strict bounds, no panic
+//! on hostile bytes, and an accompanying manifest declaring the
+//! mandatory fuzz target + explanation content.
 #![forbid(unsafe_code)]
 
 use netpulse_core::model::{ProtoEvent, ProtoEventKind};
@@ -28,8 +28,8 @@ impl Dissector for PingDissector {
 
     fn dissect(&self, flow_id: u64, bytes: &[u8]) -> Result<Vec<ProtoEvent>> {
         // Hostile-input safe: never index without a bounds check; unknown lines
-        // are simply ignored, never panic (docs/07 §8). A dissector that parses
-        // hostile bytes without care is a liability (docs/24 §4.1).
+        // are simply ignored, never panic. A dissector that parses
+        // hostile bytes without care is a liability.
         let mut events = Vec::new();
         for line in bytes.split(|b| *b == b'\n') {
             let kind = match line {
@@ -47,8 +47,8 @@ impl Dissector for PingDissector {
     }
 }
 
-/// The plugin's self-description (docs/24 §6). As a dissector it declares its
-/// mandatory fuzz target and explanation content (docs/24 §4.1); as a first-party
+/// The plugin's self-description. As a dissector it declares its
+/// mandatory fuzz target and explanation content; as a first-party
 /// example it is trusted and auto-enabled by the registry.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
@@ -78,7 +78,7 @@ pub fn manifest() -> PluginManifest {
 }
 
 /// The contract version this example targets. Kept as a small constant so the
-/// example crate needs no dependency on `netpulse-api` (docs/24 §6 keeps plugins
+/// example crate needs no dependency on `netpulse-api` ( keeps plugins
 /// pinned to a declared contract version).
 fn netpulse_api_version() -> u32 {
     4
@@ -107,8 +107,8 @@ mod tests {
 
     #[test]
     fn manifest_is_a_complete_first_party_dissector() {
-        // Conformance (docs/24 §10): a first-party dissector auto-enables and meets
-        // its fuzz + explanation obligations (docs/24 §4.1).
+        // Conformance: a first-party dissector auto-enables and meets
+        // its fuzz + explanation obligations.
         let mut reg = PluginRegistry::new(4);
         let m = manifest();
         reg.register(netpulse_plugin::VerificationOutcome {

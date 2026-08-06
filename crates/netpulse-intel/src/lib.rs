@@ -2,23 +2,23 @@
 //!
 //! The reasoning layer: it surfaces *suspicious behaviour* with explicit
 //! confidence and evidence, and **never** an unqualified malware verdict
-//! (docs/17, docs/01 X4). Three parts under one finding framework:
+//!Three parts under one finding framework:
 //!
-//! - **Security Engine** (docs/17): the [`SecurityFinding`] model whose structure
+//! - **Security Engine**: the [`SecurityFinding`] model whose structure
 //!   encodes the honesty guarantees, and the [`assess`] assembler that unifies
-//!   the two reasoning styles and corroborates their signals (docs/17 §6).
-//! - **Threat detectors** (docs/18): [`rules`] — the named rule/heuristic shapes
+//!   the two reasoning styles and corroborates their signals.
+//! - **Threat detectors**: [`rules`] — the named rule/heuristic shapes
 //!   (beaconing, port scan, unexpected egress, DNS bursts, connection storms),
-//!   each carrying its benign explanations (docs/18 §3).
-//! - **Anomaly detection** (docs/20): [`anomaly`] — learning this machine's
+//!   each carrying its benign explanations.
+//! - **Anomaly detection**: [`anomaly`] — learning this machine's
 //!   *normal* with an interpretable statistical floor and flagging deviation
-//!   with maturity-aware confidence (docs/20 §4.1, §6).
+//!   with maturity-aware confidence.
 //!
-//! Everything runs **off the hot path** (docs/02 §5.2): it reads committed data
+//! Everything runs **off the hot path**: it reads committed data
 //! through a [`TrafficView`] and emits findings; it captures, parses, and stores
-//! nothing, and it can never alter traffic (observe-only, docs/01 X1). Honesty is
+//! nothing, and it can never alter traffic (observe-only . Honesty is
 //! structural — a [`SecurityFinding`] is un-constructible without evidence and an
-//! explanation, and its confidence is capped below certainty (docs/17 §4, §5).
+//! explanation, and its confidence is capped below certainty.
 #![forbid(unsafe_code)]
 
 pub use netpulse_core::traits::Detector;
@@ -53,7 +53,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr};
 
     /// End-to-end: a beacon in real-looking flows produces exactly one grounded,
-    /// confidence-scored finding — proving the whole layer links (docs/17 §6).
+    /// confidence-scored finding — proving the whole layer links.
     #[test]
     fn assess_links_the_whole_layer() {
         let h = IpAddr::V4(Ipv4Addr::new(198, 51, 100, 7));

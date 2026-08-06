@@ -1,44 +1,44 @@
-//! The animation **model** (docs/16 §5) — the data-driven, timed, typed visual
+//! The animation **model** — the data-driven, timed, typed visual
 //! events that a renderer turns into motion. This crate owns the *model*, not
-//! the pixels: per docs/16 §10, the model is what is asserted deterministically,
-//! independent of any GPU/Canvas rendering, which lives in the UI (docs/03 §10).
+//! the pixels: per, the model is what is asserted deterministically,
+//! independent of any GPU/Canvas rendering, which lives in the UI.
 //!
-//! Every rule from docs/16 §3 ("motion with meaning") is enforced at the model:
-//! - **Data-driven, not canned** (docs/16 §3): a model is built from real
+//! Every rule from ("motion with meaning" is enforced at the model:
+//! - **Data-driven, not canned**: a model is built from real
 //!   `ProtoEvent`s / flow metrics — the handshake you watch is *your* handshake
-//!   (docs/01 E2). There is no hand-authored sequence.
-//! - **Truthful timing** (docs/16 §4.2, §10): the travel time between endpoints
+//!There is no hand-authored sequence.
+//! - **Truthful timing**: the travel time between endpoints
 //!   is the *measured* RTT, so a slow handshake feels slow. A test asserts the
 //!   animated RTT equals the measured RTT.
-//! - **Accessibility is not optional** (docs/16 §8): every model can emit an
+//! - **Accessibility is not optional**: every model can emit an
 //!   equivalent **reduced-motion** step-through that conveys the same events
 //!   without continuous motion. Building a model without its static equivalent is
-//!   not "done" (docs/16 §11).
+//!   not "done".
 //!
 //! Styling (protocol colours, shapes) is *not* here — it lives in the shared
-//! design system (docs/16 §6, docs/04 §4); the model carries only meaning
+//! design system; the model carries only meaning
 //! (direction, timing, the explanation key), never a hue.
 
 use netpulse_decode::ExplanationKey;
 
-/// The concept an animation makes legible (docs/16 §4). Each is driven by
+/// The concept an animation makes legible. Each is driven by
 /// specific real data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AnimationKind {
-    /// Packets moving between endpoints in real/replayed time (docs/16 §4.1).
+    /// Packets moving between endpoints in real/replayed time.
     PacketFlow,
-    /// A connection/encryption handshake, step-by-step (docs/16 §4.2).
+    /// A connection/encryption handshake, step-by-step.
     Handshake,
-    /// HTTP/1.1 vs 2 vs 3 concurrency (docs/16 §4.3).
+    /// HTTP/1.1 vs 2 vs 3 concurrency.
     Multiplexing,
-    /// One navigation blossoming into many connections (docs/16 §4.4).
+    /// One navigation blossoming into many connections.
     FanOut,
-    /// Loss / retransmission / stalls (docs/16 §4.5).
+    /// Loss / retransmission / stalls.
     Degradation,
 }
 
-/// Who sent to whom — the primary meaning motion encodes (docs/16 §3).
+/// Who sent to whom — the primary meaning motion encodes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Direction {
@@ -46,10 +46,10 @@ pub enum Direction {
     ServerToClient,
 }
 
-/// One timed, typed visual event (docs/16 §5). `at_nanos` is the offset from the
+/// One timed, typed visual event. `at_nanos` is the offset from the
 /// animation's start on the *real* timeline; `key` ties the element to its
-/// explanation (docs/07 §7) so the same identifier drives the animation, the
-/// lesson, and the explorer (docs/16 §11).
+/// explanation so the same identifier drives the animation, the
+/// lesson, and the explorer.
 #[derive(Debug, Clone, PartialEq)]
 pub struct VisualEvent {
     pub at_nanos: u64,
@@ -58,18 +58,18 @@ pub struct VisualEvent {
     pub key: Option<ExplanationKey>,
 }
 
-/// A complete animation model (docs/16 §5): an ordered set of visual events and
+/// A complete animation model: an ordered set of visual events and
 /// the total real duration they span.
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnimationModel {
     pub kind: AnimationKind,
     pub events: Vec<VisualEvent>,
-    /// Total span in nanoseconds on the real timeline (docs/16 §5).
+    /// Total span in nanoseconds on the real timeline.
     pub total_nanos: u64,
 }
 
 impl AnimationModel {
-    /// The reduced-motion equivalent (docs/16 §8, a hard requirement): a
+    /// The reduced-motion equivalent: a
     /// step-through list that conveys the *same events* as text, so understanding
     /// never depends on motion being on. One line per visual event, preserving
     /// order, direction, and real timing.
@@ -89,9 +89,9 @@ impl AnimationModel {
 }
 
 /// Build the marquee TCP three-way-handshake animation from the measured RTT
-/// (docs/16 §4.2). The travel time each way is `rtt/2`, so SYN→SYN-ACK spans one
+///The travel time each way is `rtt/2`, so SYN→SYN-ACK spans one
 /// full RTT and the completing ACK lands at 1.5 RTT — the honest shape of a
-/// handshake, with the learner's own timing (docs/16 §4.2, §10).
+/// handshake, with the learner's own timing.
 pub fn tcp_handshake(rtt_nanos: u64) -> AnimationModel {
     let half = rtt_nanos / 2;
     let events = vec![
@@ -122,8 +122,8 @@ pub fn tcp_handshake(rtt_nanos: u64) -> AnimationModel {
 }
 
 /// The measured RTT recoverable from a handshake model: the arrival time of the
-/// SYN-ACK (docs/16 §4.2). Used by the truthfulness test — the animated RTT must
-/// equal the RTT the flow engine measured (docs/16 §10).
+/// SYN-ACK. Used by the truthfulness test — the animated RTT must
+/// equal the RTT the flow engine measured.
 pub fn handshake_rtt_nanos(model: &AnimationModel) -> Option<u64> {
     model
         .events
@@ -132,9 +132,9 @@ pub fn handshake_rtt_nanos(model: &AnimationModel) -> Option<u64> {
         .map(|e| e.at_nanos)
 }
 
-/// Build a fan-out animation (docs/16 §4.4): one navigation blossoming into
+/// Build a fan-out animation: one navigation blossoming into
 /// connections to many servers over time. `servers` are labels (host/org names
-/// from local enrichment, docs/14 §5); `gap_nanos` spaces them so the sequence
+/// from local enrichment ; `gap_nanos` spaces them so the sequence
 /// reads as "one, then another, then another".
 pub fn fan_out(servers: &[String], gap_nanos: u64) -> AnimationModel {
     let events: Vec<VisualEvent> = servers
@@ -161,7 +161,7 @@ mod tests {
 
     #[test]
     fn handshake_timing_matches_measured_rtt() {
-        // Truthfulness (docs/16 §10): the animated RTT equals the measured RTT.
+        // Truthfulness: the animated RTT equals the measured RTT.
         let measured = 30_000_000; // 30 ms
         let model = tcp_handshake(measured);
         assert_eq!(handshake_rtt_nanos(&model), Some(measured));
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn reduced_motion_conveys_the_same_events() {
-        // Accessibility (docs/16 §8): the static equivalent has one line per
+        // Accessibility: the static equivalent has one line per
         // event, conveying direction and timing without motion.
         let model = tcp_handshake(20_000_000);
         let steps = model.reduced_motion_steps();
@@ -187,7 +187,7 @@ mod tests {
 
     #[test]
     fn model_is_deterministic() {
-        // Same input → same model (docs/16 §10, replay determinism).
+        // Same input → same model.
         assert_eq!(tcp_handshake(12_345_678), tcp_handshake(12_345_678));
     }
 

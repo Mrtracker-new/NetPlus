@@ -1,4 +1,4 @@
-//! STIX indicator domain structures (docs/18 §4.9).
+//! STIX indicator domain structures.
 
 use std::net::IpAddr;
 

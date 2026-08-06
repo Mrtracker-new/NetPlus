@@ -1,4 +1,4 @@
-//! Local offline STIX threat intelligence feed (docs/18 §4.9).
+//! Local offline STIX threat intelligence feed.
 
 pub mod indicator;
 pub mod matcher;

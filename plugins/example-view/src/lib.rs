@@ -1,8 +1,8 @@
-//! A first-party **view plugin** reference (docs/24 §4.4).
+//! A first-party **view plugin** reference.
 //! It implements the *same* [`ViewPlugin`] trait the built-in UI surfaces use
-//! (docs/24 §4) — no second-class API — declaring its read channels over the
+//! — no second-class API — declaring its read channels over the
 //! Query/Stream API (`reads()`). As a presentation surface, its capability is
-//! strictly bounded to [`Capability::ApiRead`] (docs/02 §10.2). It has no network,
+//! strictly bounded to [`Capability::ApiRead`]. It has no network,
 //! file export, or byte parsing capabilities.
 #![forbid(unsafe_code)]
 
@@ -65,7 +65,7 @@ impl ViewPlugin for TrafficSummaryView {
     }
 }
 
-/// The plugin's self-description (docs/24 §6): a first-party view reference.
+/// The plugin's self-description: a first-party view reference.
 pub fn manifest() -> PluginManifest {
     PluginManifest {
         manifest_version: 1,

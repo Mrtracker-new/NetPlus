@@ -15,7 +15,7 @@ authors.workspace = true
 netpulse-core = { path = "../netpulse-core" }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = "0.10"
+sha2 = "0.11"
 ed25519-compact = "2.1"
 
 

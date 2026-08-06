@@ -3,16 +3,16 @@
 //! Turns the unordered stream of dissected packets from [`netpulse_decode`] into
 //! **flows** (bidirectional conversations) and **sessions** (causally-related
 //! groups of flows) — the reconstruction that makes understanding-first
-//! buildable (docs/06).
+//! buildable.
 //!
 //! Pipeline position: consume decoded packets → [`decode_view::PacketView`] →
 //! [`engine::FlowEngine`] → finalized [`netpulse_core::Flow`] +
-//! [`netpulse_core::Session`] records for storage and narrative (docs/06 §2).
+//! [`netpulse_core::Session`] records for storage and narrative.
 //!
 //! Flow state is partitioned by a hash of the canonical 5-tuple across shards
-//! (docs/06 §7). Both directions of a conversation canonicalize to the same key
-//! (docs/06 §3.1), so a flow is always handled by one shard and per-flow state
-//! needs no locks (docs/02 §5.2).
+//!Both directions of a conversation canonicalize to the same key
+//!so a flow is always handled by one shard and per-flow state
+//! needs no locks.
 #![forbid(unsafe_code)]
 
 pub mod decode_view;
@@ -35,7 +35,7 @@ pub use state::TcpState;
 
 use netpulse_core::net::FiveTuple;
 
-/// Map a flow key to its owning shard index (docs/02 §5.2). A concrete,
+/// Map a flow key to its owning shard index. A concrete,
 /// testable seam: all packets of one flow hash here to the same shard, giving
 /// that shard sole ownership of the flow's mutable state.
 pub fn shard_for(key: &FiveTuple, shard_count: u16) -> u16 {

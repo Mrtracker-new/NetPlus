@@ -1,7 +1,7 @@
-//! The offline analysis pipeline (docs/05 §13, docs/04 §11): capture-from-file →
+//! The offline analysis pipeline: capture-from-file →
 //! decode → flow/session reconstruction → storage. It wires the Phase 1 layers
 //! into the exact sequence a live engine uses, but driven by a pcap fixture so
-//! it runs deterministically and without privileges (docs/03 §12, docs/05 §12).
+//! it runs deterministically and without privileges.
 //!
 //! ```text
 //! FileCapture ──frames──▶ decode_frame ──Decoded──▶ PacketView
@@ -15,7 +15,7 @@
 //! ```
 //!
 //! This is the concrete realization of "capture from wire and capture from file
-//! converge immediately after this layer" (docs/05 §13).
+//! converge immediately after this layer".
 
 use netpulse_api::dto::{MonitorSnapshotDto, NarrativeCardDto};
 use netpulse_capture::{CaptureStats, FileCapture, FrameFeed, Recording, ReplaySource};
@@ -29,7 +29,7 @@ use netpulse_storage::{CaptureStore, PayloadPolicy};
 use crate::monitor::{self, LossAccounting};
 use crate::project;
 
-/// A summary of one offline run, for reporting and tests (docs/05 §12 golden
+/// A summary of one offline run, for reporting and tests ( golden
 /// reconstructions). `PartialEq` powers the live-vs-replay parity test (docs/21
 /// §10): a replayed run's report must equal the original's.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,9 +46,9 @@ pub struct OfflineReport {
 /// Run the full offline pipeline over an in-memory pcap capture, persisting the
 /// reconstruction into `store` and returning a summary.
 ///
-/// `shards` sets the flow engine's shard count (docs/06 §7). The store's payload
+/// `shards` sets the flow engine's shard count. The store's payload
 /// policy governs whether any payload bytes could be written (they are not, in
-/// this metadata pipeline — docs/08 §4).
+/// this metadata pipeline — .
 #[tracing::instrument(level = "info", skip(pcap_bytes), fields(bytes_processed = pcap_bytes.len()))]
 pub fn run_offline(
     pcap_bytes: &[u8],
@@ -59,11 +59,11 @@ pub fn run_offline(
     run_feed(capture, shards, store)
 }
 
-/// Replay a recording deterministically through the **same** pipeline (docs/21 §4).
+/// Replay a recording deterministically through the **same** pipeline.
 /// The only thing that changes from [`run_offline`] is the frame source — a
 /// [`ReplaySource`] over the recording instead of a file — which is what
 /// guarantees replay reconstructs exactly what the original capture produced
-/// (docs/21 §6, §10 live-vs-replay parity).
+///
 pub fn run_replay(
     recording: &Recording,
     shards: u16,
@@ -73,7 +73,7 @@ pub fn run_replay(
     run_feed(source, shards, store)
 }
 
-/// The one pipeline loop, generic over its frame source (docs/21 §4 — "one
+/// The one pipeline loop, generic over its frame source ( — "one
 /// pipeline, two sources"). Both file-import and replay drive it, so what a user
 /// sees in replay is exactly what the engine did (or would do) live, with no
 /// divergent "replay mode" logic to drift.
@@ -105,8 +105,8 @@ fn run_feed<S: FrameFeed>(
             frames_read += 1;
             let decoded = decode_frame(link, &frame.bytes);
             // Pair the capture-time monotonic reading (from the frame) with the
-            // wall-clock reading (from the source) — never mix them (docs/05 §6),
-            // and never `now()` (docs/21 §6: determinism on the processing path).
+            // wall-clock reading (from the source — never mix them,
+            // and never `now( `.
             let wall = capture
                 .wall_nanos_at(global_index)
                 .unwrap_or(frame.mono_nanos);
@@ -167,7 +167,7 @@ fn persist_sessions(store: &mut CaptureStore, sessions: Vec<Session>) {
 }
 
 /// Convenience: run the pipeline into a fresh metadata-only store (the private
-/// default, docs/08 §4) and return both the store and the report.
+/// default and return both the store and the report.
 pub fn analyze_pcap(
     pcap_bytes: &[u8],
     shards: u16,
@@ -178,8 +178,8 @@ pub fn analyze_pcap(
 }
 
 /// Run the pipeline over an already-built file source into a fresh metadata-only
-/// store. Used by import (docs/23 §5): both classic pcap and pcapng resolve to a
-/// [`FileCapture`], then reuse the identical offline path (docs/21 §4).
+/// store. Used by import: both classic pcap and pcapng resolve to a
+/// [`FileCapture`], then reuse the identical offline path.
 pub fn analyze_file(
     capture: FileCapture,
     shards: u16,
@@ -201,11 +201,11 @@ pub fn link_type_from_dlt(dlt: u32) -> LinkType {
 }
 
 /// A [`FrameFeed`] over frames already captured in memory — the seam for **live
-/// capture** (docs/05 §12). The live loop accumulates [`RawFrame`]s from the
+/// capture**. The live loop accumulates [`RawFrame`]s from the
 /// platform backend and periodically feeds a snapshot through this, so live
 /// reconstruction runs the *exact same* pipeline as file import and replay
-/// (docs/21 §4). Wall time falls back to each frame's monotonic reading (the live
-/// frames already carry a monotonic base — docs/05 §6).
+///Wall time falls back to each frame's monotonic reading (the live
+/// frames already carry a monotonic base — .
 struct SliceFeed<'a> {
     link: LinkType,
     frames: &'a [RawFrame],
@@ -233,9 +233,9 @@ impl FrameFeed for SliceFeed<'_> {
     }
 }
 
-/// Reconstruct a store from a batch of live-captured frames (docs/05 §12). Runs
+/// Reconstruct a store from a batch of live-captured frames. Runs
 /// the identical offline pipeline over an in-memory [`SliceFeed`], so what a user
-/// sees live is exactly what file import / replay would produce (docs/21 §4).
+/// sees live is exactly what file import / replay would produce.
 /// `dlt` is the interface's libpcap link type (see [`link_type_from_dlt`]).
 #[tracing::instrument(level = "debug", skip(frames), fields(frames_count = frames.len()))]
 pub fn analyze_frames(
@@ -331,10 +331,10 @@ impl LivePipeline {
     }
 }
 
-/// The Phase 2 presentation projection of a completed run (docs/09, docs/11):
+/// The Phase 2 presentation projection of a completed run:
 /// the narrative feed and the monitoring snapshot, already in the `netpulse-api`
 /// wire shapes at a chosen [`Depth`]. This is the bundle a UI receives; it is a
-/// pure read-only *view* over the store (docs/11 §14), computed after the
+/// pure read-only *view* over the store, computed after the
 /// pipeline has committed its reconstruction.
 #[derive(Debug, Clone)]
 pub struct PresentationView {
@@ -343,9 +343,9 @@ pub struct PresentationView {
 }
 
 /// Build the presentation view from a committed store at the given disclosure
-/// depth (docs/09 §6.3). `capture_stats` carries the honest capture-drop count
+/// depth. `capture_stats` carries the honest capture-drop count
 /// so the monitor snapshot can keep capture loss distinct from network loss
-/// (docs/11 §6.4); pass [`CaptureStats::default`] for a lossless offline run.
+///pass [`CaptureStats::default`] for a lossless offline run.
 pub fn present(
     store: &CaptureStore,
     depth: Depth,
@@ -353,8 +353,8 @@ pub fn present(
 ) -> PresentationView {
     // --- Narrative feed: one card per session, over the store query surface ---
     // Own the flow/event clones so the borrowed SessionViews can reference them
-    // for the duration of card building (docs/04 §3.6: narrative is a projection
-    // fed by the caller, which gathers from storage per docs/08 §8).
+    // for the duration of card building (: narrative is a projection
+    // fed by the caller, which gathers from storage per .
     let session_ids = store.session_ids();
     let mut owned: Vec<(
         Session,
@@ -384,7 +384,7 @@ pub fn present(
         .map(|c| project::card_dto(c, depth))
         .collect();
 
-    // --- Monitoring snapshot over the full window (docs/11 §5) ---
+    // --- Monitoring snapshot over the full window ---
     let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(0, u64::MAX);
     let network_loss: u32 = all_flows.iter().map(|f| f.stats.loss_indicators).sum();
     let loss = LossAccounting {
@@ -427,7 +427,7 @@ mod tests {
     }
 
     /// Build a recording from the same pcap the live path reads, so replay drives
-    /// identical frames/timestamps (docs/22 fidelity feeds docs/21 §10 parity).
+    /// identical frames/timestamps.
     fn recording_from_pcap(pcap_bytes: &[u8]) -> netpulse_capture::Recording {
         let pcap = PcapFile::parse(pcap_bytes).unwrap();
         let base = pcap
@@ -445,7 +445,7 @@ mod tests {
 
     #[test]
     fn live_and_replay_reconstructions_match() {
-        // docs/21 §10: capture live into a recording, then replay; the replayed
+        // capture live into a recording, then replay; the replayed
         // reconstruction must equal what the live run produced.
         let pcap = tiny_pcap(&[&[0xde, 0xad, 0xbe, 0xef], &[1, 2, 3, 4, 5, 6]]);
 
@@ -462,7 +462,7 @@ mod tests {
 
     #[test]
     fn replay_is_repeatable() {
-        // The determinism meta-test at the pipeline level (docs/21 §10): two
+        // The determinism meta-test at the pipeline level: two
         // replays of one recording yield identical reports.
         let pcap = tiny_pcap(&[&[9, 9, 9, 9]]);
         let recording = recording_from_pcap(&pcap);

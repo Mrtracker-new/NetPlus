@@ -1,11 +1,11 @@
-//! End-to-end Phase 2 presentation test (docs/09 §14, docs/11 §11). Reuses the
+//! End-to-end Phase 2 presentation test. Reuses the
 //! Phase 1 golden fixture — a DNS lookup for `example.com` followed by a TLS
 //! connection to the resolved IP — and asserts the *presentation projection*
 //! over it: the narrative feed card and the monitoring snapshot the UI receives.
 //!
 //! Deterministic: no live network, no privileges. This is the "recorded capture
 //! yields a known feed, verified card-by-card" test the Dashboard design calls
-//! for (docs/09 §14).
+//! for.
 
 use netpulse_api::dto::ProjectionDepth;
 use netpulse_capture::CaptureStats;
@@ -138,11 +138,11 @@ fn narrative_feed_tells_the_session_story() {
 
     let view = present(&store, Depth::Beginner, CaptureStats::default());
 
-    // Exactly one session → one narrative card (docs/09 §5.1).
+    // Exactly one session → one narrative card.
     assert_eq!(view.narratives.len(), 1, "one card for the one session");
     let card = &view.narratives[0];
 
-    // The headline names the site, in plain language (docs/09 §5.1).
+    // The headline names the site, in plain language.
     assert!(
         card.headline.contains("example.com"),
         "headline names the host: {:?}",
@@ -150,7 +150,7 @@ fn narrative_feed_tells_the_session_story() {
     );
 
     // The card references its evidence — the session and the TLS flow it groups
-    // (the evidence-reference invariant, docs/02 §6.3). No card without proof.
+    // (the evidence-reference invariant . No card without proof.
     assert!(!card.evidence.is_empty(), "card carries provenance");
 
     // Beginner depth is honest about encryption: the TLS connection is encrypted.
@@ -189,7 +189,7 @@ fn monitor_snapshot_breaks_down_usage_and_separates_loss() {
     run_offline(&pcap, 16, &mut store).unwrap();
 
     // Inject a capture-drop count to prove it is reported as capture loss, not
-    // network loss (docs/11 §6.4).
+    // network loss.
     let stats = CaptureStats {
         received: 100,
         dropped: 5,
@@ -198,7 +198,7 @@ fn monitor_snapshot_breaks_down_usage_and_separates_loss() {
     let view = present(&store, Depth::Intermediate, stats);
 
     // Usage breaks down by protocol; DNS + TLS both appear as top talkers
-    // (docs/11 §5).
+    //
     let protos: Vec<&str> = view
         .monitor
         .by_protocol
@@ -225,7 +225,7 @@ fn monitor_snapshot_breaks_down_usage_and_separates_loss() {
         "a clean fixture has no network loss — capture drops must not leak in"
     );
 
-    // A healthy fixture yields no fabricated diagnosis (docs/11 §9).
+    // A healthy fixture yields no fabricated diagnosis.
     assert!(
         view.monitor.diagnoses.is_empty(),
         "no degradation → no 'why is it slow' diagnosis"
@@ -234,6 +234,6 @@ fn monitor_snapshot_breaks_down_usage_and_separates_loss() {
 
 #[test]
 fn projection_depth_dto_matches_core_depth() {
-    // The wire enum and the core enum agree on the ladder (docs/09 §6.3).
+    // The wire enum and the core enum agree on the ladder.
     assert_eq!(ProjectionDepth::default(), ProjectionDepth::Beginner);
 }

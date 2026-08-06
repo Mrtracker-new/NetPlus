@@ -1,8 +1,8 @@
 //! The flow table: per-flow records with incremental metrics and direction
-//! pairing (docs/06 §5), partitioned into shards owned one-thread-each
-//! (docs/06 §7). Metrics update in O(1) per packet — no re-scans (docs/06 §10).
+//! pairing, partitioned into shards owned one-thread-each
+//!Metrics update in O(1 per packet — no re-scans.
 //!
-//! Identity is `(canonical key, epoch)` (docs/06 §3.2): when a terminal flow's
+//! Identity is `(canonical key, epoch `: when a terminal flow's
 //! 5-tuple is seen again, a new epoch starts rather than reviving the old flow,
 //! so port reuse never merges two connections.
 
@@ -17,14 +17,14 @@ use crate::metrics::MetricsAccumulator;
 use crate::state::{advance_tcp, initial_tcp, TcpState};
 
 /// UDP flows with no traffic for this long are considered idle→closed
-/// (docs/06 §4.2). Nanoseconds.
+///Nanoseconds.
 pub const UDP_IDLE_NANOS: u64 = 30_000_000_000; // 30s
 
-/// A SYN with no reply for this long is abandoned, not merely slow (docs/06 §4.1).
+/// A SYN with no reply for this long is abandoned, not merely slow.
 pub const SYN_ABANDON_NANOS: u64 = 10_000_000_000; // 10s
 
 /// A live per-flow record. Hot fields inline; the rare/large session link is a
-/// small `Option` (docs/06 §10, compact per-flow state).
+/// small `Option`.
 #[derive(Debug, Clone)]
 pub struct FlowRecord {
     pub id: u64,
@@ -36,12 +36,12 @@ pub struct FlowRecord {
     pub tcp_state: Option<TcpState>,
     /// Whether the flow initiator (first-packet sender) is the canonical `lo`
     /// endpoint. Lets later segments be classified as from-initiator or not,
-    /// which the TCP state machine needs (docs/06 §3.1, §4.1).
+    /// which the TCP state machine needs.
     pub initiator_is_lo: bool,
     pub metrics: MetricsAccumulator,
     /// Protocol events accumulated for this flow, stamped with flow id + ts.
     pub events: Vec<ProtoEvent>,
-    /// Set once the flow is attributed to a session (docs/06 §6).
+    /// Set once the flow is attributed to a session.
     pub session_id: Option<u64>,
     /// True once finalized and flushed; kept briefly for late packets.
     finalized: bool,
@@ -59,7 +59,7 @@ impl FlowRecord {
         }
     }
 
-    /// Whether the flow has reached a terminal state (docs/06 §8).
+    /// Whether the flow has reached a terminal state.
     pub fn is_closed(&self, now: Timestamp) -> bool {
         match self.tcp_state {
             Some(ts) => ts.is_terminal(),
@@ -67,7 +67,7 @@ impl FlowRecord {
         }
     }
 
-    /// Whether this record has been sealed and flushed (docs/06 §8).
+    /// Whether this record has been sealed and flushed.
     pub fn is_finalized(&self) -> bool {
         self.finalized
     }
@@ -86,14 +86,14 @@ impl FlowRecord {
         }
     }
 
-    /// Seal metrics and produce the immutable [`Flow`] for storage (docs/06 §8).
+    /// Seal metrics and produce the immutable [`Flow`] for storage.
     pub fn finalize(&mut self) -> Flow {
         self.finalized = true;
         self.flow_snapshot()
     }
 }
 
-/// One shard: sole owner of the flows whose key hashes to it (docs/06 §7). No
+/// One shard: sole owner of the flows whose key hashes to it. No
 /// locks are needed because a given flow is only ever touched by its shard.
 #[derive(Debug, Default)]
 pub struct Shard {
@@ -111,7 +111,7 @@ impl Shard {
         let from_lo = key.is_from_lo(&pv.tuple);
 
         // Decide the epoch: reuse the current live flow unless it is terminal, in
-        // which case a repeat 5-tuple starts a new epoch (docs/06 §3.2).
+        // which case a repeat 5-tuple starts a new epoch.
         let cur_epoch = *self.epochs.get(&key).unwrap_or(&0);
         let start_new = match self.flows.get(&(key, cur_epoch)) {
             Some(f) => f.is_closed(pv.ts),
@@ -139,7 +139,7 @@ impl Shard {
                 tcp_state,
                 // The initiator is whoever sent this first packet; remember which
                 // canonical side that was so later segments can be classified as
-                // from-initiator or not (docs/06 §3.1) — the `lo` side is *not*
+                // from-initiator or not — the `lo` side is *not*
                 // necessarily the initiator.
                 initiator_is_lo: from_lo,
                 metrics: MetricsAccumulator::new(key),
@@ -188,7 +188,7 @@ impl Shard {
         out
     }
 
-    /// Drain all flows that are closed as of `now`, finalizing each (docs/06 §8).
+    /// Drain all flows that are closed as of `now`, finalizing each.
     /// Returns the sealed [`Flow`]s plus their accumulated events for storage.
     pub fn drain_closed(&mut self, now: Timestamp) -> Vec<(Flow, Vec<ProtoEvent>)> {
         let closed: Vec<(CanonicalKey, u32)> = self
@@ -207,7 +207,7 @@ impl Shard {
         out
     }
 
-    /// Finalize *every* remaining flow, e.g. at end-of-capture (docs/06 §8).
+    /// Finalize *every* remaining flow, e.g. at end-of-capture.
     pub fn drain_all(&mut self) -> Vec<(Flow, Vec<ProtoEvent>)> {
         self.flows
             .drain()

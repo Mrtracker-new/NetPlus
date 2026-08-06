@@ -1,7 +1,7 @@
-//! The flow engine facade (docs/06 §7): a fixed set of shards plus the session
+//! The flow engine facade: a fixed set of shards plus the session
 //! reconstructor, driven by decoded packets. A packet's canonical key selects
 //! its shard via [`crate::shard_for`], so all packets of a flow land on the same
-//! shard and per-flow state needs no locks (docs/06 §7).
+//! shard and per-flow state needs no locks.
 //!
 //! In this single-threaded Phase 1 slice the shards live in one engine, but the
 //! ownership discipline (a flow belongs to exactly one shard) is exactly what a
@@ -32,7 +32,7 @@ pub struct FlowEngine {
 }
 
 /// A finalized flow with the protocol events accumulated over its lifetime,
-/// ready for storage (docs/08).
+/// ready for storage.
 #[derive(Debug, Clone)]
 pub struct FinalizedFlow {
     pub flow: Flow,
@@ -96,7 +96,7 @@ impl FlowEngine {
     }
 
     /// Finalize all flows that are closed as of `now`, returning them for
-    /// storage (docs/06 §8). Called periodically to bound memory.
+    /// storage. Called periodically to bound memory.
     pub fn evict_closed(&mut self, now: Timestamp) -> Vec<FinalizedFlow> {
         let mut out = Vec::new();
         for shard in &mut self.shards {
@@ -108,7 +108,7 @@ impl FlowEngine {
     }
 
     /// Finalize every remaining flow (end of capture) and return them together
-    /// with the reconstructed sessions (docs/06 §8).
+    /// with the reconstructed sessions.
     pub fn finish(&mut self) -> (Vec<FinalizedFlow>, Vec<Session>) {
         let mut flows = Vec::new();
         for shard in &mut self.shards {
@@ -121,13 +121,13 @@ impl FlowEngine {
         (flows, sessions)
     }
 
-    /// The causal links discovered so far (docs/06 §6.2).
+    /// The causal links discovered so far.
     pub fn causal_links(&self) -> &[CausalLink] {
         self.sessions.links()
     }
 
     /// The passively-observed `IP → names` table, as deterministic `(ip, names)`
-    /// pairs ready to persist (docs/08 §5). Accumulated over the whole run; safe
+    /// pairs ready to persist. Accumulated over the whole run; safe
     /// to read after [`finish`](Self::finish), which does not consume it.
     pub fn resolutions(&self) -> Vec<(IpAddr, Vec<HostName>)> {
         self.resolutions.entries()
@@ -141,7 +141,7 @@ impl FlowEngine {
 
 /// Build a stable directional tuple from a canonical key purely for hashing into
 /// a shard. Both directions of a flow produce the same `CanonicalKey`, hence the
-/// same shard — which is the whole point (docs/06 §7).
+/// same shard — which is the whole point.
 fn canonical_repr(key: &CanonicalKey) -> netpulse_core::net::FiveTuple {
     // The canonical key already fixes a deterministic lo/hi ordering; reflect it
     // into a FiveTuple. We reconstruct from its public projection.

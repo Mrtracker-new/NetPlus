@@ -1,15 +1,15 @@
 //! # netpulse-storage — persistence
 //!
-//! The three stores from docs/02 §9 / docs/08 §3, tiered by access pattern:
+//! The three stores from /, tiered by access pattern:
 //! - Tier 1 [`ring::RingBuffer`] — the in-memory ring of newest items (seconds),
 //! - Tier 2 [`timeseries::TimeSeriesStore`] — downsampled metrics (hours→days),
 //! - Tier 3 [`capture_store::CaptureStore`] — the durable flows/sessions/events
 //!   record (SQLite + columnar in the full build; an in-memory backing behind
-//!   the identical query surface for the Phase 1 slice, docs/08 §13).
+//!   the identical query surface for the Phase 1 slice .
 //!
 //! Two privacy/honesty invariants are physical here, not conventional: the
-//! metadata-only **payload policy** default (docs/08 §4) and the
-//! **evidence-reference invariant** in retention (docs/08 §6).
+//! metadata-only **payload policy** default and the
+//! **evidence-reference invariant** in retention.
 #![forbid(unsafe_code)]
 
 pub mod capture_store;
@@ -68,8 +68,8 @@ pub struct EvictionStats {
     pub expired_findings: usize,
 }
 
-/// How much of each packet is retained (docs/02 §9). The default trades depth
-/// for privacy and disk; the user may widen it (docs/02 §10.3).
+/// How much of each packet is retained. The default trades depth
+/// for privacy and disk; the user may widen it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PayloadPolicy {
     /// Default: flow/session metadata only, no packet bytes.
@@ -81,13 +81,13 @@ pub enum PayloadPolicy {
     FullPayload,
 }
 
-/// The persistence contract shared by every store implementation (docs/08).
+/// The persistence contract shared by every store implementation.
 pub trait Store {
     /// The payload policy currently in force for this store.
     fn payload_policy(&self) -> PayloadPolicy;
 
     /// Flush in-flight data durably. Crash safety (N10) depends on this being
-    /// honored on shutdown and checkpoint boundaries (docs/02 §11).
+    /// honored on shutdown and checkpoint boundaries.
     fn flush(&mut self) -> Result<()>;
 }
 
@@ -98,7 +98,7 @@ impl<R: CaptureRepository> Store for CaptureStore<R> {
 
     fn flush(&mut self) -> Result<()> {
         // In-memory backing is always durable-in-process; the SQLite backend
-        // (docs/08 §9) commits the WAL here.
+        // commits the WAL here.
         Ok(())
     }
 }
@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn default_policy_is_metadata_only() {
-        // Privacy-preserving default (docs/02 §10.3).
+        // Privacy-preserving default.
         assert_eq!(PayloadPolicy::default(), PayloadPolicy::MetadataOnly);
     }
 

@@ -1,11 +1,11 @@
-//! Incremental per-flow metrics (docs/06 §5). Every metric updates in O(1) as
+//! Incremental per-flow metrics. Every metric updates in O(1 as
 //! packets arrive, so a flow's stats are always current without a re-scan
-//! (docs/06 §10). Each answers a concrete user question (docs/06 §5 table).
+//!Each answers a concrete user question.
 //!
 //! Loss/retransmit detection is **inferential** and never needs decryption
-//! (docs/01 X2, docs/06 §5.1): it reasons from TCP sequence numbers alone. All
+//!it reasons from TCP sequence numbers alone. All
 //! interval math uses the monotonic clock so wall-clock steps can't distort RTT
-//! (docs/05 §6).
+//!
 
 use std::collections::HashSet;
 
@@ -25,7 +25,7 @@ pub struct MetricsAccumulator {
     pkts_up: u64,
     pkts_down: u64,
     /// Monotonic ns of the first initiator segment and first responder reply,
-    /// for the connection-setup RTT (docs/06 §5, SYN → SYN-ACK).
+    /// for the connection-setup RTT.
     first_up_mono: Option<u64>,
     first_down_mono: Option<u64>,
     rtt_nanos: Option<u64>,
@@ -102,7 +102,7 @@ impl MetricsAccumulator {
                 };
                 if !set.insert(tcp.seq) {
                     // This sequence number was already observed in this
-                    // direction: a retransmission (docs/06 §5).
+                    // direction: a retransmission.
                     self.retransmits += 1;
                 }
             }
@@ -129,14 +129,14 @@ impl MetricsAccumulator {
         self.sample_tuple
     }
 
-    /// Seal the running counters into the immutable [`FlowMetrics`] (docs/02 §6).
+    /// Seal the running counters into the immutable [`FlowMetrics`].
     pub fn snapshot(&self) -> FlowMetrics {
         FlowMetrics {
             bytes: self.bytes_up + self.bytes_down,
             packets: self.total_packets(),
             rtt_estimate_nanos: self.rtt_nanos,
             retransmits: self.retransmits,
-            // Retransmits are our primary packet-loss indicator (docs/06 §5).
+            // Retransmits are our primary packet-loss indicator.
             loss_indicators: self.retransmits,
         }
     }

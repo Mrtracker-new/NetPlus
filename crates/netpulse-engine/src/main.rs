@@ -1,13 +1,13 @@
 //! # netpulse-engine (binary)
 //!
-//! The analysis process (docs/02 §5.1, docs/04 §3.12). It wires the pipeline —
+//! The analysis process. It wires the pipeline —
 //! decode → flow → narrative → storage → intel → ai/learn — and serves the
 //! Query/Stream API to the UI. Runs at user privilege; it holds no raw-capture
 //! capability (that lives in the separate `netpulse-capture-svc` process).
 //!
 //! **Status: Phase 1 offline pipeline online.** With no arguments it prints the
 //! scaffold banner and asserts the privacy-preserving storage default. Given a
-//! pcap path it runs the full offline reconstruction (docs/05 §13) and reports
+//! pcap path it runs the full offline reconstruction and reports
 //! the flows and sessions recovered — the same code path integration tests use.
 #![forbid(unsafe_code)]
 
@@ -56,7 +56,7 @@ fn main() -> ExitCode {
         .ok();
     }
 
-    // Privacy-preserving storage default is asserted at startup (docs/08 §4).
+    // Privacy-preserving storage default is asserted at startup.
     debug_assert_eq!(
         netpulse_storage::PayloadPolicy::default(),
         netpulse_storage::PayloadPolicy::MetadataOnly,
@@ -102,7 +102,7 @@ fn main() -> ExitCode {
                 "Analyzed pcap successfully"
             );
             // The pipeline stores metadata only; payloads are never written
-            // under the default policy (docs/08 §4).
+            // under the default policy.
             debug_assert_eq!(store.payload_records(), 0);
             ExitCode::SUCCESS
         }

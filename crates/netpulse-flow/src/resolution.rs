@@ -1,4 +1,4 @@
-//! Passive name resolution (docs/06 §6.1, docs/08 §5): building the `IP → names`
+//! Passive name resolution: building the `IP → names`
 //! map from traffic we already dissect. Two signals feed it, both observed on the
 //! wire — never an active lookup:
 //!
@@ -11,10 +11,10 @@
 //! It is deliberately a *separate* accumulator from [`crate::session`]: session
 //! reconstruction cares about the most-recent resolution within a causal window
 //! (lineage), whereas naming wants the full set of names ever seen for an IP so
-//! the UI can show every one honestly (docs/02 §10.3 — passive enrichment, no
+//! the UI can show every one honestly ( — passive enrichment, no
 //! egress). Both observe the same [`PacketView`] stream, so the table is built
 //! deterministically alongside flow reconstruction and rides the same replay
-//! parity guarantee (docs/21 §10).
+//! parity guarantee.
 
 use std::collections::BTreeMap;
 use std::net::IpAddr;
@@ -29,7 +29,7 @@ pub const MAX_RESOLUTIONS: usize = 10_000;
 /// Accumulates the set of passively-observed hostnames per IP. Deterministic:
 /// output order does not depend on `HashMap` iteration — IPs come out sorted and
 /// names within an IP are ordered by `(source, name)`, so the same packet stream
-/// always yields the same table (replay parity, docs/21 §10).
+/// always yields the same table (replay parity .
 #[derive(Debug, Default)]
 pub struct ResolutionTable {
     by_ip: BTreeMap<IpAddr, Vec<HostName>>,

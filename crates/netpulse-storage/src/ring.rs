@@ -1,4 +1,4 @@
-//! Tier 1 — the in-memory ring buffer (docs/08 §3.1). A fixed-capacity circular
+//! Tier 1 — the in-memory ring buffer. A fixed-capacity circular
 //! buffer of the most recent items (raw frames, freshly-decoded packets). The
 //! live pipeline and "last few seconds" UI need zero-latency access to the
 //! newest data; fixed capacity guarantees a hard memory ceiling (N5) — the
@@ -7,13 +7,13 @@
 use std::collections::VecDeque;
 
 /// A bounded FIFO that overwrites its oldest element when full. Pushing is O(1)
-/// and never allocates past `capacity` (docs/08 §7.1).
+/// and never allocates past `capacity`.
 #[derive(Debug, Clone)]
 pub struct RingBuffer<T> {
     items: VecDeque<T>,
     capacity: usize,
     /// Total items ever pushed, including those overwritten — so callers can see
-    /// how many were dropped from the live window (honesty, docs/01 §7.2).
+    /// how many were dropped from the live window (honesty .
     total_pushed: u64,
     overwritten: u64,
 }

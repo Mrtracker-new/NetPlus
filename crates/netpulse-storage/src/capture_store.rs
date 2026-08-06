@@ -1,9 +1,9 @@
-//! Tier 3 — the capture store (docs/08 §3.3, §5): the authoritative record of
+//! Tier 3 — the capture store: the authoritative record of
 //! flows, sessions, protocol events, and hosts — the structured reconstruction
-//! model (docs/02 §6). The physical design (docs/03 §5) splits indexed metadata
+//! model. The physical design splits indexed metadata
 //! (SQLite) from bulk columnar files; this Phase 1 slice keeps the *same logical
 //! model and query surface* over an in-memory backing, so the SQLite backend can
-//! drop in behind the identical API later (docs/08 §13).
+//! drop in behind the identical API later.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -14,7 +14,7 @@ use crate::repository::{CaptureRepository, MemoryCaptureStore};
 use crate::{EvictionStats, PayloadPolicy, StorageConfig};
 
 // NOTE:
-// CaptureStore is the authoritative runtime validator for EvidenceRef invariants (docs/02 §6.3, docs/08 §6).
+// CaptureStore is the authoritative runtime validator for EvidenceRef invariants.
 // Repository implementations assume pre-validated input and MUST NOT duplicate invariant validation.
 
 fn check_evidence_exists(
@@ -32,7 +32,7 @@ fn check_evidence_exists(
     }
 }
 
-/// A finding plus the retention annotation from docs/08 §6.
+/// A finding plus the retention annotation from.
 #[derive(Debug, Clone)]
 pub struct StoredFinding {
     pub finding: Finding,
@@ -486,7 +486,7 @@ impl<R: CaptureRepository> CaptureStore<R> {
     }
 
     /// Attempt to write packet payload bytes. Honors the payload policy
-    /// (docs/08 §4, §13): rejected under `MetadataOnly`. Returns whether the
+    ///rejected under `MetadataOnly`. Returns whether the
     /// bytes were accepted.
     #[must_use]
     pub fn try_write_payload(&mut self, _packet_ref: u64, _bytes: &[u8]) -> bool {
@@ -528,7 +528,7 @@ impl<R: CaptureRepository> CaptureStore<R> {
                 }
                 EvidenceRef::Packet(_) => {
                     // Packet IDs cannot currently be resolved to stored packet objects because
-                    // CaptureStore operates in metadata-only mode (docs/08 §4). The runtime invariant
+                    // CaptureStore operates in metadata-only mode. The runtime invariant
                     // therefore verifies only that the packet identifier is syntactically valid (non-zero).
                 }
                 _ => {}

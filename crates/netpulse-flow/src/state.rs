@@ -1,4 +1,4 @@
-//! Per-flow lifecycle state machines (docs/06 §4). Different transports have
+//! Per-flow lifecycle state machines. Different transports have
 //! different lifecycles: TCP is connection-oriented with an explicit handshake
 //! and teardown (the richest, most diagnostic machine), while UDP is
 //! connectionless and inferred from an idle timeout.
@@ -6,13 +6,13 @@
 //! The machine maps to [`netpulse_core::FlowState`], the shared vocabulary term,
 //! but tracks a little more internally (e.g. `SynAckSeen`) so it can measure the
 //! connection-setup RTT and distinguish an abandoned SYN from a refused one
-//! (docs/06 §4.1).
+//!
 
 use netpulse_core::FlowState;
 
 use crate::decode_view::TcpSignals;
 
-/// The TCP connection state (docs/06 §4.1). A superset of [`FlowState`] with the
+/// The TCP connection state. A superset of [`FlowState`] with the
 /// intermediate handshake step the RTT calculation needs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TcpState {
@@ -26,7 +26,7 @@ pub enum TcpState {
     /// SYN with no reply within the abandon timeout — unreachable/dropped.
     Abandoned,
     /// Capture started mid-connection; the handshake was never seen
-    /// (docs/06 §9, "joined mid-stream"). Setup RTT is unavailable, not wrong.
+    ///Setup RTT is unavailable, not wrong.
     JoinedMidStream,
 }
 
@@ -42,7 +42,7 @@ impl TcpState {
     }
 
     /// Whether the flow has reached a terminal state and can be finalized
-    /// (docs/06 §8).
+    ///
     pub fn is_terminal(self) -> bool {
         matches!(
             self,
@@ -56,7 +56,7 @@ impl TcpState {
 ///
 /// This is deliberately tolerant: real captures reorder, retransmit, and start
 /// mid-stream. The machine never enters an impossible state and always makes
-/// progress toward a terminal one (asserted by property tests in docs/06 §11).
+/// progress toward a terminal one (asserted by property tests in .
 pub fn advance_tcp(state: TcpState, sig: &TcpSignals, from_initiator: bool) -> TcpState {
     // A reset ends the conversation from any state.
     if sig.rst {

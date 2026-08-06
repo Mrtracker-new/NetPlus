@@ -1,18 +1,18 @@
-//! Export & import (docs/23): sharing NetPulse's data and captures in open,
+//! Export & import: sharing NetPulse's data and captures in open,
 //! interoperable formats — always by explicit user choice, always privacy-aware —
 //! and importing external captures back through the full pipeline.
 //!
 //! Export is the boundary where data can leave the machine, so it carries the
-//! heaviest consent discipline after AI (docs/23 §6): every export is **previewed**
+//! heaviest consent discipline after AI: every export is **previewed**
 //! ([`preview`]) so the user sees exactly what it contains before a byte is
 //! written; the default is the least-revealing form (metadata-only, sanitized,
-//! docs/23 §3); and export writes a *file* — it never transmits it. The single
-//! egress boundary stays `netpulse-ai` (docs/02 §10.1).
+//!  ; and export writes a *file* — it never transmits it. The single
+//! egress boundary stays `netpulse-ai`.
 //!
-//! Import is export's inverse (docs/23 §5): an external `pcap`/`pcapng` is fed to
+//! Import is export's inverse: an external `pcap`/`pcapng` is fed to
 //! the file [`netpulse_capture::FileCapture`] source and run through the *same*
-//! pipeline (docs/21 §4). Imported captures lack NetPulse's original attribution,
-//! which is marked unavailable honestly (docs/12 §8) while decode/flow/intel run
+//! pipeline. Imported captures lack NetPulse's original attribution,
+//! which is marked unavailable honestly while decode/flow/intel run
 //! fresh.
 
 use std::collections::BTreeSet;
@@ -24,12 +24,12 @@ use netpulse_storage::CaptureStore;
 
 use crate::pipeline::{analyze_file, analyze_pcap, OfflineReport};
 
-/// An open export format (docs/23 §4).
+/// An open export format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ExportFormat {
-    /// Raw frames for Wireshark/tcpdump (docs/03 §5).
+    /// Raw frames for Wireshark/tcpdump.
     Pcapng,
-    /// The structured model with evidence references (docs/23 §4).
+    /// The structured model with evidence references.
     Json,
     /// Tabular flows/metrics for spreadsheets.
     Csv,
@@ -37,23 +37,23 @@ pub enum ExportFormat {
     Report,
 }
 
-/// What to export — a selection, not just "everything" (docs/23 §8). Scoped
+/// What to export — a selection, not just "everything". Scoped
 /// export keeps artifacts small, relevant, and privacy-minimized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Selection {
-    /// A time window (docs/10 §5).
+    /// A time window.
     Window { from: u64, to: u64 },
-    /// One session/journey (docs/14).
+    /// One session/journey.
     Session(u64),
-    /// A finding + its evidence (docs/17).
+    /// A finding + its evidence.
     Finding(u64),
     /// The entire committed capture.
     All,
 }
 
-/// Sanitization/redaction options for a shareable export (docs/23 §7). The default
+/// Sanitization/redaction options for a shareable export. The default
 /// is the least-revealing, most-shareable form: metadata-only with names/IPs
-/// coarsened (docs/23 §3, §6).
+/// coarsened.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sanitizer {
     pub level: RecordingPayloadLevel,
@@ -65,7 +65,7 @@ pub struct Sanitizer {
 
 impl Default for Sanitizer {
     fn default() -> Self {
-        // The recommended sharing default (docs/23 §3, docs/22 §5).
+        // The recommended sharing default.
         Self {
             level: RecordingPayloadLevel::MetadataOnly,
             coarsen_ips: true,
@@ -77,7 +77,7 @@ impl Default for Sanitizer {
 }
 
 impl Sanitizer {
-    /// Human-readable list of the techniques this sanitizer applies (docs/23 §7),
+    /// Human-readable list of the techniques this sanitizer applies,
     /// shown in the preview so the user knows exactly what is being stripped.
     fn applied(&self) -> Vec<String> {
         let mut v = Vec::new();
@@ -101,8 +101,8 @@ impl Sanitizer {
 }
 
 /// A preview of exactly what an export will contain, before it is written or
-/// shared (docs/23 §6). Matches the produced output exactly — the preview is a
-/// tested invariant, not a best-effort estimate (docs/23 §12).
+/// shared. Matches the produced output exactly — the preview is a
+/// tested invariant, not a best-effort estimate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExportPreview {
     pub format: ExportFormat,
@@ -115,7 +115,7 @@ pub struct ExportPreview {
     pub provenance: String,
 }
 
-/// The version line stamped into every export (docs/23 §6 provenance).
+/// The version line stamped into every export.
 fn provenance(level: RecordingPayloadLevel) -> String {
     format!(
         "NetPulse {} · {}",
@@ -130,12 +130,12 @@ fn level_label(level: RecordingPayloadLevel) -> &'static str {
         RecordingPayloadLevel::Headers => "headers",
         RecordingPayloadLevel::FullPayload => "full-payload",
         // A future level reads as metadata-only (the least-revealing label) rather
-        // than over-claiming (docs/22 §5).
+        // than over-claiming.
         _ => "metadata-only",
     }
 }
 
-/// The flows a selection resolves to, in deterministic order (docs/08 §8).
+/// The flows a selection resolves to, in deterministic order.
 fn select_flows<'a>(store: &'a CaptureStore, selection: &Selection) -> Vec<&'a Flow> {
     match *selection {
         Selection::Window { from, to } => store.flows_in_window(from, to),
@@ -174,9 +174,9 @@ fn distinct_hosts(flows: &[&Flow]) -> usize {
         .len()
 }
 
-/// Build the export preview for a selection (docs/23 §6). This is what the user
+/// Build the export preview for a selection. This is what the user
 /// approves before anything is written; the actual export functions honor the
-/// same sanitizer so output matches the preview (docs/23 §12).
+/// same sanitizer so output matches the preview.
 pub fn preview(
     store: &CaptureStore,
     selection: &Selection,
@@ -195,7 +195,7 @@ pub fn preview(
         sessions,
         hosts: distinct_hosts(&flows) as u32,
         // pcapng is the only format that could carry payloads, and only above the
-        // metadata level; every other format is structural metadata (docs/23 §9).
+        // metadata level; every other format is structural metadata.
         contains_payloads: sanitizer.level.allows_payloads() && format == ExportFormat::Pcapng,
         sanitized: sanitizer.applied(),
         provenance: provenance(sanitizer.level),
@@ -203,7 +203,7 @@ pub fn preview(
 }
 
 /// The coarsened label for a flow's destination when IP coarsening is on
-/// (docs/23 §7): a network-level token rather than the exact address.
+///a network-level token rather than the exact address.
 fn dst_label(flow: &Flow, sanitizer: &Sanitizer) -> String {
     if sanitizer.coarsen_ips {
         match flow.key.dst_ip {
@@ -224,9 +224,9 @@ fn l4_label(l4: L4Proto) -> &'static str {
 }
 
 /// Export the selection as the structured JSON model with evidence references
-/// (docs/23 §4). Evidence refs are preserved so exported findings stay auditable
-/// and re-importable (docs/23 §12). Deterministic ordering + `to_string_pretty`
-/// so a report/export is reproducible (docs/23 §9).
+///Evidence refs are preserved so exported findings stay auditable
+/// and re-importable. Deterministic ordering + `to_string_pretty`
+/// so a report/export is reproducible.
 pub fn export_json(
     store: &CaptureStore,
     selection: &Selection,
@@ -242,7 +242,7 @@ pub fn export_json(
                 "l4": l4_label(f.l4),
                 "bytes": f.stats.bytes,
                 "packets": f.stats.packets,
-                // The evidence-reference invariant travels on the wire (docs/02 §6.3).
+                // The evidence-reference invariant travels on the wire.
                 "evidence": [{ "kind": "flow", "id": f.id }],
             })
         })
@@ -256,7 +256,7 @@ pub fn export_json(
         .map_err(|e| NpError::Storage(format!("export json serialization failed: {e}")))
 }
 
-/// Export the selection as tabular CSV of flow metrics (docs/23 §4). Metadata
+/// Export the selection as tabular CSV of flow metrics. Metadata
 /// only; no payloads.
 pub fn export_csv(store: &CaptureStore, selection: &Selection, sanitizer: &Sanitizer) -> String {
     let mut out = String::from("flow_id,dst,l4,bytes,packets\n");
@@ -273,9 +273,9 @@ pub fn export_csv(store: &CaptureStore, selection: &Selection, sanitizer: &Sanit
     out
 }
 
-/// Export the selection as a human-readable HTML report (docs/23 §4). Reuses the
+/// Export the selection as a human-readable HTML report. Reuses the
 /// projected metrics and is deterministic so a shared report is reproducible
-/// (docs/23 §9, §12).
+///
 pub fn export_report(store: &CaptureStore, selection: &Selection, sanitizer: &Sanitizer) -> String {
     let flows = select_flows(store, selection);
     let mut rows = String::new();
@@ -298,17 +298,17 @@ pub fn export_report(store: &CaptureStore, selection: &Selection, sanitizer: &Sa
     )
 }
 
-/// Export a recording's frames as pcapng (docs/23 §4, §10). Near-copy: the frames
-/// are already pcapng inside the recording (docs/22 §3.1), so this is essentially
+/// Export a recording's frames as pcapng. Near-copy: the frames
+/// are already pcapng inside the recording, so this is essentially
 /// free.
 pub fn export_pcapng(recording: &Recording) -> Vec<u8> {
     recording.pcapng_bytes.clone()
 }
 
 /// Import an external `pcap` or `pcapng` capture and run the full pipeline over it
-/// (docs/23 §5). The magic bytes select the parser; both converge on
-/// [`FileCapture`] and the identical offline path (docs/21 §4). Attribution is
-/// honestly unavailable for a foreign capture (docs/12 §8) — decode/flow/intel run
+///The magic bytes select the parser; both converge on
+/// [`FileCapture`] and the identical offline path. Attribution is
+/// honestly unavailable for a foreign capture — decode/flow/intel run
 /// fresh.
 pub fn import_capture(bytes: &[u8]) -> netpulse_core::Result<(CaptureStore, OfflineReport)> {
     // pcapng section-header block type, little- or big-endian.
@@ -324,7 +324,7 @@ pub fn import_capture(bytes: &[u8]) -> netpulse_core::Result<(CaptureStore, Offl
         )?;
         analyze_file(capture, 16)
     } else {
-        // Classic pcap path (docs/05 §13).
+        // Classic pcap path.
         analyze_pcap(bytes, 16)
     }
 }
@@ -387,7 +387,7 @@ mod tests {
         );
         assert_eq!(p.flows, 2);
         assert_eq!(p.hosts, 2);
-        // Metadata-only, JSON: no payloads leave (docs/23 §9).
+        // Metadata-only, JSON: no payloads leave.
         assert!(!p.contains_payloads);
         assert!(p.sanitized.iter().any(|s| s.contains("metadata-only")));
         assert!(p.provenance.contains("NetPulse"));
@@ -395,7 +395,7 @@ mod tests {
 
     #[test]
     fn scoped_export_contains_only_the_selection() {
-        // Privacy minimization (docs/23 §8): a finding-scoped export includes
+        // Privacy minimization: a finding-scoped export includes
         // exactly the finding's evidence flows, nothing more.
         let mut store = seeded();
         store
@@ -418,10 +418,10 @@ mod tests {
     fn sanitized_export_coarsens_ips_and_carries_no_payloads() {
         let store = seeded();
         let json = export_json(&store, &Selection::All, &Sanitizer::default()).unwrap();
-        // Coarsened to a network label, exact address not present (docs/23 §7).
+        // Coarsened to a network label, exact address not present.
         assert!(json.contains("net-198"));
         assert!(!json.contains("198.51.100.10"));
-        // Metadata-only: no payload field ever (docs/23 §9).
+        // Metadata-only: no payload field ever.
         assert!(!json.contains("payload"));
     }
 
@@ -435,7 +435,7 @@ mod tests {
 
     #[test]
     fn report_is_deterministic() {
-        // Reproducible shared reports (docs/23 §12).
+        // Reproducible shared reports.
         let store = seeded();
         let a = export_report(&store, &Selection::All, &Sanitizer::default());
         let b = export_report(&store, &Selection::All, &Sanitizer::default());

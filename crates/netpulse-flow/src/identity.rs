@@ -1,13 +1,13 @@
-//! Canonical flow identity (docs/06 §3) — the single most bug-prone logic in the
-//! engine (docs/06 §12), so it is small, explicit, and heavily tested.
+//! Canonical flow identity — the single most bug-prone logic in the
+//! engine, so it is small, explicit, and heavily tested.
 //!
 //! Traffic flows both ways; the two directions of one conversation have mirror
 //! 5-tuples (src/dst swapped). A [`CanonicalKey`] orders the two endpoints
-//! deterministically so **both directions hash to the same key** (docs/06 §3.1)
+//! deterministically so **both directions hash to the same key**
 //! — the precondition for treating them as one bidirectional flow and for
-//! shard-by-key ownership (docs/06 §7).
+//! shard-by-key ownership.
 //!
-//! Identity also carries a **time epoch** (docs/06 §3.2): the OS recycles ports,
+//! Identity also carries a **time epoch**: the OS recycles ports,
 //! so `(canonical tuple, epoch)` distinguishes a fresh connection that reuses a
 //! 5-tuple from the previous one — preventing two unrelated connections from
 //! merging and corrupting metrics.
@@ -60,7 +60,7 @@ impl CanonicalKey {
 
     /// A deterministic directional tuple (`lo` → `hi`) for hashing this flow into
     /// a shard. Both directions of a conversation share one `CanonicalKey`, so
-    /// they map to the same shard (docs/06 §7). Not a claim about who initiated —
+    /// they map to the same shard. Not a claim about who initiated —
     /// that is tracked separately via [`CanonicalKey::is_from_lo`].
     pub fn to_repr_tuple(&self) -> FiveTuple {
         FiveTuple::new(self.lo_ip, self.lo_port, self.hi_ip, self.hi_port, self.l4)
@@ -85,7 +85,7 @@ fn ip_key(ip: IpAddr) -> u128 {
     }
 }
 
-/// The direction a packet travels relative to the flow initiator (docs/06 §3.1).
+/// The direction a packet travels relative to the flow initiator.
 /// The initiator is the endpoint that sent the first packet (the SYN for TCP).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {

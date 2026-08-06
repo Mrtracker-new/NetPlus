@@ -1,8 +1,8 @@
-//! End-to-end offline pipeline test (docs/04 §9, docs/05 §12 golden
+//! End-to-end offline pipeline test (, golden
 //! reconstruction). Builds an in-memory pcap of a realistic mini-session — a DNS
 //! lookup for `example.com` followed by a TLS connection to the resolved IP —
 //! and asserts the reconstructed flows, session, and DNS→connection lineage
-//! (docs/06 §6.1). Deterministic: no live network, no privileges.
+//!Deterministic: no live network, no privileges.
 
 use std::net::Ipv4Addr;
 
@@ -146,7 +146,7 @@ fn reconstructs_dns_then_connection_session() {
     let session = store.flows_in_window(0, u64::MAX);
     assert!(!session.is_empty());
 
-    // Metadata-only: the pipeline wrote zero payload bytes (docs/08 §4).
+    // Metadata-only: the pipeline wrote zero payload bytes.
     assert_eq!(store.payload_records(), 0);
 }
 

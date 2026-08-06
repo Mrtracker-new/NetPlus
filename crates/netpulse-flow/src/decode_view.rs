@@ -1,11 +1,11 @@
-//! The flow engine's input view (docs/06 §2: "consumes dissected packets from
+//! The flow engine's input view (: "consumes dissected packets from
 //! `07`"). Rather than couple the flow table to every field of
 //! [`netpulse_decode::Decoded`], the engine ingests a compact [`PacketView`]:
 //! the canonical key material, direction signals, and the L7 lineage hints that
-//! session reconstruction needs (docs/06 §6.1).
+//! session reconstruction needs.
 //!
 //! Building the view is where `07` ("what a packet means") meets `06` ("how
-//! packets relate over time") — the clean boundary from docs/06 §12.
+//! packets relate over time" — the clean boundary from.
 
 use std::net::IpAddr;
 
@@ -26,7 +26,7 @@ pub struct TcpSignals {
 }
 
 /// A DNS name→address resolution extracted from a response, the strongest causal
-/// link for session grouping (docs/06 §6.1).
+/// link for session grouping.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DnsResolution {
     pub name: String,
@@ -41,7 +41,7 @@ pub struct PacketView {
     pub l7: L7Proto,
     pub payload_len: u32,
     pub tcp: Option<TcpSignals>,
-    /// Coarse protocol landmarks to record as `ProtoEvent`s (docs/02 §6.2).
+    /// Coarse protocol landmarks to record as `ProtoEvent`s.
     pub events: Vec<ProtoEventKind>,
     /// Name→IP resolutions from a DNS response (for lineage).
     pub dns_resolutions: Vec<DnsResolution>,

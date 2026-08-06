@@ -1,15 +1,15 @@
-//! The Phase 3 education presentation (docs/13–16): the read-only projection of
+//! The Phase 3 education presentation: the read-only projection of
 //! a committed capture into what the learning surfaces show — grounded lesson
 //! offers, staged website journeys, the browsable protocol reference, and the
 //! data-driven handshake animation model.
 //!
 //! Like the Phase 2 [`crate::pipeline::present`], this is a pure *view* over the
-//! store (docs/11 §14): it runs off the hot path (docs/13 §10), gathers the
+//! store: it runs off the hot path, gathers the
 //! reconstruction the caller already committed, and hands the education engines
 //! (`netpulse-learn`, `netpulse-narrative`) exactly the slices they need. It
 //! projects the results down into the stable `netpulse-api` wire DTOs at the
 //! requested [`Depth`], so a beginner journey never serializes expert detail
-//! (docs/09 §6.3). No new capture, parse, or storage — one source of truth.
+//!No new capture, parse, or storage — one source of truth.
 
 use netpulse_api::dto::{AnimationModelDto, ExplorerEntryDto, LessonOfferDto, PageJourneyDto};
 use netpulse_core::{Depth, Flow, ProtoEvent, Session};
@@ -22,22 +22,22 @@ use netpulse_storage::CaptureStore;
 
 use crate::project;
 
-/// The education projection of a committed run (docs/13–16). The bundle a
+/// The education projection of a committed run. The bundle a
 /// learning UI receives: grounded offers, one journey per session, and the
 /// protocol reference with real "your examples" availability wired in.
 #[derive(Debug, Clone)]
 pub struct EducationView {
     /// Grounded lesson offers across every session's teachable moments
-    /// (docs/13 §4), most-fundamental first.
+    ///most-fundamental first.
     pub offers: Vec<LessonOfferDto>,
-    /// One staged website journey per session (docs/14), depth-projected.
+    /// One staged website journey per session, depth-projected.
     pub journeys: Vec<PageJourneyDto>,
-    /// The browsable protocol reference (docs/15 §4), with `examples_available`
-    /// set from the learner's real flows (docs/15 §5).
+    /// The browsable protocol reference, with `examples_available`
+    /// set from the learner's real flows.
     pub reference: Vec<ExplorerEntryDto>,
 }
 
-/// Build the education view from a committed store at `depth` (docs/09 §6.3).
+/// Build the education view from a committed store at `depth`.
 pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
     // Own the per-session flow/event clones so the borrowed views can reference
     // them while the education engines run (same pattern as `present`, docs/04
@@ -60,7 +60,7 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
     let mut offers = Vec::new();
     let mut journeys = Vec::new();
     for (session, flows, events) in &owned {
-        // Grounded lesson offers for this session's teachable moments (docs/13 §4).
+        // Grounded lesson offers for this session's teachable moments.
         let tview = TrafficView {
             session: Some(session),
             flows,
@@ -70,13 +70,13 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
             offers.push(project::lesson_offer_dto(&offer));
         }
 
-        // The staged website journey for this session (docs/14).
+        // The staged website journey for this session.
         let sview = SessionView::new(session, flows.iter().collect(), events.iter().collect());
         let journey = build_page_journey(&sview);
         journeys.push(project::page_journey_dto(&journey, depth));
     }
 
-    // The protocol reference, with real "your examples" availability (docs/15 §5).
+    // The protocol reference, with real "your examples" availability.
     let reference = entries_with_examples(store, browse());
 
     EducationView {
@@ -87,19 +87,19 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
 }
 
 /// Browse the whole protocol reference, with real "your examples" availability
-/// wired in from the learner's flows (docs/15 §4, §5).
+/// wired in from the learner's flows.
 pub fn explorer_browse(store: &CaptureStore) -> Vec<ExplorerEntryDto> {
     entries_with_examples(store, browse())
 }
 
-/// Search the protocol reference by term/symptom (docs/15 §8), with real "your
-/// examples" availability wired in (docs/15 §5).
+/// Search the protocol reference by term/symptom, with real "your
+/// examples" availability wired in.
 pub fn explorer_search(store: &CaptureStore, term: &str) -> Vec<ExplorerEntryDto> {
     entries_with_examples(store, search(term))
 }
 
 /// Project explorer entries to wire DTOs, marking `examples_available` only when
-/// a matching flow actually exists in the store (docs/15 §5) — the reference↔
+/// a matching flow actually exists in the store — the reference↔
 /// reality wiring, never a guess.
 fn entries_with_examples(
     store: &CaptureStore,
@@ -120,9 +120,9 @@ fn entries_with_examples(
         .collect()
 }
 
-/// Build the data-driven handshake animation model for one flow (docs/16 §4.2),
+/// Build the data-driven handshake animation model for one flow,
 /// projected to its wire DTO. `None` when the flow is unknown or its RTT was
-/// never observable (we never fabricate a timing, docs/16 §11).
+/// never observable (we never fabricate a timing .
 pub fn handshake_animation_for_flow(
     store: &CaptureStore,
     flow_id: u64,
@@ -248,10 +248,10 @@ mod tests {
     fn handshake_animation_is_grounded_in_measured_rtt() {
         let store = seeded_store();
         let anim = handshake_animation_for_flow(&store, 10).expect("flow has an RTT");
-        // The SYN-ACK arrives at the measured RTT — truthful timing (docs/16 §10).
+        // The SYN-ACK arrives at the measured RTT — truthful timing.
         let syn_ack = anim.events.iter().find(|e| e.label == "SYN-ACK").unwrap();
         assert_eq!(syn_ack.at_nanos, 30_000_000);
-        // The mandatory reduced-motion equivalent ships alongside (docs/16 §8).
+        // The mandatory reduced-motion equivalent ships alongside.
         assert_eq!(anim.reduced_motion.len(), anim.events.len());
         // An unknown flow yields no fabricated animation.
         assert!(handshake_animation_for_flow(&store, 999).is_none());

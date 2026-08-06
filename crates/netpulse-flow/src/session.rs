@@ -1,16 +1,16 @@
-//! Session reconstruction (docs/06 §6): grouping related flows into sessions and
+//! Session reconstruction: grouping related flows into sessions and
 //! establishing causal order. A single page load spawns dozens of flows — one
 //! DNS lookup, then connections to the origin and CDNs. Grouping them answers
 //! "what happened when I visited X?".
 //!
-//! The strongest causal signal (docs/06 §6.1) is **DNS lineage**: a response
+//! The strongest causal signal is **DNS lineage**: a response
 //! resolving `cdn.example.com` → an IP, followed shortly by a connection to that
 //! IP, is strong evidence the connection was *caused by* that lookup. Session
 //! building runs as a separate stage over the committed flow-event stream
-//! because it needs cross-shard visibility (docs/06 §7).
+//! because it needs cross-shard visibility.
 //!
 //! Causality is often probabilistic; every inferred link carries a
-//! [`netpulse_core::Confidence`] and is never upgraded to certainty (docs/06 §6.3).
+//! [`netpulse_core::Confidence`] and is never upgraded to certainty.
 
 use std::collections::HashMap;
 use std::net::IpAddr;
@@ -20,7 +20,7 @@ use netpulse_core::{Confidence, Session, Timestamp};
 use crate::decode_view::PacketView;
 
 /// How long after a DNS resolution a connection to the resolved IP is still
-/// considered caused by it (docs/06 §6.1, temporal proximity). Nanoseconds.
+/// considered caused by it. Nanoseconds.
 pub const LINEAGE_WINDOW_NANOS: u64 = 5_000_000_000; // 5s
 
 /// A recorded name→IP resolution with the time it was observed, used to attribute
@@ -31,19 +31,19 @@ struct Resolution {
     at_mono: u64,
 }
 
-/// One causal link in a session's graph (docs/06 §6.2): a DNS lookup led to a
+/// One causal link in a session's graph: a DNS lookup led to a
 /// connection to the resolved address.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CausalLink {
     pub name: String,
     pub dst_ip: IpAddr,
     pub flow_id: u64,
-    /// Calibrated confidence in the inference (docs/06 §6.3).
+    /// Calibrated confidence in the inference.
     pub confidence: Confidence,
 }
 
 /// Reconstructs sessions from the packet/flow stream by DNS lineage
-/// (docs/06 §6). A minimal-but-honest realization of the causal graph for the
+///A minimal-but-honest realization of the causal graph for the
 /// Phase 1 slice: it links connections to the DNS lookups that resolved their
 /// destination, with confidence, and groups linked flows into one session.
 #[derive(Debug, Default)]
@@ -108,7 +108,7 @@ impl SessionReconstructor {
         self.links.iter().any(|l| l.flow_id == flow_id)
     }
 
-    /// The causal links discovered so far (docs/06 §6.2).
+    /// The causal links discovered so far.
     pub fn links(&self) -> &[CausalLink] {
         &self.links
     }
@@ -144,9 +144,9 @@ impl SessionReconstructor {
         sessions
     }
 
-    /// Finalize the discovered groups into [`Session`]s (docs/06 §8). Each
+    /// Finalize the discovered groups into [`Session`]s. Each
     /// session's trigger names the DNS lookup that seeded it, keeping the
-    /// human-readable causal story attached (docs/06 §6.2).
+    /// human-readable causal story attached.
     pub fn finalize(&self, next_session_id: &mut u64) -> Vec<Session> {
         let mut sessions = Vec::new();
         for (name, flow_ids) in &self.groups {
@@ -159,7 +159,7 @@ impl SessionReconstructor {
             });
             sessions.push(Session {
                 id: sid,
-                process_id: 0, // attribution is a Phase 2 signal (docs/12)
+                process_id: 0, // attribution is a Phase 2 signal
                 start_ts: self
                     .starts
                     .get(name)
@@ -169,7 +169,7 @@ impl SessionReconstructor {
                 flow_ids: flow_ids.clone(),
             });
         }
-        // Deterministic order for reproducible reconstruction (docs/06 §11).
+        // Deterministic order for reproducible reconstruction.
         sessions.sort_by_key(|s| s.id);
         sessions
     }

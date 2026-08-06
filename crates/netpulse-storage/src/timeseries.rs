@@ -1,10 +1,10 @@
-//! Tier 2 — the time-series metrics store (docs/08 §3.2, §5.3). Compact numeric
+//! Tier 2 — the time-series metrics store. Compact numeric
 //! series (bytes, packets, RTT, connection counts) at regular intervals, queried
 //! as *aggregates over time* by dashboards and the timeline — not as individual
 //! packets. A purpose-built layout makes "throughput of X over the last hour"
 //! cheap.
 //!
-//! Older data is progressively **downsampled** (docs/08 §7.2): recent points at
+//! Older data is progressively **downsampled**: recent points at
 //! fine resolution, older ones coarsened — the standard TSDB rollup that keeps
 //! long histories small. This module implements the raw→coarse rollup and
 //! range-scan query; the multi-level cascade (minute→hour→day) is the same
@@ -12,13 +12,13 @@
 
 use std::collections::BTreeMap;
 
-/// Identifies one metric series (docs/08 §5.3): the dimension being measured,
+/// Identifies one metric series: the dimension being measured,
 /// e.g. "bytes_down for process 42". A small interned integer on the hot path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct SeriesId(pub u32);
 
 /// One time-bucketed value. Timestamps are monotonic-ns bucket starts so range
-/// scans prune by time (docs/08 §8).
+/// scans prune by time.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
     pub bucket_start: u64,
@@ -62,7 +62,7 @@ impl TimeSeriesStore {
     }
 
     /// Record `value` into `series` at monotonic time `ts`, summing within the
-    /// bucket (docs/08 §5.3, counters accumulate per interval).
+    /// bucket.
     pub fn record(&mut self, series: SeriesId, ts: u64, value: f64) {
         let base = self.base_resolution_nanos;
         self.series
@@ -75,7 +75,7 @@ impl TimeSeriesStore {
     }
 
     /// Range scan: all points of `series` with bucket start in `[from, to)`,
-    /// ordered by time (docs/08 §8, range-scan by series and time).
+    /// ordered by time.
     pub fn query(&self, series: SeriesId, from: u64, to: u64) -> Vec<Point> {
         match self.series.get(&series) {
             Some(s) => s
@@ -96,7 +96,7 @@ impl TimeSeriesStore {
     }
 
     /// Downsample `series` into `factor`-times-coarser buckets, collapsing older
-    /// fine points (docs/08 §7.2). Points at or after `keep_fine_from` are left
+    /// fine points. Points at or after `keep_fine_from` are left
     /// at base resolution; older ones are merged. Returns the number of buckets
     /// removed, so the caller can log the size reduction.
     pub fn downsample(&mut self, series: SeriesId, factor: u64, keep_fine_from: u64) -> usize {

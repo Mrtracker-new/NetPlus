@@ -1,4 +1,4 @@
-//! End-to-end Phase 3 education test (docs/13–16). Reuses the Phase 1/2 golden
+//! End-to-end Phase 3 education test. Reuses the Phase 1/2 golden
 //! fixture — a DNS lookup for `example.com` followed by a TLS connection to the
 //! resolved IP — and asserts the *education projection* over it: the grounded
 //! lesson offers, the staged website journey, the protocol reference wired to
@@ -6,7 +6,7 @@
 //!
 //! Deterministic: no live network, no privileges. This is the "recorded capture
 //! yields a known lesson, grounded in real values" test the Learning Engine
-//! design calls for (docs/13 §11) and the "golden journey" of docs/14 §10.
+//! design calls for and the "golden journey" of.
 
 use netpulse_core::Depth;
 use netpulse_engine::education::{handshake_animation_for_flow, present_education};
@@ -138,7 +138,7 @@ fn the_capture_becomes_a_grounded_lesson() {
     let view = present_education(&store, Depth::Beginner);
 
     // The DNS lookup in the fixture becomes a grounded lesson whose exercise
-    // answer is the *actual* name looked up (docs/13 §5.1, §11).
+    // answer is the *actual* name looked up.
     let dns = view
         .offers
         .iter()
@@ -148,7 +148,7 @@ fn the_capture_becomes_a_grounded_lesson() {
     let ex = dns.exercise.as_ref().expect("a grounded check");
     assert_eq!(ex.answer, "example.com");
 
-    // Every offer cites real evidence — no lesson without proof (docs/02 §6.3).
+    // Every offer cites real evidence — no lesson without proof.
     assert!(view.offers.iter().all(|o| !o.evidence.is_empty()));
 }
 
@@ -177,7 +177,7 @@ fn the_reference_links_back_to_the_users_own_flow() {
     run_offline(&pcap, 16, &mut store).unwrap();
 
     let view = present_education(&store, Depth::Beginner);
-    // The TLS entry reports the learner has a real example (docs/15 §5).
+    // The TLS entry reports the learner has a real example.
     let tls = view
         .reference
         .iter()
@@ -193,7 +193,7 @@ fn the_handshake_animation_uses_the_measured_rtt() {
     run_offline(&pcap, 16, &mut store).unwrap();
 
     // The one TLS flow (id derived by the engine) has a measured RTT; the
-    // animation's SYN-ACK lands at exactly that RTT (docs/16 §10).
+    // animation's SYN-ACK lands at exactly that RTT.
     let flow_id = store
         .flows_in_window(0, u64::MAX)
         .iter()

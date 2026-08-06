@@ -1,18 +1,18 @@
 //! Monitoring — usage breakdowns and the "why is it slow?" diagnostics
-//! (docs/11). This is the presentation-side analysis layer: it *projects* the
-//! flow metrics the engine already computed (docs/06 §5) into the standing
+//!This is the presentation-side analysis layer: it *projects* the
+//! flow metrics the engine already computed into the standing
 //! answers users want — "how much / to where?" and "why is it bad?" — never
-//! re-scanning packets (docs/11 §10).
+//! re-scanning packets.
 //!
 //! It lives in the engine because it is a read-only aggregation over the
-//! committed reconstruction model (docs/11 §14: "consumes metrics from 06 and
+//! committed reconstruction model (: "consumes metrics from 06 and
 //! time-series from 08"); it holds no capture or storage logic of its own.
 //!
 //! Two honesty rules from docs/11 are load-bearing here:
-//! - **Diagnoses are hypotheses, not verdicts** (docs/11 §6.3): every
+//! - **Diagnoses are hypotheses, not verdicts**: every
 //!   [`Diagnosis`] carries a [`Confidence`] and the evidence it rests on, and is
 //!   phrased "looks like", never asserted as certain.
-//! - **Capture loss is not network loss** (docs/11 §6.4): the two are tracked in
+//! - **Capture loss is not network loss**: the two are tracked in
 //!   distinct fields and never summed. Presenting our own dropped packets as the
 //!   network's loss would be both a correctness bug and a lie.
 
@@ -23,10 +23,10 @@ use netpulse_core::net::L7Proto;
 use netpulse_core::{Confidence, EvidenceRef, Flow, HostName};
 
 /// The passively-observed `IP → names` map the host breakdown joins against
-/// (docs/08 §5). Owned by the store; borrowed here read-only for the join.
+///Owned by the store; borrowed here read-only for the join.
 pub type NameMap = HashMap<IpAddr, Vec<HostName>>;
 
-/// A ranked usage breakdown along one dimension (docs/11 §5): protocol, host,
+/// A ranked usage breakdown along one dimension: protocol, host,
 /// or interface. Rows are ordered by bytes descending, ties by label, so the
 /// "top talkers" are deterministic and stable to render.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -35,7 +35,7 @@ pub struct Breakdown {
     pub rows: Vec<BreakdownRow>,
 }
 
-/// The dimension a [`Breakdown`] decomposes traffic along (docs/11 §5).
+/// The dimension a [`Breakdown`] decomposes traffic along.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Dimension {
@@ -45,7 +45,7 @@ pub enum Dimension {
 }
 
 /// One row of a usage breakdown: a label, its byte and flow totals, and the
-/// flows that back it so a click drills into them (docs/11 §5, continuous zoom).
+/// flows that back it so a click drills into them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BreakdownRow {
     pub label: String,
@@ -54,19 +54,19 @@ pub struct BreakdownRow {
     /// Passively-observed names for this row's endpoint, empty when none were
     /// seen or the dimension has no IP (protocol/interface). The `label` stays the
     /// raw IP — the authoritative key — and these enrich it for display; a name is
-    /// never substituted *for* the address (docs/08 §5, docs/02 §10.3).
+    /// never substituted *for* the address.
     pub hostnames: Vec<HostName>,
-    /// The flows this row aggregates — the drill-down target (docs/09 §8).
+    /// The flows this row aggregates — the drill-down target.
     pub evidence: Vec<EvidenceRef>,
 }
 
-/// Decompose a set of flows by application protocol (docs/11 §5, "by protocol").
+/// Decompose a set of flows by application protocol.
 pub fn breakdown_by_protocol(flows: &[&Flow]) -> Breakdown {
     aggregate(Dimension::Protocol, flows, |f| l7_label(f.l7).to_string())
 }
 
-/// Decompose by destination host IP (docs/11 §5, "by host"), joining in the
-/// passively-observed names for each IP (docs/08 §5). The label stays the raw IP
+/// Decompose by destination host IP, joining in the
+/// passively-observed names for each IP. The label stays the raw IP
 /// so the row's identity/key is unambiguous; `names` only *enriches* it, and an
 /// IP with no observed name simply carries an empty list — honest about what we
 /// have not seen rather than inventing a label.
@@ -83,9 +83,9 @@ pub fn breakdown_by_host(flows: &[&Flow], names: &NameMap) -> Breakdown {
     breakdown
 }
 
-/// Decompose by capture interface (docs/11 §5, "by interface incl. VPN").
+/// Decompose by capture interface.
 /// The [`Flow`] model carries no interface id yet (it is a per-packet field,
-/// docs/02 §6.1); until it is threaded through, everything attributes to one
+///  ; until it is threaded through, everything attributes to one
 /// interface honestly rather than inventing a split.
 pub fn breakdown_by_interface(flows: &[&Flow]) -> Breakdown {
     aggregate(Dimension::Interface, flows, |_| "primary".to_string())
@@ -133,24 +133,24 @@ fn l7_label(l7: L7Proto) -> &'static str {
 }
 
 /// The likely cause of degradation the diagnostic classifier settles on
-/// (docs/11 §6.1). Each is a *hypothesis*, surfaced with confidence + evidence.
+///Each is a *hypothesis*, surfaced with confidence + evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Cause {
     /// Loss/jitter across many hosts at once → likely the local link
-    /// (docs/11 §6.2).
+    ///
     LocalWifi,
     /// High RTT to one host but not others → likely that server/path
-    /// (docs/11 §6.2).
+    ///
     DistantServer,
-    /// A long gap before any connection starts → likely DNS (docs/11 §6.2).
+    /// A long gap before any connection starts → likely DNS.
     SlowDns,
-    /// Loss that climbs as throughput rises → likely congestion (docs/11 §6.2).
+    /// Loss that climbs as throughput rises → likely congestion.
     Congestion,
 }
 
 impl Cause {
-    /// A plain-language, "looks like" phrasing — never a verdict (docs/11 §6.3).
+    /// A plain-language, "looks like" phrasing — never a verdict.
     pub fn explain(self) -> &'static str {
         match self {
             Cause::LocalWifi => {
@@ -172,30 +172,30 @@ impl Cause {
     }
 }
 
-/// A degradation diagnosis (docs/11 §6): a likely cause, a calibrated
+/// A degradation diagnosis: a likely cause, a calibrated
 /// confidence, and the flows that justify it. Constructed only by
 /// [`diagnose`], so a diagnosis can never exist without its evidence
-/// (docs/02 §6.3, docs/11 §12).
+///
 #[derive(Debug, Clone, PartialEq)]
 pub struct Diagnosis {
     pub cause: Cause,
     pub confidence: Confidence,
     pub evidence: Vec<EvidenceRef>,
-    /// The "looks like …" explanation, ready to show (docs/11 §6.3).
+    /// The "looks like …" explanation, ready to show.
     pub explanation: String,
 }
 
-/// Capture-vs-network loss, kept strictly separate (docs/11 §6.4). Summing
+/// Capture-vs-network loss, kept strictly separate. Summing
 /// these would misreport our own dropped packets as the network's loss.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct LossAccounting {
-    /// Packets the *network* lost, inferred from flow metrics (docs/06 §5).
+    /// Packets the *network* lost, inferred from flow metrics.
     pub network_loss_indicators: u32,
-    /// Frames *NetPulse* dropped under load (docs/05 §9) — never network loss.
+    /// Frames *NetPulse* dropped under load — never network loss.
     pub capture_drops: u64,
 }
 
-/// Thresholds for the heuristic classifier (docs/11 §12: each rule is explicit
+/// Thresholds for the heuristic classifier (: each rule is explicit
 /// and versioned). Nanoseconds for RTT; counts for loss.
 mod thresh {
     /// RTT above this is "high" for the distant-server test (150 ms).
@@ -210,12 +210,12 @@ mod thresh {
 }
 
 /// Diagnose likely degradation causes from a set of flows and a loss split
-/// (docs/11 §6). Returns every cause whose evidence is present, most-confident
+///Returns every cause whose evidence is present, most-confident
 /// first. An empty result means "nothing looks wrong" — the honest default,
-/// never a fabricated problem (docs/11 §9, idle state).
+/// never a fabricated problem.
 ///
 /// `dns_setup_gap_nanos` is the observed pause before the first connection in
-/// the window, when a DNS lookup preceded it (docs/11 §6.2); `None` when there
+/// the window, when a DNS lookup preceded it; `None` when there
 /// was no such gap to measure.
 pub fn diagnose(
     flows: &[&Flow],
@@ -224,7 +224,7 @@ pub fn diagnose(
 ) -> Vec<Diagnosis> {
     let mut out = Vec::new();
 
-    // --- Slow DNS: a long gap before any connection started (docs/11 §6.2) ---
+    // --- Slow DNS: a long gap before any connection started ---
     if let Some(gap) = dns_setup_gap_nanos {
         if gap >= thresh::SLOW_DNS_NANOS {
             // Confidence scales with how far past the threshold we are, capped.
@@ -331,7 +331,7 @@ fn lossy_flow_evidence(flows: &[&Flow]) -> Vec<EvidenceRef> {
         .collect()
 }
 
-/// A monitoring snapshot over a window (docs/11 §5, §7): the usage breakdowns
+/// A monitoring snapshot over a window: the usage breakdowns
 /// plus any degradation diagnoses, ready to hand to the UI as one bundle.
 #[derive(Debug, Clone)]
 pub struct MonitorSnapshot {
@@ -441,7 +441,7 @@ mod tests {
         let ds = diagnose(&[&slow, &ok1, &ok2], LossAccounting::default(), None);
         assert!(ds.iter().any(|d| d.cause == Cause::DistantServer));
         let d = ds.iter().find(|d| d.cause == Cause::DistantServer).unwrap();
-        // Diagnosis points at the slow flow specifically (docs/02 §6.3).
+        // Diagnosis points at the slow flow specifically.
         assert_eq!(d.evidence, vec![EvidenceRef::Flow(1)]);
         assert!(d.explanation.contains("looks like"));
     }
@@ -468,7 +468,7 @@ mod tests {
 
     #[test]
     fn healthy_traffic_yields_no_diagnosis() {
-        // Fast, lossless flows → nothing looks wrong (docs/11 §9). No fabrication.
+        // Fast, lossless flows → nothing looks wrong. No fabrication.
         let f1 = flow(1, ip(1, 1, 1, 1), L7Proto::Tls, 1000, Some(20_000_000), 0);
         let f2 = flow(2, ip(2, 2, 2, 2), L7Proto::Tls, 1000, Some(18_000_000), 0);
         assert!(diagnose(&[&f1, &f2], LossAccounting::default(), None).is_empty());
@@ -477,7 +477,7 @@ mod tests {
     #[test]
     fn capture_loss_is_not_summed_into_network_loss() {
         // The two loss kinds live in separate fields; nothing here adds them
-        // (docs/11 §6.4). A snapshot preserves both distinctly.
+        //A snapshot preserves both distinctly.
         let f = flow(1, ip(1, 1, 1, 1), L7Proto::Tls, 1000, Some(20_000_000), 0);
         let loss = LossAccounting {
             network_loss_indicators: 0,

@@ -1,12 +1,12 @@
 //! The rule system that projects the reconstruction model into cards
-//! (docs/09 §5, docs/12 §7). Sentences are *generated* from the model here, not
-//! free-written (docs/09 §15), and every one is backed by the flows/session it
-//! describes (docs/02 §6.3).
+//!Sentences are *generated* from the model here, not
+//! free-written, and every one is backed by the flows/session it
+//! describes.
 //!
 //! A [`SessionView`] bundles a [`Session`] with the [`Flow`]s it groups and
 //! their [`ProtoEvent`]s, because narrative is a pure projection with no storage
-//! dependency (docs/04 §3.6): the caller (the engine, over the query surface of
-//! docs/08 §8) gathers the pieces and hands them in.
+//! dependency: the caller (the engine, over the query surface of
+//!  gathers the pieces and hands them in.
 
 use netpulse_core::net::L7Proto;
 use netpulse_core::{EvidenceRef, Flow, Journey, ProtoEvent, ProtoEventKind, Session};
@@ -15,7 +15,7 @@ use crate::card::{NarrativeCard, Severity};
 
 /// A session together with the flows it groups and their protocol events — the
 /// input the card/journey rules need, gathered by the caller from storage
-/// (docs/08 §8) so this crate stays a pure projection.
+/// so this crate stays a pure projection.
 #[derive(Debug, Clone)]
 pub struct SessionView<'a> {
     pub session: &'a Session,
@@ -34,17 +34,17 @@ impl<'a> SessionView<'a> {
     }
 }
 
-/// Build one narrative card summarizing a session (docs/09 §5.1).
+/// Build one narrative card summarizing a session.
 ///
 /// The card carries detail lines at increasing depths (protocol, DNS timing,
 /// byte volume, server fan-out), so one card serves beginner through expert
-/// (docs/09 §6). Provenance is the session plus every flow it groups, so a
-/// drill-down (docs/09 §8) can reach the exact evidence.
+///Provenance is the session plus every flow it groups, so a
+/// drill-down can reach the exact evidence.
 pub fn build_card(view: &SessionView) -> NarrativeCard {
     let s = view.session;
     let host = triggering_host(&s.trigger);
 
-    // Provenance: the session and each of its flows (docs/02 §6.3).
+    // Provenance: the session and each of its flows.
     let mut evidence = Vec::with_capacity(1 + view.flows.len());
     evidence.push(EvidenceRef::Session(s.id));
     for f in &view.flows {
@@ -94,16 +94,16 @@ pub fn build_card(view: &SessionView) -> NarrativeCard {
     card.with_severity(Severity::Neutral)
 }
 
-/// Build cards for many sessions, feed-ordered newest-first (docs/09 §5.3).
+/// Build cards for many sessions, feed-ordered newest-first.
 pub fn build_cards(views: &[SessionView]) -> Vec<NarrativeCard> {
     let mut cards: Vec<NarrativeCard> = views.iter().map(build_card).collect();
     // Feed order: most recent first. A stable sort preserves input order for
-    // equal timestamps, so the result is deterministic (docs/06 §11).
+    // equal timestamps, so the result is deterministic.
     cards.sort_by_key(|c| std::cmp::Reverse(c.at_mono_nanos));
     cards
 }
 
-/// Build the [`Journey`] projection of a session (docs/14): the ordered
+/// Build the [`Journey`] projection of a session: the ordered
 /// sentences of its story. Each sentence is generated from the model; the
 /// journey shares the card's evidence discipline via [`build_card`].
 pub fn build_journey(view: &SessionView) -> Journey {
@@ -117,7 +117,7 @@ pub fn build_journey(view: &SessionView) -> Journey {
 }
 
 /// Extract the host name from a session trigger. The reconstructor writes
-/// "resolved and connected to {name}" (docs/06 §6.2 → `session.rs`); we read the
+/// "resolved and connected to {name}"; we read the
 /// name back rather than re-deriving it, keeping one source of truth.
 fn triggering_host(trigger: &str) -> Option<String> {
     trigger
@@ -214,7 +214,7 @@ fn event_breakdown(events: &[&ProtoEvent]) -> Option<String> {
     }
 }
 
-/// Human-readable byte size (KB/MB), matching the card mockups (docs/09 §5.1).
+/// Human-readable byte size (KB/MB , matching the card mockups.
 fn human_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
     const MB: u64 = 1024 * KB;
@@ -284,7 +284,7 @@ mod tests {
         let card = build_card(&view);
 
         assert_eq!(card.headline, "Connected to example.com");
-        // Session + both flows are referenced (docs/02 §6.3).
+        // Session + both flows are referenced.
         assert!(card.evidence().contains(&EvidenceRef::Session(1)));
         assert!(card.evidence().contains(&EvidenceRef::Flow(10)));
         assert!(card.evidence().contains(&EvidenceRef::Flow(11)));
@@ -334,7 +334,7 @@ mod tests {
 
     #[test]
     fn plaintext_and_encrypted_phrasing_is_honest() {
-        // A plaintext-only session must not be called "encrypted" (docs/01 E3).
+        // A plaintext-only session must not be called "encrypted".
         let s = session(1_000, vec![10]);
         let mut f = tls_flow(10, ip(1, 2, 3, 4), 1_000, 0);
         f.l7 = L7Proto::Http1;

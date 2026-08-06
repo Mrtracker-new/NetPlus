@@ -1,16 +1,16 @@
-//! The Phase 4 intelligence presentation (docs/17–20): the read-only projection
+//! The Phase 4 intelligence presentation: the read-only projection
 //! of a committed capture into the security findings and grounded AI answers the
 //! UI shows. Like the Phase 2/3 projections ([`crate::pipeline::present`],
 //! [`crate::education::present_education`]), this is a pure *view* over the store
-//! (docs/11 §14): it runs off the hot path (docs/17 §10), gathers the committed
+//!it runs off the hot path, gathers the committed
 //! reconstruction, and hands the intelligence engines (`netpulse-intel`,
 //! `netpulse-ai`) exactly the slices they need — capturing, parsing, and storing
-//! nothing (docs/17 §6, observe-only docs/01 X1).
+//! nothing.
 //!
 //! Attribution is honestly absent in this build: no live [`SocketTableSource`]
-//! (docs/12 §4 stub) is wired, so the process map handed to the detectors is
+//! is wired, so the process map handed to the detectors is
 //! empty and the attribution-dependent detector (unexpected unsigned egress,
-//! docs/18 §4.1) stays silent rather than blaming the wrong app (docs/12 §8).
+//!  stays silent rather than blaming the wrong app.
 //! When a live socket source lands, feeding a populated map here is the only
 //! change needed — the detectors already read it.
 
@@ -25,8 +25,8 @@ use netpulse_storage::CaptureStore;
 use crate::project;
 
 /// Assess a window of committed traffic and project the corroborated, ranked
-/// findings to their wire DTOs at `depth` (docs/17 §6). Most-confident first; an
-/// empty result is the honest "nothing looks unusual" (docs/17), never a
+/// findings to their wire DTOs at `depth`. Most-confident first; an
+/// empty result is the honest "nothing looks unusual", never a
 /// fabricated alarm.
 pub fn present_security(
     store: &CaptureStore,
@@ -35,7 +35,7 @@ pub fn present_security(
     depth: Depth,
 ) -> Vec<SecurityFindingDto> {
     // Own the flow/event clones so the borrowed view can reference them while the
-    // engine runs (same pattern as the other projections, docs/04 §3.6).
+    // engine runs (same pattern as the other projections .
     let flows: Vec<Flow> = store
         .flows_in_window(from_mono_nanos, to_mono_nanos)
         .into_iter()
@@ -46,7 +46,7 @@ pub fn present_security(
         events.extend(store.events_for_flow(f.id).iter().cloned());
     }
 
-    // No live socket source in this build → no attribution (docs/12 §4, §8).
+    // No live socket source in this build → no attribution.
     let process_of: HashMap<u64, Process> = HashMap::new();
     let view = TrafficView {
         flows: &flows,
@@ -60,8 +60,8 @@ pub fn present_security(
         .collect()
 }
 
-/// Answer a natural-language question grounded in the committed capture (docs/19).
-/// Uses the local-default assistant — zero egress (docs/19 §4.1) — and projects
+/// Answer a natural-language question grounded in the committed capture.
+/// Uses the local-default assistant — zero egress — and projects
 /// the grounded, cited answer to its wire DTO.
 pub fn ask_assistant(store: &CaptureStore, question: &str) -> AssistantAnswerDto {
     let answer = Assistant::local().answer(store, question);
@@ -127,14 +127,14 @@ mod tests {
             f.title,
             "An app is contacting one server on a regular schedule"
         );
-        assert!(f.confidence_percent < 100); // never certainty (docs/17 §5)
-        assert!(!f.evidence.is_empty()); // auditable (docs/02 §6.3)
-        assert!(!f.benign_explanations.is_empty()); // names innocence (docs/18 §3)
+        assert!(f.confidence_percent < 100); // never certainty
+        assert!(!f.evidence.is_empty()); // auditable
+        assert!(!f.benign_explanations.is_empty()); // names innocence
     }
 
     #[test]
     fn quiet_capture_yields_no_findings() {
-        // A single ordinary flow → nothing unusual, no fabrication (docs/17).
+        // A single ordinary flow → nothing unusual, no fabrication.
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
         store.insert_flow(beacon_flow(1, 0), vec![]);
         assert!(present_security(&store, 0, u64::MAX, Depth::Beginner).is_empty());
@@ -144,7 +144,7 @@ mod tests {
     fn assistant_answers_grounded_and_local() {
         let store = seeded_store();
         let a = ask_assistant(&store, "which host did I talk to the most?");
-        assert!(!a.is_remote); // local-default (docs/19 §4.1)
+        assert!(!a.is_remote); // local-default
         assert_eq!(a.backend_id, "local-template");
         assert!(a.disclosure.contains("No packet payloads"));
     }

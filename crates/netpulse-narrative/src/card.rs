@@ -1,20 +1,20 @@
-//! The narrative card — the unit of the Dashboard feed (docs/09 §5.1–§5.2).
+//! The narrative card — the unit of the Dashboard feed.
 //!
 //! A card summarizes one session or notable event in plain language. Its
-//! anatomy is fixed by docs/09 §5.2: a plain-language *headline* (what/who), a
+//! anatomy is fixed by: a plain-language *headline* (what/who , a
 //! one-line technical *summary* (depth scales with mode), *provenance* (links to
 //! the evidence it summarizes), and *severity/affect* (neutral by default;
 //! findings render calm and confidence-scored, never alarmist).
 //!
-//! The evidence-reference invariant (docs/02 §6.3) is enforced by construction:
+//! The evidence-reference invariant is enforced by construction:
 //! there is no way to build a card without at least one [`EvidenceRef`].
 
 use netpulse_core::{Depth, EvidenceRef};
 use serde::{Deserialize, Serialize};
 
-/// The affect of a card (docs/09 §5.2). Neutral by default; findings are calm
-/// and explained, never alarms (docs/01 §7.6, docs/09 §5.2). Colour is never the
-/// sole carrier of meaning (docs/09 §12), so this also names the severity.
+/// The affect of a card. Neutral by default; findings are calm
+/// and explained, never alarms. Colour is never the
+/// sole carrier of meaning, so this also names the severity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[non_exhaustive]
 pub enum Severity {
@@ -23,11 +23,11 @@ pub enum Severity {
     Neutral,
     /// Worth a glance, not a worry (e.g. an unfamiliar app, first-seen host).
     Notable,
-    /// A confidence-scored finding surfaced calmly (docs/17); still not an alarm.
+    /// A confidence-scored finding surfaced calmly; still not an alarm.
     Finding,
 }
 
-/// One card in the narrative feed (docs/09 §5).
+/// One card in the narrative feed.
 ///
 /// Construct via [`NarrativeCard::new`], which requires the provenance up front
 /// so the evidence-reference invariant cannot be violated. `headline` is the
@@ -35,12 +35,12 @@ pub enum Severity {
 /// least to most advanced, disclosed progressively by [`NarrativeCard::render`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NarrativeCard {
-    /// Plain-language "what happened / who did it" — no jargon (docs/09 §5.1).
+    /// Plain-language "what happened / who did it" — no jargon.
     pub headline: String,
     /// Technical detail lines, each tagged with the minimum [`Depth`] at which
     /// it should appear. Kept ordered beginner→expert for stable rendering.
     lines: Vec<DepthLine>,
-    /// Everything this card asserts is justified by these (docs/02 §6.3).
+    /// Everything this card asserts is justified by these.
     evidence: Vec<EvidenceRef>,
     pub severity: Severity,
     /// Monotonic capture time of the summarized event, for feed ordering.
@@ -56,7 +56,7 @@ struct DepthLine {
 
 impl NarrativeCard {
     /// Start a card. `evidence` must be non-empty — a card that summarizes
-    /// nothing has nothing to say and would violate docs/02 §6.3; the assert
+    /// nothing has nothing to say and would violate; the assert
     /// turns a would-be silent honesty bug into an immediate, loud failure.
     pub fn new(
         headline: impl Into<String>,
@@ -91,15 +91,15 @@ impl NarrativeCard {
         self
     }
 
-    /// The evidence this card is built from (docs/02 §6.3). Always non-empty.
+    /// The evidence this card is built from. Always non-empty.
     pub fn evidence(&self) -> &[EvidenceRef] {
         &self.evidence
     }
 
     /// Render the card at a disclosure depth: the headline plus every detail
-    /// line authored for `depth` or shallower (docs/09 §6.1, additive depth).
+    /// line authored for `depth` or shallower.
     /// The same card yields a terse beginner summary or a dense expert one —
-    /// density, not vocabulary, is the lever (docs/09 §6.4).
+    /// density, not vocabulary, is the lever.
     pub fn render(&self, depth: Depth) -> Vec<String> {
         let mut out = Vec::with_capacity(1 + self.lines.len());
         out.push(self.headline.clone());
@@ -112,7 +112,7 @@ impl NarrativeCard {
     }
 
     /// The one-line technical summary shown under the headline at `depth`
-    /// (docs/09 §5.1) — the visible detail lines joined with a middot, matching
+    /// — the visible detail lines joined with a middot, matching
     /// the card mockups ("TLS 1.3 · DNS 12 ms · 240 KB").
     pub fn summary(&self, depth: Depth) -> String {
         self.lines
@@ -142,7 +142,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "must reference its evidence")]
     fn card_without_evidence_is_impossible() {
-        // The invariant is structural: no evidence, no card (docs/02 §6.3).
+        // The invariant is structural: no evidence, no card.
         let _ = NarrativeCard::new("orphan", 0, vec![]);
     }
 

@@ -1,21 +1,21 @@
-//! The Website Journey (docs/14): the reconstruction and narration of the
+//! The Website Journey: the reconstruction and narration of the
 //! *complete* story behind loading a website — the flagship of NetPulse's
-//! understanding-first thesis (docs/14 §1).
+//! understanding-first thesis.
 //!
-//! A journey is the narrative projection of a **session** (docs/14 §3): the Flow
-//! Engine already produced the session's directed causal graph (docs/06 §6);
+//! A journey is the narrative projection of a **session**: the Flow
+//! Engine already produced the session's directed causal graph;
 //! this module turns that graph into a human story of recognizable stages
 //! (Navigation → DNS → Connection → Encryption → Request → Fan-out → Completion,
-//! docs/14 §4) and visualizes the CDN/organization fan-out (docs/14 §5).
+//!  and visualizes the CDN/organization fan-out.
 //!
-//! Two rules are strict (docs/14 §11):
+//! Two rules are strict:
 //! - It **renders** causality, never re-infers it — the session graph is the one
 //!   source of truth. If causality is wrong, fix `06`, not this renderer.
 //! - Every stage points back at the exact flows/session it rests on
-//!   (evidence-reference invariant, docs/02 §6.3), so a beginner's clean story is
+//!   (evidence-reference invariant , so a beginner's clean story is
 //!   auditable to the byte for an expert.
 //!
-//! It is honest about limits (docs/14 §8): an encrypted-only load is narrated
+//! It is honest about limits: an encrypted-only load is narrated
 //! from metadata; a load that never completed is marked as such, not fabricated.
 
 use std::collections::BTreeMap;
@@ -25,44 +25,44 @@ use netpulse_core::{EvidenceRef, Flow, Host};
 
 use crate::render::SessionView;
 
-/// A recognizable stage of a page load (docs/14 §4). The ordering of the enum is
+/// A recognizable stage of a page load. The ordering of the enum is
 /// the natural causal order the journey reads in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum StageKind {
-    /// "You asked to visit example.com" (docs/14 §4, attribution/trigger).
+    /// "You asked to visit example.com".
     Navigation,
-    /// Name → IP (docs/14 §4, docs/07 §6.5).
+    /// Name → IP.
     DnsResolution,
-    /// TCP/QUIC setup (docs/14 §4, docs/06 §4).
+    /// TCP/QUIC setup.
     Connection,
-    /// TLS/QUIC handshake (docs/14 §4, docs/07 §6.6).
+    /// TLS/QUIC handshake.
     Encryption,
-    /// HTTP request(s) (docs/14 §4, docs/07 §6.7–6.10).
+    /// HTTP request(s .
     Request,
-    /// Sub-resources from many hosts (docs/14 §4–§5, session graph).
+    /// Sub-resources from many hosts.
     FanOut,
-    /// Load finished — or honestly didn't (docs/14 §4, §8).
+    /// Load finished — or honestly didn't.
     Completion,
 }
 
-/// One narrated stage of the journey (docs/14 §4, §6). `narration` is the
+/// One narrated stage of the journey. `narration` is the
 /// beginner story; `detail` is the intermediate+ technical line (timings,
-/// transport, versions), disclosed progressively (docs/14 §7). Every stage
-/// carries the evidence it rests on (docs/02 §6.3).
+/// transport, versions , disclosed progressively. Every stage
+/// carries the evidence it rests on.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JourneyStage {
     pub kind: StageKind,
     pub title: String,
     pub narration: String,
-    /// Depth-gated technical detail (docs/14 §7); shown at Intermediate and above.
+    /// Depth-gated technical detail; shown at Intermediate and above.
     pub detail: Option<String>,
     pub evidence: Vec<EvidenceRef>,
 }
 
-/// One node of the CDN/organization fan-out (docs/14 §5): a server or org the
-/// page talked to, labeled by *local* enrichment where available (docs/14 §5,
-/// never a live lookup, docs/14 §11). Each node drills into its real flows.
+/// One node of the CDN/organization fan-out: a server or org the
+/// page talked to, labeled by *local* enrichment where available (,
+/// never a live lookup . Each node drills into its real flows.
 #[derive(Debug, Clone, PartialEq)]
 pub struct FanoutNode {
     /// Organization/CDN name if enriched, else the bare IP — honest either way.
@@ -72,9 +72,9 @@ pub struct FanoutNode {
     pub evidence: Vec<EvidenceRef>,
 }
 
-/// The complete journey for one session (docs/14 §3): the ordered stages and the
+/// The complete journey for one session: the ordered stages and the
 /// fan-out. A projection of one session model — the same data as the flows and
-/// packets, told as cause-and-effect over time (docs/14 §3).
+/// packets, told as cause-and-effect over time.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PageJourney {
     pub session_id: u64,
@@ -89,8 +89,8 @@ pub fn build_page_journey(view: &SessionView) -> PageJourney {
 }
 
 /// Build a journey, labeling fan-out nodes by organization/CDN from local
-/// enrichment where a matching [`Host`] is supplied (docs/14 §5). Never performs
-/// a live lookup — labels come only from the passed-in local data (docs/14 §11).
+/// enrichment where a matching [`Host`] is supplied. Never performs
+/// a live lookup — labels come only from the passed-in local data.
 pub fn build_page_journey_with_hosts(view: &SessionView, hosts: &[Host]) -> PageJourney {
     let host_name = triggering_host(&view.session.trigger);
     let mut stages = Vec::new();
@@ -140,7 +140,7 @@ fn navigation_stage(view: &SessionView, host: Option<&str>) -> JourneyStage {
 fn dns_stage(view: &SessionView, host: Option<&str>) -> Option<JourneyStage> {
     // DNS is evidenced by a DNS event or by the session's resolution lineage —
     // the reconstructor only names a "resolved and connected to X" trigger on
-    // DNS lineage (docs/06 §6.1), so that is itself honest proof (docs/14 §11).
+    // DNS lineage, so that is itself honest proof.
     let dns_seen = view.session.trigger.contains("resolved")
         || view.events.iter().any(|e| {
             matches!(
@@ -201,7 +201,7 @@ fn encryption_stage(view: &SessionView, host: Option<&str>) -> Option<JourneySta
     let plaintext = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Http1));
 
     if encrypted.is_empty() {
-        // Honest: only narrate encryption when we actually saw it (docs/01 E3).
+        // Honest: only narrate encryption when we actually saw it.
         if plaintext {
             return Some(JourneyStage {
                 kind: StageKind::Encryption,
@@ -236,7 +236,7 @@ fn request_stage(view: &SessionView) -> Option<JourneyStage> {
         )
     });
     // Even fully-encrypted loads make a request; narrate it honestly from
-    // metadata when we can't see the plaintext (docs/14 §8).
+    // metadata when we can't see the plaintext.
     let has_established = view.flows.iter().any(|f| {
         matches!(
             f.state,
@@ -291,7 +291,7 @@ fn completion_stage(view: &SessionView) -> JourneyStage {
             Some(format!("{bytes} bytes total")),
         )
     } else {
-        // Honest about an incomplete/failed load (docs/14 §8) — never fabricated.
+        // Honest about an incomplete/failed load — never fabricated.
         (
             "The load did not complete — the connection was not established.".to_string(),
             Some("No established connection observed".to_string()),
@@ -306,9 +306,9 @@ fn completion_stage(view: &SessionView) -> JourneyStage {
     }
 }
 
-/// Group the session's flows into fan-out nodes (docs/14 §5), by organization
+/// Group the session's flows into fan-out nodes, by organization
 /// when a local [`Host`] enrichment supplies one, else by destination IP.
-/// Deterministic order (by label) for reproducible journeys (docs/14 §10).
+/// Deterministic order (by label for reproducible journeys.
 fn build_fanout(flows: &[&Flow], hosts: &[Host]) -> Vec<FanoutNode> {
     let mut by_label: BTreeMap<String, (usize, u64, Vec<EvidenceRef>)> = BTreeMap::new();
     for f in flows {
@@ -329,8 +329,8 @@ fn build_fanout(flows: &[&Flow], hosts: &[Host]) -> Vec<FanoutNode> {
         .collect()
 }
 
-/// The org/CDN label for a destination IP from local enrichment (docs/14 §5),
-/// falling back to the bare IP. Never a live lookup (docs/14 §11).
+/// The org/CDN label for a destination IP from local enrichment,
+/// falling back to the bare IP. Never a live lookup.
 fn label_for(ip: std::net::IpAddr, hosts: &[Host]) -> String {
     hosts
         .iter()
@@ -347,7 +347,7 @@ fn first_server(flows: &[&Flow]) -> Option<std::net::IpAddr> {
 }
 
 /// The DNS→connect setup delay in ms, when a lookup preceded a connection (the
-/// same measure the narrative card uses, docs/09 §5.1).
+/// same measure the narrative card uses .
 fn dns_setup_millis(view: &SessionView) -> Option<u64> {
     let start = view.session.start_ts.mono_nanos;
     let first_conn = view
@@ -360,7 +360,7 @@ fn dns_setup_millis(view: &SessionView) -> Option<u64> {
 }
 
 /// Read the host name back out of the session trigger, one source of truth
-/// (docs/14 §11) — mirrors the helper in `render.rs`.
+/// — mirrors the helper in `render.rs`.
 fn triggering_host(trigger: &str) -> Option<String> {
     trigger
         .rsplit(" to ")
@@ -442,13 +442,13 @@ mod tests {
         assert_eq!(kinds.last(), Some(&StageKind::Completion));
         // The navigation names the site in plain words.
         assert!(journey.stages[0].narration.contains("example.com"));
-        // Every stage carries evidence (docs/02 §6.3).
+        // Every stage carries evidence.
         assert!(journey.stages.iter().all(|s| !s.evidence.is_empty()));
     }
 
     #[test]
     fn encrypted_only_journey_is_built_from_metadata() {
-        // No HTTP event (encrypted), but a coherent journey still forms (docs/14 §8).
+        // No HTTP event (encrypted , but a coherent journey still forms.
         let s = session(1_000, vec![10]);
         let f = flow(
             10,
@@ -546,7 +546,7 @@ mod tests {
             },
         ];
         let journey = build_page_journey_with_hosts(&view, &hosts);
-        // Two orgs, not three IPs (docs/14 §5 groups by organization).
+        // Two orgs, not three IPs.
         assert_eq!(journey.fanout.len(), 2);
         let cf = journey
             .fanout
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn incomplete_load_is_marked_not_fabricated() {
-        // Only a SynSeen flow — the connection never established (docs/14 §8).
+        // Only a SynSeen flow — the connection never established.
         let s = session(1_000, vec![10]);
         let f = flow(
             10,

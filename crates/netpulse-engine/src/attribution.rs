@@ -1,20 +1,20 @@
-//! Attribution — mapping each flow to the OS process that caused it (docs/12).
+//! Attribution — mapping each flow to the OS process that caused it.
 //!
 //! A captured packet carries a 5-tuple but no PID; the OS knows the mapping, but
 //! it lives in per-OS tables that change over time and can miss short-lived
-//! flows (docs/12 §3). So attribution is a **time-sensitive correlation** between
+//! flows. So attribution is a **time-sensitive correlation** between
 //! the flow stream and periodic socket-table snapshots — not a lookup
-//! (docs/12 §5).
+//!
 //!
 //! This module is the platform-neutral correlator: **poll + cache + match**
-//! (docs/12 §5.1) with a time-indexed history, retro-matching (docs/12 §5.2),
-//! PID-reuse safety via process start-time (docs/12 §5.3), and graded confidence
-//! (docs/12 §5.4). The per-OS [`SocketTableSource`] backends stay behind the
-//! trait in `netpulse-platform` (docs/12 §4); everything here is exercised
+//! with a time-indexed history, retro-matching,
+//! PID-reuse safety via process start-time, and graded confidence
+//!The per-OS [`SocketTableSource`] backends stay behind the
+//! trait in `netpulse-platform`; everything here is exercised
 //! against a synthetic source, so the hard correlation logic is fully tested
 //! without any OS calls or privilege.
 //!
-//! The governing stance (docs/12 §8): **attribute confidently when the OS gives
+//! The governing stance: **attribute confidently when the OS gives
 //! clear ownership; say "unknown" honestly when it doesn't.** A wrong PID is
 //! worse than an admitted unknown, so every ambiguous case degrades to
 //! [`AttributionConfidence::Unknown`], never a guess.
@@ -25,12 +25,12 @@ use netpulse_core::net::FiveTuple;
 use netpulse_core::{AttributionConfidence, SocketOwner};
 
 /// How long a cached socket→PID mapping stays valid after the snapshot that
-/// observed it (docs/12 §5.1: the table snapshot may arrive slightly after a
+/// observed it (: the table snapshot may arrive slightly after a
 /// flow's first packet, so mappings must have a validity window). Nanoseconds.
 pub const MAPPING_VALIDITY_NANOS: u64 = 2_000_000_000; // 2s
 
 /// How far *before* a snapshot a flow may have started and still be retro-matched
-/// to it (docs/12 §5.2): a connection that opened just before the poll is back-
+/// to it: a connection that opened just before the poll is back-
 /// filled when the snapshot arrives. Nanoseconds.
 pub const RETRO_MATCH_NANOS: u64 = 1_000_000_000; // 1s
 
@@ -44,9 +44,9 @@ struct CachedMapping {
     observed_at: u64,
 }
 
-/// The outcome of attributing one flow (docs/12 §5.4): the resolved PID (when
+/// The outcome of attributing one flow: the resolved PID (when
 /// known) with a graded confidence and the process's start time for PID-reuse
-/// safety. `Unknown` confidence means honestly unattributed (docs/12 §8).
+/// safety. `Unknown` confidence means honestly unattributed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Attribution {
     pub pid: Option<u64>,
@@ -55,7 +55,7 @@ pub struct Attribution {
 }
 
 impl Attribution {
-    /// The honest "unknown owner" result (docs/12 §8).
+    /// The honest "unknown owner" result.
     pub fn unknown() -> Self {
         Self {
             pid: None,
@@ -65,18 +65,18 @@ impl Attribution {
     }
 }
 
-/// The time-indexed correlator (docs/12 §5.1). Feed it socket-table snapshots as
+/// The time-indexed correlator. Feed it socket-table snapshots as
 /// they are polled; ask it to attribute a flow by its 5-tuple and start time. It
 /// keeps a bounded history of recent mappings keyed by 5-tuple so per-flow
-/// matching is a cheap lookup rather than a table re-scan (docs/12 §9).
+/// matching is a cheap lookup rather than a table re-scan.
 #[derive(Debug, Default)]
 pub struct Correlator {
     /// Most recent valid mappings per 5-tuple. A tuple can be reused over time;
     /// we keep the newest observation and its predecessor's start time is
-    /// distinguished by `start_mono_nanos` (docs/12 §5.3).
+    /// distinguished by `start_mono_nanos`.
     cache: HashMap<FiveTuple, CachedMapping>,
     /// Snapshots retained for retro-matching flows that started just before a
-    /// poll (docs/12 §5.2). Bounded to the most recent snapshot per tuple.
+    /// poll. Bounded to the most recent snapshot per tuple.
     latest_snapshot_at: u64,
 }
 
@@ -89,7 +89,7 @@ impl Correlator {
     /// Ingest a socket-table snapshot observed at monotonic time `at` (docs/12
     /// §5.1 poll step). Newer observations supersede older ones for the same
     /// 5-tuple; a changed `start_mono_nanos` means the socket was recycled by a
-    /// new process, and the fresh identity wins (docs/12 §5.3).
+    /// new process, and the fresh identity wins.
     pub fn ingest_snapshot(&mut self, at: u64, owners: &[SocketOwner]) {
         self.latest_snapshot_at = self.latest_snapshot_at.max(at);
         for o in owners {
@@ -104,15 +104,15 @@ impl Correlator {
         }
     }
 
-    /// Attribute a flow that started at `flow_start` to a process (docs/12 §5.1
+    /// Attribute a flow that started at `flow_start` to a process (
     /// match step). Returns a graded [`Attribution`]:
     ///
     /// - **High** when a cached mapping's validity window contains the flow start
     ///   (a direct match).
     /// - **Low** when only a retro-match applies — the flow started shortly
-    ///   before the snapshot that first saw the socket (docs/12 §5.2).
+    ///   before the snapshot that first saw the socket.
     /// - **Unknown** when no mapping fits, e.g. a flow too brief to ever appear
-    ///   in a snapshot (docs/12 §8). Never a guessed PID.
+    ///   in a snapshot. Never a guessed PID.
     pub fn attribute(&self, tuple: &FiveTuple, flow_start: u64) -> Attribution {
         let Some(m) = self.cache.get(tuple) else {
             return Attribution::unknown();
@@ -120,7 +120,7 @@ impl Correlator {
 
         // Direct match: the flow started within the mapping's validity window,
         // i.e. at or after the socket was observed, and not so long after that
-        // the mapping has expired (docs/12 §5.1).
+        // the mapping has expired.
         let valid_from = m.observed_at.saturating_sub(RETRO_MATCH_NANOS);
         let valid_to = m.observed_at + MAPPING_VALIDITY_NANOS;
 
@@ -133,7 +133,7 @@ impl Correlator {
         }
 
         // Retro-match: the flow started just *before* the snapshot that observed
-        // the socket (the poll-miss window, docs/12 §5.2). Lower confidence.
+        // the socket (the poll-miss window . Lower confidence.
         if flow_start >= valid_from && flow_start < m.observed_at {
             return Attribution {
                 pid: Some(m.pid),
@@ -144,12 +144,12 @@ impl Correlator {
 
         // The mapping exists but does not temporally fit this flow — the socket
         // was reused for a different connection than the one we are attributing.
-        // Honest unknown rather than a wrong PID (docs/12 §8).
+        // Honest unknown rather than a wrong PID.
         Attribution::unknown()
     }
 
     /// Whether a cached mapping for `tuple` describes the *same* process instance
-    /// as `start_mono_nanos` — the PID-reuse guard (docs/12 §5.3). A matching PID
+    /// as `start_mono_nanos` — the PID-reuse guard. A matching PID
     /// with a different start time is a recycled PID, not the original process.
     pub fn is_same_process(&self, tuple: &FiveTuple, pid: u64, start_mono_nanos: u64) -> bool {
         self.cache
@@ -158,7 +158,7 @@ impl Correlator {
     }
 
     /// Drop mappings whose validity window ended before `now`, bounding memory
-    /// (docs/12 §9, time-indexed cache stays small). Returns the number pruned.
+    ///Returns the number pruned.
     pub fn evict_expired(&mut self, now: u64) -> usize {
         let before = self.cache.len();
         self.cache
@@ -217,7 +217,7 @@ mod tests {
     #[test]
     fn unseen_tuple_is_honest_unknown() {
         let c = Correlator::new();
-        // A flow that never appeared in any snapshot (too brief, docs/12 §5.2).
+        // A flow that never appeared in any snapshot (too brief .
         let a = c.attribute(&tuple(50002), 1_000);
         assert_eq!(a.pid, None);
         assert_eq!(a.confidence, AttributionConfidence::Unknown);
@@ -228,7 +228,7 @@ mod tests {
         let mut c = Correlator::new();
         c.ingest_snapshot(1_000, &[owner(50003, 9, 100)]);
         // Flow starts well past the validity window → not attributed to the old
-        // socket owner; honest unknown, never a wrong PID (docs/12 §8).
+        // socket owner; honest unknown, never a wrong PID.
         let a = c.attribute(&tuple(50003), 1_000 + MAPPING_VALIDITY_NANOS + 1);
         assert_eq!(a.confidence, AttributionConfidence::Unknown);
     }
@@ -295,7 +295,7 @@ mod tests {
         c.ingest_snapshot(1_000, &src.snapshot().unwrap());
         let a = c.attribute(&tuple(50007), 1_000);
         assert_eq!(a.pid, Some(55));
-        // The source can enrich identity for an attributed PID (docs/12 §6).
+        // The source can enrich identity for an attributed PID.
         let info = src.process_info(55).unwrap().unwrap();
         assert_eq!(info.name, "proc55");
     }

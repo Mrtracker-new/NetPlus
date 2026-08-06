@@ -1,11 +1,11 @@
-//! Coalescing high-frequency cards into rolling summaries (docs/09 §7).
+//! Coalescing high-frequency cards into rolling summaries.
 //!
 //! Under a traffic storm, emitting one card per event would both bury the story
-//! (docs/01 §7.6, "calm, not noisy") and overwhelm the renderer (docs/09 §13).
+//! and overwhelm the renderer.
 //! Instead, bursts of same-headline cards within a time window collapse into a
 //! single summary card ("Chrome: 320 connections in the last second") while
 //! *preserving every card's evidence* — the count is real and each reference is
-//! carried through, so drill-down still reaches all of it (docs/02 §6.3).
+//! carried through, so drill-down still reaches all of it.
 
 use crate::card::{NarrativeCard, Severity};
 
@@ -15,7 +15,7 @@ use crate::card::{NarrativeCard, Severity};
 /// that order. A run of one card passes through unchanged.
 ///
 /// The merged card unions the evidence of every card it represents, so no
-/// provenance is lost when the feed is compacted (docs/09 §7).
+/// provenance is lost when the feed is compacted.
 pub fn coalesce(cards: Vec<NarrativeCard>, window_nanos: u64) -> Vec<NarrativeCard> {
     let mut out: Vec<NarrativeCard> = Vec::new();
     let mut iter = cards.into_iter();
@@ -40,7 +40,7 @@ pub fn coalesce(cards: Vec<NarrativeCard>, window_nanos: u64) -> Vec<NarrativeCa
 
 /// Merge a run of same-headline cards into one. A single-card run is returned
 /// as-is; a multi-card run becomes a summary that counts the burst and unions
-/// all evidence (docs/09 §7).
+/// all evidence.
 fn merge_run(seed: NarrativeCard, mut rest: Vec<NarrativeCard>) -> NarrativeCard {
     if rest.is_empty() {
         return seed;
@@ -54,7 +54,7 @@ fn merge_run(seed: NarrativeCard, mut rest: Vec<NarrativeCard>) -> NarrativeCard
         evidence.extend_from_slice(c.evidence());
     }
     // Preserve the loudest severity in the run — a finding in a burst must not be
-    // hidden by coalescing (docs/09 §5.2, findings stay visible).
+    // hidden by coalescing.
     let severity = rest
         .iter()
         .map(|c| c.severity)
@@ -109,7 +109,7 @@ mod tests {
         let out = coalesce(cards, 2_000);
         assert_eq!(out.len(), 1);
         assert_eq!(out[0].headline, "Chrome connected ×3");
-        // All three flows remain reachable via the merged card (docs/02 §6.3).
+        // All three flows remain reachable via the merged card.
         assert_eq!(out[0].evidence().len(), 3);
     }
 

@@ -8,7 +8,7 @@ use netpulse_engine::export::{preview as export_preview, Sanitizer};
 use netpulse_engine::pipeline::present;
 use netpulse_engine::security::{ask_assistant, present_security};
 
-/// Execute a historical or aggregated read query against the shell app state (docs/02 §7.1).
+/// Execute a historical or aggregated read query against the shell app state.
 #[tracing::instrument(level = "debug", skip(state))]
 pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, String> {
     let store = state.store.lock().map_err(|_| "state poisoned")?;

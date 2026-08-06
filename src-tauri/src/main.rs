@@ -1,16 +1,16 @@
-//! The NetPulse desktop shell (docs/03 §8). Tauri hosts the React webview and
+//! The NetPulse desktop shell. Tauri hosts the React webview and
 //! exposes exactly two commands — `query` and `command` — that carry the
 //! enumerated `netpulse-api` surface. The webview can invoke nothing else, so
-//! the observe-only guarantee is trivially auditable (docs/02 §10): there is no
+//! the observe-only guarantee is trivially auditable: there is no
 //! IPC path that modifies traffic.
 //!
 //! This shell is intentionally thin. All analysis lives in `netpulse-engine`;
 //! the shell owns the committed store and maps a [`Query`] to a [`QueryResponse`]
-//! over the engine's read-only presentation view (docs/11 §14). `StartCapture`
+//! over the engine's read-only presentation view. `StartCapture`
 //! opens the platform's live backend (Windows/Npcap, docs/05) and drives a
 //! background reconstruction loop; where the backend is unavailable it fails
-//! closed honestly rather than pretending (docs/02 §11). Capture is observe-only:
-//! a read-only frame stream wired to no injection API (docs/01 X1).
+//! closed honestly rather than pretending. Capture is observe-only:
+//! a read-only frame stream wired to no injection API.
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
@@ -85,13 +85,13 @@ pub(crate) struct AppState {
     pub(crate) recordings: Mutex<Vec<Recording>>,
     pub(crate) replay: Mutex<Option<ReplayController>>,
     pub(crate) registry: Mutex<PluginRegistry>,
-    /// Handle to the running live capture, if any (docs/05). `None` when idle.
+    /// Handle to the running live capture, if any. `None` when idle.
     pub(crate) capture: Mutex<Option<CaptureControl>>,
-    /// The time-indexed flow→process correlator (docs/12), fed socket-table
+    /// The time-indexed flow→process correlator, fed socket-table
     /// snapshots by the capture loop and queried by `AttributionOfFlow`.
     pub(crate) correlator: Arc<Mutex<Correlator>>,
     /// The live socket→PID source, or `None` where no backend exists (attribution
-    /// then stays honestly Unknown, docs/12 §8).
+    /// then stays honestly Unknown .
     pub(crate) sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
     /// Stop flag for the background HTTP health probe server.
     pub(crate) health_stop: Arc<AtomicBool>,
@@ -113,7 +113,7 @@ impl Drop for CompletionGuard {
 
 /// Control handle for the background live-capture thread: a stop flag it polls
 /// between batches, a completion receiver, and its join handle so [`stop_capture`]
-/// can wait deterministically without indefinite blocking (docs/05 §4).
+/// can wait deterministically without indefinite blocking.
 struct CaptureControl {
     stop: Arc<AtomicBool>,
     done_rx: std::sync::mpsc::Receiver<()>,
@@ -125,8 +125,8 @@ impl Default for AppState {
         // The shell boots empty; data arrives from live capture (Start capture in
         // the UI) or, for offline work, by setting `NETPULSE_PCAP=<path>` to seed
         // the store from a saved capture — the same import path the engine CLI
-        // uses (docs/23 §5). Without either, the UI shows its honest empty states
-        // (docs/02 §11).
+        // uses. Without either, the UI shows its honest empty states
+//
         let (store, stats) = seed_store_from_env();
         Self {
             store: Arc::new(Mutex::new(store)),
@@ -145,10 +145,10 @@ impl Default for AppState {
 }
 
 /// Start live capture on `iface_id` and spawn the background reconstruction loop
-/// (docs/05). The capture handle is opened *inside* the thread so the (possibly
+///The capture handle is opened *inside* the thread so the (possibly
 /// non-`Send`) backend never crosses a thread boundary; the open result is
 /// reported back so the UI gets an immediate, honest error if Npcap is missing or
-/// privileges are insufficient (docs/02 §11).
+/// privileges are insufficient.
 pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), String> {
     let mut guard = state.capture.lock().map_err(|_| "state poisoned")?;
     if guard.is_some() {
@@ -277,7 +277,7 @@ impl AppState {
     /// 1. Signals background health probe HTTP server to terminate (`health_stop = true`, `Release` ordering).
     /// 2. Signals and joins live capture thread (up to 3s timeout), committing pipeline state into `store`.
     /// 3. Flushes persistent store (`Store::flush`, WAL commit / storage crash safety).
-    ///
+///
     /// Guarded by `shutting_down: AtomicBool` with `AcqRel` ordering to run exactly once.
     pub(crate) fn shutdown(&self) -> ShutdownReport {
         if self.shutting_down.swap(true, Ordering::AcqRel) {
@@ -528,7 +528,7 @@ impl LiveLoopContext {
     }
 }
 
-/// The background live-capture loop (docs/05 §4). Drains frames from the backend
+/// The background live-capture loop. Drains frames from the backend
 /// into a bounded buffer and periodically commits incremental engine updates
 /// into the committed store via [`netpulse_engine::pipeline::LivePipeline`].
 /// Runs until the stop flag is set or the source closes.
@@ -600,7 +600,7 @@ fn live_loop(
             );
 
             // Poll the OS socket tables and feed the correlator, timestamped in the
-            // same capture-relative monotonic clock the flows use (docs/12 §5).
+            // same capture-relative monotonic clock the flows use.
             if let Some(source) = &sockets {
                 if let Ok(owners) = source.snapshot() {
                     if let Ok(mut c) = correlator.lock() {
@@ -625,9 +625,9 @@ fn live_loop(
 /// running the identical offline pipeline the CLI does (`analyze_pcap`). Any
 /// problem (unset var, unreadable file, undecodable capture) falls back to an
 /// empty metadata-only store rather than failing the launch — the UI then shows
-/// its empty states honestly (docs/02 §11: never fabricate data).
+/// its empty states honestly.
 fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
-    // Metadata-only is the private default (docs/08 §4).
+    // Metadata-only is the private default.
     let empty = || {
         (
             CaptureStore::new(PayloadPolicy::MetadataOnly),
@@ -652,7 +652,7 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
         Ok((store, report)) => {
             // An offline file is lossless: every frame read was "received" and none
             // was dropped, so the monitor keeps capture loss honestly at zero
-            // (docs/11 §6.4).
+//
             let stats = CaptureStats {
                 received: report.frames_read as u64,
                 dropped: 0,
@@ -679,7 +679,7 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
     }
 }
 
-/// Register the first-party reference plugins (docs/24 §6) so the Plugins surface
+/// Register the first-party reference plugins so the Plugins surface
 /// lists real, capability-bounded seams. Their manifests mirror the in-tree
 /// examples under `plugins/`; the registry auto-enables first-party references.
 fn seed_registry() -> PluginRegistry {
@@ -814,7 +814,7 @@ pub(crate) fn to_depth(d: ProjectionDepth) -> Depth {
     }
 }
 
-/// Map a wire export selection to the engine's domain selection (docs/23 §8).
+/// Map a wire export selection to the engine's domain selection.
 pub(crate) fn to_selection(sel: ExportSelectionDto) -> Selection {
     match sel {
         ExportSelectionDto::Window {
@@ -840,8 +840,8 @@ pub(crate) fn to_format(f: ExportFormatDto) -> ExportFormat {
     }
 }
 
-/// An honest zero replay state when no recording is loaded (docs/21 §8; docs/02
-/// §11 fail-closed rather than pretend).
+/// An honest zero replay state when no recording is loaded (fail-closed
+/// rather than pretend).
 pub(crate) fn empty_replay_state() -> ReplayState {
     ReplayState {
         position_nanos: 0,
@@ -853,7 +853,7 @@ pub(crate) fn empty_replay_state() -> ReplayState {
     }
 }
 
-/// The single pull entry point (docs/02 §7.1). Every historical/aggregated read
+/// The single pull entry point. Every historical/aggregated read
 /// the UI performs comes through here and is answered from the committed store.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
@@ -861,7 +861,7 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
     ipc::execute_query(&state, query)
 }
 
-/// The single control entry point (docs/02 §7.1) — the only write path UI→engine.
+/// The single control entry point — the only write path UI→engine.
 /// Observe-only: nothing here touches network traffic.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]

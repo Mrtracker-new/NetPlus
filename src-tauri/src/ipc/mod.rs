@@ -1,4 +1,4 @@
-//! IPC query and command execution module for NetPulse Tauri shell (docs/02 §7.1).
+//! IPC query and command execution module for NetPulse Tauri shell.
 
 pub mod command;
 pub mod query;

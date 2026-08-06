@@ -1,7 +1,7 @@
 use crate::AppState;
 use netpulse_api::Command;
 
-/// Execute a control write command against the shell app state (docs/02 §7.1).
+/// Execute a control write command against the shell app state.
 #[tracing::instrument(level = "debug", skip(state))]
 pub fn execute_command(state: &AppState, command: Command) -> Result<(), String> {
     match command {

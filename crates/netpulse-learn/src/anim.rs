@@ -5,8 +5,8 @@
 //!
 //! Every rule from ("motion with meaning" is enforced at the model:
 //! - **Data-driven, not canned**: a model is built from real
-//!   `ProtoEvent`s / flow metrics — the handshake you watch is *your* handshake
-//!There is no hand-authored sequence.
+//!   `ProtoEvent`s / flow metrics — the handshake you watch is *your* handshake.
+//!   There is no hand-authored sequence.
 //! - **Truthful timing**: the travel time between endpoints
 //!   is the *measured* RTT, so a slow handshake feels slow. A test asserts the
 //!   animated RTT equals the measured RTT.

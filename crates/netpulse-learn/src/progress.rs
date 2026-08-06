@@ -4,7 +4,7 @@
 //!
 //! Two principles are load-bearing:
 //! - **Local-first**: progress lives in the learner's own store
-//! and is *never uploaded*. These types are `serde`-serializable so
+//!   and is *never uploaded*. These types are `serde`-serializable so
 //!   the engine can persist them alongside settings — nothing more.
 //! - **Non-nagging**: the adaptive next-offer is
 //!   calm and *optional*. Mastered concepts are not re-taught; when nothing is

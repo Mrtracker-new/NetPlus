@@ -173,4 +173,4 @@ jobs:
           node-version: 22
 
       - name: pnpm audit (production dependencies)
-        run: pnpm audit --prod --audit-level high || true
+        run: pnpm audit --prod --audit-level high

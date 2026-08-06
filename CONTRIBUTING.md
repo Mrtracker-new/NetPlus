@@ -47,7 +47,7 @@ Find the layer appropriate for your change:
 
 ### Workflow B: Adding a Security Detector
 
-1. **Implement Detector**: Open [`crates/netpulse-intel/src/rules/`](crates/netpulse-intel/src/rules/) and create a new rule implementing the `Detector` trait.
+1. **Implement Detector**: Open [`crates/netpulse-intel/src/rules.rs`](crates/netpulse-intel/src/rules.rs) and create a new rule implementing the `Detector` trait.
 2. **Evidence Invariant**: Every `Finding` returned **must** include immutable evidence references (`flow_id`, `packet_id`, or `session_id`). Findings without evidence are invalid.
 3. **Calibrated Confidence**: Assign a confidence score (`Low`, `Medium`, `High`, `Certain`) based on factual signal strength — never overstate findings.
 4. **Add Tests**: Write unit tests asserting both detection on malicious traffic and false-positive resilience on normal traffic.
@@ -86,10 +86,21 @@ cargo clippy --workspace --all-targets -- -D warnings
 # 3. Rust Workspace Tests
 cargo test --workspace
 
-# 4. TypeScript Contract & Application Checks
+# 4. Documentation Status & Link Verification
+python scripts/verify_docs_status.py
+
+# 5. TypeScript Contract & Application Checks
 pnpm --filter @netpulse/contract typecheck
 pnpm --filter @netpulse/app typecheck
 ```
+
+### Documentation Ownership & Status Rule
+
+Documentation must strictly reflect the current implementation state of the source code.
+Whenever a pull request changes the maturity status of a crate or capability (e.g. implementing live capture or SQLite storage):
+1. Audit crate code and update [`docs/status.yml`](docs/status.yml).
+2. Update status tables in `README.md`, `ARCHITECTURE.md`, `docs/README.md`, and `crates/README.md`.
+3. Run `python scripts/verify_docs_status.py` to confirm zero drift and zero broken links before opening a PR.
 
 ### Toolchain Pinning & Upgrade Policy
 

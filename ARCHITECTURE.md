@@ -110,22 +110,24 @@ Progressive cards          Confidence scoring          protocol explorer        
 
 ## 4. Crate Taxonomy & Responsibility Matrix
 
-| Crate Name | Layer | Purpose & Responsibility |
-|---|---|---|
-| [`netpulse-core`](crates/netpulse-core) | Base | Core data types (`Flow`, `Session`, `Finding`, `Packet`), error taxonomy, progressive disclosure levels (`Beginner`, `Intermediate`, `Expert`), and shared traits. |
-| [`netpulse-platform`](crates/netpulse-platform) | Platform | OS-specific network interface enumeration, process attribution (`GetExtendedTcpTable` / `/proc/net`), and Windows Npcap bindings. |
-| [`netpulse-capture`](crates/netpulse-capture) | Ingest | Capture source abstractions (`PcapSource`, `LiveSource`), pcap/pcapng file readers/writers, bounded ring buffer, and packet shedding policy. |
-| [`netpulse-capture-svc`](crates/netpulse-capture-svc) | Daemon | Standalone, privileged capture daemon binary and IPC transport. |
-| [`netpulse-decode`](crates/netpulse-decode) | Decode | Fast, zero-copy protocol dissectors (Ethernet, ARP, IPv4, IPv6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS). Fuzzed in isolation. |
-| [`netpulse-flow`](crates/netpulse-flow) | Assembly | Bi-directional flow state machine, 5-tuple tracking, session synthesis, causal event ordering, and connection metrics. |
-| [`netpulse-storage`](crates/netpulse-storage) | Persistence | Thread-safe, SQLite-backed or in-memory `CaptureStore`, windowed queries, and time-series rollups. Enforces metadata-only retention policies. |
-| [`netpulse-narrative`](crates/netpulse-narrative) | Presentation | Session-to-story translation engine. Maps raw network events into human-understandable narrative cards across disclosure levels. |
-| [`netpulse-intel`](crates/netpulse-intel) | Intelligence | Security finding detectors (e.g., DNS tunneling, port scanning, plain-text credentials) and statistical anomaly engines with calibrated confidence scores. |
-| [`netpulse-ai`](crates/netpulse-ai) | AI Engine | Context retriever, prompt constructor, citation validator, and local/remote LLM backend interface. Holds the sole egress capability. |
-| [`netpulse-learn`](crates/netpulse-learn) | Education | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
-| [`netpulse-api`](crates/netpulse-api) | API | Versioned IPC DTO contract (`v4`), Query/Command definitions, stream message schemas, and TypeScript codegen. |
-| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | Plugin host, capability checking, signature verification, and reference plugin interfaces (dissectors, detectors, enrichment, views, export). |
-| [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | Main engine binary, live capture execution loop, pipeline assembly, and query execution. |
+**Status Legend**: ✅ Complete | 🚧 In Progress | 📋 Planned | Single Source of Truth: [`docs/status.yml`](docs/status.yml)
+
+| Crate Name | Layer | Design | Code | Runtime | Purpose & Responsibility |
+|---|---|:---:|:---:|:---:|---|
+| [`netpulse-core`](crates/netpulse-core) | Base | ✅ Complete | ✅ Complete | ✅ Complete | Shared data models (`Flow`, `Session`, `Finding`, `Packet`), error taxonomy, progressive disclosure levels (`Beginner`, `Intermediate`, `Expert`), and core traits. |
+| [`netpulse-platform`](crates/netpulse-platform) | Platform | ✅ Complete | 🚧 In Progress | 🚧 In Progress | OS-specific network interface enumeration, process attribution (`GetExtendedTcpTable`), and Windows Npcap bindings (behind `live-capture` feature gate). |
+| [`netpulse-capture`](crates/netpulse-capture) | Ingest | ✅ Complete | ✅ Complete | 🚧 In Progress | Capture source abstractions (`PcapSource`, `LiveSource`), PCAP/PCAPNG file readers/writers, bounded ring buffer, shedding policy, recording & replay. |
+| [`netpulse-capture-svc`](crates/netpulse-capture-svc) | Daemon | ✅ Complete | 🚧 In Progress | 📋 Planned | Standalone privileged capture daemon binary scaffold and IPC frame-handoff transport. |
+| [`netpulse-decode`](crates/netpulse-decode) | Decode | ✅ Complete | ✅ Complete | 🚧 In Progress | Zero-copy dissectors (Ethernet, ARP, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS) complete & fuzzed. QUIC/HTTP3, DHCP, mDNS planned. |
+| [`netpulse-flow`](crates/netpulse-flow) | Assembly | ✅ Complete | ✅ Complete | ✅ Complete | Bi-directional flow state machine, 5-tuple tracking, session synthesis, causal event ordering, and connection metrics. |
+| [`netpulse-storage`](crates/netpulse-storage) | Persistence | ✅ Complete | ✅ Complete | 🚧 In Progress | Thread-safe in-memory `CaptureStore`, windowed queries, and time-series rollups complete. Durable SQLite backend planned. |
+| [`netpulse-narrative`](crates/netpulse-narrative) | Presentation | ✅ Complete | ✅ Complete | ✅ Complete | Session-to-story translation engine. Maps raw network flows and sessions into human-understandable narrative cards across disclosure levels. |
+| [`netpulse-intel`](crates/netpulse-intel) | Intelligence | ✅ Complete | ✅ Complete | ✅ Complete | Rules-based threat detectors (DNS tunneling, port scans) and statistical anomaly engines with calibrated confidence scores. |
+| [`netpulse-ai`](crates/netpulse-ai) | AI Engine | ✅ Complete | ✅ Complete | 🚧 In Progress | Grounded retrieval, citation validator, and `LocalTemplateBackend` complete. Local ONNX LLM backend planned. Holds sole egress capability. |
+| [`netpulse-learn`](crates/netpulse-learn) | Education | ✅ Complete | ✅ Complete | ✅ Complete | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
+| [`netpulse-api`](crates/netpulse-api) | API | ✅ Complete | ✅ Complete | ✅ Complete | Versioned IPC DTO contract (`v4`), Query/Command definitions, stream message schemas, and TypeScript codegen. |
+| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Plugin seam traits, capability model, Ed25519 signature verifier, registry, and config manager complete. WASM host loader planned. |
+| [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | ✅ Complete | ✅ Complete | 🚧 In Progress | Main engine binary, offline PCAP file pipeline complete. Live capture loop execution and streaming push events in progress. |
 
 ---
 
@@ -133,8 +135,18 @@ Progressive cards          Confidence scoring          protocol explorer        
 
 The UI is managed as a pnpm workspace under `ui/`:
 
-- **`@netpulse/contract`** (`ui/packages/contract`): Generated TypeScript types matching `netpulse-api` Rust structs.
-- **`@netpulse/design-system`** (`ui/packages/design-system`): CSS design tokens, typography, dark mode palettes, protocol iconography, and severity styling.
-- **`@netpulse/components`** (`ui/packages/components`): Reusable, disclosure-aware UI components (cards, headers, filters, detail drawers).
-- **`@netpulse/viz`** (`ui/packages/viz`): WebGL and Canvas visualization primitives (Sparklines, Donut charts, Flow diagrams, Confidence meters).
-- **`@netpulse/app`** (`ui/app`): Main React 18 single-page application hosting screens (`Dashboard`, `Timeline`, `Security`, `Apps`, `Learn`, `Explorer`, `Plugins`).
+- **`@netpulse/contract`** (`ui/packages/contract`): ✅ Complete | Generated TypeScript types matching `netpulse-api` Rust structs.
+- **`@netpulse/design-system`** (`ui/packages/design-system`): 🚧 In Progress | CSS design tokens, typography, dark mode palettes, protocol iconography, and severity styling.
+- **`@netpulse/components`** (`ui/packages/components`): 🚧 In Progress | Reusable, disclosure-aware UI components (cards, headers, filters, detail drawers).
+- **`@netpulse/viz`** (`ui/packages/viz`): 🚧 In Progress | WebGL and Canvas visualization primitives (Sparklines, Donut charts, Flow diagrams, Confidence meters).
+- **`@netpulse/app`** (`ui/app`): 🚧 In Progress | Main React 18 single-page application hosting screens (`Dashboard`, `Timeline`, `Security`, `Apps`, `Learn`, `Explorer`, `Plugins`).
+
+---
+
+## 6. Documentation Ownership & Status Governance
+
+Documentation must strictly reflect the current implementation state of the source code.
+Whenever a pull request changes the maturity status of a crate or capability (e.g. implementing live capture or SQLite storage):
+1. Audit crate code and update [`docs/status.yml`](docs/status.yml).
+2. Update status tables in `README.md`, `ARCHITECTURE.md`, `docs/README.md`, and `crates/README.md`.
+3. Run `python scripts/verify_docs_status.py` to confirm zero drift and zero broken links before opening a PR.

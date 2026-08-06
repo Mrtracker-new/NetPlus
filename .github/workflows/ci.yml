@@ -66,6 +66,9 @@ jobs:
       - name: Verify Cargo lockfiles are unchanged
         run: git diff --exit-code Cargo.lock src-tauri/Cargo.lock
 
+      - name: Verify documentation status synchronization & links
+        run: python scripts/verify_docs_status.py
+
       - name: Contract drift
         shell: bash
         run: |

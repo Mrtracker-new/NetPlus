@@ -16,15 +16,22 @@ NetPulse reconstructs, explains, and teaches the complete story behind network e
 
 ---
 
-## Capabilities
+## Implementation Status & Capabilities
 
-| Capability | Components | Description |
-|---|---|---|
-| **Capture & Decoding** | `netpulse-capture`, `-decode`, `-flow`, `-storage`, `-platform` | Live Npcap / PCAP / PCAPNG capture, zero-copy protocol decoding (DNS, HTTP, TLS, TCP, UDP), flow assembly, and SQLite storage. |
-| **Narrative & Presentation** | `netpulse-narrative`, `netpulse-api`, `ui/` | Human narrative feed, real-time bandwidth & latency monitoring, OS process attribution (`GetExtendedTcpTable`), versioned v4 API contract. |
-| **Education & Exploration** | `netpulse-learn`, `ui/app` | Grounded interactive lessons, Website Load Journey reconstruction, interactive Protocol Explorer, animated flow visualizers. |
-| **Intelligence & AI** | `netpulse-intel`, `netpulse-ai` | Confidence-scored threat detectors (DNS tunneling, port scans), statistical anomaly engine, grounded local AI assistant. |
-| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `plugins/` | Session recording & deterministic replay, PCAPNG import/export, capability-bounded WASM/in-tree plugin system. |
+NetPulse capabilities are specified, implemented, and executed across three distinct maturity dimensions:
+- **Design**: Architecture, specs, contracts, and privacy bounds.
+- **Code**: Parsers, data models, state machines, and unit tests.
+- **Runtime**: Active execution in standard builds, live OS capture, persistent DB, or GUI integration.
+
+**Status Legend**: ✅ Complete | 🚧 In Progress | 📋 Planned | Single Source of Truth: [`docs/status.yml`](docs/status.yml)
+
+| Capability | Key Crates & Packages | Design | Code | Runtime | Description |
+|---|---|:---:|:---:|:---:|---|
+| **Capture & Decoding** | `netpulse-capture`, `netpulse-decode`, `netpulse-flow`, `netpulse-storage`, `netpulse-platform` | ✅ Complete | ✅ Complete | 🚧 In Progress | Zero-copy decoding (Ethernet, IPv4/6, TCP, UDP, DNS, HTTP, TLS), flow assembly, PCAP/PCAPNG parsing & replay complete. Live Npcap capture & durable SQLite storage in progress. |
+| **Narrative & Presentation** | `netpulse-narrative`, `netpulse-api`, `@netpulse/contract`, `ui/` | ✅ Complete | ✅ Complete | 🚧 In Progress | Session narrative card projection & v4 API DTO contract complete. Real-time bandwidth/latency monitoring UI & socket process attribution (`GetExtendedTcpTable`) in progress. |
+| **Education & Exploration** | `netpulse-learn`, `@netpulse/app` | ✅ Complete | ✅ Complete | ✅ Complete | Grounded interactive curriculum, Website Load Journey synthesizer, and Protocol Explorer reference content fully operational. |
+| **Intelligence & AI** | `netpulse-intel`, `netpulse-ai` | ✅ Complete | ✅ Complete | 🚧 In Progress | Threat detectors (DNS tunneling, port scans), statistical anomaly engine, grounded retrieval & `LocalTemplateBackend` complete. Local ONNX LLM backend planned. |
+| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `netpulse-capture-svc` | ✅ Complete | ✅ Complete | 🚧 In Progress | Session recording & deterministic replay, PCAPNG import/export, plugin seam traits & trust model complete. WASM runtime loader & privileged daemon loop in progress/planned. |
 
 ---
 
@@ -134,6 +141,7 @@ Run local checks before pushing:
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+python scripts/verify_docs_status.py
 pnpm --filter @netpulse/contract typecheck
 ```
 

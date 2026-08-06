@@ -33,8 +33,44 @@ use netpulse_plugin::{
     ContractVersion, PluginManifest, PluginRegistry, PluginType, TrustMetadata, TrustStatus,
 };
 use netpulse_storage::{CaptureStore, PayloadPolicy};
+use tauri::Manager;
 
 pub(crate) mod ipc;
+
+/// Typed errors returned during shell application shutdown.
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ShutdownError {
+    Capture(String),
+    Storage(String),
+    Health(String),
+}
+
+/// Structured summary report of shell lifecycle teardown outcomes and timing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ShutdownReport {
+    pub(crate) already_shutdown: bool,
+    pub(crate) health_signaled: bool,
+    pub(crate) capture_stopped: bool,
+    pub(crate) store_flushed: bool,
+    pub(crate) store_flush_duration: std::time::Duration,
+    pub(crate) errors: Vec<ShutdownError>,
+}
+
+impl ShutdownReport {
+    /// Returns a report indicating no work was performed because shutdown had already completed.
+    /// All status flags are intentionally false, duration is zero, and errors vector is empty.
+    pub(crate) fn already_done() -> Self {
+        Self {
+            already_shutdown: true,
+            health_signaled: false,
+            capture_stopped: false,
+            store_flushed: false,
+            store_flush_duration: std::time::Duration::ZERO,
+            errors: Vec::new(),
+        }
+    }
+}
 
 /// Shell state: the committed reconstruction store, the current disclosure depth,
 /// and the Phase 5 lifecycle state — recordings, an optional replay controller,
@@ -57,6 +93,10 @@ pub(crate) struct AppState {
     /// The live socket→PID source, or `None` where no backend exists (attribution
     /// then stays honestly Unknown, docs/12 §8).
     pub(crate) sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
+    /// Stop flag for the background HTTP health probe server.
+    pub(crate) health_stop: Arc<AtomicBool>,
+    /// Atomic once-guard guaranteeing shutdown sequence executes exactly once.
+    pub(crate) shutting_down: AtomicBool,
 }
 
 /// Scope guard that guarantees a completion signal is sent when live_loop exits
@@ -98,6 +138,8 @@ impl Default for AppState {
             capture: Mutex::new(None),
             correlator: Arc::new(Mutex::new(Correlator::new())),
             sockets: netpulse_platform::socket_table(),
+            health_stop: Arc::new(AtomicBool::new(false)),
+            shutting_down: AtomicBool::new(false),
         }
     }
 }
@@ -162,11 +204,142 @@ pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), Strin
     }
 }
 
+impl AppState {
+    fn shutdown_health(&self) -> bool {
+        tracing::info!(event = "health.stopping", "Signaling health probe HTTP server to stop");
+        self.health_stop.store(true, Ordering::Release);
+        true
+    }
+
+    fn shutdown_capture(&self) -> Result<bool, ShutdownError> {
+        let is_running = match self.capture.lock() {
+            Ok(g) => g.is_some(),
+            Err(p) => p.into_inner().is_some(),
+        };
+
+        if !is_running {
+            tracing::info!(event = "capture.idle", "No active live capture to stop");
+            return Ok(false);
+        }
+
+        tracing::info!(event = "capture.stopping", "Signaling live capture thread to stop");
+        match stop_capture(self) {
+            Ok(()) => {
+                tracing::info!(event = "capture.stopped", "Live capture stopped gracefully on shutdown");
+                Ok(true)
+            }
+            Err(e) => {
+                tracing::warn!(event = "shell.capture_stop_failed", "Live capture shutdown issue: {e}");
+                Err(ShutdownError::Capture(e))
+            }
+        }
+    }
+
+    fn shutdown_storage(&self) -> Result<std::time::Duration, ShutdownError> {
+        tracing::info!(event = "store.flushing", "Flushing persistent storage WAL");
+        let start = std::time::Instant::now();
+        let mut store_guard = match self.store.lock() {
+            Ok(g) => g,
+            Err(poison) => {
+                tracing::warn!(
+                    event = "shell.store_mutex_poisoned",
+                    "Capture store mutex poisoned; recovering state for shutdown flush"
+                );
+                poison.into_inner()
+            }
+        };
+
+        use netpulse_storage::Store;
+        let res = store_guard.flush();
+        let elapsed = start.elapsed();
+
+        match res {
+            Ok(()) => {
+                tracing::info!(
+                    event = "store.flushed",
+                    duration_ms = elapsed.as_millis(),
+                    "Storage flushed successfully"
+                );
+                Ok(elapsed)
+            }
+            Err(e) => {
+                tracing::error!(
+                    event = "shell.store_flush_failed",
+                    duration_ms = elapsed.as_millis(),
+                    "Failed to flush store on shutdown: {e}"
+                );
+                Err(ShutdownError::Storage(e.to_string()))
+            }
+        }
+    }
+
+    /// Performs graceful shutdown of shell background services:
+    /// 1. Signals background health probe HTTP server to terminate (`health_stop = true`, `Release` ordering).
+    /// 2. Signals and joins live capture thread (up to 3s timeout), committing pipeline state into `store`.
+    /// 3. Flushes persistent store (`Store::flush`, WAL commit / storage crash safety).
+    ///
+    /// Guarded by `shutting_down: AtomicBool` with `AcqRel` ordering to run exactly once.
+    pub(crate) fn shutdown(&self) -> ShutdownReport {
+        if self.shutting_down.swap(true, Ordering::AcqRel) {
+            return ShutdownReport::already_done();
+        }
+
+        tracing::info!(event = "shell.shutdown_start", "Initiating NetPulse desktop shell graceful shutdown");
+
+        let mut errors = Vec::new();
+
+        // 1. Health server stop flag (first, so health probe reports shutting down)
+        let health_signaled = self.shutdown_health();
+
+        // 2. Stop live capture (if running)
+        let capture_stopped = match self.shutdown_capture() {
+            Ok(stopped) => stopped,
+            Err(err) => {
+                errors.push(err);
+                false
+            }
+        };
+
+        // 3. Flush storage WAL (always runs, even if capture stop failed)
+        let (store_flushed, store_flush_duration) = match self.shutdown_storage() {
+            Ok(duration) => (true, duration),
+            Err(err) => {
+                errors.push(err);
+                (false, std::time::Duration::ZERO)
+            }
+        };
+
+        let report = ShutdownReport {
+            already_shutdown: false,
+            health_signaled,
+            capture_stopped,
+            store_flushed,
+            store_flush_duration,
+            errors,
+        };
+
+        tracing::info!(
+            event = "shell.shutdown_complete",
+            health_signaled = report.health_signaled,
+            capture_stopped = report.capture_stopped,
+            store_flushed = report.store_flushed,
+            flush_duration_ms = report.store_flush_duration.as_millis(),
+            errors_count = report.errors.len(),
+            "NetPulse desktop shell shutdown complete"
+        );
+
+        report
+    }
+}
+
 /// Stop the running live capture gracefully: signal the thread, wait for a completion
 /// signal (up to 3s), join cleanly, and commit the final reconstruction store.
 pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
-    let ctrl = state.capture.lock().map_err(|_| "state poisoned")?.take();
-    match ctrl {
+    let ctrl_guard = match state.capture.lock() {
+        Ok(mut g) => g.take(),
+        Err(p) => p.into_inner().take(),
+    };
+    match ctrl_guard {
         Some(ctrl) => {
             ctrl.stop.store(true, Ordering::Relaxed);
             match ctrl.done_rx.recv_timeout(std::time::Duration::from_secs(3)) {
@@ -178,8 +351,9 @@ pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
                 }
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     // Put control handle back so UI state honestly reflects thread is still running
-                    if let Ok(mut guard) = state.capture.lock() {
-                        *guard = Some(ctrl);
+                    match state.capture.lock() {
+                        Ok(mut g) => *g = Some(ctrl),
+                        Err(p) => *p.into_inner() = Some(ctrl),
                     }
                     Err("capture thread did not terminate within 3 seconds".into())
                 }
@@ -709,8 +883,8 @@ fn main() {
 
     tracing::info!(event = "engine.start", "NetPulse desktop shell starting");
 
+    let app_state = AppState::default();
     let health_config = netpulse_core::health::read_env_health_config();
-    let health_stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
     if health_config.enabled {
         let tracker = std::sync::Arc::new(netpulse_core::health::AtomicHealthTracker::default());
         let provider = std::sync::Arc::new(netpulse_core::health::CompositeHealthProvider::new(
@@ -721,16 +895,24 @@ fn main() {
         let _health_thread = netpulse_core::health::spawn_health_server(
             health_config,
             provider,
-            health_stop.clone(),
+            app_state.health_stop.clone(),
         )
         .ok();
     }
 
-    tauri::Builder::default()
-        .manage(AppState::default())
+    let app = tauri::Builder::default()
+        .manage(app_state)
         .invoke_handler(tauri::generate_handler![query, command])
-        .run(tauri::generate_context!())
-        .expect("error while running the NetPulse shell");
+        .build(tauri::generate_context!())
+        .expect("error while building the NetPulse shell");
+
+    app.run(|app_handle, event| match event {
+        tauri::RunEvent::ExitRequested { .. } | tauri::RunEvent::Exit => {
+            let state = app_handle.state::<AppState>();
+            let _report = state.shutdown();
+        }
+        _ => {}
+    });
 }
 
 #[cfg(test)]
@@ -1059,6 +1241,112 @@ mod tests {
             assert_eq!(handshake.min_supported_version, 5);
         } else {
             panic!("Expected Handshake variant in response");
+        }
+    }
+
+    #[test]
+    fn test_app_state_shutdown_is_idempotent() {
+        let state = AppState::default();
+        let report1 = state.shutdown();
+        assert!(!report1.already_shutdown);
+        assert!(report1.health_signaled);
+        assert!(!report1.capture_stopped);
+        assert!(report1.store_flushed);
+        assert!(report1.errors.is_empty());
+
+        let report2 = state.shutdown();
+        assert_eq!(report2, ShutdownReport::already_done());
+    }
+
+    #[test]
+    fn test_shutdown_once_guard_barrier_contention() {
+        let state = Arc::new(AppState::default());
+        let barrier = Arc::new(std::sync::Barrier::new(10));
+        let mut handles = Vec::new();
+
+        for _ in 0..10 {
+            let s = state.clone();
+            let b = barrier.clone();
+            handles.push(std::thread::spawn(move || {
+                b.wait();
+                s.shutdown()
+            }));
+        }
+
+        let reports: Vec<ShutdownReport> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+
+        let executed_count = reports.iter().filter(|r| !r.already_shutdown).count();
+        let skipped_count = reports.iter().filter(|r| r.already_shutdown).count();
+
+        assert_eq!(executed_count, 1, "Exactly one thread executes shutdown sequence");
+        assert_eq!(skipped_count, 9, "9 threads receive already_done report");
+    }
+
+    #[test]
+    fn test_shutdown_health_first_ordering() {
+        let state = AppState::default();
+        assert!(!state.health_stop.load(Ordering::Acquire));
+        let report = state.shutdown();
+        assert!(report.health_signaled);
+        assert!(state.health_stop.load(Ordering::Acquire));
+    }
+
+    #[test]
+    fn test_shutdown_when_capture_idle() {
+        let state = AppState::default();
+        let report = state.shutdown();
+        assert!(!report.already_shutdown);
+        assert!(!report.capture_stopped);
+        assert!(report.store_flushed);
+        assert!(report.errors.is_empty());
+    }
+
+    #[test]
+    fn test_shutdown_poisoned_store_mutex_recovers() {
+        let state = AppState::default();
+        let store_arc = state.store.clone();
+
+        // Deliberately poison the store mutex in a worker thread
+        let _ = std::thread::spawn(move || {
+            let _guard = store_arc.lock().unwrap();
+            panic!("Simulated store lock poison panic");
+        })
+        .join();
+
+        assert!(state.store.lock().is_err(), "Mutex must be poisoned");
+
+        let report = state.shutdown();
+        assert!(report.store_flushed, "Shutdown flush must succeed via poison recovery into_inner()");
+        assert!(report.errors.is_empty());
+    }
+
+    #[test]
+    fn test_shutdown_continues_on_capture_stop_failure() {
+        let state = AppState::default();
+        let stop = Arc::new(AtomicBool::new(false));
+        let (_done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+        // Spawn worker thread that ignores stop flag to trigger timeout
+        let handle = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_secs(4));
+        });
+
+        {
+            let mut guard = state.capture.lock().unwrap();
+            *guard = Some(CaptureControl {
+                stop,
+                done_rx,
+                handle,
+            });
+        }
+
+        let report = state.shutdown();
+        assert!(report.health_signaled);
+        assert!(!report.capture_stopped);
+        assert!(report.store_flushed, "Store flush must proceed even if capture stop fails");
+        assert_eq!(report.errors.len(), 1);
+        match &report.errors[0] {
+            ShutdownError::Capture(err) => assert!(err.contains("did not terminate within 3 seconds")),
+            _ => panic!("Expected ShutdownError::Capture"),
         }
     }
 }

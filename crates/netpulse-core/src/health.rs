@@ -404,7 +404,7 @@ where
                 "Health probe HTTP server listening"
             );
 
-            while !stop_flag.load(Ordering::Relaxed) {
+            while !stop_flag.load(Ordering::Acquire) {
                 // Set short read timeout to check stop flag cleanly
                 listener.set_ttl(64).ok();
 

@@ -1113,14 +1113,20 @@ mod tests {
             },
         );
 
-        // First call triggers background worker
+        // Pre-set in-flight flag to simulate an active background worker thread
+        ctx.hint_in_flight.store(true, Ordering::Release);
+
+        // Rebuild and commit while worker is in-flight must refuse to spawn a duplicate worker
         ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
 
-        // Second call while worker running should not spawn a duplicate
-        let prev_flag = ctx.hint_in_flight.swap(true, Ordering::AcqRel);
+        // Assert that the flag remains set and no channel message was queued
         assert!(
-            prev_flag,
-            "Flag must remain in-flight while worker is running"
+            ctx.hint_in_flight.load(Ordering::Acquire),
+            "Flag must remain in-flight when duplicate spawn is refused"
+        );
+        assert!(
+            ctx.hint_rx.try_recv().is_err(),
+            "No new worker should have been spawned to send hints"
         );
     }
 

@@ -1,13 +1,10 @@
-# ── Docs (excluded per project decision) ──────────────────────────
-docs/
-
 # ── Rust / Cargo ──────────────────────────────────────────────────
 target/
 **/*.rs.bk
 *.pdb
 # Cargo.lock is intentionally committed: this workspace ships binaries
 # (netpulse-engine, netpulse-capture-svc), so the lockfile is pinned for
-# reproducible builds (docs/03 §12). Do not ignore it.
+# reproducible builds. Do not ignore it.
 
 # ── Tauri ─────────────────────────────────────────────────────────
 src-tauri/target/

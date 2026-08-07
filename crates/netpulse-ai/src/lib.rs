@@ -202,7 +202,7 @@ mod tests {
             panic!(
                 "\nSingle Egress Boundary violated!\n\
                  Forbidden outbound networking dependencies detected in non-egress crates:\n\n{}\n\n\
-                 Only netpulse-ai (docs/02 §10) is permitted outbound network egress.\n",
+                 Only netpulse-ai is permitted outbound network egress.\n",
                 violations.join("\n")
             );
         }

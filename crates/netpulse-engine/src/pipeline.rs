@@ -30,8 +30,8 @@ use crate::monitor::{self, LossAccounting};
 use crate::project;
 
 /// A summary of one offline run, for reporting and tests ( golden
-/// reconstructions). `PartialEq` powers the live-vs-replay parity test (docs/21
-/// §10): a replayed run's report must equal the original's.
+/// reconstructions). `PartialEq` powers the live-vs-replay parity test:
+/// a replayed run's report must equal the original's.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OfflineReport {
     pub frames_read: usize,
@@ -189,8 +189,8 @@ pub fn analyze_file(
     Ok((store, report))
 }
 
-/// Map a libpcap link-layer type (DLT) to the decoder's [`LinkType`] (docs/07
-/// §4.2). Mirrors the pcap file reader's mapping so live and file captures decode
+/// Map a libpcap link-layer type (DLT) to the decoder's [`LinkType`].
+/// Mirrors the pcap file reader's mapping so live and file captures decode
 /// identically. `1` (Ethernet) is the near-universal case and the default.
 pub fn link_type_from_dlt(dlt: u32) -> LinkType {
     match dlt {

@@ -65,7 +65,7 @@ impl NarrativeCard {
     ) -> Self {
         assert!(
             !evidence.is_empty(),
-            "a narrative card must reference its evidence (docs/02 §6.3)"
+            "a narrative card must reference its evidence"
         );
         Self {
             headline: headline.into(),

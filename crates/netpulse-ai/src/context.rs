@@ -110,8 +110,8 @@ impl Intent {
     }
 }
 
-/// One grounded fact: a plain statement plus the evidence that backs it (docs/19
-/// §3). A fact with no evidence is a bug — the assistant never builds one.
+/// One grounded fact: a plain statement plus the evidence that backs it.
+/// A fact with no evidence is a bug — the assistant never builds one.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fact {
     pub text: String,

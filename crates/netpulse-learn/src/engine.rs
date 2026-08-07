@@ -10,8 +10,7 @@
 //! - A grounded offer **cites real evidence** ([`EvidenceRef`]s) — the same
 //!   evidence-reference invariant the narrative obeys. An offer
 //!   that asserts something the capture cannot show is a bug.
-//! - Detection runs **off the hot path** over already-committed data (docs/13
-//!   §10 , so it never affects capture.
+//! - Detection runs **off the hot path** over already-committed data, so it never affects capture.
 //!
 //! When the learner has produced no example of a concept, an offer can fall back
 //! to a curated example, clearly flagged `grounded = false` so the

@@ -278,7 +278,7 @@ pub enum QueryResponse {
     PageJourney {
         journey: PageJourneyDto,
     },
-    /// Protocol reference entries (browse or search, docs/15).
+    /// Protocol reference entries (browse or search).
     ExplorerEntries {
         entries: Vec<ExplorerEntryDto>,
     },

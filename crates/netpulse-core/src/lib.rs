@@ -1,7 +1,7 @@
 //! # netpulse-core
 //!
 //! The shared vocabulary of the whole system: the logical data model from
-//! [`docs/0-foundation/02_System_Architecture.md`] §6 plus the core role-noun
+//! The shared logical data model plus the core role-noun
 //! traits every higher layer implements.
 //!
 //! This crate is the base of the dependency graph: it depends on

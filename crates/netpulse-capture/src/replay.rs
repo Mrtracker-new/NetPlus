@@ -5,8 +5,7 @@
 //! instead of a NIC, preserving their **original capture timestamps** so replay
 //! timelines are truthful.
 //!
-//! [`ReplayController`] adds the time control the live view can't offer (docs/21
-//! §5): play/pause, speed, step, and seek. Seeking uses the recording's
+//! [`ReplayController`] adds the time control the live view can't offer: play/pause, speed, step, and seek. Seeking uses the recording's
 //! checkpoints so it need not replay from the very start each time
 //!All timing derives from recorded timestamps against a virtual
 //! clock — **never `now( ` or RNG** — which is what makes a
@@ -122,7 +121,7 @@ impl CaptureSource for ReplaySource {
 }
 
 /// The playback state a UI renders. `speed_percent` is 100 for 1×,
-/// 10 for slow-motion 0.1× (teaching, docs/16), 1000 for 10× review — an integer
+/// 10 for slow-motion 0.1× (teaching), 1000 for 10× review — an integer
 /// so it stays exact on the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ReplayState {
@@ -204,8 +203,7 @@ impl ReplayController {
         }
     }
 
-    /// Seek to `mono_nanos`, reconstructing position as of that instant (docs/21
-    /// §5). Snaps to the nearest checkpoint at or before the target, then advances
+    /// Seek to `mono_nanos`, reconstructing position as of that instant. Snaps to the nearest checkpoint at or before the target, then advances
     /// over frames — so a seek is bounded by the checkpoint spacing, not O(n) from
     /// the start.
     pub fn seek(&mut self, mono_nanos: u64) {

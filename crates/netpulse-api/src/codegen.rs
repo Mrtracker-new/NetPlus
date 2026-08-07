@@ -13,8 +13,8 @@
 //! test — [`crate::codegen::tests`] asserts the emitter's output equals the
 //! committed `ui/packages/contract/src/generated.ts`, and each DTO has a serde
 //! round-trip test pinning its field names (see [`crate::dto`]). If the two ever
-//! diverge, CI fails, exactly as the `contract-drift` gate specifies (docs/04
-//! §7). Swapping in `ts-rs` later is a drop-in that deletes this file.
+//! diverge, CI fails, exactly as the `contract-drift` gate specifies.
+//! Swapping in `ts-rs` later is a drop-in that deletes this file.
 
 /// Emit the complete TypeScript contract module for `ui/packages/contract`.
 ///

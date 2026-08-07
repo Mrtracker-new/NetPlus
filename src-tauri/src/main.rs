@@ -7,7 +7,7 @@
 //! This shell is intentionally thin. All analysis lives in `netpulse-engine`;
 //! the shell owns the committed store and maps a [`Query`] to a [`QueryResponse`]
 //! over the engine's read-only presentation view. `StartCapture`
-//! opens the platform's live backend (Windows/Npcap, docs/05) and drives a
+//! opens the platform's live backend (Windows/Npcap) and drives a
 //! background reconstruction loop; where the backend is unavailable it fails
 //! closed honestly rather than pretending. Capture is observe-only:
 //! a read-only frame stream wired to no injection API.

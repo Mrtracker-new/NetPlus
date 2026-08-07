@@ -4,8 +4,9 @@
 //! grounded* [`DistilledContext`] and must explain **only** that — it may add no
 //! facts of its own.
 //!
-//! Confining egress to this crate makes the privacy guarantee auditable (docs/02
-//! §10.1): the only type that could ever leave the device is a
+//! Confining egress to this crate makes the privacy guarantee auditable.
+//! All external AI interactions pass through an explicit, opt-in egress boundary:
+//! the only type that could ever leave the device is a
 //! [`DistilledContext`], and exactly what it discloses is inspectable via
 //! [`DistilledContext::disclosure_preview`] before any send.
 
@@ -23,8 +24,8 @@ pub trait AiBackend: std::fmt::Debug {
     fn is_remote(&self) -> bool;
 
     /// Produce a grounded explanation for `context`. The backend must explain the
-    /// provided facts and cite their evidence, adding nothing of its own (docs/19
-    /// §3). Returns the answer text; the assistant validates its citations against
+    /// provided facts and cite their evidence, adding nothing of its own.
+    /// Returns the answer text; the assistant validates its citations against
     /// the store afterwards, so grounding is *checked, not trusted*.
     fn explain(&self, context: &DistilledContext) -> String;
 }

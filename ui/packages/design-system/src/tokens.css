@@ -9,8 +9,8 @@
  *
  *
  * Light is the default; the original deep-observatory dark theme is preserved
- * under [data-theme="dark"]. Color is never the sole carrier of meaning (docs/09
- * §12) — glyphs and labels always accompany it in the components. */
+ * under [data-theme="dark"]. Color is never the sole carrier of meaning
+ * — glyphs and labels always accompany it in the components. */
 
 :root {
   color-scheme: light;

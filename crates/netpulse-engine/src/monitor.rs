@@ -8,7 +8,7 @@
 //! committed reconstruction model (: "consumes metrics from 06 and
 //! time-series from 08"); it holds no capture or storage logic of its own.
 //!
-//! Two honesty rules from docs/11 are load-bearing here:
+//! Two honesty rules are load-bearing here:
 //! - **Diagnoses are hypotheses, not verdicts**: every
 //!   [`Diagnosis`] carries a [`Confidence`] and the evidence it rests on, and is
 //!   phrased "looks like", never asserted as certain.

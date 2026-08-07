@@ -4,16 +4,14 @@
 //! views, and export formats. This crate turns the architecture's layer
 //! boundaries into **five stable seams** and — crucially — the
 //! **capability and trust model** that keeps an extension from compromising the
-//! safety, privacy, and honesty guarantees the whole product rests on (docs/24
-//! §1 . Per, the loader mechanism (dynamic/WASM is an implementation
+//! safety, privacy, and honesty guarantees the whole product rests on.
 //! detail; the *contracts and capability model here are the specified, stable
 //! part*.
 //!
 //! Three invariants are enforced **structurally**, not by trusting plugin authors
 //!
 //! - **No plugin gets egress.** There is no network/egress/system [`Capability`]
-//!   variant at all — the single egress boundary stays `netpulse-ai` (docs/02
-//!   §10.1). A plugin literally cannot request the capability to phone home.
+//!   variant at all — the single egress boundary stays `netpulse-ai`. A plugin literally cannot request the capability to phone home.
 //! - **Least capability per type.** Each [`PluginType`] is granted only the
 //!   capabilities its seam needs ([`capabilities_for`]).
 //! - **Honesty is preserved.** Detector plugins emit through the core
@@ -215,8 +213,7 @@ pub trait ViewPlugin: Configurable {
 }
 
 /// An export plugin: adds an output format under the same privacy
-/// discipline as built-ins — preview, sanitization, no implicit egress (docs/23
-/// §6). It writes bytes; it never transmits them.
+/// discipline as built-ins — preview, sanitization, no implicit egress. It writes bytes; it never transmits them.
 pub trait ExportPlugin: Configurable {
     fn id(&self) -> &'static str;
     /// The format's short name (e.g. "har", "siem").

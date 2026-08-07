@@ -128,8 +128,7 @@ fn triggering_host(trigger: &str) -> Option<String> {
 }
 
 /// A beginner-readable security phrase, only when the L7 evidence supports it.
-/// We never claim "encrypted" without seeing an encrypted protocol (docs/01 E3:
-/// simplifications may not lie).
+/// We never claim "encrypted" without seeing an encrypted protocol (simplifications may not lie).
 fn security_phrase(flows: &[&Flow]) -> Option<String> {
     let encrypted = flows
         .iter()

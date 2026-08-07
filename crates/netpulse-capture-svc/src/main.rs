@@ -10,7 +10,7 @@
 //! Observe-only: the capture backend is a read-only frame stream, wired to no
 //! injection API.
 //!
-//! **Status: foundation stub.** Real capture lands in Phase 1, docs/05.
+//! **Status: foundation stub.**
 #![forbid(unsafe_code)]
 
 use netpulse_core::telemetry::{init_telemetry, read_env_config};

@@ -1,4 +1,4 @@
--- Initial Capture Store Schema (docs/08 §5)
+-- Initial Capture Store Schema
 -- Tier 3 durable capture metadata tables and indexes.
 
 CREATE TABLE IF NOT EXISTS flows (

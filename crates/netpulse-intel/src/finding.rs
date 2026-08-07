@@ -24,8 +24,7 @@ use netpulse_core::{Confidence, EvidenceRef, FindingCategory};
 /// 1.0. A rule match can be *strong*; it is never *proof*.
 pub const MAX_INFERRED_CONFIDENCE: f32 = 0.95;
 
-/// The specific behaviour a finding describes — the named, bounded set (docs/17
-/// §4, "no vague 'threat'"). Each maps up to a broad [`FindingCategory`] for
+/// The specific behaviour a finding describes — the named, bounded set ("no vague 'threat'"). Each maps up to a broad [`FindingCategory`] for
 /// storage and carries its own human title and benign-explanation list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -98,8 +97,7 @@ impl FindingKind {
     }
 
     /// Innocent readings the finding must weigh. Surfaced to the
-    /// user so a benign-but-unusual event never reads as an accusation (docs/17
-    /// §9). A non-empty list is required by [`SecurityFinding::observe`].
+    /// user so a benign-but-unusual event never reads as an accusation. A non-empty list is required by [`SecurityFinding::observe`].
     pub fn benign_explanations(self) -> &'static [&'static str] {
         match self {
             FindingKind::UnexpectedEgress => &[

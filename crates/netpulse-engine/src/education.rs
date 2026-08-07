@@ -40,8 +40,8 @@ pub struct EducationView {
 /// Build the education view from a committed store at `depth`.
 pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
     // Own the per-session flow/event clones so the borrowed views can reference
-    // them while the education engines run (same pattern as `present`, docs/04
-    // §3.6: the projection is fed by the caller, which gathers from storage).
+    // them while the education engines run (the projection is fed by the caller,
+    // which gathers from storage).
     let session_ids = store.session_ids();
     let mut owned: Vec<(Session, Vec<Flow>, Vec<ProtoEvent>)> =
         Vec::with_capacity(session_ids.len());

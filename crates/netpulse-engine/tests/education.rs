@@ -182,7 +182,7 @@ fn the_reference_links_back_to_the_users_own_flow() {
         .reference
         .iter()
         .find(|e| e.key == "tls.sni")
-        .expect("tls.sni is browsable (docs/15 §4)");
+        .expect("tls.sni is browsable");
     assert!(tls.examples_available);
 }
 

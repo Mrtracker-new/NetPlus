@@ -1,5 +1,5 @@
 //! Network addressing primitives: the 5-tuple that identifies a flow, and the
-//! transport/application protocol enumerations. See and docs/06.
+//! transport/application protocol enumerations.
 
 use std::net::IpAddr;
 

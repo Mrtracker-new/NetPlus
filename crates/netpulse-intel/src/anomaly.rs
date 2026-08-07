@@ -1,7 +1,7 @@
 //! Anomaly detection: learning each machine's *normal* and flagging
 //! deviation from it — catching the unknown that the named rules can't.
 //!
-//! Two honesty rules from docs/20 are load-bearing here:
+//! Two honesty rules are load-bearing here:
 //! - **Deviation ≠ danger**: a finding says "different from your
 //!   normal, worth a look", never a verdict. Its confidence reflects
 //!   *both* how far outside normal the point is *and* how well-established the

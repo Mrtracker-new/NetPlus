@@ -8,11 +8,11 @@
 //! Runs at user privilege; it holds no raw-capture capability (that lives in the
 //! separate `netpulse-capture-svc` process .
 //!
-//! Phase 2 adds the presentation-side analysis layers that project the Phase 1
+//! Presentation-side analysis layers project the core
 //! model into what the UI shows: [`monitor`] (usage breakdowns + "why is it
-//! slow?" diagnostics, docs/11) and [`attribution`] (socket→process correlation,
-//! docs/12). [`project`] maps those and narrative cards into the `netpulse-api`
-//! wire DTOs. Phase 4 adds [`security`] — the intelligence projection that runs
+//! slow?" diagnostics) and [`attribution`] (socket→process correlation).
+//! [`project`] maps those and narrative cards into the `netpulse-api`
+//! wire DTOs. [`security`] is the intelligence projection that runs
 //! the `netpulse-intel` detectors and the grounded `netpulse-ai` assistant over
 //! the committed store. All are read-only projections over committed
 //! data.

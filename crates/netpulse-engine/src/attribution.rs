@@ -86,8 +86,7 @@ impl Correlator {
         Self::default()
     }
 
-    /// Ingest a socket-table snapshot observed at monotonic time `at` (docs/12
-    /// §5.1 poll step). Newer observations supersede older ones for the same
+    /// Ingest a socket-table snapshot observed at monotonic time `at`. Newer observations supersede older ones for the same
     /// 5-tuple; a changed `start_mono_nanos` means the socket was recycled by a
     /// new process, and the fresh identity wins.
     pub fn ingest_snapshot(&mut self, at: u64, owners: &[SocketOwner]) {
@@ -241,7 +240,7 @@ mod tests {
         assert!(c.is_same_process(&tuple(50004), 100, 500));
         assert!(
             !c.is_same_process(&tuple(50004), 100, 999),
-            "a reused PID with a new start time is a different process (docs/12 §5.3)"
+            "a reused PID with a new start time is a different process"
         );
     }
 

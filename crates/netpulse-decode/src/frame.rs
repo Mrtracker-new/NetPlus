@@ -1,16 +1,16 @@
 //! Structured dissection output. Dissection is **stateless per
 //! packet**: each parse depends only on the bytes and lower-layer
 //! context, never on history — that is what lets the decode pool parallelize
-//! freely. Cross-packet state (flows, reassembly) belongs to docs/06.
+//! freely. Cross-packet state (flows, reassembly) belongs to the flow engine.
 //!
 //! **Partial success is valid**: if a deeper layer fails, the
 //! layers that parsed are retained and [`Decoded::partial`] is set; the packet
 //! is never discarded.
 //!
 //! Two currencies flow out of here: the coarse [`netpulse_core::ProtoEventKind`]
-//! landmarks (the storage/narrative currency, stamped with a flow id + timestamp
-//! by docs/06) and the richer [`L7Detail`] the flow engine needs for causal
-//! session lineage (DNS name→IP, TLS SNI — .
+//! landmarks (the storage/narrative currency, stamped with a flow id + timestamp)
+//! and the richer [`L7Detail`] the flow engine needs for causal
+//! session lineage (DNS name→IP, TLS SNI).
 
 use std::net::IpAddr;
 

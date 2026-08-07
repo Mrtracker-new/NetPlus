@@ -109,7 +109,7 @@ fn main() {
                         sdk_dir.display()
                     );
                     let status = std::process::Command::new("powershell")
-                        .args(&["-NoProfile", "-Command", &ps_script])
+                        .args(["-NoProfile", "-Command", &ps_script])
                         .status();
 
                     if status.map(|s| s.success()).unwrap_or(false) && lib_x64.exists() {

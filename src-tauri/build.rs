@@ -86,6 +86,40 @@ fn main() {
             }
         }
 
+        // 5. Automatic fallback for clean Windows environments / CI runners:
+        // Fetch Npcap SDK into OUT_DIR if missing on host machine.
+        if !found {
+            if let Ok(out_dir_var) = std::env::var("OUT_DIR") {
+                let out_dir = PathBuf::from(out_dir_var);
+                let sdk_dir = out_dir.join("npcap-sdk");
+                let lib_x64 = sdk_dir.join("Lib").join("x64");
+
+                if lib_x64.exists() {
+                    println!("cargo:rustc-link-search=native={}", lib_x64.display());
+                    found = true;
+                } else {
+                    println!("cargo:warning=Npcap SDK not found locally. Downloading Npcap SDK for Windows build...");
+                    let zip_path = out_dir.join("npcap-sdk.zip");
+                    let ps_script = format!(
+                        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+                         Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile '{}'; \
+                         Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
+                        zip_path.display(),
+                        zip_path.display(),
+                        sdk_dir.display()
+                    );
+                    let status = std::process::Command::new("powershell")
+                        .args(&["-NoProfile", "-Command", &ps_script])
+                        .status();
+
+                    if status.map(|s| s.success()).unwrap_or(false) && lib_x64.exists() {
+                        println!("cargo:rustc-link-search=native={}", lib_x64.display());
+                        found = true;
+                    }
+                }
+            }
+        }
+
         if !found {
             println!("cargo:warning=Npcap SDK library directory not found. Set NPCAP_SDK_PATH or LIB if live capture linking requires Npcap.");
         }

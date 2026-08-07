@@ -30,15 +30,10 @@ netpulse-capture-svc = { path = "../crates/netpulse-capture-svc" }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
 
-# Live capture is a Windows/Npcap capability today; enable the platform
-# backend only there so the shell still builds on other targets (the feature
-# stays off and capture fails closed honestly).
-[target.'cfg(windows)'.dependencies]
-netpulse-platform = { path = "../crates/netpulse-platform", features = ["live-capture"] }
-
 [features]
 # Tauri's default custom-protocol feature for production builds.
 custom-protocol = ["tauri/custom-protocol"]
+live-capture = ["netpulse-platform/live-capture"]
 
 [profile.release]
 lto = true

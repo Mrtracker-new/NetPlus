@@ -277,7 +277,7 @@ jobs:
         run: pnpm --filter @netpulse/app... build
 
       - name: Build Tauri Desktop Application
-        run: pnpm --dir ui/app exec tauri build
+        run: node ui/app/node_modules/@tauri-apps/cli/tauri.js build
 
       - name: Validate OS Bundle Directories & Generate Checksums (Linux / macOS)
         if: matrix.os != 'windows-latest'

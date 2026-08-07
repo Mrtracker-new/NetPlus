@@ -61,7 +61,7 @@ export function Assistant() {
               className="np-assistant__input"
               type="text"
               value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPrompt(e.target.value)}
               placeholder={t("placeholder")}
               aria-label={t("placeholder")}
               disabled={busy}

@@ -48,7 +48,7 @@ export function CompareControls({
             type="number"
             min={1}
             value={sessionA}
-            onChange={(e) => onSessionAChange(parseSessionId(e.target.value))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSessionAChange(parseSessionId(e.target.value))}
             placeholder={t("select_baseline")}
             aria-label={t("select_baseline")}
           />
@@ -69,7 +69,7 @@ export function CompareControls({
             type="number"
             min={1}
             value={sessionB}
-            onChange={(e) => onSessionBChange(parseSessionId(e.target.value))}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => onSessionBChange(parseSessionId(e.target.value))}
             placeholder={t("select_target")}
             aria-label={t("select_target")}
           />

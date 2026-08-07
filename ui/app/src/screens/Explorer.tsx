@@ -65,7 +65,7 @@ export function Explorer() {
             type="search"
             placeholder={t("search_placeholder")}
             value={term}
-            onChange={(e) => setTerm(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTerm(e.target.value)}
             aria-label={t("search_placeholder")}
           />
         </div>

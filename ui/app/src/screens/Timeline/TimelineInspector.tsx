@@ -98,7 +98,7 @@ export function TimelineInspector({
           <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--np-muted, #8b9bb4)", marginBottom: "0.35rem" }}>
             Telemetry Evidence:
           </div>
-          <EvidenceChips evidence={event.evidence} onNavigate={(ref) => onNavigateEvidence(ref, "timeline")} />
+          <EvidenceChips evidence={event.evidence} onNavigate={(ref: any) => onNavigateEvidence(ref, "timeline")} />
         </div>
       )}
 

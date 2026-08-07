@@ -228,7 +228,7 @@ jobs:
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
       - name: Build frontend app
-        run: pnpm --filter @netpulse/app build
+        run: pnpm --filter @netpulse/app... build
 
       - name: Verify Cargo lockfiles are unchanged
         run: git diff --exit-code Cargo.lock src-tauri/Cargo.lock
@@ -274,7 +274,7 @@ jobs:
           workspaces: "src-tauri -> target"
 
       - name: Build frontend app
-        run: pnpm --filter @netpulse/app build
+        run: pnpm --filter @netpulse/app... build
 
       - name: Build Tauri Desktop Application
         run: pnpm --filter @netpulse/app tauri build

@@ -47,7 +47,7 @@ export function DiagnosticsScreen() {
         <div style={{ flex: "1 1 260px", minWidth: "220px" }}>
           <Input
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTarget(e.target.value)}
             placeholder={t("target_placeholder")}
             aria-label={t("target_placeholder")}
           />

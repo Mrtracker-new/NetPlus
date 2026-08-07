@@ -256,7 +256,6 @@ def main():
         REPO_ROOT / "CONTRIBUTING.md",
         REPO_ROOT / "SECURITY.md",
         REPO_ROOT / "docs" / "README.md",
-        REPO_ROOT / "docs" / "IMPLEMENTATION_PLAN.md",
         REPO_ROOT / "crates" / "README.md",
     ]
 

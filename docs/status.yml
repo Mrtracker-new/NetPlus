@@ -1,0 +1,119 @@
+# NetPulse System Implementation Status Manifest
+# Single authoritative source of truth for implementation maturity across crates & capabilities.
+# Synchronized with documentation via `python scripts/verify_docs_status.py`.
+
+version: 1
+last_updated: "2026-08-06"
+
+status_legend:
+  complete: "✅ Complete"
+  in_progress: "🚧 In Progress"
+  planned: "📋 Planned"
+
+crates:
+  netpulse-core:
+    layer: Base
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "Shared data models, traits, error taxonomy, and progressive disclosure levels."
+  netpulse-platform:
+    layer: Platform
+    design: complete
+    code: in_progress
+    runtime: in_progress
+    summary: "OS abstractions; Windows Npcap live capture & socket table behind `live-capture` feature gate."
+  netpulse-capture:
+    layer: Ingest
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "PCAP/PCAPNG file parsing, ring buffer, shedding policy, recording & replay complete."
+  netpulse-capture-svc:
+    layer: Daemon
+    design: complete
+    code: in_progress
+    runtime: planned
+    summary: "Privileged capture daemon binary scaffold; frame-handoff IPC daemon planned."
+  netpulse-decode:
+    layer: Decode
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "Zero-copy dissection for Ethernet, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS complete & fuzzed."
+  netpulse-flow:
+    layer: Assembly
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "Bi-directional flow state machine, 5-tuple tracking, and session synthesis."
+  netpulse-storage:
+    layer: Persistence
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "In-memory CaptureStore and query surface complete; durable SQLite backend planned."
+  netpulse-narrative:
+    layer: Presentation
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "Session-to-story translation engine and progressive disclosure card projection."
+  netpulse-intel:
+    layer: Intelligence
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "Rules-based threat detectors (DNS tunneling, port scans) and anomaly engine."
+  netpulse-ai:
+    layer: AI Engine
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "Single egress boundary, grounded retrieval, citation validator, and LocalTemplateBackend complete."
+  netpulse-learn:
+    layer: Education
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer content."
+  netpulse-api:
+    layer: API
+    design: complete
+    code: complete
+    runtime: complete
+    summary: "v4 DTO IPC contract and TypeScript type drift check."
+  netpulse-plugin:
+    layer: Extensibility
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "Extension seam traits, capability model, Ed25519 verifier & registry complete; WASM host planned."
+  netpulse-engine:
+    layer: Orchestrator
+    design: complete
+    code: complete
+    runtime: in_progress
+    summary: "Offline file analysis pipeline operational; live capture loop & event streaming in progress."
+
+ui_workspace:
+  contract:
+    design: complete
+    code: complete
+    runtime: complete
+  design_system:
+    design: complete
+    code: in_progress
+    runtime: in_progress
+  components:
+    design: complete
+    code: in_progress
+    runtime: in_progress
+  viz:
+    design: complete
+    code: in_progress
+    runtime: in_progress
+  app:
+    design: complete
+    code: in_progress
+    runtime: in_progress

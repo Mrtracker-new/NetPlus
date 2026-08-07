@@ -309,7 +309,7 @@ jobs:
             Copy-Item $file.FullName -Destination artifacts\
           }
           Set-Location artifacts
-          Get-FileHash -Algorithm SHA256 * | Out-File -Encoding ascii SHA256SUMS.txt
+          Get-ChildItem -File | Where-Object { $_.Name -ne "SHA256SUMS.txt" } | Get-FileHash -Algorithm SHA256 | Out-File -Encoding ascii SHA256SUMS.txt
           Get-Content SHA256SUMS.txt
 
       - name: Upload Desktop Application Artifacts (${{ matrix.os }})

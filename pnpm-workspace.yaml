@@ -1,6 +1,5 @@
 # pnpm workspace topology.
-# Dependencies are NOT installed in the foundation phase — this file declares
-# the package topology so Phase 2 can `pnpm install` and wire Vite + Tauri.
+# pnpm workspace topology for the NetPulse UI.
 packages:
   - "ui/app"
   - "ui/packages/*"

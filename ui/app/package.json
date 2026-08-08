@@ -2,7 +2,7 @@
   "name": "@netpulse/app",
   "version": "0.1.0",
   "private": true,
-  "description": "The Tauri-hosted NetPulse UI: routes, screens, Beginner/Intermediate/Expert disclosure. Phase 2.",
+  "description": "The Tauri-hosted NetPulse UI: routes, screens, Beginner/Intermediate/Expert disclosure.",
   "license": "MIT OR Apache-2.0",
   "type": "module",
   "scripts": {

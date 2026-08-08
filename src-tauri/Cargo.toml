@@ -31,6 +31,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
 
 [features]
+default = ["live-capture"]
 # Tauri's default custom-protocol feature for production builds.
 custom-protocol = ["tauri/custom-protocol"]
 live-capture = ["netpulse-platform/live-capture"]

@@ -57,7 +57,5 @@ tmp/
 temp/
 *.tmp
 .claude/
-
-# Local Tauri shell build config (machine-specific Npcap SDK path; use LIB env or
-# your own local path — see README "Live capture").
+.cargo/
 src-tauri/.cargo/

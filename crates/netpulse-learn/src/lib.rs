@@ -1,8 +1,8 @@
-//! # netpulse-learn — the education engine (Phase 3)
+//! # netpulse-learn — the education engine
 //!
 //! Turns NetPulse from a tool you *use* into a tool you *learn from*, using the
 //! learner's own captured traffic as the curriculum.
-//! This crate is the backend substrate for three of Phase 3's four surfaces:
+//! This crate is the backend substrate for three of the four surfaces:
 //!
 //! - **Learning Engine**: [`content`] authors lessons as data;
 //!   [`engine`] detects teachable moments in real traffic and offers grounded

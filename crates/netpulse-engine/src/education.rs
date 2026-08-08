@@ -1,9 +1,9 @@
-//! The Phase 3 education presentation: the read-only projection of
+//! The education presentation: the read-only projection of
 //! a committed capture into what the learning surfaces show — grounded lesson
 //! offers, staged website journeys, the browsable protocol reference, and the
 //! data-driven handshake animation model.
 //!
-//! Like the Phase 2 [`crate::pipeline::present`], this is a pure *view* over the
+//! Like [`crate::pipeline::present`], this is a pure *view* over the
 //! store: it runs off the hot path, gathers the
 //! reconstruction the caller already committed, and hands the education engines
 //! (`netpulse-learn`, `netpulse-narrative`) exactly the slices they need. It

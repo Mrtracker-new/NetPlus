@@ -1,7 +1,7 @@
 //! Tier 3 — the capture store: the authoritative record of
 //! flows, sessions, protocol events, and hosts — the structured reconstruction
 //! model. The physical design splits indexed metadata
-//! (SQLite) from bulk columnar files; this Phase 1 slice keeps the *same logical
+//! (SQLite) from bulk columnar files; this initial slice keeps the *same logical
 //! model and query surface* over an in-memory backing, so the SQLite backend can
 //! drop in behind the identical API later.
 

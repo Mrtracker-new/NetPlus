@@ -141,7 +141,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 3 education enums ---
+    // --- Education enums ---
     s.push_str(&union(
         "ExerciseKind",
         &["identify", "explain_back", "predict", "diagnose"],
@@ -173,7 +173,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 3 education interfaces ---
+    // --- Education interfaces ---
     s.push_str(&iface(
         "GroundedExercise",
         &[
@@ -252,7 +252,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 4 intelligence enums ---
+    // --- Intelligence enums ---
     s.push_str(&union(
         "FindingCategory",
         &["anomaly", "suspicious", "informational"],
@@ -273,7 +273,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 4 intelligence interfaces ---
+    // --- Intelligence interfaces ---
     s.push_str(&iface(
         "SecurityFinding",
         &[
@@ -322,7 +322,7 @@ pub fn typescript_contract() -> String {
         ],
     ));
 
-    // --- Phase 5 lifecycle enums ---
+    // --- Lifecycle enums ---
     s.push_str(&union(
         "PayloadLevel",
         &["metadata_only", "headers", "full_payload"],
@@ -357,7 +357,7 @@ pub fn typescript_contract() -> String {
          | { kind: \"all\" };\n",
     );
 
-    // --- Phase 5 lifecycle interfaces ---
+    // --- Lifecycle interfaces ---
     s.push_str(&iface(
         "VersionPins",
         &[

@@ -1,4 +1,4 @@
-//! End-to-end Phase 3 education test. Reuses the Phase 1/2 golden
+//! End-to-end education test. Reuses the golden
 //! fixture — a DNS lookup for `example.com` followed by a TLS connection to the
 //! resolved IP — and asserts the *education projection* over it: the grounded
 //! lesson offers, the staged website journey, the protocol reference wired to

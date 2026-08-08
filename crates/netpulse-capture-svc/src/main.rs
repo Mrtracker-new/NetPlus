@@ -39,7 +39,7 @@ fn main() {
         "NetPulse capture service started — Privileged, observe-only"
     );
 
-    // Foundation stub: enumerating interfaces is unimplemented until Phase 1.
+    // Stub: interface enumeration is not yet implemented.
     // Referencing the type keeps the platform dependency exercised.
     let _list_fn = netpulse_platform::list_interfaces;
     let _shed = netpulse_capture::ShedStage::None;

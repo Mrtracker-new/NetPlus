@@ -1,5 +1,5 @@
-//! End-to-end Phase 2 presentation test. Reuses the
-//! Phase 1 golden fixture — a DNS lookup for `example.com` followed by a TLS
+//! End-to-end presentation test. Reuses the
+//! golden fixture — a DNS lookup for `example.com` followed by a TLS
 //! connection to the resolved IP — and asserts the *presentation projection*
 //! over it: the narrative feed card and the monitoring snapshot the UI receives.
 //!

@@ -1,4 +1,4 @@
-//! The Phase 2 wire types. These are the *contract
+//! The wire types. These are the *contract
 //! DTOs*: the exact shapes that cross the Tauri IPC boundary between engine and
 //! UI. They are deliberately separate from the internal domain types in
 //! `netpulse-narrative` / `netpulse-engine` (which sit *above* this crate in the
@@ -184,9 +184,9 @@ pub struct InterfaceDto {
     pub description: Option<String>,
 }
 
-// ===== Phase 3 — Education ====================================
+// ===== Education ====================================
 //
-// The wire projections of the education surfaces. Like the Phase 2 DTOs above,
+// The wire projections of the education surfaces. Like the DTOs above,
 // these are deliberately distinct from the rich domain types in `netpulse-learn`
 // / `netpulse-narrative`; the engine maps down into these stable shapes. Every
 // one that asserts something about the learner's traffic carries `evidence`
@@ -327,7 +327,7 @@ pub struct AnimationModelDto {
     pub reduced_motion: Vec<String>,
 }
 
-// ===== Phase 4 — Intelligence =================================
+// ===== Intelligence =================================
 //
 // The wire projections of the Security Engine and AI Assistant. Like every DTO
 // above, these are distinct from the rich domain types in `netpulse-intel` /
@@ -428,7 +428,7 @@ pub struct AssistantAnswerDto {
     pub disclosure: String,
 }
 
-// ===== Phase 5 — Lifecycle & Extensibility ====================
+// ===== Lifecycle & Extensibility ====================
 //
 // The wire projections of Recording, Replay, Export, and Plugins. As with every
 // DTO above, these are distinct from the rich domain types in `netpulse-capture`

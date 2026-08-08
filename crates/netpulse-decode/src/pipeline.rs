@@ -179,7 +179,7 @@ fn identify_and_dissect(out: &mut Decoded, src_port: u16, dst_port: u16, app: &[
                 return;
             }
         }
-        // QUIC identification (long-header form) is left to Phase 1 deepening
+        // QUIC identification (long-header form) is planned for future implementation
         //for now UDP/443 is hinted, not dissected.
     }
 

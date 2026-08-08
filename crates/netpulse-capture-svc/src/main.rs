@@ -9,19 +9,20 @@
 //!
 //! Observe-only: the capture backend is a read-only frame stream, wired to no
 //! injection API.
-//!
-//! **Status: foundation stub.**
+
 #![forbid(unsafe_code)]
 
+use netpulse_capture_svc::{CaptureDaemon, DaemonConfig};
 use netpulse_core::telemetry::{init_telemetry, read_env_config};
+use std::process::ExitCode;
 
-fn main() {
+fn main() -> ExitCode {
     let config = read_env_config("netpulse-capture-svc", env!("CARGO_PKG_VERSION"));
     let _handle = match init_telemetry(config) {
         Ok(h) => h,
         Err(e) => {
             eprintln!("Failed to initialize telemetry in netpulse-capture-svc: {e}");
-            return;
+            return ExitCode::FAILURE;
         }
     };
 
@@ -39,13 +40,49 @@ fn main() {
         "NetPulse capture service started — Privileged, observe-only"
     );
 
-    // Stub: interface enumeration is not yet implemented.
-    // Referencing the type keeps the platform dependency exercised.
-    let _list_fn = netpulse_platform::list_interfaces;
-    let _shed = netpulse_capture::ShedStage::None;
+    let mut args = std::env::args().skip(1);
+    let mut daemon_cfg = DaemonConfig::default();
 
-    tracing::info!(
-        event = "capture.stopped",
-        "NetPulse capture service finished execution"
-    );
+    while let Some(arg) = args.next() {
+        match arg.as_str() {
+            "--interface" | "-i" => {
+                if let Some(val) = args.next() {
+                    daemon_cfg.iface_id = val.parse().unwrap_or(0);
+                }
+            }
+            "--socket" | "-s" => {
+                if let Some(val) = args.next() {
+                    daemon_cfg.socket_path = val;
+                }
+            }
+            "--capacity" | "-c" => {
+                if let Some(val) = args.next() {
+                    daemon_cfg.buffer_capacity = val.parse().unwrap_or(50_000);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut daemon = CaptureDaemon::new(daemon_cfg);
+    let stdout = std::io::stdout();
+
+    // Stream framed binary transport batches to stdout/socket stream
+    match daemon.run_stream(stdout.lock()) {
+        Ok(()) => {
+            tracing::info!(
+                event = "capture.stopped",
+                "NetPulse capture service finished execution cleanly"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => {
+            tracing::error!(
+                event = "capture.error",
+                error = %e,
+                "NetPulse capture service exited with error"
+            );
+            ExitCode::FAILURE
+        }
+    }
 }

@@ -87,18 +87,12 @@ pub fn usize_to_i64(val: usize, field: &'static str) -> Result<i64> {
 
 /// Safely convert a stored SQLite `i64` value back to a domain `u64`.
 pub fn i64_to_u64(val: i64, field: &'static str) -> Result<u64> {
-    u64::try_from(val).map_err(|_| StorageError::InvalidStoredValue {
-        field,
-        value: val,
-    })
+    u64::try_from(val).map_err(|_| StorageError::InvalidStoredValue { field, value: val })
 }
 
 /// Safely convert a stored SQLite `i64` count back to `usize`.
 pub fn i64_to_usize(val: i64, field: &'static str) -> Result<usize> {
-    usize::try_from(val).map_err(|_| StorageError::InvalidStoredValue {
-        field,
-        value: val,
-    })
+    usize::try_from(val).map_err(|_| StorageError::InvalidStoredValue { field, value: val })
 }
 
 /// Safely convert a `u64` count (e.g. rows_affected) to `usize`.
@@ -1141,10 +1135,7 @@ mod tests {
     fn test_checked_conversion_helpers() {
         // u64_to_i64 boundary tests
         assert_eq!(u64_to_i64(0, "field").unwrap(), 0);
-        assert_eq!(
-            u64_to_i64(i64::MAX as u64, "field").unwrap(),
-            i64::MAX
-        );
+        assert_eq!(u64_to_i64(i64::MAX as u64, "field").unwrap(), i64::MAX);
         match u64_to_i64(i64::MAX as u64 + 1, "field").unwrap_err() {
             StorageError::ValueOutOfRange { field, value, max } => {
                 assert_eq!(field, "field");
@@ -1163,10 +1154,7 @@ mod tests {
         // usize_to_i64 platform-independent boundary tests
         assert_eq!(usize_to_i64(0, "field").unwrap(), 0);
         if (i64::MAX as u128) <= (usize::MAX as u128) {
-            assert_eq!(
-                usize_to_i64(i64::MAX as usize, "field").unwrap(),
-                i64::MAX
-            );
+            assert_eq!(usize_to_i64(i64::MAX as usize, "field").unwrap(), i64::MAX);
         }
         if (usize::MAX as u128) > (i64::MAX as u128) {
             let overflow_usize = (i64::MAX as u128 + 1) as usize;
@@ -1217,7 +1205,10 @@ mod tests {
         let res = repo.insert_flow(flow, vec![]).await;
         assert!(matches!(
             res.unwrap_err(),
-            StorageError::ValueOutOfRange { field: "flow.id", .. }
+            StorageError::ValueOutOfRange {
+                field: "flow.id",
+                ..
+            }
         ));
 
         // 2. flow.first_ts.mono_nanos = u64::MAX
@@ -1454,7 +1445,10 @@ mod tests {
                 assert_eq!(field, "session_id");
                 assert_eq!(value, -1);
             }
-            other => panic!("Expected InvalidStoredValue for session_id, got {:?}", other),
+            other => panic!(
+                "Expected InvalidStoredValue for session_id, got {:?}",
+                other
+            ),
         }
 
         // 2. Manually insert raw negative proto_events row: flow_id = 99, ts = -1
@@ -1481,7 +1475,10 @@ mod tests {
                 assert_eq!(field, "ProtoEventRow.ts");
                 assert_eq!(value, -500);
             }
-            other => panic!("Expected InvalidStoredValue for ProtoEventRow.ts, got {:?}", other),
+            other => panic!(
+                "Expected InvalidStoredValue for ProtoEventRow.ts, got {:?}",
+                other
+            ),
         }
 
         // 3. Manually insert raw negative finding row: finding_id = -50
@@ -1494,9 +1491,10 @@ mod tests {
         .unwrap();
 
         // Reading all findings / looking up finding by negative id via raw query
-        let row: std::result::Result<FindingRow, _> = sqlx::query_as("SELECT * FROM findings WHERE finding_id = -50")
-            .fetch_one(repo.pool())
-            .await;
+        let row: std::result::Result<FindingRow, _> =
+            sqlx::query_as("SELECT * FROM findings WHERE finding_id = -50")
+                .fetch_one(repo.pool())
+                .await;
         assert!(row.is_ok());
         let f_row = row.unwrap();
         let conv_res = i64_to_u64(f_row.finding_id, "FindingRow.finding_id");
@@ -1506,7 +1504,10 @@ mod tests {
                 assert_eq!(field, "FindingRow.finding_id");
                 assert_eq!(value, -50);
             }
-            other => panic!("Expected InvalidStoredValue for FindingRow.finding_id, got {:?}", other),
+            other => panic!(
+                "Expected InvalidStoredValue for FindingRow.finding_id, got {:?}",
+                other
+            ),
         }
     }
 }

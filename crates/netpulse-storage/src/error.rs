@@ -46,10 +46,7 @@ pub enum StorageError {
     },
 
     #[error("Invalid stored value in SQLite database: field '{field}' contains negative signed value {value} which cannot be converted to u64")]
-    InvalidStoredValue {
-        field: &'static str,
-        value: i64,
-    },
+    InvalidStoredValue { field: &'static str, value: i64 },
 }
 
 pub type MigrationError = StorageError;

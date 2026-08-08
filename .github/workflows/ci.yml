@@ -195,6 +195,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
+      - name: Install Windows system dependencies (Npcap)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install npcap -y --no-progress
+          echo "C:\Windows\System32\Npcap" >> $env:GITHUB_PATH
+
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -250,6 +256,12 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Windows system dependencies (Npcap)
+        if: matrix.os == 'windows-latest'
+        run: |
+          choco install npcap -y --no-progress
+          echo "C:\Windows\System32\Npcap" >> $env:GITHUB_PATH
 
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable

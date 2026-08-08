@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Replay } from "../screens/Replay";
@@ -98,6 +98,9 @@ describe("Replay Screen & useReplayController", () => {
     const playBtn = screen.getByRole("button", { name: "▶️ Play" });
     fireEvent.click(playBtn);
 
-    expect(cmdSpy).toHaveBeenCalledWith({ kind: "replayPlay" });
+    await waitFor(() => {
+      expect(cmdSpy).toHaveBeenCalledWith({ kind: "replayPlay" });
+      expect(screen.getByRole("button", { name: "▶️ Play" })).not.toBeDisabled();
+    });
   });
 });

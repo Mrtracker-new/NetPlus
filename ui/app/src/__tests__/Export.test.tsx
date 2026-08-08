@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Export } from "../screens/Export";
@@ -101,11 +101,14 @@ describe("Export Screen & useExportController", () => {
     const exportBtn = screen.getByRole("button", { name: "📥 Export to File" });
     fireEvent.click(exportBtn);
 
-    expect(cmdSpy).toHaveBeenCalledWith({
-      kind: "startExport",
-      selection: { kind: "all" },
-      format: "json",
-      level: "metadata_only",
+    await waitFor(() => {
+      expect(cmdSpy).toHaveBeenCalledWith({
+        kind: "startExport",
+        selection: { kind: "all" },
+        format: "json",
+        level: "metadata_only",
+      });
+      expect(screen.getByText("Export written locally to disk. Sharing is a separate, explicit action.")).toBeInTheDocument();
     });
   });
 });

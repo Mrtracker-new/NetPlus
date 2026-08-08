@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Plugins } from "../screens/Plugins";
@@ -90,6 +90,9 @@ describe("Plugins Screen & usePluginsController", () => {
     const enableBtn = screen.getByRole("button", { name: "Enable" });
     fireEvent.click(enableBtn);
 
-    expect(cmdSpy).toHaveBeenCalledWith({ kind: "enablePlugin", name: "JA3 Fingerprinter" });
+    await waitFor(() => {
+      expect(cmdSpy).toHaveBeenCalledWith({ kind: "enablePlugin", name: "JA3 Fingerprinter" });
+      expect(screen.getByRole("button", { name: "Enable" })).not.toBeDisabled();
+    });
   });
 });

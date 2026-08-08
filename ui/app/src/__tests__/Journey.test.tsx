@@ -66,7 +66,7 @@ describe("Journey Screen & useJourneyController", () => {
     __resetForTest();
   });
 
-  it("controller hook extracts sessions from store feed evidence", () => {
+  it("controller hook extracts sessions from store feed evidence", async () => {
     setFeed([
       {
         headline: "google.com session started",
@@ -85,6 +85,8 @@ describe("Journey Screen & useJourneyController", () => {
         </DisclosureProvider>
       ),
     });
+
+    await waitFor(() => expect(result.current.loaded).toBe(true));
 
     expect(result.current.sessions.length).toBe(1);
     expect(result.current.sessions[0]?.id).toBe(101);

@@ -126,7 +126,7 @@ Progressive cards          Confidence scoring          protocol explorer        
 | [`netpulse-ai`](crates/netpulse-ai) | AI Engine | ✅ Complete | ✅ Complete | 🚧 In Progress | Grounded retrieval, citation validator, and `LocalTemplateBackend` complete. Local ONNX LLM backend planned. Holds sole egress capability. |
 | [`netpulse-learn`](crates/netpulse-learn) | Education | ✅ Complete | ✅ Complete | ✅ Complete | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
 | [`netpulse-api`](crates/netpulse-api) | API | ✅ Complete | ✅ Complete | ✅ Complete | Versioned IPC DTO contract (`v4`), Query/Command definitions, stream message schemas, and TypeScript codegen. |
-| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Plugin seam traits, capability model, Ed25519 signature verifier, registry, and config manager complete. WASM host loader planned. |
+| [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Plugin seam traits (`Dissector`, `Detector`, `Enrichment`, `ExportPlugin`, `ViewPlugin`), capability model, Ed25519 signature verifier, registry, and config manager complete. WASM host loader planned. |
 | [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | ✅ Complete | ✅ Complete | 🚧 In Progress | Main engine binary, offline PCAP file pipeline complete. Live capture loop execution and streaming push events in progress. |
 
 ---

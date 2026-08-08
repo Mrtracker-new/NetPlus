@@ -22,7 +22,7 @@ The core NetPulse backend is structured as a Rust workspace comprising 14 decoup
 | [`netpulse-ai`](netpulse-ai/) | AI Engine | ✅ Complete | ✅ Complete | 🚧 In Progress | Grounded context retriever, citation validator, and `LocalTemplateBackend` complete. Local ONNX LLM backend planned. **Holds sole egress capability.** |
 | [`netpulse-learn`](netpulse-learn/) | Education | ✅ Complete | ✅ Complete | ✅ Complete | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
 | [`netpulse-api`](netpulse-api/) | API | ✅ Complete | ✅ Complete | ✅ Complete | Versioned IPC contract (`v4`), Query/Command/Stream DTOs, and automated TypeScript codegen for `@netpulse/contract`. |
-| [`netpulse-plugin`](netpulse-plugin/) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Extension seam traits (`Dissector`, `Detector`, `Enrichment`, `ExportPlugin`), capability model, Ed25519 verifier, registry complete; WASM host planned. |
+| [`netpulse-plugin`](netpulse-plugin/) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Extension seam traits (`Dissector`, `Detector`, `Enrichment`, `ExportPlugin`, `ViewPlugin`), capability model, Ed25519 verifier, registry complete; WASM host planned. |
 | [`netpulse-engine`](netpulse-engine/) | Orchestrator | ✅ Complete | ✅ Complete | 🚧 In Progress | Main engine binary, offline PCAP file pipeline complete. Live capture execution loop and stream dispatcher in progress. |
 
 ---

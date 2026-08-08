@@ -23,7 +23,7 @@ We acknowledge receipt of security reports within 72 hours and provide remediati
 
 ## 2. Security Architecture & Isolation Boundaries
 
-NetPulse minimizes its attack surface through five structural boundaries:
+NetPulse minimizes its attack surface through three structural boundaries:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐

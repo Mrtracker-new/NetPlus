@@ -38,6 +38,7 @@ Packets ──► Dissector ──► Enrichment ──► Detector ──► En
 - **Architectural Prohibitions**:
   - MUST NOT parse raw bytes (`Capability::ParseBytes`)
   - MUST NOT emit security findings (`Capability::EmitFindings`)
+  - MUST NOT read engine model state (`Capability::ReadModel`)
   - MUST NOT read arbitrary local filesystem data (`Capability::ReadLocalData`)
   - MUST NOT write export files (`Capability::WriteOutput`)
   - MUST NOT perform network egress (no egress capability exists)

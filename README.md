@@ -117,7 +117,7 @@ cargo tauri dev
 crates/       14 Rust workspace crates — engine, decode, flow, storage, intel, AI, API
 ui/           pnpm workspace — app, contract, design-system, components, viz
 src-tauri/    Tauri v2 desktop shell and IPC bridge
-plugins/      First-party reference plugins (dissector, detector, enrichment, export)
+plugins/      First-party reference plugins (dissector, detector, enrichment, export, view)
 fixtures/     Deterministic test capture files (.pcap / .pcapng)
 fuzz/         cargo-fuzz targets for protocol dissectors
 models/       Local ONNX model files and model cards

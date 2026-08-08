@@ -37,6 +37,19 @@ pub enum StorageError {
 
     #[error("Deserialization error: {0}")]
     Deserialization(serde_json::Error),
+
+    #[error("Value out of range for SQLite storage: field '{field}' value {value} exceeds maximum supported i64 ({max})")]
+    ValueOutOfRange {
+        field: &'static str,
+        value: u128,
+        max: i64,
+    },
+
+    #[error("Invalid stored value in SQLite database: field '{field}' contains negative signed value {value} which cannot be converted to u64")]
+    InvalidStoredValue {
+        field: &'static str,
+        value: i64,
+    },
 }
 
 pub type MigrationError = StorageError;

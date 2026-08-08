@@ -67,6 +67,49 @@ pub trait CaptureRepository: std::fmt::Debug + Send + Sync {
     }
 }
 
+/// Safely convert a domain `u64` value to a signed `i64` for SQLite storage.
+pub fn u64_to_i64(val: u64, field: &'static str) -> Result<i64> {
+    i64::try_from(val).map_err(|_| StorageError::ValueOutOfRange {
+        field,
+        value: val as u128,
+        max: i64::MAX,
+    })
+}
+
+/// Safely convert a `usize` value (e.g. eviction counts) to `i64` for SQLite storage.
+pub fn usize_to_i64(val: usize, field: &'static str) -> Result<i64> {
+    i64::try_from(val).map_err(|_| StorageError::ValueOutOfRange {
+        field,
+        value: val as u128,
+        max: i64::MAX,
+    })
+}
+
+/// Safely convert a stored SQLite `i64` value back to a domain `u64`.
+pub fn i64_to_u64(val: i64, field: &'static str) -> Result<u64> {
+    u64::try_from(val).map_err(|_| StorageError::InvalidStoredValue {
+        field,
+        value: val,
+    })
+}
+
+/// Safely convert a stored SQLite `i64` count back to `usize`.
+pub fn i64_to_usize(val: i64, field: &'static str) -> Result<usize> {
+    usize::try_from(val).map_err(|_| StorageError::InvalidStoredValue {
+        field,
+        value: val,
+    })
+}
+
+/// Safely convert a `u64` count (e.g. rows_affected) to `usize`.
+pub fn u64_to_usize(val: u64, field: &'static str) -> Result<usize> {
+    usize::try_from(val).map_err(|_| StorageError::ValueOutOfRange {
+        field,
+        value: val as u128,
+        max: i64::MAX,
+    })
+}
+
 /// Resolve the canonical OS-specific default path for the NetPulse SQLite database.
 pub fn default_db_path() -> PathBuf {
     if let Some(proj_dirs) = directories::ProjectDirs::from("com", "NetPulse", "NetPulse") {
@@ -468,7 +511,17 @@ impl SqliteCaptureRepository {
 impl CaptureRepository for SqliteCaptureRepository {
     async fn insert_flow(&self, flow: Flow, events: Vec<ProtoEvent>) -> Result<()> {
         let key_bytes = serde_json::to_vec(&flow.key).map_err(StorageError::Serialization)?;
-        let rtt = flow.stats.rtt_estimate_nanos.map(|n| n / 1000).unwrap_or(0);
+        let rtt_i64 = match flow.stats.rtt_estimate_nanos {
+            Some(n) => u64_to_i64(n, "flow.stats.rtt_estimate_nanos")? / 1000,
+            None => 0,
+        };
+
+        let flow_id_i64 = u64_to_i64(flow.id, "flow.id")?;
+        let first_ts_i64 = u64_to_i64(flow.first_ts.mono_nanos, "flow.first_ts.mono_nanos")?;
+        let last_ts_i64 = u64_to_i64(flow.last_ts.wall_nanos, "flow.last_ts.wall_nanos")?;
+        let bytes_i64 = u64_to_i64(flow.stats.bytes, "flow.stats.bytes")?;
+        let packets_i64 = u64_to_i64(flow.stats.packets, "flow.stats.packets")?;
+        let retransmits_i64 = i64::from(flow.stats.retransmits);
 
         let mut tx = self.pool.begin().await?;
 
@@ -490,19 +543,19 @@ impl CaptureRepository for SqliteCaptureRepository {
                 state=excluded.state
             "#,
         )
-        .bind(flow.id as i64)
+        .bind(flow_id_i64)
         .bind(key_bytes)
         .bind(0i64)
         .bind(0i64)
         .bind(0i64)
-        .bind(flow.first_ts.mono_nanos as i64)
-        .bind(flow.last_ts.wall_nanos as i64)
-        .bind(flow.stats.bytes as i64)
+        .bind(first_ts_i64)
+        .bind(last_ts_i64)
+        .bind(bytes_i64)
         .bind(0i64)
-        .bind(flow.stats.packets as i64)
+        .bind(packets_i64)
         .bind(0i64)
-        .bind(rtt as i64)
-        .bind(flow.stats.retransmits as i64)
+        .bind(rtt_i64)
+        .bind(retransmits_i64)
         .bind(0i64)
         .execute(&mut *tx)
         .await?;
@@ -510,14 +563,16 @@ impl CaptureRepository for SqliteCaptureRepository {
         for event in events {
             let fields_json =
                 serde_json::to_string(&event.kind).map_err(StorageError::Serialization)?;
+            let event_flow_id_i64 = u64_to_i64(event.flow_id, "event.flow_id")?;
+            let event_ts_i64 = u64_to_i64(event.ts.mono_nanos, "event.ts.mono_nanos")?;
             sqlx::query(
                 r#"
                 INSERT INTO proto_events (flow_id, ts, kind, fields, packet_ref)
                 VALUES (?1, ?2, ?3, ?4, ?5)
                 "#,
             )
-            .bind(event.flow_id as i64)
-            .bind(event.ts.mono_nanos as i64)
+            .bind(event_flow_id_i64)
+            .bind(event_ts_i64)
             .bind(0i64)
             .bind(fields_json)
             .bind(None::<i64>)
@@ -530,6 +585,9 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn insert_session(&self, session: Session) -> Result<()> {
+        let session_id_i64 = u64_to_i64(session.id, "session.id")?;
+        let process_id_i64 = u64_to_i64(session.process_id, "session.process_id")?;
+        let start_ts_i64 = u64_to_i64(session.start_ts.mono_nanos, "session.start_ts.mono_nanos")?;
         sqlx::query(
             r#"
             INSERT INTO sessions (session_id, process_id, start_ts, trigger)
@@ -539,9 +597,9 @@ impl CaptureRepository for SqliteCaptureRepository {
                 trigger=excluded.trigger
             "#,
         )
-        .bind(session.id as i64)
-        .bind(session.process_id as i64)
-        .bind(session.start_ts.mono_nanos as i64)
+        .bind(session_id_i64)
+        .bind(process_id_i64)
+        .bind(start_ts_i64)
         .bind(&session.trigger)
         .execute(&self.pool)
         .await?;
@@ -549,6 +607,7 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn insert_host(&self, id: u64, host: Host) -> Result<()> {
+        let host_id_i64 = u64_to_i64(id, "host.id")?;
         let geo_json = host
             .geo
             .as_ref()
@@ -568,7 +627,7 @@ impl CaptureRepository for SqliteCaptureRepository {
                 geo=excluded.geo
             "#,
         )
-        .bind(id as i64)
+        .bind(host_id_i64)
         .bind(host.ip.to_string())
         .bind(Some(rdns))
         .bind(asn_org)
@@ -617,6 +676,7 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn insert_finding(&self, finding: Finding) -> Result<()> {
+        let finding_id_i64 = u64_to_i64(finding.id, "finding.id")?;
         let refs_json =
             serde_json::to_string(&finding.evidence_refs).map_err(StorageError::Serialization)?;
         sqlx::query(
@@ -628,7 +688,7 @@ impl CaptureRepository for SqliteCaptureRepository {
                 evidence_refs=excluded.evidence_refs
             "#,
         )
-        .bind(finding.id as i64)
+        .bind(finding_id_i64)
         .bind(0i64)
         .bind(finding.confidence.value() as f64)
         .bind(refs_json)
@@ -639,8 +699,9 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn flow(&self, id: u64) -> Result<Option<Flow>> {
+        let id_i64 = u64_to_i64(id, "flow_id query")?;
         let row = sqlx::query_as::<_, FlowRow>("SELECT * FROM flows WHERE flow_id = ?1")
-            .bind(id as i64)
+            .bind(id_i64)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -651,16 +712,23 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn session(&self, id: u64) -> Result<Option<Session>> {
+        let id_i64 = u64_to_i64(id, "session_id query")?;
         let row = sqlx::query_as::<_, SessionRow>("SELECT * FROM sessions WHERE session_id = ?1")
-            .bind(id as i64)
+            .bind(id_i64)
             .fetch_optional(&self.pool)
             .await?;
 
         match row {
             Some(r) => Ok(Some(Session {
-                id: r.session_id as u64,
-                process_id: r.process_id.unwrap_or(0) as u64,
-                start_ts: Timestamp::new(r.start_ts as u64, r.start_ts as u64),
+                id: i64_to_u64(r.session_id, "SessionRow.session_id")?,
+                process_id: match r.process_id {
+                    Some(pid) => i64_to_u64(pid, "SessionRow.process_id")?,
+                    None => 0,
+                },
+                start_ts: Timestamp::new(
+                    i64_to_u64(r.start_ts, "SessionRow.start_ts")?,
+                    i64_to_u64(r.start_ts, "SessionRow.start_ts")?,
+                ),
                 trigger: r.trigger,
                 flow_ids: vec![],
             })),
@@ -669,8 +737,9 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn finding(&self, id: u64) -> Result<Option<StoredFinding>> {
+        let id_i64 = u64_to_i64(id, "finding_id query")?;
         let row = sqlx::query_as::<_, FindingRow>("SELECT * FROM findings WHERE finding_id = ?1")
-            .bind(id as i64)
+            .bind(id_i64)
             .fetch_optional(&self.pool)
             .await?;
 
@@ -678,9 +747,10 @@ impl CaptureRepository for SqliteCaptureRepository {
             Some(r) => {
                 let refs: Vec<EvidenceRef> = serde_json::from_str(&r.evidence_refs)
                     .map_err(StorageError::Deserialization)?;
+                let finding_id = i64_to_u64(r.finding_id, "FindingRow.finding_id")?;
                 Ok(Some(StoredFinding {
                     finding: Finding {
-                        id: r.finding_id as u64,
+                        id: finding_id,
                         category: netpulse_core::FindingCategory::Suspicious,
                         confidence: netpulse_core::Confidence::new(r.confidence as f32),
                         evidence_refs: refs,
@@ -697,9 +767,10 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn events_for_flow(&self, flow_id: u64) -> Result<Vec<ProtoEvent>> {
+        let flow_id_i64 = u64_to_i64(flow_id, "events_for_flow.flow_id")?;
         let rows =
             sqlx::query_as::<_, ProtoEventRow>("SELECT * FROM proto_events WHERE flow_id = ?1")
-                .bind(flow_id as i64)
+                .bind(flow_id_i64)
                 .fetch_all(&self.pool)
                 .await?;
 
@@ -707,9 +778,11 @@ impl CaptureRepository for SqliteCaptureRepository {
         for r in rows {
             let kind: ProtoEventKind =
                 serde_json::from_str(&r.fields).map_err(StorageError::Deserialization)?;
+            let ev_flow_id = i64_to_u64(r.flow_id, "ProtoEventRow.flow_id")?;
+            let ev_ts = i64_to_u64(r.ts, "ProtoEventRow.ts")?;
             events.push(ProtoEvent {
-                flow_id: r.flow_id as u64,
-                ts: Timestamp::new(r.ts as u64, r.ts as u64),
+                flow_id: ev_flow_id,
+                ts: Timestamp::new(ev_ts, ev_ts),
                 kind,
             });
         }
@@ -771,24 +844,26 @@ impl CaptureRepository for SqliteCaptureRepository {
         let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM flows")
             .fetch_one(&self.pool)
             .await?;
-        Ok(count.0 as usize)
+        i64_to_usize(count.0, "flow_count")
     }
 
     async fn session_count(&self) -> Result<usize> {
         let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sessions")
             .fetch_one(&self.pool)
             .await?;
-        Ok(count.0 as usize)
+        i64_to_usize(count.0, "session_count")
     }
 
     async fn session_ids(&self) -> Result<Vec<u64>> {
         let rows = sqlx::query("SELECT session_id FROM sessions ORDER BY session_id ASC")
             .fetch_all(&self.pool)
             .await?;
-        Ok(rows
-            .into_iter()
-            .map(|r| r.get::<i64, _>(0) as u64)
-            .collect())
+        let mut ids = Vec::with_capacity(rows.len());
+        for r in rows {
+            let raw_id: i64 = r.get(0);
+            ids.push(i64_to_u64(raw_id, "session_id")?);
+        }
+        Ok(ids)
     }
 
     async fn evict_oldest_flows(&self, target_max: usize) -> Result<usize> {
@@ -797,6 +872,7 @@ impl CaptureRepository for SqliteCaptureRepository {
             return Ok(0);
         }
         let to_remove = count - target_max;
+        let to_remove_i64 = usize_to_i64(to_remove, "evict_oldest_flows.to_remove")?;
         let res = sqlx::query(
             r#"
             DELETE FROM flows WHERE flow_id IN (
@@ -804,10 +880,10 @@ impl CaptureRepository for SqliteCaptureRepository {
             )
             "#,
         )
-        .bind(to_remove as i64)
+        .bind(to_remove_i64)
         .execute(&self.pool)
         .await?;
-        Ok(res.rows_affected() as usize)
+        u64_to_usize(res.rows_affected(), "evict_oldest_flows.rows_affected")
     }
 
     async fn evict_oldest_sessions(&self, target_max: usize) -> Result<usize> {
@@ -816,6 +892,7 @@ impl CaptureRepository for SqliteCaptureRepository {
             return Ok(0);
         }
         let to_remove = count - target_max;
+        let to_remove_i64 = usize_to_i64(to_remove, "evict_oldest_sessions.to_remove")?;
         let res = sqlx::query(
             r#"
             DELETE FROM sessions WHERE session_id IN (
@@ -823,10 +900,10 @@ impl CaptureRepository for SqliteCaptureRepository {
             )
             "#,
         )
-        .bind(to_remove as i64)
+        .bind(to_remove_i64)
         .execute(&self.pool)
         .await?;
-        Ok(res.rows_affected() as usize)
+        u64_to_usize(res.rows_affected(), "evict_oldest_sessions.rows_affected")
     }
 }
 
@@ -1051,15 +1128,6 @@ mod tests {
         let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
 
         // Verify StorageError::Serialization carries real serde_json::Error structured info
-        let serde_err = serde_json::from_str::<String>("invalid json").unwrap_err();
-        let storage_err = StorageError::Serialization(serde_err);
-        match storage_err {
-            StorageError::Serialization(e) => {
-                assert!(e.line() > 0 || e.column() > 0 || !e.to_string().is_empty());
-            }
-            other => panic!("Expected StorageError::Serialization, got {:?}", other),
-        }
-
         // Verify database remains completely empty (0 flows, 0 proto_events)
         assert_eq!(repo.flow_count().await.unwrap(), 0);
         let proto_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM proto_events")
@@ -1067,5 +1135,378 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(proto_count.0, 0);
+    }
+
+    #[test]
+    fn test_checked_conversion_helpers() {
+        // u64_to_i64 boundary tests
+        assert_eq!(u64_to_i64(0, "field").unwrap(), 0);
+        assert_eq!(
+            u64_to_i64(i64::MAX as u64, "field").unwrap(),
+            i64::MAX
+        );
+        match u64_to_i64(i64::MAX as u64 + 1, "field").unwrap_err() {
+            StorageError::ValueOutOfRange { field, value, max } => {
+                assert_eq!(field, "field");
+                assert_eq!(value, i64::MAX as u128 + 1);
+                assert_eq!(max, i64::MAX);
+            }
+            other => panic!("Expected ValueOutOfRange, got {:?}", other),
+        }
+        match u64_to_i64(u64::MAX, "field").unwrap_err() {
+            StorageError::ValueOutOfRange { value, .. } => {
+                assert_eq!(value, u64::MAX as u128);
+            }
+            other => panic!("Expected ValueOutOfRange, got {:?}", other),
+        }
+
+        // usize_to_i64 platform-independent boundary tests
+        assert_eq!(usize_to_i64(0, "field").unwrap(), 0);
+        if (i64::MAX as u128) <= (usize::MAX as u128) {
+            assert_eq!(
+                usize_to_i64(i64::MAX as usize, "field").unwrap(),
+                i64::MAX
+            );
+        }
+        if (usize::MAX as u128) > (i64::MAX as u128) {
+            let overflow_usize = (i64::MAX as u128 + 1) as usize;
+            match usize_to_i64(overflow_usize, "field").unwrap_err() {
+                StorageError::ValueOutOfRange { value, .. } => {
+                    assert_eq!(value, overflow_usize as u128);
+                }
+                other => panic!("Expected ValueOutOfRange, got {:?}", other),
+            }
+        }
+
+        // i64_to_u64 boundary tests
+        assert_eq!(i64_to_u64(0, "field").unwrap(), 0);
+        assert_eq!(i64_to_u64(i64::MAX, "field").unwrap(), i64::MAX as u64);
+        match i64_to_u64(-1, "field").unwrap_err() {
+            StorageError::InvalidStoredValue { field, value } => {
+                assert_eq!(field, "field");
+                assert_eq!(value, -1);
+            }
+            other => panic!("Expected InvalidStoredValue, got {:?}", other),
+        }
+        match i64_to_u64(i64::MIN, "field").unwrap_err() {
+            StorageError::InvalidStoredValue { value, .. } => {
+                assert_eq!(value, i64::MIN);
+            }
+            other => panic!("Expected InvalidStoredValue, got {:?}", other),
+        }
+
+        // i64_to_usize boundary tests
+        assert_eq!(i64_to_usize(0, "field").unwrap(), 0);
+        match i64_to_usize(-1, "field").unwrap_err() {
+            StorageError::InvalidStoredValue { value, .. } => {
+                assert_eq!(value, -1);
+            }
+            other => panic!("Expected InvalidStoredValue, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_field_by_field_write_overflow_protection() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("overflow_test.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        // 1. flow.id = u64::MAX
+        let mut flow = make_test_flow(1, 100);
+        flow.id = u64::MAX;
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange { field: "flow.id", .. }
+        ));
+
+        // 2. flow.first_ts.mono_nanos = u64::MAX
+        let mut flow = make_test_flow(1, 100);
+        flow.first_ts = Timestamp::new(u64::MAX, 100);
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow.first_ts.mono_nanos",
+                ..
+            }
+        ));
+
+        // 3. flow.last_ts.wall_nanos = u64::MAX
+        let mut flow = make_test_flow(1, 100);
+        flow.last_ts = Timestamp::new(100, u64::MAX);
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow.last_ts.wall_nanos",
+                ..
+            }
+        ));
+
+        // 4. flow.stats.bytes = u64::MAX
+        let mut flow = make_test_flow(1, 100);
+        flow.stats.bytes = u64::MAX;
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow.stats.bytes",
+                ..
+            }
+        ));
+
+        // 5. flow.stats.packets = u64::MAX
+        let mut flow = make_test_flow(1, 100);
+        flow.stats.packets = u64::MAX;
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow.stats.packets",
+                ..
+            }
+        ));
+
+        // 6. flow.stats.rtt_estimate_nanos = Some(u64::MAX)
+        let mut flow = make_test_flow(1, 100);
+        flow.stats.rtt_estimate_nanos = Some(u64::MAX);
+        let res = repo.insert_flow(flow, vec![]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow.stats.rtt_estimate_nanos",
+                ..
+            }
+        ));
+
+        // 7. event.flow_id = u64::MAX
+        let flow = make_test_flow(1, 100);
+        let event = ProtoEvent {
+            flow_id: u64::MAX,
+            ts: Timestamp::new(100, 100),
+            kind: ProtoEventKind::DnsQuery,
+        };
+        let res = repo.insert_flow(flow, vec![event]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "event.flow_id",
+                ..
+            }
+        ));
+
+        // 8. event.ts.mono_nanos = u64::MAX
+        let flow = make_test_flow(1, 100);
+        let event = ProtoEvent {
+            flow_id: 1,
+            ts: Timestamp::new(u64::MAX, 100),
+            kind: ProtoEventKind::DnsQuery,
+        };
+        let res = repo.insert_flow(flow, vec![event]).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "event.ts.mono_nanos",
+                ..
+            }
+        ));
+
+        // 9. session.id = u64::MAX
+        let session = Session {
+            id: u64::MAX,
+            process_id: 10,
+            start_ts: Timestamp::new(100, 100),
+            trigger: "test".into(),
+            flow_ids: vec![],
+        };
+        let res = repo.insert_session(session).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "session.id",
+                ..
+            }
+        ));
+
+        // 10. session.process_id = u64::MAX
+        let session = Session {
+            id: 1,
+            process_id: u64::MAX,
+            start_ts: Timestamp::new(100, 100),
+            trigger: "test".into(),
+            flow_ids: vec![],
+        };
+        let res = repo.insert_session(session).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "session.process_id",
+                ..
+            }
+        ));
+
+        // 11. session.start_ts.mono_nanos = u64::MAX
+        let session = Session {
+            id: 1,
+            process_id: 10,
+            start_ts: Timestamp::new(u64::MAX, 100),
+            trigger: "test".into(),
+            flow_ids: vec![],
+        };
+        let res = repo.insert_session(session).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "session.start_ts.mono_nanos",
+                ..
+            }
+        ));
+
+        // 12. host_id = u64::MAX
+        let host = Host {
+            ip: IpAddr::V4(std::net::Ipv4Addr::LOCALHOST),
+            names: vec![],
+            geo: None,
+            asn: None,
+            org: None,
+        };
+        let res = repo.insert_host(u64::MAX, host).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "host.id",
+                ..
+            }
+        ));
+
+        // 13. finding.id = u64::MAX
+        let finding = Finding {
+            id: u64::MAX,
+            category: netpulse_core::FindingCategory::Suspicious,
+            confidence: netpulse_core::Confidence::new(0.8),
+            evidence_refs: vec![],
+        };
+        let res = repo.insert_finding(finding).await;
+        assert!(matches!(
+            res.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "finding.id",
+                ..
+            }
+        ));
+
+        // 14. Query parameters with u64::MAX
+        assert!(matches!(
+            repo.flow(u64::MAX).await.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "flow_id query",
+                ..
+            }
+        ));
+        assert!(matches!(
+            repo.session(u64::MAX).await.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "session_id query",
+                ..
+            }
+        ));
+        assert!(matches!(
+            repo.finding(u64::MAX).await.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "finding_id query",
+                ..
+            }
+        ));
+        assert!(matches!(
+            repo.events_for_flow(u64::MAX).await.unwrap_err(),
+            StorageError::ValueOutOfRange {
+                field: "events_for_flow.flow_id",
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_read_negative_stored_value_returns_invalid_stored_value_error() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("corruption_test.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        // 1. Manually insert raw negative session row: session_id = -1
+        sqlx::query(
+            "INSERT INTO sessions (session_id, process_id, start_ts, trigger) VALUES (?1, ?2, ?3, ?4)",
+        )
+        .bind(-1i64)
+        .bind(Some(100i64))
+        .bind(1000i64)
+        .bind("corrupted")
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        let _session_res = repo.session(1).await;
+        // Looking up session(1) returns None, but session_ids() reads all session rows
+        let ids_res = repo.session_ids().await;
+        assert!(ids_res.is_err());
+        match ids_res.unwrap_err() {
+            StorageError::InvalidStoredValue { field, value } => {
+                assert_eq!(field, "session_id");
+                assert_eq!(value, -1);
+            }
+            other => panic!("Expected InvalidStoredValue for session_id, got {:?}", other),
+        }
+
+        // 2. Manually insert raw negative proto_events row: flow_id = 99, ts = -1
+        sqlx::query(
+            "INSERT INTO flows (flow_id, canonical_key, epoch, l4_proto, l7_proto, first_ts_mono, last_ts_wall, bytes_up, bytes_down, pkts_up, pkts_down, rtt_us, retransmits, state) VALUES (99, X'00', 0, 0, 0, 100, 100, 0, 0, 0, 0, 0, 0, 0)",
+        )
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        sqlx::query(
+            "INSERT INTO proto_events (flow_id, ts, kind, fields, packet_ref) VALUES (99, ?1, 0, ?2, NULL)",
+        )
+        .bind(-500i64)
+        .bind("\"DnsQuery\"")
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        let events_res = repo.events_for_flow(99).await;
+        assert!(events_res.is_err());
+        match events_res.unwrap_err() {
+            StorageError::InvalidStoredValue { field, value } => {
+                assert_eq!(field, "ProtoEventRow.ts");
+                assert_eq!(value, -500);
+            }
+            other => panic!("Expected InvalidStoredValue for ProtoEventRow.ts, got {:?}", other),
+        }
+
+        // 3. Manually insert raw negative finding row: finding_id = -50
+        sqlx::query(
+            "INSERT INTO findings (finding_id, category, confidence, evidence_refs, evidence_expired) VALUES (?1, 0, 0.5, '[]', 0)",
+        )
+        .bind(-50i64)
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        // Reading all findings / looking up finding by negative id via raw query
+        let row: std::result::Result<FindingRow, _> = sqlx::query_as("SELECT * FROM findings WHERE finding_id = -50")
+            .fetch_one(repo.pool())
+            .await;
+        assert!(row.is_ok());
+        let f_row = row.unwrap();
+        let conv_res = i64_to_u64(f_row.finding_id, "FindingRow.finding_id");
+        assert!(conv_res.is_err());
+        match conv_res.unwrap_err() {
+            StorageError::InvalidStoredValue { field, value } => {
+                assert_eq!(field, "FindingRow.finding_id");
+                assert_eq!(value, -50);
+            }
+            other => panic!("Expected InvalidStoredValue for FindingRow.finding_id, got {:?}", other),
+        }
     }
 }

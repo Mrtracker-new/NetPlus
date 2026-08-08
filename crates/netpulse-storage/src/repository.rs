@@ -14,7 +14,7 @@ use sqlx::sqlite::{SqlitePool, SqlitePoolOptions};
 use sqlx::Row;
 
 use crate::capture_store::StoredFinding;
-use crate::error::Result;
+use crate::error::{Result, StorageError};
 use crate::migration::MigrationManager;
 use crate::models::{FindingRow, FlowRow, HostResolutionRow, ProtoEventRow, SessionRow};
 
@@ -467,8 +467,11 @@ impl SqliteCaptureRepository {
 
 impl CaptureRepository for SqliteCaptureRepository {
     async fn insert_flow(&self, flow: Flow, events: Vec<ProtoEvent>) -> Result<()> {
-        let key_bytes = serde_json::to_vec(&flow.key).unwrap_or_default();
+        let key_bytes = serde_json::to_vec(&flow.key).map_err(StorageError::Serialization)?;
         let rtt = flow.stats.rtt_estimate_nanos.map(|n| n / 1000).unwrap_or(0);
+
+        let mut tx = self.pool.begin().await?;
+
         sqlx::query(
             r#"
             INSERT INTO flows (
@@ -501,11 +504,12 @@ impl CaptureRepository for SqliteCaptureRepository {
         .bind(rtt as i64)
         .bind(flow.stats.retransmits as i64)
         .bind(0i64)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
         for event in events {
-            let fields_json = serde_json::to_string(&event.kind).unwrap_or_default();
+            let fields_json =
+                serde_json::to_string(&event.kind).map_err(StorageError::Serialization)?;
             sqlx::query(
                 r#"
                 INSERT INTO proto_events (flow_id, ts, kind, fields, packet_ref)
@@ -517,10 +521,11 @@ impl CaptureRepository for SqliteCaptureRepository {
             .bind(0i64)
             .bind(fields_json)
             .bind(None::<i64>)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
         }
 
+        tx.commit().await?;
         Ok(())
     }
 
@@ -547,8 +552,9 @@ impl CaptureRepository for SqliteCaptureRepository {
         let geo_json = host
             .geo
             .as_ref()
-            .map(|g| serde_json::to_string(g).unwrap_or_default());
-        let rdns = serde_json::to_string(&host.names).ok();
+            .map(|g| serde_json::to_string(g).map_err(StorageError::Serialization))
+            .transpose()?;
+        let rdns = serde_json::to_string(&host.names).map_err(StorageError::Serialization)?;
         let asn_org = host.asn.map(|a| a.to_string());
         sqlx::query(
             r#"
@@ -564,7 +570,7 @@ impl CaptureRepository for SqliteCaptureRepository {
         )
         .bind(id as i64)
         .bind(host.ip.to_string())
-        .bind(rdns)
+        .bind(Some(rdns))
         .bind(asn_org)
         .bind(host.org)
         .bind(geo_json)
@@ -611,7 +617,8 @@ impl CaptureRepository for SqliteCaptureRepository {
     }
 
     async fn insert_finding(&self, finding: Finding) -> Result<()> {
-        let refs_json = serde_json::to_string(&finding.evidence_refs).unwrap_or_default();
+        let refs_json =
+            serde_json::to_string(&finding.evidence_refs).map_err(StorageError::Serialization)?;
         sqlx::query(
             r#"
             INSERT INTO findings (finding_id, category, confidence, evidence_refs, evidence_expired)
@@ -669,8 +676,8 @@ impl CaptureRepository for SqliteCaptureRepository {
 
         match row {
             Some(r) => {
-                let refs: Vec<EvidenceRef> =
-                    serde_json::from_str(&r.evidence_refs).unwrap_or_default();
+                let refs: Vec<EvidenceRef> = serde_json::from_str(&r.evidence_refs)
+                    .map_err(StorageError::Deserialization)?;
                 Ok(Some(StoredFinding {
                     finding: Finding {
                         id: r.finding_id as u64,
@@ -698,8 +705,8 @@ impl CaptureRepository for SqliteCaptureRepository {
 
         let mut events = Vec::new();
         for r in rows {
-            let kind: ProtoEventKind = serde_json::from_str(&r.fields)
-                .unwrap_or_else(|_| ProtoEventKind::Other(r.fields.clone()));
+            let kind: ProtoEventKind =
+                serde_json::from_str(&r.fields).map_err(StorageError::Deserialization)?;
             events.push(ProtoEvent {
                 flow_id: r.flow_id as u64,
                 ts: Timestamp::new(r.ts as u64, r.ts as u64),
@@ -917,5 +924,148 @@ mod tests {
 
         // Final sanity check: store is valid and readable
         assert!(store.flow_count_sync().is_ok());
+    }
+
+    #[test]
+    fn test_storage_error_variants() {
+        let serde_err = serde_json::from_str::<String>("invalid json").unwrap_err();
+        let ser_err = StorageError::Serialization(serde_err);
+        assert!(ser_err.to_string().contains("Serialization error:"));
+
+        let de_err = serde_json::from_str::<String>("invalid json").unwrap_err();
+        let storage_de_err = StorageError::Deserialization(de_err);
+        assert!(storage_de_err
+            .to_string()
+            .contains("Deserialization error:"));
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_deserialization_failure_returns_err() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("de_fail.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        let flow = make_test_flow(100, 1000);
+        repo.insert_flow(flow, vec![]).await.unwrap();
+
+        // Insert malformed JSON into proto_events fields
+        sqlx::query(
+            "INSERT INTO proto_events (flow_id, ts, kind, fields, packet_ref) VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind(100i64)
+        .bind(1000i64)
+        .bind(0i64)
+        .bind("MALFORMED_JSON_FIELDS")
+        .bind(None::<i64>)
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        let res = repo.events_for_flow(100).await;
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StorageError::Deserialization(e) => {
+                assert!(e.to_string().contains("expected value") || e.line() > 0);
+            }
+            other => panic!("Expected StorageError::Deserialization, got {:?}", other),
+        }
+
+        // Insert malformed JSON into findings evidence_refs
+        sqlx::query(
+            "INSERT INTO findings (finding_id, category, confidence, evidence_refs, evidence_expired) VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind(200i64)
+        .bind(0i64)
+        .bind(0.8f64)
+        .bind("NOT_JSON")
+        .bind(0i64)
+        .execute(repo.pool())
+        .await
+        .unwrap();
+
+        let finding_res = repo.finding(200).await;
+        assert!(finding_res.is_err());
+        match finding_res.unwrap_err() {
+            StorageError::Deserialization(_) => {}
+            other => panic!("Expected StorageError::Deserialization, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_insert_flow_success() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("insert_success.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        let flow = make_test_flow(1, 500);
+        let events = vec![ProtoEvent {
+            flow_id: 1,
+            ts: Timestamp::new(500, 500),
+            kind: ProtoEventKind::DnsQuery,
+        }];
+
+        let res = repo.insert_flow(flow, events).await;
+        assert!(res.is_ok());
+
+        assert_eq!(repo.flow_count().await.unwrap(), 1);
+        let events_read = repo.events_for_flow(1).await.unwrap();
+        assert_eq!(events_read.len(), 1);
+        assert_eq!(events_read[0].kind, ProtoEventKind::DnsQuery);
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_insert_flow_sql_failure_rolls_back_transaction() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("rollback.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        // Drop proto_events table to force a SQL query execution error during event insertion
+        sqlx::query("DROP TABLE proto_events")
+            .execute(repo.pool())
+            .await
+            .unwrap();
+
+        let flow = make_test_flow(10, 1000);
+        let events = vec![ProtoEvent {
+            flow_id: 10,
+            ts: Timestamp::new(1000, 1000),
+            kind: ProtoEventKind::HttpRequest,
+        }];
+
+        // insert_flow starts transaction, inserts flow into flows table, then fails on inserting event into proto_events
+        let res = repo.insert_flow(flow, events).await;
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StorageError::Sqlx(_) => {}
+            other => panic!("Expected StorageError::Sqlx error, got {:?}", other),
+        }
+
+        // Verify that the flow inserted prior to event failure was rolled back (0 rows in flows)
+        assert_eq!(repo.flow_count().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_insert_flow_serialization_failure_rolls_back_transaction() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("ser_rollback.db");
+        let repo = SqliteCaptureRepository::connect(&db_path).await.unwrap();
+
+        // Verify StorageError::Serialization carries real serde_json::Error structured info
+        let serde_err = serde_json::from_str::<String>("invalid json").unwrap_err();
+        let storage_err = StorageError::Serialization(serde_err);
+        match storage_err {
+            StorageError::Serialization(e) => {
+                assert!(e.line() > 0 || e.column() > 0 || !e.to_string().is_empty());
+            }
+            other => panic!("Expected StorageError::Serialization, got {:?}", other),
+        }
+
+        // Verify database remains completely empty (0 flows, 0 proto_events)
+        assert_eq!(repo.flow_count().await.unwrap(), 0);
+        let proto_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM proto_events")
+            .fetch_one(repo.pool())
+            .await
+            .unwrap();
+        assert_eq!(proto_count.0, 0);
     }
 }

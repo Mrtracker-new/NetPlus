@@ -22,7 +22,7 @@ pub mod ring;
 pub mod timeseries;
 
 pub use capture_store::{CaptureStore, StoredFinding};
-pub use error::{MigrationError, Result as StorageResult};
+pub use error::{MigrationError, Result as StorageResult, StorageError};
 pub use indexer::{IncrementalSessionIndexer, SessionIndexMetrics};
 pub use migration::{MigrationManager, MigrationStatus};
 pub use repository::{

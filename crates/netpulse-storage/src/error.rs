@@ -4,7 +4,7 @@ use thiserror::Error;
 
 /// Storage migration and database operation errors.
 #[derive(Debug, Error)]
-pub enum MigrationError {
+pub enum StorageError {
     #[error("Database schema version {db_version} is newer than maximum supported version {app_max_version}")]
     DatabaseTooNew {
         db_version: i64,
@@ -31,6 +31,13 @@ pub enum MigrationError {
 
     #[error(transparent)]
     Migrate(#[from] sqlx::migrate::MigrateError),
+
+    #[error("Serialization error: {0}")]
+    Serialization(serde_json::Error),
+
+    #[error("Deserialization error: {0}")]
+    Deserialization(serde_json::Error),
 }
 
-pub type Result<T> = std::result::Result<T, MigrationError>;
+pub type MigrationError = StorageError;
+pub type Result<T> = std::result::Result<T, StorageError>;

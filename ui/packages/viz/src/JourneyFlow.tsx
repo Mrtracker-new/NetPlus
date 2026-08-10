@@ -6,19 +6,102 @@ import { humanBytes } from "./utils";
 
 export interface StageConfig {
   kind: StageKind;
-  glyph: string;
+  glyph: ReactElement;
+  glyphString: string;
   labelKey: string;
   order: number;
 }
 
 export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
-  navigation: { kind: "navigation", glyph: "⌖", labelKey: "stages.navigation", order: 0 },
-  dns_resolution: { kind: "dns_resolution", glyph: "?", labelKey: "stages.dns_resolution", order: 1 },
-  connection: { kind: "connection", glyph: "⇄", labelKey: "stages.connection", order: 2 },
-  encryption: { kind: "encryption", glyph: "🛡", labelKey: "stages.encryption", order: 3 },
-  request: { kind: "request", glyph: "↧", labelKey: "stages.request", order: 4 },
-  fan_out: { kind: "fan_out", glyph: "⋔", labelKey: "stages.fan_out", order: 5 },
-  completion: { kind: "completion", glyph: "✓", labelKey: "stages.completion", order: 6 },
+  navigation: {
+    kind: "navigation",
+    glyphString: "⌖",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+      </svg>
+    ),
+    labelKey: "stages.navigation",
+    order: 0,
+  },
+  dns_resolution: {
+    kind: "dns_resolution",
+    glyphString: "?",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+      </svg>
+    ),
+    labelKey: "stages.dns_resolution",
+    order: 1,
+  },
+  connection: {
+    kind: "connection",
+    glyphString: "⇄",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5" />
+        <path d="M7 11 3 15l4 4" />
+        <path d="M7 3v2a4 4 0 0 0 4 4h8" />
+        <path d="M17 13l4-4-4-4" />
+      </svg>
+    ),
+    labelKey: "stages.connection",
+    order: 2,
+  },
+  encryption: {
+    kind: "encryption",
+    glyphString: "🛡",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      </svg>
+    ),
+    labelKey: "stages.encryption",
+    order: 3,
+  },
+  request: {
+    kind: "request",
+    glyphString: "↧",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+    ),
+    labelKey: "stages.request",
+    order: 4,
+  },
+  fan_out: {
+    kind: "fan_out",
+    glyphString: "⋔",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="18" cy="18" r="3" />
+        <circle cx="6" cy="6" r="3" />
+        <path d="M13 6h3a2 2 0 0 1 2 2v7" />
+        <line x1="6" y1="9" x2="6" y2="21" />
+      </svg>
+    ),
+    labelKey: "stages.fan_out",
+    order: 5,
+  },
+  completion: {
+    kind: "completion",
+    glyphString: "✓",
+    glyph: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+        <polyline points="22 4 12 14.01 9 11.01" />
+      </svg>
+    ),
+    labelKey: "stages.completion",
+    order: 6,
+  },
 };
 
 export interface JourneyFlowProps {
@@ -92,12 +175,11 @@ export const JourneyFlow = memo(function JourneyFlow({
         className="np-jflow__track"
         role="tablist"
         aria-label="Journey stage steps"
-        style={{ overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: "0.5rem" }}
       >
         {stages.map((s, i) => {
           const isSelected = selectedStageIndex === i;
           const config = STAGE_CONFIG_REGISTRY[s.kind];
-          const glyph = config?.glyph ?? "•";
+          const glyphNode = config?.glyph ?? null;
 
           return (
             <Fragment key={`${s.kind}-${i}`}>
@@ -115,15 +197,9 @@ export const JourneyFlow = memo(function JourneyFlow({
                     onSelectStage?.(i);
                   }
                 }}
-                style={{
-                  cursor: "pointer",
-                  outline: isSelected ? "2px solid var(--np-accent, #2fe0d6)" : undefined,
-                  outlineOffset: "2px",
-                  borderRadius: "var(--np-radius-md, 6px)",
-                }}
               >
                 <span className="np-jflow__glyph" aria-hidden="true">
-                  {glyph}
+                  {glyphNode}
                 </span>
                 <span className="np-jflow__label">{s.title}</span>
               </div>
@@ -138,43 +214,57 @@ export const JourneyFlow = memo(function JourneyFlow({
       </div>
 
       {orgGroups.length > 0 && (
-        <div className="np-jflow__fanout" aria-label="Servers contacted">
-          <div className="np-jflow__hub" aria-hidden="true">
-            {stages.length}
+        <div className="np-jflow__fanout" aria-label="Contacted Servers Fan-out">
+          <div className="np-jflow__fanout-title">
+            <span className="np-jflow__hub" aria-hidden="true">
+              {orgGroups.length}
+            </span>
+            <span>Contacted Organizations & Servers Fan-out</span>
           </div>
-          <ul className="np-jflow__dests" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+
+          <ul className="np-jflow__dests">
             {orgGroups.slice(0, 5).map((group) => {
               const isExpanded = expandedOrgs.has(group.orgName);
               return (
-                <li
-                  className="np-jflow__dest"
-                  key={group.orgName}
-                  style={{ display: "flex", flexDirection: "column", gap: "0.2rem", cursor: "pointer" }}
-                >
+                <li className="np-jflow__dest" key={group.orgName}>
                   <div
+                    className="np-jflow__dest-header"
                     onClick={() => toggleOrg(group.orgName)}
-                    style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={isExpanded}
+                    aria-label={`Organization ${group.orgName}, ${group.nodes.length} hosts, ${group.totalFlows} flows`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        toggleOrg(group.orgName);
+                      }
+                    }}
                   >
                     <span className="np-jflow__dest-label" title={group.orgName}>
-                      {group.orgName} ({group.nodes.length})
+                      {group.orgName} ({group.nodes.length} {group.nodes.length === 1 ? "host" : "hosts"})
                     </span>
                     <span className="np-jflow__dest-meta">
-                      {group.totalFlows} conn · {humanBytes(group.totalBytes)} {isExpanded ? "▲" : "▼"}
+                      <span>{group.totalFlows} flows</span> · <span>{humanBytes(group.totalBytes)}</span>
+                      <span aria-hidden="true">{isExpanded ? "▲" : "▼"}</span>
                     </span>
                   </div>
 
                   {isExpanded && (
-                    <div style={{ marginLeft: "0.5rem", borderLeft: "2px solid var(--np-surface-2)", paddingLeft: "0.5rem" }}>
+                    <div className="np-jflow__dest-children">
                       {group.nodes.map((node) => (
-                        <div key={node.label} style={{ fontSize: "0.75rem", margin: "0.2rem 0" }}>
-                          <span>{node.label}</span> · <span>{humanBytes(node.bytes)}</span>
-                          {node.evidence && node.evidence.length > 0 && (
-                            <EvidenceChips
-                              evidence={node.evidence}
-                              onNavigate={handleNavigateFanout}
-                              className="np-evidence-chips--compact"
-                            />
-                          )}
+                        <div className="np-jflow__dest-child" key={node.label}>
+                          <span title={node.label}>{node.label}</span>
+                          <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <span>{humanBytes(node.bytes)}</span>
+                            {node.evidence && node.evidence.length > 0 && (
+                              <EvidenceChips
+                                evidence={node.evidence}
+                                onNavigate={handleNavigateFanout}
+                                className="np-evidence-chips--compact"
+                              />
+                            )}
+                          </span>
                         </div>
                       ))}
                     </div>
@@ -190,3 +280,4 @@ export const JourneyFlow = memo(function JourneyFlow({
 });
 
 JourneyFlow.displayName = "JourneyFlow";
+

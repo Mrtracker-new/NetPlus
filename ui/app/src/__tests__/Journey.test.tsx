@@ -197,4 +197,25 @@ describe("Journey Screen & useJourneyController", () => {
       );
     });
   });
+
+  it("does not render redundant stepper pill container", async () => {
+    vi.spyOn(ipc, "query").mockResolvedValue(mockJourneyResponse);
+
+    setFeed([
+      {
+        headline: "google.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 101 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    const { container } = render(<JourneyTestWrapper />);
+
+    await screen.findByText("Journey Summary");
+    expect(container.querySelector(".np-journey__stepper")).toBeNull();
+  });
 });
+

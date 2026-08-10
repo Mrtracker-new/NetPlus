@@ -1832,7 +1832,47 @@ button {
   color: var(--np-text-mute);
 }
 
-/* ---- Journey flow diagram ---- */
+/* ---- Journey flow diagram & Page Journey ---- */
+.np-journey-summary {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--np-3);
+  margin-bottom: var(--np-5);
+}
+
+@media (max-width: 1024px) {
+  .np-journey-summary {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .np-journey-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.np-session-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+  margin-bottom: var(--np-5);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border-strong);
+  box-shadow: var(--np-neu-sm);
+  backdrop-filter: var(--np-glass-blur);
+  padding: var(--np-3) var(--np-4);
+  border-radius: var(--np-radius-lg);
+}
+
+@media (max-width: 640px) {
+  .np-session-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 .np-jflow {
   padding: var(--np-5);
   background: var(--np-surface-1);
@@ -1841,11 +1881,13 @@ button {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   min-width: 0;
+  border: 1px solid var(--np-border);
 }
 .np-jflow__track {
   display: flex;
   align-items: flex-start;
   min-width: min-content;
+  padding-bottom: var(--np-2);
 }
 .np-jflow__node {
   display: flex;
@@ -1853,8 +1895,15 @@ button {
   align-items: center;
   gap: var(--np-2);
   flex: none;
-  width: 92px;
+  width: 96px;
   text-align: center;
+  cursor: pointer;
+  border-radius: var(--np-radius-md);
+  padding: var(--np-1);
+  transition: transform var(--np-t);
+}
+.np-jflow__node:hover {
+  transform: translateY(-2px);
 }
 .np-jflow__glyph {
   display: grid;
@@ -1866,11 +1915,26 @@ button {
   color: var(--np-accent-strong);
   background: var(--np-surface-1);
   box-shadow: var(--np-neu-sm);
+  transition: all var(--np-t);
+}
+.np-jflow__node--active .np-jflow__glyph {
+  color: var(--np-accent-strong);
+  box-shadow: 0 0 0 2px var(--np-accent), 0 0 16px var(--np-accent-soft);
+  animation: np-jflow-pulse 2s infinite ease-in-out;
+}
+@keyframes np-jflow-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--np-accent), 0 0 12px var(--np-accent-soft); }
+  50% { box-shadow: 0 0 0 4px var(--np-accent), 0 0 20px var(--np-accent-soft); }
 }
 .np-jflow__label {
   font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-medium);
   color: var(--np-text-dim);
   line-height: 1.3;
+}
+.np-jflow__node--active .np-jflow__label {
+  color: var(--np-text);
+  font-weight: var(--np-fw-semibold);
 }
 .np-jflow__link {
   position: relative;
@@ -1899,45 +1963,66 @@ button {
 }
 .np-jflow__fanout {
   display: flex;
-  align-items: center;
-  gap: var(--np-4);
+  flex-direction: column;
+  gap: var(--np-3);
   margin-top: var(--np-5);
   padding-top: var(--np-4);
   border-top: 1px solid var(--np-hairline);
-  flex-wrap: wrap;
+}
+.np-jflow__fanout-title {
+  font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-semibold);
+  letter-spacing: var(--np-tracking-wide);
+  text-transform: uppercase;
+  color: var(--np-text-mute);
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
 }
 .np-jflow__hub {
   flex: none;
-  display: grid;
+  display: inline-grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   font-family: var(--np-font-mono);
-  color: var(--np-accent-2);
-  background: var(--np-surface-1);
-  box-shadow: var(--np-neu-sm);
+  font-size: var(--np-fs-xs);
+  color: var(--np-accent);
+  background: var(--np-accent-soft);
 }
 .np-jflow__dests {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
+  flex-direction: column;
   gap: var(--np-2);
-  flex-wrap: wrap;
-  flex: 1;
 }
 .np-jflow__dest {
   display: flex;
   flex-direction: column;
-  padding: var(--np-2) var(--np-3);
-  background: var(--np-surface-1);
+  padding: var(--np-3);
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-sm);
   box-shadow: var(--np-neu-sm);
-  max-width: 22ch;
+  transition: border-color var(--np-t);
+}
+.np-jflow__dest:hover {
+  border-color: var(--np-border-strong);
+}
+.np-jflow__dest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--np-3);
+  cursor: pointer;
+  user-select: none;
 }
 .np-jflow__dest-label {
   font-size: var(--np-fs-sm);
+  font-weight: var(--np-fw-medium);
   color: var(--np-text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1947,6 +2032,88 @@ button {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
   color: var(--np-text-mute);
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+  white-space: nowrap;
+}
+.np-jflow__dest-children {
+  margin-top: var(--np-2);
+  padding-left: var(--np-3);
+  border-left: 2px solid var(--np-accent-line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+}
+.np-jflow__dest-child {
+  font-size: var(--np-fs-xs);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--np-2);
+  color: var(--np-text-dim);
+}
+
+.np-journey__stages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  margin-top: var(--np-4);
+  padding: 0;
+  list-style: none;
+}
+.np-journey__stage {
+  padding: var(--np-4);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-left: 3px solid transparent;
+  border-radius: var(--np-radius-md);
+  box-shadow: var(--np-neu-sm);
+  transition: all var(--np-t);
+  cursor: pointer;
+}
+.np-journey__stage:hover {
+  border-color: var(--np-border-strong);
+  transform: translateY(-1px);
+}
+.np-journey__stage--active {
+  border-left-color: var(--np-accent);
+  background: var(--np-surface-2);
+  box-shadow: var(--np-neu);
+}
+.np-journey__stage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--np-2);
+  margin-bottom: var(--np-1);
+}
+.np-journey__stage-title {
+  font-size: var(--np-fs-base);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+.np-journey__stage-narration {
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+  line-height: var(--np-lh);
+  margin-bottom: var(--np-2);
+}
+.np-journey__stage-detail {
+  font-size: var(--np-fs-xs);
+  font-family: var(--np-font-mono);
+  color: var(--np-text-mute);
+  margin-bottom: var(--np-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-jflow__packet,
+  .np-jflow__node--active .np-jflow__glyph {
+    animation: none !important;
+  }
 }
 
 /* ============================ Network Constellation (Cyber Network Visualizer) ============================ */

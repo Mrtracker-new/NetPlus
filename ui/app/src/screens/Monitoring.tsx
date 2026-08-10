@@ -55,30 +55,48 @@ export function Monitoring() {
           </p>
         </div>
 
-        {/* Time-Range Selection Filter */}
-        <div className="np-monitor-header__controls">
-          {(["5m", "15m", "1h", "24h"] as const).map((tr) => (
-            <button
-              key={tr}
-              className="np-monitor-badge"
-              style={{
-                background:
-                  preferences.timeRange === tr
-                    ? "var(--np-monitor-primary, #00f2fe)"
-                    : "var(--np-surface-2, #1e2636)",
-                color:
-                  preferences.timeRange === tr
-                    ? "#000"
-                    : "var(--np-text-dim, #9ca3af)",
-                fontWeight: preferences.timeRange === tr ? 700 : 500,
-                cursor: "pointer",
-                border: "1px solid var(--np-border-strong, rgba(255,255,255,0.12))",
-              }}
-              onClick={() => actions.setTimeRange(tr)}
-            >
-              {tr}
-            </button>
-          ))}
+        {/* Time-Range Selection Filter Segmented Control */}
+        <div
+          className="np-monitor-header__controls"
+          role="group"
+          aria-label="Time range filter"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            background: "var(--np-surface-1, #131b2a)",
+            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.1))",
+            borderRadius: "var(--np-radius-lg, 12px)",
+            padding: "3px",
+            gap: "2px",
+            boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+          }}
+        >
+          {(["5m", "15m", "1h", "24h"] as const).map((tr) => {
+            const isSelected = preferences.timeRange === tr;
+            return (
+              <button
+                key={tr}
+                type="button"
+                className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
+                aria-pressed={isSelected}
+                aria-label={`Set time range to ${tr}`}
+                style={{
+                  fontSize: "0.8rem",
+                  padding: "0.35rem 0.85rem",
+                  borderRadius: "var(--np-radius-md, 8px)",
+                  background: isSelected ? "var(--np-monitor-primary, #00f2fe)" : "transparent",
+                  color: isSelected ? "#000" : "var(--np-text-dim, #9ca3af)",
+                  fontWeight: isSelected ? 700 : 500,
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onClick={() => actions.setTimeRange(tr)}
+              >
+                {tr}
+              </button>
+            );
+          })}
         </div>
       </header>
 

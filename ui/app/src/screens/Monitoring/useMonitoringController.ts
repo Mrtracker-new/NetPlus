@@ -69,14 +69,15 @@ export function useMonitoringController() {
     }
   }, [monitor, throughput]);
 
-  // Compute ViewModel via pure mapper
+  // Compute ViewModel via pure mapper with reactive timeRange preference
   const viewModel: ViewTelemetry = useMemo(() => {
     return MonitoringMapper.toViewModel(
       domainTelemetry,
       monitoringService.getEngineState(),
-      monitoringService.getEngineError()
+      monitoringService.getEngineError(),
+      preferences.timeRange
     );
-  }, [domainTelemetry]);
+  }, [domainTelemetry, preferences.timeRange]);
 
   // Preference handlers
   const setTimeRange = useCallback((tr: DashboardTimeRange) => {

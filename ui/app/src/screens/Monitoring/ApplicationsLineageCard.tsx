@@ -48,9 +48,80 @@ export function ApplicationsLineageCard({
     <div className="np-monitor-card" aria-label="Applications & Lineage Topology Graph">
       <div className="np-monitor-card__header">
         <h3 className="np-monitor-card__title">Applications & Lineage</h3>
-        <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>
-          {filteredNodes.length} Active Nodes
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }}>
+          <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>
+            {filteredNodes.length} Active Nodes
+          </span>
+          <button
+            type="button"
+            className="np-monitor-badge"
+            style={{
+              background: "var(--np-surface-2, #1e2636)",
+              color: "var(--np-text, #fff)",
+              cursor: "pointer",
+              border: "1px solid var(--np-border-strong, rgba(255,255,255,0.12))",
+              fontSize: "0.75rem",
+              padding: "0.2rem 0.6rem",
+              borderRadius: "var(--np-radius-sm, 6px)",
+            }}
+            onClick={() => setShowDropdown((prev) => !prev)}
+            aria-expanded={showDropdown}
+            aria-label="Filter lineage topology rules"
+          >
+            {filterMode} ▾
+          </button>
+
+          {showDropdown && (
+            <div
+              style={{
+                position: "absolute",
+                top: "100%",
+                right: 0,
+                marginTop: "6px",
+                background: "var(--np-surface-1, #151d2a)",
+                border: "1px solid var(--np-border-strong, rgba(255,255,255,0.15))",
+                borderRadius: "8px",
+                padding: "4px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "2px",
+                zIndex: 50,
+                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                minWidth: "150px",
+              }}
+            >
+              {(["Custom Rules", "All Traffic", "High Bandwidth", "Critical Path"] as const).map(
+                (mode) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    style={{
+                      background:
+                        filterMode === mode ? "var(--np-surface-3, #1e293b)" : "transparent",
+                      color:
+                        filterMode === mode
+                          ? "var(--np-monitor-primary, #00f2fe)"
+                          : "var(--np-text)",
+                      border: "none",
+                      padding: "6px 12px",
+                      borderRadius: "4px",
+                      fontSize: "0.78rem",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontWeight: filterMode === mode ? 600 : 400,
+                    }}
+                    onClick={() => {
+                      setFilterMode(mode);
+                      setShowDropdown(false);
+                    }}
+                  >
+                    {mode}
+                  </button>
+                )
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {filteredNodes.length === 0 ? (
@@ -94,6 +165,7 @@ export function ApplicationsLineageCard({
             alignItems: "center",
             fontSize: "0.825rem",
             boxShadow: "0 0 16px rgba(0,242,254,0.15)",
+            marginTop: "0.5rem",
           }}
         >
           <div>
@@ -105,6 +177,7 @@ export function ApplicationsLineageCard({
             </div>
           </div>
           <button
+            type="button"
             style={{
               background: "transparent",
               border: "none",
@@ -119,78 +192,6 @@ export function ApplicationsLineageCard({
           </button>
         </div>
       )}
-
-      {/* Interactive Rules Filter Dropdown Selector */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "center",
-          marginTop: "0.25rem",
-          position: "relative",
-        }}
-      >
-        <button
-          className="np-monitor-badge"
-          style={{
-            background: "var(--np-surface-2, #1e2636)",
-            color: "var(--np-text, #fff)",
-            cursor: "pointer",
-            border: "1px solid var(--np-border-strong, rgba(255,255,255,0.12))",
-          }}
-          onClick={() => setShowDropdown((prev) => !prev)}
-        >
-          {filterMode} ▾
-        </button>
-
-        {showDropdown && (
-          <div
-            style={{
-              position: "absolute",
-              bottom: "100%",
-              marginBottom: "6px",
-              background: "var(--np-surface-1, #151d2a)",
-              border: "1px solid var(--np-border-strong, rgba(255,255,255,0.15))",
-              borderRadius: "8px",
-              padding: "4px",
-              display: "flex",
-              flexDirection: "column",
-              gap: "2px",
-              zIndex: 50,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-              minWidth: "150px",
-            }}
-          >
-            {(["Custom Rules", "All Traffic", "High Bandwidth", "Critical Path"] as const).map(
-              (mode) => (
-                <button
-                  key={mode}
-                  style={{
-                    background:
-                      filterMode === mode ? "var(--np-surface-3, #1e293b)" : "transparent",
-                    color:
-                      filterMode === mode
-                        ? "var(--np-monitor-primary, #00f2fe)"
-                        : "var(--np-text)",
-                    border: "none",
-                    padding: "6px 12px",
-                    borderRadius: "4px",
-                    fontSize: "0.78rem",
-                    textAlign: "left",
-                    cursor: "pointer",
-                    fontWeight: filterMode === mode ? 600 : 400,
-                  }}
-                  onClick={() => {
-                    setFilterMode(mode);
-                    setShowDropdown(false);
-                  }}
-                >
-                  {mode}
-                </button>
-              )
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

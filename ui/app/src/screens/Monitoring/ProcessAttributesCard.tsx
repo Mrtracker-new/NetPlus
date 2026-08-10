@@ -149,10 +149,11 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
               <div
                 style={{
                   width: "100%",
-                  height: "6px",
-                  backgroundColor: "var(--np-surface-2, rgba(255,255,255,0.06))",
-                  borderRadius: "3px",
+                  height: "8px",
+                  backgroundColor: "var(--np-surface-2, rgba(255,255,255,0.08))",
+                  borderRadius: "4px",
                   overflow: "hidden",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3)",
                 }}
               >
                 <div
@@ -160,8 +161,9 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
                     width: `${Math.min(100, Math.max(5, p.utilizationPercent * 7))}%`,
                     height: "100%",
                     backgroundColor: p.color,
-                    borderRadius: "3px",
-                    transition: "width 0.5s ease",
+                    borderRadius: "4px",
+                    boxShadow: `0 0 6px ${p.color}`,
+                    transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
                 />
               </div>

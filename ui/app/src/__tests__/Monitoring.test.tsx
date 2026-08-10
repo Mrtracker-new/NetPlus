@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, beforeEach } from "vitest";
+import "@testing-library/jest-dom";
 import { I18nextProvider } from "react-i18next";
 import { protocolColor } from "@netpulse/viz";
 import type { MonitorSnapshot } from "@netpulse/contract";
@@ -69,7 +70,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
   it("renders simulation telemetry dashboard when monitor snapshot is null", () => {
     render(<MonitoringTestWrapper />);
 
-    expect(screen.getByText("Live Monitoring & System Health")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Live Monitoring & System Health/i })).toBeTruthy();
     expect(screen.getByText("Throughput & Lineage")).toBeTruthy();
     expect(screen.getByText("Applications & Lineage")).toBeTruthy();
     expect(screen.getByText("Process Attributes")).toBeTruthy();
@@ -105,6 +106,47 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
     render(<MonitoringTestWrapper />);
 
-    expect(screen.getByText("Live Monitoring & System Health")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Live Monitoring & System Health/i })).toBeTruthy();
+  });
+
+  it("updates chart timestamps and preferences when time-range toggle buttons are clicked", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    render(<MonitoringTestWrapper />);
+
+    const btn5m = screen.getByRole("button", { name: "Set time range to 5m" });
+    expect(btn5m).toHaveAttribute("aria-pressed", "false");
+
+    fireEvent.click(btn5m);
+    expect(btn5m).toHaveAttribute("aria-pressed", "true");
+
+    // Timestamps for 5m range appear cleanly across charts without minus-sign clipping
+    expect(screen.getAllByText("5m ago").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("1m ago").length).toBeGreaterThan(0);
+  });
+
+  it("preserves unrelated UI state (e.g. topology rules selection) when time range is toggled", async () => {
+    const { fireEvent } = await import("@testing-library/react");
+    render(<MonitoringTestWrapper />);
+
+    // Open topology rules dropdown and select "High Bandwidth"
+    const rulesBtn = screen.getByRole("button", { name: "Filter lineage topology rules" });
+    fireEvent.click(rulesBtn);
+
+    const highBwRule = screen.getByRole("button", { name: "High Bandwidth" });
+    fireEvent.click(highBwRule);
+
+    expect(screen.getByRole("button", { name: "Filter lineage topology rules" })).toHaveTextContent(
+      "High Bandwidth ▾"
+    );
+
+    // Toggle time range to 15m
+    const btn15m = screen.getByRole("button", { name: "Set time range to 15m" });
+    fireEvent.click(btn15m);
+
+    // Verify time range changed while active topology rule state was preserved
+    expect(btn15m).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Filter lineage topology rules" })).toHaveTextContent(
+      "High Bandwidth ▾"
+    );
   });
 });

@@ -24,17 +24,17 @@ export class MonitoringMapper {
 
     switch (timeRange) {
       case "5m":
-        timestamps = ["-5m", "-4m", "-3m", "-2m", "-1m", "Now"];
+        timestamps = ["5m ago", "4m ago", "3m ago", "2m ago", "1m ago", "Now"];
         windowMultiplier = 5 / 1440;
         rateSmoothingFactor = 0.85;
         break;
       case "15m":
-        timestamps = ["-15m", "-12m", "-9m", "-6m", "-3m", "Now"];
+        timestamps = ["15m ago", "12m ago", "9m ago", "6m ago", "3m ago", "Now"];
         windowMultiplier = 15 / 1440;
         rateSmoothingFactor = 0.95;
         break;
       case "1h":
-        timestamps = ["-60m", "-45m", "-30m", "-15m", "Now"];
+        timestamps = ["60m ago", "45m ago", "30m ago", "15m ago", "Now"];
         windowMultiplier = 60 / 1440;
         rateSmoothingFactor = 1.05;
         break;

@@ -88,23 +88,40 @@ export function TimelineFilters({
       >
         {filters.map((f) => {
           const isSelected = severityFilter === f.id;
+          const activeBg =
+            f.id === "finding"
+              ? "var(--np-danger, #ff5c7c)"
+              : f.id === "notable"
+              ? "var(--np-warning, #ffb800)"
+              : "var(--np-accent, #2fe0d6)";
+
           return (
             <button
               type="button"
               key={f.id}
               className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
+              aria-pressed={isSelected}
               style={{
                 fontSize: "0.8rem",
                 padding: "0.35rem 0.75rem",
                 borderRadius: "var(--np-radius-md, 8px)",
-                background: isSelected ? "var(--np-accent, #2fe0d6)" : "var(--np-surface-2, #1c2636)",
+                background: isSelected ? activeBg : "var(--np-surface-2, #1c2636)",
                 color: isSelected ? "#000" : "var(--np-text, #e2e8f0)",
                 border: "none",
                 fontWeight: isSelected ? 600 : 400,
                 cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.35rem",
               }}
               onClick={() => onSeverityChange(f.id)}
             >
+              {f.id === "finding" && (
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? "#000" : "var(--np-danger, #ff5c7c)" }} />
+              )}
+              {f.id === "notable" && (
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? "#000" : "var(--np-warning, #ffb800)" }} />
+              )}
               {f.label}
             </button>
           );

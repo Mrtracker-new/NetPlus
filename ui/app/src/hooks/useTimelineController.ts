@@ -43,12 +43,27 @@ export function useTimelineController() {
     });
   }, [events, severityFilter, searchQuery]);
 
-  // Fallback focus guard: if selection is out of bounds after filter change
+  // Deterministic initial auto-selection:
+  // Runs only when selectedEventIndex === null and filteredEvents become available.
+  // Selects highest-severity event (finding > notable > neutral), breaking ties by earliest timestamp.
   useEffect(() => {
-    if (selectedEventIndex !== null && selectedEventIndex >= filteredEvents.length) {
+    if (selectedEventIndex === null && filteredEvents.length > 0) {
+      let bestIndex = 0;
+      let bestSeverityWeight = -1;
+
+      for (let i = 0; i < filteredEvents.length; i++) {
+        const ev = filteredEvents[i]!;
+        const weight = ev.severity === "finding" ? 3 : ev.severity === "notable" ? 2 : 1;
+        if (weight > bestSeverityWeight) {
+          bestSeverityWeight = weight;
+          bestIndex = i;
+        }
+      }
+      setSelectedEventIndex(bestIndex);
+    } else if (selectedEventIndex !== null && selectedEventIndex >= filteredEvents.length) {
       setSelectedEventIndex(filteredEvents.length > 0 ? filteredEvents.length - 1 : null);
     }
-  }, [filteredEvents.length, selectedEventIndex]);
+  }, [filteredEvents, selectedEventIndex]);
 
   // Dynamic Time Axis Ticks
   const axisTicks = useMemo(() => {

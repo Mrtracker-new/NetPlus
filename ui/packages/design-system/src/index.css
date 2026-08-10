@@ -1800,36 +1800,61 @@ button {
   box-shadow: var(--np-neu-inset);
 }
 .np-ribbon__mark {
+  --mark-scale: 1;
   position: absolute;
   top: 50%;
   width: 11px;
   height: 11px;
   margin-left: -5px;
-  transform: translateY(-50%) rotate(45deg);
+  transform: translateY(-50%) rotate(45deg) scale(var(--mark-scale, 1));
   border-radius: 2px;
-  background: var(--np-neutral);
-  border: 1px solid var(--np-surface-1);
-  cursor: default;
-  transition: transform var(--np-t);
+  background: var(--np-neutral, #8b9bb4);
+  border: 1px solid var(--np-surface-1, #131b2a);
+  cursor: pointer;
+  transition: transform var(--np-t, 0.15s ease), border-color var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease);
 }
-.np-ribbon__mark:hover {
-  transform: translateY(-50%) rotate(45deg) scale(1.4);
-  z-index: var(--np-z-elevated);
+.np-ribbon__mark:hover,
+.np-ribbon__mark:focus-visible {
+  --mark-scale: 1.35;
+  z-index: var(--np-z-elevated, 10);
+  outline: 2px solid var(--np-accent, #2fe0d6);
+  outline-offset: 2px;
+}
+.np-ribbon__mark[data-highlighted="true"] {
+  --mark-scale: 1.35;
+  z-index: var(--np-z-elevated, 10);
+  border: 2px solid var(--np-accent, #2fe0d6) !important;
+  box-shadow: 0 0 8px rgba(47, 224, 214, 0.5);
 }
 .np-ribbon__mark[data-sev="notable"] {
-  background: var(--np-notable);
+  background: var(--np-notable, #ffb800);
 }
 .np-ribbon__mark[data-sev="finding"] {
-  background: var(--np-finding);
+  background: var(--np-finding, #ff5c7c);
 }
 .np-ribbon__axis {
-  display: flex;
-  justify-content: space-between;
-  margin-top: var(--np-2);
-  padding-left: 88px;
-  font-family: var(--np-font-mono);
-  font-size: var(--np-fs-xs);
-  color: var(--np-text-mute);
+  display: grid;
+  grid-template-columns: 88px 1fr;
+  align-items: center;
+  gap: var(--np-3, 0.75rem);
+  margin-top: var(--np-2, 0.5rem);
+  font-family: var(--np-font-mono, monospace);
+  font-size: var(--np-fs-xs, 0.75rem);
+  color: var(--np-text-mute, #8b9bb4);
+}
+.np-ribbon__axis-track {
+  position: relative;
+  width: 100%;
+  height: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-ribbon__mark,
+  .np-kpi,
+  .np-timeline-filters,
+  .np-timeline-inspector {
+    transition: none !important;
+  }
 }
 
 /* ---- Journey flow diagram & Page Journey ---- */

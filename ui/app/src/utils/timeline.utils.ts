@@ -43,7 +43,22 @@ export function formatTimeSpan(spanNanos: number): string {
   return `${hours}h ${remMinutes}m`;
 }
 
-/** Generate adaptive time axis ticks based on time span */
+/** Helper to format relative time offset in seconds into human-readable label */
+export function formatTimeOffset(seconds: number): string {
+  const rounded = Math.round(seconds);
+  if (rounded <= 0) return "0s";
+  if (rounded < 60) return `-${rounded}s`;
+  const mins = Math.floor(rounded / 60);
+  const secs = rounded % 60;
+  if (secs === 0) return `-${mins}m`;
+  if (mins < 60) return `-${mins}m ${secs}s`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (remMins === 0) return `-${hrs}h`;
+  return `-${hrs}h ${remMins}m`;
+}
+
+/** Generate adaptive time axis ticks based on time span with strict label deduplication */
 export function formatTimelineAxis(min: number, max: number): TimelineAxisTick[] {
   const spanNanos = max - min;
   const totalSeconds = spanNanos / 1e9;
@@ -55,27 +70,26 @@ export function formatTimelineAxis(min: number, max: number): TimelineAxisTick[]
     ];
   }
 
-  if (totalSeconds < 60) {
+  if (totalSeconds <= 2) {
     return [
-      { positionPercent: 2, label: `-${Math.round(totalSeconds)}s` },
-      { positionPercent: 50, label: `-${Math.round(totalSeconds / 2)}s` },
+      { positionPercent: 2, label: `-${totalSeconds.toFixed(totalSeconds < 1 ? 1 : 0)}s` },
       { positionPercent: 98, label: "now" },
     ];
   }
 
-  const totalMinutes = Math.round(totalSeconds / 60);
-  if (totalMinutes < 60) {
-    return [
-      { positionPercent: 2, label: `-${totalMinutes}m` },
-      { positionPercent: 50, label: `-${Math.round(totalMinutes / 2)}m` },
-      { positionPercent: 98, label: "now" },
-    ];
+  const startLabel = formatTimeOffset(totalSeconds);
+  const midLabel = formatTimeOffset(totalSeconds / 2);
+
+  // Guarantee strict deduplication: if startLabel and midLabel match, fallback to exact seconds
+  let finalMidLabel = midLabel;
+  if (startLabel === midLabel || midLabel === "now" || midLabel === "0s") {
+    const halfSec = Math.round(totalSeconds / 2);
+    finalMidLabel = halfSec > 0 ? `-${halfSec}s` : "-0.5s";
   }
 
-  const totalHours = Math.round(totalMinutes / 60);
   return [
-    { positionPercent: 2, label: `-${totalHours}h` },
-    { positionPercent: 50, label: `-${Math.round(totalHours / 2)}h` },
+    { positionPercent: 2, label: startLabel },
+    { positionPercent: 50, label: finalMidLabel },
     { positionPercent: 98, label: "now" },
   ];
 }

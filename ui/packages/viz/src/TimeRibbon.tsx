@@ -108,7 +108,7 @@ export const TimeRibbon = memo(function TimeRibbon({
                       if (isHighlighted) highlightedRef.current = el;
                     }}
                     className={`np-ribbon__mark ${isHighlighted ? "np-ribbon__mark--highlighted" : ""}`}
-                    aria-current={isHighlighted ? "true" : undefined}
+                    aria-pressed={isHighlighted}
                     aria-label={`Event ${globalIndex + 1}: ${e.label} (${e.severity})`}
                     data-sev={e.severity}
                     data-highlighted={isHighlighted ? "true" : undefined}
@@ -116,11 +116,6 @@ export const TimeRibbon = memo(function TimeRibbon({
                     onKeyDown={(evt) => handleKeyDown(evt, globalIndex)}
                     style={{
                       left: pos(e.at),
-                      position: "absolute",
-                      cursor: "pointer",
-                      border: isHighlighted ? "2px solid var(--np-accent, #2fe0d6)" : "none",
-                      transform: isHighlighted ? "scale(1.35)" : "scale(1)",
-                      transition: "transform 0.15s ease, border-color 0.15s ease",
                     }}
                     title={e.label}
                   />
@@ -131,19 +126,32 @@ export const TimeRibbon = memo(function TimeRibbon({
         );
       })}
 
-      <div className="np-ribbon__axis" style={{ display: "flex", justifyContent: "space-between" }}>
-        {axisTicks && axisTicks.length > 0 ? (
-          axisTicks.map((tick, i) => (
-            <span key={i} style={{ fontSize: "0.75rem", color: "var(--np-muted, #8b9bb4)" }}>
-              {tick.label}
-            </span>
-          ))
-        ) : (
-          <>
-            <span>earlier</span>
-            <span>now</span>
-          </>
-        )}
+      <div className="np-ribbon__axis">
+        <span aria-hidden="true" style={{ fontSize: "0.7rem", color: "var(--np-muted, #8b9bb4)", opacity: 0.85, display: "flex", alignItems: "center" }}>
+          ← / → scrub
+        </span>
+        <div className="np-ribbon__axis-track">
+          {axisTicks && axisTicks.length > 0 ? (
+            axisTicks.map((tick, i) => (
+              <span
+                key={i}
+                style={{
+                  position: "absolute",
+                  left: `${tick.positionPercent}%`,
+                  transform: "translateX(-50%)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {tick.label}
+              </span>
+            ))
+          ) : (
+            <>
+              <span style={{ position: "absolute", left: "2%", transform: "translateX(-50%)" }}>earlier</span>
+              <span style={{ position: "absolute", left: "98%", transform: "translateX(-50%)" }}>now</span>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

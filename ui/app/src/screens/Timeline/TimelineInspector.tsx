@@ -72,6 +72,8 @@ export function TimelineInspector({
             className="np-btn np-btn--ghost"
             onClick={onPrev}
             disabled={currentIndex <= 0}
+            aria-disabled={currentIndex <= 0}
+            aria-label={`Previous event (${currentIndex} of ${totalCount})`}
             style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem", cursor: currentIndex <= 0 ? "not-allowed" : "pointer", opacity: currentIndex <= 0 ? 0.5 : 1 }}
           >
             ◀ {t("prev_event")}
@@ -81,6 +83,8 @@ export function TimelineInspector({
             className="np-btn np-btn--ghost"
             onClick={onNext}
             disabled={currentIndex >= totalCount - 1}
+            aria-disabled={currentIndex >= totalCount - 1}
+            aria-label={`Next event (${currentIndex + 2} of ${totalCount})`}
             style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem", cursor: currentIndex >= totalCount - 1 ? "not-allowed" : "pointer", opacity: currentIndex >= totalCount - 1 ? 0.5 : 1 }}
           >
             {t("next_event")} ▶

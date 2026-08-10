@@ -19,17 +19,12 @@ export const SituationSummary = memo(function SituationSummary({
           <span className={`np-badge np-badge--${hero.state}`}>
             ● {hero.badgeText}
           </span>
-          <h1 className="np-hero__title">{hero.title}</h1>
+          <h1 className="np-situation-card__headline">{summary.headline}</h1>
         </div>
-        <p className="np-hero__sub">{hero.subtitle}</p>
+        <p className="np-situation-card__paragraph">{summary.explanation}</p>
       </header>
 
       <div className="np-situation-card__body">
-        <div className="np-situation-card__narrative">
-          <h2 className="np-situation-card__headline">{summary.headline}</h2>
-          <p className="np-situation-card__paragraph">{summary.explanation}</p>
-        </div>
-
         <div className="np-situation-card__footer">
           <div className="np-situation-card__highlights">
             {summary.highlights.map((item, idx) => (

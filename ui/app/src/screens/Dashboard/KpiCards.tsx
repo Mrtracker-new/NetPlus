@@ -37,7 +37,18 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
             <div className="np-kpi-card__val">{kpi.value}</div>
             {kpi.sparklineData.length > 1 && (
               <div className="np-kpi-card__spark">
-                <Sparkline data={kpi.sparklineData} width={84} height={24} />
+                <Sparkline
+                  data={kpi.sparklineData}
+                  width={84}
+                  height={24}
+                  color={
+                    kpi.statusBadge.variant === "spike"
+                      ? "var(--np-finding)"
+                      : kpi.statusBadge.variant === "congested"
+                      ? "var(--np-notable)"
+                      : "var(--np-accent)"
+                  }
+                />
               </div>
             )}
           </div>

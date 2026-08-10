@@ -162,9 +162,14 @@ export function Dashboard({ loading = false, error = null, onRetry }: DashboardP
 
       {/* 5. Live Network Constellation Visualization */}
       <section aria-labelledby="dashboard-live-title" role="region">
-        <h2 id="dashboard-live-title" className="np-dash__section-title">
-          {t("live_traffic")}
-        </h2>
+        <div className="np-dash__section-header">
+          <h2 id="dashboard-live-title" className="np-dash__section-title">
+            {t("live_traffic")}
+          </h2>
+          <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
+            ● REAL-TIME MATRIX
+          </span>
+        </div>
         {loading ? (
           <div
             style={{
@@ -189,9 +194,11 @@ export function Dashboard({ loading = false, error = null, onRetry }: DashboardP
 
       {/* 6. Filtered Narrative Feed ("What's Happening") */}
       <section aria-labelledby="dashboard-feed-title" role="region">
-        <h2 id="dashboard-feed-title" className="np-dash__section-title">
-          {t("whats_happening")}
-        </h2>
+        <div className="np-dash__section-header">
+          <h2 id="dashboard-feed-title" className="np-dash__section-title">
+            {t("whats_happening")}
+          </h2>
+        </div>
         {loading ? (
           <div className="np-feed">
             {[1, 2].map((i) => (

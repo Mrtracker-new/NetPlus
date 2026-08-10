@@ -3149,14 +3149,15 @@ svg path {
 }
 
 .np-situation-card__header {
-  margin-bottom: var(--np-4);
+  margin-bottom: var(--np-3);
 }
 
 .np-situation-card__title-row {
   display: flex;
   align-items: center;
   gap: var(--np-3);
-  margin-bottom: var(--np-1);
+  margin-bottom: var(--np-2);
+  flex-wrap: wrap;
 }
 
 .np-badge {
@@ -3188,17 +3189,18 @@ svg path {
 }
 
 .np-situation-card__headline {
-  font-size: var(--np-fs-lg);
+  font-size: var(--np-fs-xl);
   font-weight: var(--np-fw-bold);
   color: var(--np-text);
-  margin-bottom: var(--np-2);
+  margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .np-situation-card__paragraph {
   font-size: var(--np-fs-base);
   line-height: 1.6;
   color: var(--np-text-dim);
-  margin-bottom: var(--np-4);
+  margin-bottom: 0;
 }
 
 .np-situation-card__footer {
@@ -3207,8 +3209,8 @@ svg path {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--np-3);
-  pt: var(--np-3);
-  border-top: 1px solid var(--np-border);
+  padding-top: var(--np-3);
+  border-top: 1px solid var(--np-hairline);
 }
 
 .np-situation-card__highlights {

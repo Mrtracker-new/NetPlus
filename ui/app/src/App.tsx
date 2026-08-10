@@ -346,6 +346,7 @@ function RightRail() {
     ? [...monitor.by_host.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6)
     : [];
   const totalFlows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
+  const maxBytes = hosts.length > 0 ? Math.max(...hosts.map((h) => h.bytes), 1) : 1;
 
   return (
     <aside className="np-rail-right" aria-label="Context">
@@ -376,17 +377,14 @@ function RightRail() {
         {hosts.length === 0 ? (
           <p className="np-cons__hint">{t("rail.quiet_no_hosts")}</p>
         ) : (
-          <ul className="np-rail-list">
+          <ul className="np-rail-list np-rail-list--hosts">
             {hosts.map((h) => {
               const nm = primaryHostName(h);
+              const pct = Math.min(100, Math.max(8, Math.round((h.bytes / maxBytes) * 100)));
               return (
-                <li key={h.label}>
+                <li key={h.label} className="np-rail-host-item" style={{ "--host-pct": `${pct}%` } as React.CSSProperties}>
                   <span
-                    style={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
+                    className="np-rail-host-name"
                     title={nm ? `${nm.name} · ${h.label}` : h.label}
                   >
                     {nm ? nm.name : h.label}

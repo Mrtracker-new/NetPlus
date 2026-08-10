@@ -3089,8 +3089,7 @@ svg path {
   align-items: center;
   gap: var(--np-3);
   padding: var(--np-2) var(--np-4);
-  background: var(--np-glass-bg);
-  backdrop-filter: var(--np-glass-blur);
+  background: var(--np-surface-1);
   border: 1px solid var(--np-border-strong);
   border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-xs);
@@ -3098,12 +3097,18 @@ svg path {
   margin-bottom: var(--np-4);
   overflow-x: auto;
   white-space: nowrap;
+  box-shadow: var(--np-neu-sm);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.np-health-strip::-webkit-scrollbar {
+  display: none;
 }
 
 .np-health-strip__item {
   display: flex;
   align-items: center;
-  gap: var(--np-1);
+  gap: 6px;
 }
 
 .np-health-dot {
@@ -3112,6 +3117,7 @@ svg path {
   border-radius: 50%;
   background: var(--np-neutral);
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .np-health-dot--active {
@@ -3127,6 +3133,7 @@ svg path {
 .np-health-strip__val {
   font-family: var(--np-font-mono);
   color: var(--np-text);
+  font-weight: var(--np-fw-semibold);
 }
 
 .np-health-strip__val--warning {
@@ -3136,16 +3143,32 @@ svg path {
 .np-health-strip__divider {
   color: var(--np-border-strong);
   user-select: none;
+  opacity: 0.6;
 }
 
 /* 2. Situation Summary & Dynamic Hero Header */
 .np-situation-card {
   background: var(--np-surface-1);
   border: 1px solid var(--np-border-strong);
+  border-left: 4px solid var(--np-accent);
   border-radius: var(--np-radius-lg);
   padding: var(--np-5);
   margin-bottom: var(--np-5);
   box-shadow: var(--np-neu);
+  transition: border-color var(--np-t);
+}
+
+.np-situation-card--healthy {
+  border-left-color: var(--np-good);
+}
+
+.np-situation-card--spike,
+.np-situation-card--new_device {
+  border-left-color: var(--np-notable);
+}
+
+.np-situation-card--finding {
+  border-left-color: var(--np-finding);
 }
 
 .np-situation-card__header {
@@ -3232,94 +3255,36 @@ svg path {
 .np-rec-tag {
   font-size: var(--np-fs-xs);
   font-weight: var(--np-fw-semibold);
-  padding: 4px 12px;
+  padding: 5px 14px;
   border-radius: var(--np-radius-pill);
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all var(--np-t);
+}
+
+.np-rec-tag__prefix {
+  opacity: 0.85;
+  font-weight: var(--np-fw-bold);
+}
+
+.np-rec-tag--normal {
+  background: var(--np-good-soft);
+  color: var(--np-good);
+  border-color: rgba(40, 146, 109, 0.3);
+}
+
+.np-rec-tag--caution {
+  background: var(--np-notable-soft);
+  color: var(--np-notable);
+  border-color: rgba(184, 122, 31, 0.3);
 }
 
 .np-rec-tag--investigate {
   background: var(--np-finding-soft);
   color: var(--np-finding);
-}
-
-/* 3. Smart Narrative Feed Filter Bar */
-.np-filter-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--np-3);
-  flex-wrap: wrap;
-  margin-bottom: var(--np-5);
-  padding: var(--np-2) var(--np-3);
-  background: var(--np-surface-1);
-  border: 1px solid var(--np-border-strong);
-  border-radius: var(--np-radius);
-  box-shadow: var(--np-neu-sm);
-}
-
-.np-filter-bar__tabs {
-  display: flex;
-  gap: var(--np-1);
-  overflow-x: auto;
-}
-
-.np-filter-tab {
-  background: transparent;
-  border: none;
-  color: var(--np-text-dim);
-  font-size: var(--np-fs-xs);
-  font-weight: var(--np-fw-medium);
-  padding: 6px 14px;
-  border-radius: var(--np-radius-pill);
-  cursor: pointer;
-  transition: all var(--np-t);
-}
-
-.np-filter-tab:hover {
-  color: var(--np-text);
-  background: var(--np-surface-2);
-}
-
-.np-filter-tab--active {
-  color: var(--np-on-accent);
-  background: var(--np-accent);
-  font-weight: var(--np-fw-semibold);
-}
-
-.np-filter-bar__search {
-  display: flex;
-  align-items: center;
-  gap: var(--np-2);
-  position: relative;
-}
-
-.np-filter-input {
-  background: var(--np-surface-2);
-  border: 1px solid var(--np-border-strong);
-  border-radius: var(--np-radius-pill);
-  padding: 6px var(--np-4);
-  font-size: var(--np-fs-xs);
-  color: var(--np-text);
-  width: 240px;
-  outline: none;
-  transition: border-color var(--np-t);
-}
-
-.np-filter-input:focus {
-  border-color: var(--np-accent);
-}
-
-.np-filter-clear {
-  background: transparent;
-  border: none;
-  color: var(--np-text-mute);
-  cursor: pointer;
-  font-size: 11px;
-}
-
-.np-filter-count {
-  font-family: var(--np-font-mono);
-  font-size: var(--np-fs-xs);
-  color: var(--np-text-mute);
+  border-color: rgba(196, 77, 83, 0.3);
 }
 
 /* 4. Enhanced Dynamic KPI Cards */
@@ -3330,24 +3295,27 @@ svg path {
   padding: var(--np-4);
   box-shadow: var(--np-neu);
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
   transition: transform var(--np-t), box-shadow var(--np-t);
 }
 
 .np-kpi-card:hover {
   transform: translateY(-2px);
+  box-shadow: var(--np-neu-lg);
 }
 
 .np-kpi-card__header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--np-2);
 }
 
 .np-kpi-card__label {
   font-size: var(--np-fs-xs);
   font-weight: var(--np-fw-semibold);
-  color: var(--np-text-dim);
+  color: var(--np-text-mute);
   text-transform: uppercase;
   letter-spacing: var(--np-tracking-wide);
 }
@@ -3366,9 +3334,9 @@ svg path {
 .np-status-badge--congested { background: var(--np-notable-soft); color: var(--np-notable); }
 .np-status-badge--quiet, .np-status-badge--learning { background: var(--np-surface-3); color: var(--np-text-dim); }
 
-.np-kpi-card__body {
+.np-kpi-card__main {
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--np-2);
 }
@@ -3378,18 +3346,26 @@ svg path {
   font-weight: var(--np-fw-bold);
   color: var(--np-text);
   font-family: var(--np-font-mono);
+  line-height: 1;
 }
 
 .np-kpi-card__rates {
   display: flex;
-  gap: var(--np-3);
+  gap: var(--np-2);
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
-  margin-top: var(--np-1);
 }
 
 .np-kpi-rate--down { color: var(--np-accent-strong); }
 .np-kpi-rate--up { color: var(--np-accent-2); }
+
+.np-kpi-card__spark {
+  margin-top: 4px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 
 .np-kpi-card__tooltip {
   display: none;
@@ -3749,6 +3725,11 @@ svg path {
   gap: var(--np-2);
   overflow-x: auto;
   padding-bottom: 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.np-filter-tabs-row::-webkit-scrollbar {
+  display: none;
 }
 
 .np-filter-tab-pill {
@@ -3761,6 +3742,7 @@ svg path {
   border-radius: var(--np-radius-pill);
   cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: all var(--np-t);
 }
 
@@ -3774,6 +3756,54 @@ svg path {
   background: var(--np-accent);
   border-color: var(--np-accent-strong);
   font-weight: var(--np-fw-bold);
+}
+
+/* Right Rail Top Hosts Visual Bar Indicator */
+.np-rail-list--hosts {
+  gap: 6px;
+}
+
+.np-rail-host-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  border-radius: var(--np-radius-xs);
+  background: transparent;
+  overflow: hidden;
+  transition: background var(--np-t);
+}
+
+.np-rail-host-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--host-pct, 0%);
+  background: var(--np-accent-soft);
+  border-radius: var(--np-radius-xs);
+  pointer-events: none;
+  z-index: 0;
+  transition: width 300ms ease-out;
+}
+
+.np-rail-host-name,
+.np-rail-host-item .np-rail-list__val {
+  position: relative;
+  z-index: 1;
+}
+
+.np-rail-host-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
+}
+
+.np-rail-host-item:hover {
+  background: var(--np-surface-2);
 }
 
 /* In-Card Collapsible Explanation Box */

@@ -12,8 +12,17 @@ export const SituationSummary = memo(function SituationSummary({
   summary,
   onSelectCategory,
 }: SituationSummaryProps) {
+  const rec = summary.recommendations[0];
+  const recText = rec?.text ?? "";
+  const recClass =
+    hero.state === "healthy" || recText.toLowerCase().includes("no action required")
+      ? "np-rec-tag--normal"
+      : hero.state === "finding"
+      ? "np-rec-tag--investigate"
+      : "np-rec-tag--caution";
+
   return (
-    <section className="np-situation-card" aria-label="Situation Summary">
+    <section className={`np-situation-card np-situation-card--${hero.state}`} aria-label="Situation Summary">
       <header className="np-situation-card__header">
         <div className="np-situation-card__title-row">
           <span className={`np-badge np-badge--${hero.state}`}>
@@ -34,15 +43,15 @@ export const SituationSummary = memo(function SituationSummary({
             ))}
           </div>
 
-          {summary.recommendations.length > 0 && (
+          {rec && (
             <div className="np-situation-card__rec">
               <button
                 type="button"
-                className="np-rec-tag np-rec-tag--investigate np-rec-btn"
+                className={`np-rec-tag ${recClass} np-rec-btn`}
                 onClick={() => onSelectCategory?.("findings")}
-                aria-label={`Recommendation: ${summary.recommendations[0]!.text}`}
+                aria-label={`Recommendation: ${rec.text}`}
               >
-                Recommendation: {summary.recommendations[0]!.text}
+                <span className="np-rec-tag__prefix">Recommendation:</span> {rec.text}
               </button>
             </div>
           )}

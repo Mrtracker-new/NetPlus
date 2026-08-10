@@ -33,30 +33,30 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
             </span>
           </div>
 
-          <div className="np-kpi-card__body">
+          <div className="np-kpi-card__main">
             <div className="np-kpi-card__val">{kpi.value}</div>
-            {kpi.sparklineData.length > 1 && (
-              <div className="np-kpi-card__spark">
-                <Sparkline
-                  data={kpi.sparklineData}
-                  width={84}
-                  height={24}
-                  color={
-                    kpi.statusBadge.variant === "spike"
-                      ? "var(--np-finding)"
-                      : kpi.statusBadge.variant === "congested"
-                      ? "var(--np-notable)"
-                      : "var(--np-accent)"
-                  }
-                />
+            {(kpi.rateDown || kpi.rateUp) && (
+              <div className="np-kpi-card__rates">
+                {kpi.rateDown && <span className="np-kpi-rate np-kpi-rate--down">▼ {kpi.rateDown.replace("▼", "").trim()}</span>}
+                {kpi.rateUp && <span className="np-kpi-rate np-kpi-rate--up">▲ {kpi.rateUp.replace("▲", "").trim()}</span>}
               </div>
             )}
           </div>
 
-          {(kpi.rateDown || kpi.rateUp) && (
-            <div className="np-kpi-card__rates">
-              {kpi.rateDown && <span className="np-kpi-rate np-kpi-rate--down">{kpi.rateDown}</span>}
-              {kpi.rateUp && <span className="np-kpi-rate np-kpi-rate--up">{kpi.rateUp}</span>}
+          {kpi.sparklineData.length > 1 && (
+            <div className="np-kpi-card__spark">
+              <Sparkline
+                data={kpi.sparklineData}
+                width={110}
+                height={28}
+                color={
+                  kpi.statusBadge.variant === "spike"
+                    ? "var(--np-finding)"
+                    : kpi.statusBadge.variant === "congested"
+                    ? "var(--np-notable)"
+                    : "var(--np-accent)"
+                }
+              />
             </div>
           )}
 

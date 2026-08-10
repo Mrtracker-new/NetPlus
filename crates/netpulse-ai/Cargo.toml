@@ -16,7 +16,7 @@ netpulse-core = { path = "../netpulse-core" }
 netpulse-storage = { path = "../netpulse-storage" }
 
 [dev-dependencies]
-toml = "0.8"
+toml = "1.1"
 
 [lints]
 workspace = true

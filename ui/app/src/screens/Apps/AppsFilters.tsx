@@ -59,6 +59,7 @@ export function AppsFilters({
         </span>
         <input
           type="search"
+          aria-label={t("search_placeholder")}
           placeholder={t("search_placeholder")}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
@@ -89,6 +90,8 @@ export function AppsFilters({
               type="button"
               key={f.id}
               className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
+              aria-pressed={isSelected}
+              aria-label={`Filter by ${t(f.labelKey as any)}`}
               style={{
                 fontSize: "0.8rem",
                 padding: "0.35rem 0.75rem",
@@ -98,6 +101,7 @@ export function AppsFilters({
                 border: "none",
                 fontWeight: isSelected ? 600 : 400,
                 cursor: "pointer",
+                transition: "all 0.15s ease",
               }}
               onClick={() => onConfidenceChange(f.id)}
             >

@@ -120,28 +120,55 @@ export function Apps() {
               </EmptyState>
             </div>
           ) : (
-            <table aria-label={t("title")} style={{ width: "100%", borderCollapse: "separate", borderSpacing: "0 0.5rem" }}>
-              <thead>
-                <tr style={{ textAlign: "left", color: "var(--np-muted, #8b9bb4)", fontSize: "0.8rem" }}>
-                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.process")}</th>
-                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.pid")}</th>
-                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.flows")}</th>
-                  <th scope="col" style={{ padding: "0.5rem 0.75rem" }}>{t("table_headers.confidence")}</th>
-                  <th scope="col" style={{ padding: "0.5rem 0.75rem", textAlign: "right" }}>{t("table_headers.actions")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groupedProcesses.map((group) => (
-                  <ProcessRow
-                    key={group.key}
-                    group={group}
-                    isExpanded={expandedKeys.has(group.key)}
-                    onToggleExpand={toggleExpandGroup}
-                    onInspectFlow={inspectFlow}
-                  />
-                ))}
-              </tbody>
-            </table>
+            <div
+              className="np-table-container"
+              style={{
+                overflowX: "auto",
+                background: "var(--np-surface-1, #131b2a)",
+                border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
+                borderRadius: "var(--np-radius-lg, 12px)",
+                padding: "0.5rem",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+              }}
+            >
+              <table
+                aria-label={t("title")}
+                style={{
+                  width: "100%",
+                  minWidth: "600px",
+                  borderCollapse: "separate",
+                  borderSpacing: "0 0.4rem",
+                }}
+              >
+                <colgroup>
+                  <col style={{ width: "34%" }} />
+                  <col style={{ width: "14%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "20%" }} />
+                  <col style={{ width: "16%" }} />
+                </colgroup>
+                <thead>
+                  <tr style={{ textAlign: "left", color: "var(--np-muted, #8b9bb4)", fontSize: "0.8rem" }}>
+                    <th scope="col" style={{ padding: "0.5rem 0.85rem" }}>{t("table_headers.process")}</th>
+                    <th scope="col" style={{ padding: "0.5rem 0.85rem" }}>{t("table_headers.pid")}</th>
+                    <th scope="col" style={{ padding: "0.5rem 0.85rem" }}>{t("table_headers.flows")}</th>
+                    <th scope="col" style={{ padding: "0.5rem 0.85rem" }}>{t("table_headers.confidence")}</th>
+                    <th scope="col" style={{ padding: "0.5rem 0.85rem", textAlign: "right" }}>{t("table_headers.actions")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedProcesses.map((group) => (
+                    <ProcessRow
+                      key={group.key}
+                      group={group}
+                      isExpanded={expandedKeys.has(group.key)}
+                      onToggleExpand={toggleExpandGroup}
+                      onInspectFlow={inspectFlow}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       )}

@@ -18,10 +18,12 @@ export function ProcessRow({
 
   const confidenceBadge =
     group.confidence === "high"
-      ? { label: t("confidence_labels.high"), color: "#10b981", icon: "🟢" }
+      ? { label: t("confidence_labels.high"), color: "var(--np-good, #28926d)", icon: "🟢" }
       : group.confidence === "low"
-      ? { label: t("confidence_labels.low"), color: "#f59e0b", icon: "🟡" }
-      : { label: t("confidence_labels.unknown"), color: "var(--np-subtext, #94a3b8)", icon: "⚪" };
+      ? { label: t("confidence_labels.low"), color: "var(--np-notable, #b87a1f)", icon: "🟡" }
+      : { label: t("confidence_labels.unknown"), color: "var(--np-neutral, #97a0b4)", icon: "⚪" };
+
+  const lineageRegionId = `flow-lineage-${group.key}`;
 
   return (
     <>
@@ -31,24 +33,26 @@ export function ProcessRow({
         style={{
           cursor: "pointer",
           background: isExpanded ? "var(--np-surface-2, rgba(255, 255, 255, 0.04))" : "transparent",
-          transition: "background 0.15s ease",
+          transition: "background var(--np-t, 0.15s ease)",
         }}
       >
-        <td style={{ fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
+        <td style={{ padding: "0.65rem 0.85rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span aria-hidden="true" style={{ fontSize: "0.75rem", color: "var(--np-muted, #8b9bb4)" }}>
+            <span aria-hidden="true" style={{ fontSize: "0.75rem", color: "var(--np-muted, #8b9bb4)", transition: "transform 0.15s ease" }}>
               {isExpanded ? "▼" : "▶"}
             </span>
             <span>{group.processName}</span>
           </div>
         </td>
-        <td>{group.pid !== null ? `PID ${group.pid}` : "—"}</td>
-        <td>
+        <td style={{ padding: "0.65rem 0.85rem", color: "var(--np-text-dim, #9ca3af)" }}>
+          {group.pid !== null ? `PID ${group.pid}` : "—"}
+        </td>
+        <td style={{ padding: "0.65rem 0.85rem" }}>
           <span style={{ fontSize: "0.85rem", color: "var(--np-accent, #2fe0d6)" }}>
             {group.flowsCount} {group.flowsCount === 1 ? "flow" : "flows"}
           </span>
         </td>
-        <td>
+        <td style={{ padding: "0.65rem 0.85rem" }}>
           <span
             style={{
               display: "inline-flex",
@@ -68,7 +72,7 @@ export function ProcessRow({
             {confidenceBadge.label}
           </span>
         </td>
-        <td style={{ textAlign: "right" }}>
+        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right" }}>
           <button
             type="button"
             className="np-btn np-btn--ghost"
@@ -78,6 +82,7 @@ export function ProcessRow({
               onToggleExpand(group.key);
             }}
             aria-expanded={isExpanded}
+            aria-controls={lineageRegionId}
             aria-label={`${isExpanded ? t("collapse") : t("expand")} ${group.processName}`}
           >
             {isExpanded ? t("collapse") : t("expand")}
@@ -87,8 +92,8 @@ export function ProcessRow({
 
       {/* Expanded Child Flow Rows */}
       {isExpanded && (
-        <tr>
-          <td colSpan={5} style={{ padding: "0.5rem 1rem 1rem 2.5rem", background: "var(--np-bg, #0b1019)" }}>
+        <tr id={lineageRegionId}>
+          <td colSpan={5} style={{ padding: "0.65rem 1rem 1rem 2.5rem", background: "var(--np-bg, #0b1019)" }}>
             <div style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", marginBottom: "0.5rem", fontWeight: 600 }}>
               Active Flow Lineage:
             </div>

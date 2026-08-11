@@ -5,7 +5,7 @@
 
 import type { ReactElement } from "react";
 
-type IconProps = { className?: string };
+type IconProps = { className?: string; style?: React.CSSProperties };
 
 const S = {
   fill: "none",
@@ -15,9 +15,9 @@ const S = {
   strokeLinejoin: "round" as const,
 };
 
-function Svg({ children, className }: { children: React.ReactNode; className?: string }) {
+function Svg({ children, className, style }: { children: React.ReactNode; className?: string; style?: React.CSSProperties }) {
   return (
-    <svg viewBox="0 0 24 24" className={className} aria-hidden="true" {...S}>
+    <svg viewBox="0 0 24 24" className={className} style={style} aria-hidden="true" {...S}>
       {children}
     </svg>
   );
@@ -159,10 +159,10 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
   diagnostics: (
     <>
-      <path d="M6 3v6a6 6 0 0 0 12 0V3" />
-      <path d="M12 15v2a3 3 0 0 0 3 3h2" />
-      <circle cx="19" cy="20" r="1.5" />
-      <path d="M4.5 3h3M16.5 3h3" />
+      <path d="M7 4v5.5a5 5 0 0 0 10 0V4" />
+      <path d="M12 14.5v2a2.5 2.5 0 0 0 2.5 2.5h1.5" />
+      <circle cx="17.5" cy="19" r="1.2" />
+      <path d="M5.5 4h3M15.5 4h3" />
     </>
   ),
   sandbox: (
@@ -193,6 +193,6 @@ const PATHS: Record<IconName, ReactElement> = {
   ),
 };
 
-export function Icon({ name, className }: { name: IconName } & IconProps) {
-  return <Svg className={className}>{PATHS[name]}</Svg>;
+export function Icon({ name, className, style }: { name: IconName } & IconProps) {
+  return <Svg className={className} style={style}>{PATHS[name]}</Svg>;
 }

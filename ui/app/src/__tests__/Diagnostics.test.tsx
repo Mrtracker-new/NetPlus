@@ -94,7 +94,7 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
 
     expect(await screen.findByText("Traceroute Hops for 1.1.1.1 (2 hops)")).toBeInTheDocument();
     expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
-    expect(screen.getByText("gateway.local")).toBeInTheDocument();
+    expect(screen.getAllByText("gateway.local")[0]).toBeInTheDocument();
   });
 
   it("runs Bufferbloat probe and renders grade badge and scorecard", async () => {
@@ -129,5 +129,56 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
     expect(
       await screen.findByText("Please enter a valid target hostname, IPv4, IPv6, or localhost address.")
     ).toBeInTheDocument();
+  });
+
+  it("triggers Ping probe when Enter key is pressed in target input", async () => {
+    vi.spyOn(ipcModule, "query").mockResolvedValue({
+      kind: "pingResult",
+      result: {
+        target: "8.8.8.8",
+        sent: 4,
+        received: 4,
+        lossPct: 0,
+        minRttMs: 10,
+        avgRttMs: 12,
+        maxRttMs: 14,
+      },
+    } as any);
+
+    render(<DiagnosticsTestWrapper />);
+
+    const input = screen.getByPlaceholderText("Target Host (e.g. 1.1.1.1, google.com)");
+    fireEvent.change(input, { target: { value: "8.8.8.8" } });
+    fireEvent.keyDown(input, { key: "Enter", code: "Enter" });
+
+    expect(await screen.findByText("Ping Results for 8.8.8.8")).toBeInTheDocument();
+  });
+
+  it("updates target input when quick target preset is clicked", () => {
+    render(<DiagnosticsTestWrapper />);
+
+    const googlePresetBtn = screen.getAllByRole("button", { name: /8\.8\.8\.8/i })[0]!;
+    fireEvent.click(googlePresetBtn);
+
+    const input = screen.getByPlaceholderText("Target Host (e.g. 1.1.1.1, google.com)") as HTMLInputElement;
+    expect(input.value).toBe("8.8.8.8");
+  });
+
+  it("renders Traceroute timeout hop nodes in vertical timeline", async () => {
+    vi.spyOn(ipcModule, "query").mockResolvedValue({
+      kind: "tracerouteResult",
+      hops: [
+        { ttl: 1, ip: "192.168.1.1", hostname: "gateway.local", rttMs: 2 },
+        { ttl: 2, ip: "*", hostname: null, rttMs: 0, status: "timeout" },
+      ],
+    } as any);
+
+    render(<DiagnosticsTestWrapper />);
+
+    const traceBtn = screen.getByRole("button", { name: "Traceroute" });
+    fireEvent.click(traceBtn);
+
+    expect(await screen.findByText("Traceroute Hops for 1.1.1.1 (2 hops)")).toBeInTheDocument();
+    expect(screen.getAllByText("timeout")[0]).toBeInTheDocument();
   });
 });

@@ -1,9 +1,10 @@
 import { useTranslation } from "react-i18next";
-import { Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Notice, Skeleton } from "@netpulse/components";
 import { useSandboxController } from "../hooks/useSandboxController";
 import { LayerBuilder } from "./Sandbox/LayerBuilder";
 import { HexViewer } from "./Sandbox/HexViewer";
 import { RfcDiagnostics } from "./Sandbox/RfcDiagnostics";
+import { EmptySandboxState } from "./Sandbox/EmptySandboxState";
 
 export function ProtocolSandboxScreen() {
   const { t } = useTranslation(["sandbox", "common"]);
@@ -28,7 +29,7 @@ export function ProtocolSandboxScreen() {
       </div>
 
       <h2 id="protocol-sandbox-title">{t("title")}</h2>
-      <p className="np-sandbox__desc" style={{ color: "var(--np-subtext, #94a3b8)", marginBottom: "1.25rem" }}>
+      <p className="np-sandbox__desc" style={{ color: "var(--np-subtext)", marginBottom: "1.25rem" }}>
         {t("desc")}
       </p>
 
@@ -49,9 +50,13 @@ export function ProtocolSandboxScreen() {
 
       {/* Main Inspection Grid */}
       {isBuilding ? (
-        <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-          <Skeleton height="180px" />
-          <Skeleton height="140px" />
+        <div role="status" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+          <div className="np-sandbox__card">
+            <Skeleton height="160px" />
+          </div>
+          <div className="np-sandbox__card">
+            <Skeleton height="120px" />
+          </div>
         </div>
       ) : inspection ? (
         <div className="np-sandbox__inspection-results">
@@ -67,7 +72,7 @@ export function ProtocolSandboxScreen() {
           <RfcDiagnostics diagnostics={inspection.diagnostics} />
         </div>
       ) : (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptySandboxState onLoadPreset={actions.loadPreset} isBuilding={isBuilding} />
       )}
     </section>
   );

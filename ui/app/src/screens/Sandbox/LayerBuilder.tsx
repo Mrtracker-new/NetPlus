@@ -37,53 +37,49 @@ export function LayerBuilder({
 
   return (
     <div style={{ marginBottom: "1.5rem" }}>
-      {/* Presets Bar */}
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "0.5rem", marginBottom: "1.25rem" }}>
-        <Button variant="primary" busy={isBuilding} disabled={isBuilding} onClick={onInspect}>
-          {t("build_btn")}
-        </Button>
+      {/* Decoupled Layer Stack Templates Bar */}
+      <div className="np-sandbox__preset-bar" aria-label="Layer Stack Templates">
+        <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--np-subtext)", marginRight: "0.25rem" }}>
+          Templates:
+        </span>
         {presets.map((p) => (
-          <Button
+          <button
             key={p.key}
-            variant="standard"
+            type="button"
+            className="np-sandbox__preset-chip"
             disabled={isBuilding}
             onClick={() => onLoadPreset(p.key)}
-            style={{ fontSize: "0.8rem", padding: "0.35rem 0.75rem" }}
+            aria-label={`Load ${t(p.labelKey as any)} template`}
           >
             {t(p.labelKey as any)}
-          </Button>
+          </button>
         ))}
       </div>
 
-      {/* Interactive Layer Builder Controls */}
-      <section
-        style={{
-          background: "var(--np-surface-1, #131b2a)",
-          border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-          borderRadius: "var(--np-radius-lg, 12px)",
-          padding: "1.25rem 1.5rem",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        }}
-        aria-label={t("layer_builder")}
-      >
-        <h3 style={{ margin: "0 0 1rem 0", fontSize: "1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
-          {t("layer_builder")}
-        </h3>
+      {/* Interactive Layer Builder Panel */}
+      <section className="np-sandbox__card" aria-label={t("layer_builder")}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 600, color: "var(--np-text)" }}>
+              {t("layer_builder")}
+            </h3>
+            <span style={{ fontSize: "0.8rem", color: "var(--np-subtext)" }}>
+              Configure active protocol stack sequence
+            </span>
+          </div>
+
+          <Button variant="primary" busy={isBuilding} disabled={isBuilding} onClick={onInspect}>
+            {t("build_btn")}
+          </Button>
+        </div>
 
         {/* Layer Dropdown + Add Button */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1rem", flexWrap: "wrap" }}>
           <select
             value={selectedLayerToAdd}
             onChange={(e) => onSelectLayerToAdd(e.target.value)}
-            style={{
-              padding: "0.4rem 0.75rem",
-              fontSize: "0.85rem",
-              borderRadius: "var(--np-radius-md, 8px)",
-              border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-              background: "var(--np-bg, #0b1019)",
-              color: "var(--np-text, #e2e8f0)",
-              outline: "none",
-            }}
+            className="np-sandbox__select"
+            aria-label="Select layer to add"
           >
             {AVAILABLE_LAYERS.map((layer) => (
               <option key={layer} value={layer}>
@@ -98,62 +94,60 @@ export function LayerBuilder({
 
         {/* Current Configured Layer Stack List */}
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-          {layers.map((layer, index) => (
-            <div
-              key={`${layer}-${index}`}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                background: "var(--np-bg, #0b1019)",
-                padding: "0.5rem 0.85rem",
-                borderRadius: "var(--np-radius-md, 8px)",
-                border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--np-accent, #2fe0d6)" }}>
-                  L{index + 1}
-                </span>
-                <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
-                  {layer}
-                </span>
-              </div>
+          {layers.map((layer, index) => {
+            const isFirst = index === 0;
+            const isLast = index === layers.length - 1;
+            const isOnlyOne = layers.length <= 1;
 
-              <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                <button
-                  type="button"
-                  className="np-btn np-btn--ghost"
-                  style={{ fontSize: "0.75rem", padding: "0.15rem 0.4rem" }}
-                  disabled={index === 0 || isBuilding}
-                  onClick={() => onMoveLayer(index, "up")}
-                  title={t("move_up")}
-                >
-                  ▲
-                </button>
-                <button
-                  type="button"
-                  className="np-btn np-btn--ghost"
-                  style={{ fontSize: "0.75rem", padding: "0.15rem 0.4rem" }}
-                  disabled={index === layers.length - 1 || isBuilding}
-                  onClick={() => onMoveLayer(index, "down")}
-                  title={t("move_down")}
-                >
-                  ▼
-                </button>
-                <button
-                  type="button"
-                  className="np-btn np-btn--ghost"
-                  style={{ fontSize: "0.75rem", padding: "0.15rem 0.4rem", color: "var(--np-danger, #ff5c7c)" }}
-                  disabled={layers.length <= 1 || isBuilding}
-                  onClick={() => onRemoveLayer(index)}
-                  title={t("remove_layer")}
-                >
-                  ✕
-                </button>
+            return (
+              <div key={`${layer}-${index}`} className="np-sandbox__layer-card">
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                  <span className="np-sandbox__layer-badge">
+                    L{index + 1}
+                  </span>
+                  <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--np-text)" }}>
+                    {layer}
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <button
+                    type="button"
+                    className="np-btn np-btn--ghost"
+                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                    disabled={isFirst || isBuilding}
+                    onClick={() => onMoveLayer(index, "up")}
+                    aria-label={`Move ${layer} layer up`}
+                    title={`Move ${layer} layer up`}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    className="np-btn np-btn--ghost"
+                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem" }}
+                    disabled={isLast || isBuilding}
+                    onClick={() => onMoveLayer(index, "down")}
+                    aria-label={`Move ${layer} layer down`}
+                    title={`Move ${layer} layer down`}
+                  >
+                    ▼
+                  </button>
+                  <button
+                    type="button"
+                    className="np-btn np-btn--ghost"
+                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", color: "var(--np-finding)" }}
+                    disabled={isOnlyOne || isBuilding}
+                    onClick={() => onRemoveLayer(index)}
+                    aria-label={`Remove ${layer} layer`}
+                    title={`Remove ${layer} layer`}
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

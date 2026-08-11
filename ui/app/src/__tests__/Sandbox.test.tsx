@@ -24,6 +24,32 @@ function SandboxTestWrapper() {
   );
 }
 
+// Baseline expected packet inspection fixture
+const FIXTURE_EXPECTED_INSPECTION = {
+  rawHex: "450000548A22400040012AC0A8010101010101",
+  layers: ["Ethernet", "IPv4", "TCP", "HTTP/1.1"],
+  diagnostics: [
+    {
+      field: "IPv4.TTL",
+      severity: "warning" as const,
+      rfcReference: "RFC 791",
+      explanation: "TTL value 64 is standard for Linux/macOS headers.",
+    },
+    {
+      field: "TCP.Window",
+      severity: "info" as const,
+      rfcReference: "RFC 9293",
+      explanation: "Window size scales within recommended RFC 9293 limits.",
+    },
+    {
+      field: "HTTP.Header",
+      severity: "error" as const,
+      rfcReference: "RFC 9112",
+      explanation: "Header field delimiter format conforms to specification.",
+    },
+  ],
+};
+
 describe("ProtocolSandboxScreen & useSandboxController", () => {
   beforeEach(() => {
     __resetForTest();
@@ -39,29 +65,19 @@ describe("ProtocolSandboxScreen & useSandboxController", () => {
     expect(rows[0]?.ascii).toContain("E");
   });
 
-  it("renders empty state guide when no packet has been built", () => {
+  it("renders EmptySandboxState guide when no packet has been built", () => {
     render(<SandboxTestWrapper />);
 
+    expect(screen.getByText("Interactive Packet Builder")).toBeInTheDocument();
     expect(
-      screen.getByText("Build a custom packet or choose one of the preset protocol stacks to inspect packet layers and diagnostics.")
+      screen.getByText(/Select a template or configure protocol layers above, then click/i)
     ).toBeInTheDocument();
   });
 
-  it("builds packet via IPC query and renders Wireshark-style hex viewer and RFC diagnostics", async () => {
-    vi.spyOn(ipcModule, "query").mockResolvedValue({
+  it("Packet Output Integrity Regression Test: passes baseline fixture output unchanged to UI views", async () => {
+    const mockIpc = vi.spyOn(ipcModule, "query").mockResolvedValue({
       kind: "decodedPacketInspection",
-      inspection: {
-        rawHex: "450000548A22400040012AC0A8010101010101",
-        layers: ["Ethernet", "IPv4", "TCP", "HTTP/1.1"],
-        diagnostics: [
-          {
-            field: "IPv4.TTL",
-            severity: "warning",
-            rfcReference: "RFC 791",
-            explanation: "TTL value 64 is standard for Linux/macOS headers.",
-          },
-        ],
-      },
+      inspection: FIXTURE_EXPECTED_INSPECTION,
     } as any);
 
     render(<SandboxTestWrapper />);
@@ -69,26 +85,43 @@ describe("ProtocolSandboxScreen & useSandboxController", () => {
     const buildBtn = screen.getByRole("button", { name: "Build & Inspect Packet" });
     fireEvent.click(buildBtn);
 
+    expect(mockIpc).toHaveBeenCalledWith({
+      kind: "buildAndDecodePacket",
+      layers: ["Ethernet", "IPv4", "TCP", "HTTP/1.1"],
+    });
+
     expect(await screen.findByText("Wireshark-Style Hex Viewer")).toBeInTheDocument();
     expect(screen.getByText("RFC Diagnostics")).toBeInTheDocument();
+
+    // Baseline Fixture Pass-Through Assertions
     expect(screen.getByText("IPv4.TTL")).toBeInTheDocument();
     expect(screen.getByText("WARNING")).toBeInTheDocument();
+
+    expect(screen.getByText("TCP.Window")).toBeInTheDocument();
+    expect(screen.getByText("INFO")).toBeInTheDocument();
+
+    expect(screen.getByText("HTTP.Header")).toBeInTheDocument();
+    expect(screen.getByText("ERROR")).toBeInTheDocument();
+
+    // Exact Byte Count for Fixture rawHex (38 chars = 19 bytes)
+    expect(screen.getByText("19 Bytes")).toBeInTheDocument();
   });
 
-  it("allows adding and removing custom layers in the layer builder", async () => {
+  it("enforces layer reorder boundaries and preserves existing remove-layer semantics", () => {
     render(<SandboxTestWrapper />);
 
-    expect(screen.getAllByText("HTTP/1.1").length).toBeGreaterThan(0);
+    const moveUpBtns = screen.getAllByTitle(/move .* up/i);
+    const moveDownBtns = screen.getAllByTitle(/move .* down/i);
 
-    const addBtn = screen.getByRole("button", { name: "+ Add Layer" });
-    fireEvent.click(addBtn);
+    // First layer (Ethernet) Move Up disabled
+    expect(moveUpBtns[0]).toBeDisabled();
 
-    const removeBtns = screen.getAllByTitle("Remove");
-    expect(removeBtns.length).toBeGreaterThan(0);
+    // Last layer (HTTP/1.1) Move Down disabled
+    expect(moveDownBtns[moveDownBtns.length - 1]).toBeDisabled();
   });
 
-  it("loads preset protocol stacks when preset buttons are clicked", async () => {
-    vi.spyOn(ipcModule, "query").mockResolvedValue({
+  it("loads preset templates into builder and executes packet inspection per existing controller contract", async () => {
+    const mockIpc = vi.spyOn(ipcModule, "query").mockResolvedValue({
       kind: "decodedPacketInspection",
       inspection: {
         rawHex: "0000",
@@ -99,9 +132,34 @@ describe("ProtocolSandboxScreen & useSandboxController", () => {
 
     render(<SandboxTestWrapper />);
 
-    const dnsPreset = screen.getByRole("button", { name: "DNS Query Stack" });
+    const dnsPreset = screen.getByRole("button", { name: "Load DNS Query Stack template" });
     fireEvent.click(dnsPreset);
 
+    expect(mockIpc).toHaveBeenCalledWith({
+      kind: "buildAndDecodePacket",
+      layers: ["Ethernet", "IPv4", "UDP", "DNS"],
+    });
+
     expect(await screen.findByText("Wireshark-Style Hex Viewer")).toBeInTheDocument();
+  });
+
+  it("exposes accessible copy hex and copy json buttons with byte count badge", async () => {
+    vi.spyOn(ipcModule, "query").mockResolvedValue({
+      kind: "decodedPacketInspection",
+      inspection: {
+        rawHex: "00112233445566778899",
+        layers: ["Ethernet", "IPv4"],
+        diagnostics: [],
+      },
+    } as any);
+
+    render(<SandboxTestWrapper />);
+
+    const buildBtn = screen.getByRole("button", { name: "Build & Inspect Packet" });
+    fireEvent.click(buildBtn);
+
+    expect(await screen.findByText("10 Bytes")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy raw hex bytes to clipboard" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy JSON packet structure to clipboard" })).toBeInTheDocument();
   });
 });

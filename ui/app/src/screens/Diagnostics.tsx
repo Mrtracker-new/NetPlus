@@ -62,14 +62,13 @@ export function DiagnosticsScreen() {
           Quick Target Presets:
         </span>
         {TARGET_PRESETS.map((p) => (
-          <button
+          <Button
             key={p.value}
-            type="button"
-            className={`np-diagnostics__preset-btn ${target === p.value ? "np-diagnostics__preset-btn--active" : ""}`}
+            variant={target === p.value ? "primary" : "standard"}
             onClick={() => setTarget(p.value)}
           >
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
 

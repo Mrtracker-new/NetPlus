@@ -113,11 +113,12 @@ export function PingResultCard({ result }: PingResultCardProps) {
           alignItems: "center",
           gap: "0.5rem",
           fontSize: "0.85rem",
-          color: "var(--np-subtext, #94a3b8)",
+          color: "var(--np-subtext)",
           fontFamily: "monospace",
-          background: "var(--np-bg, #0b1019)",
+          background: "var(--np-bg)",
           padding: "0.5rem 0.75rem",
-          borderRadius: "var(--np-radius-xs, 6px)",
+          borderRadius: "var(--np-radius-xs)",
+          boxShadow: "var(--np-neu-inset)",
         }}
       >
         Min: {minRttStr}ms · Avg: {avgRttStr}ms · Max: {maxRttStr}ms

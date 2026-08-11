@@ -72,14 +72,13 @@ export function EmptyDiagnosticsState({
         </span>
         <div className="np-diagnostics__presets">
           {QUICK_TARGETS.map((qt) => (
-            <button
+            <Button
               key={qt.value}
-              type="button"
-              className={`np-diagnostics__preset-btn ${target === qt.value ? "np-diagnostics__preset-btn--active" : ""}`}
+              variant={target === qt.value ? "primary" : "standard"}
               onClick={() => onSetTarget(qt.value)}
             >
               {qt.label}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

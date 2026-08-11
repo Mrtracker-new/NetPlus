@@ -14,12 +14,12 @@ export function TracerouteCard({ target, hops }: TracerouteCardProps) {
     <div
       className="np-diagnostics__result"
       style={{
-        background: "var(--np-surface-1, #131b2a)",
-        border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-        borderRadius: "var(--np-radius-lg, 12px)",
+        background: "var(--np-surface-1)",
+        border: "1px solid var(--np-border)",
+        borderRadius: "var(--np-radius-lg)",
         padding: "1.25rem 1.5rem",
         marginBottom: "1.5rem",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+        boxShadow: "var(--np-neu)",
       }}
     >
       <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>

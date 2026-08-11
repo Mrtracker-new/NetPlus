@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@netpulse/components";
 import { Icon } from "../../icons";
 
 export interface EmptySandboxStateProps {
@@ -36,16 +37,15 @@ export function EmptySandboxState({ onLoadPreset, isBuilding }: EmptySandboxStat
           Quick Template Presets
         </span>
         {presets.map((p) => (
-          <button
+          <Button
             key={p.key}
-            type="button"
-            className="np-sandbox__preset-chip"
+            variant="standard"
             disabled={isBuilding}
             onClick={() => onLoadPreset(p.key)}
             aria-label={`Load ${p.label} preset`}
           >
             {p.label}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

@@ -43,16 +43,15 @@ export function LayerBuilder({
           Templates:
         </span>
         {presets.map((p) => (
-          <button
+          <Button
             key={p.key}
-            type="button"
-            className="np-sandbox__preset-chip"
+            variant="standard"
             disabled={isBuilding}
             onClick={() => onLoadPreset(p.key)}
             aria-label={`Load ${t(p.labelKey as any)} template`}
           >
             {t(p.labelKey as any)}
-          </button>
+          </Button>
         ))}
       </div>
 

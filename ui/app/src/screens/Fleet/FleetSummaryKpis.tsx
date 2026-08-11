@@ -17,31 +17,31 @@ export function FleetSummaryKpis({ summary }: FleetSummaryKpisProps) {
       style={{
         display: "grid",
         gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-        gap: "0.75rem",
+        gap: "0.85rem",
         marginBottom: "1.25rem",
       }}
     >
-      <div className="np-kpi">
+      <div className="np-kpi" style={{ boxShadow: "var(--np-neu)" }}>
         <div className="np-kpi__label">{t("kpis.total")}</div>
-        <div className="np-kpi__value" style={{ color: "var(--np-text, #e2e8f0)" }}>
+        <div className="np-kpi__value" style={{ color: "var(--np-text)" }}>
           {summary.total}
         </div>
       </div>
-      <div className="np-kpi">
+      <div className="np-kpi" style={{ boxShadow: "var(--np-neu)" }}>
         <div className="np-kpi__label">{t("kpis.online")}</div>
-        <div className="np-kpi__value" style={{ color: "#10b981" }}>
+        <div className="np-kpi__value" style={{ color: "var(--np-good)" }}>
           {summary.online}
         </div>
       </div>
-      <div className="np-kpi">
+      <div className="np-kpi" style={{ boxShadow: "var(--np-neu)" }}>
         <div className="np-kpi__label">{t("kpis.degraded")}</div>
-        <div className="np-kpi__value" style={{ color: "#f59e0b" }}>
+        <div className="np-kpi__value" style={{ color: "var(--np-notable)" }}>
           {summary.degraded}
         </div>
       </div>
-      <div className="np-kpi">
+      <div className="np-kpi" style={{ boxShadow: "var(--np-neu)" }}>
         <div className="np-kpi__label">{t("kpis.offline")}</div>
-        <div className="np-kpi__value" style={{ color: "#ef4444" }}>
+        <div className="np-kpi__value" style={{ color: "var(--np-finding)" }}>
           {summary.offline}
         </div>
       </div>

@@ -2998,20 +2998,54 @@ button {
   flex-wrap: wrap;
   gap: var(--np-4);
 }
+.np-fleet__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-lg);
+  padding: 0.85rem 1.25rem;
+  box-shadow: var(--np-neu);
+}
+.np-fleet__search-input {
+  width: 100%;
+  padding: 0.5rem 0.85rem;
+  font-size: 0.85rem;
+  border-radius: var(--np-radius-md);
+  border: 1px solid var(--np-border);
+  background: var(--np-bg);
+  color: var(--np-text);
+  box-shadow: var(--np-neu-inset);
+  outline: none;
+  transition: border-color var(--np-t);
+}
+.np-fleet__search-input:focus {
+  border-color: var(--np-accent);
+}
 .np-fleet__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: var(--np-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
 }
 .np-fleet__card,
 .np-fleet__node {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--np-4);
+  padding: var(--np-4) var(--np-5);
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg);
+  border: 1px solid var(--np-border);
   box-shadow: var(--np-neu);
+  transition: all var(--np-t);
+}
+.np-fleet__node:hover {
+  box-shadow: var(--np-neu-lg);
+  transform: translateY(-2px);
 }
 .np-fleet__name {
   font-weight: var(--np-fw-bold);

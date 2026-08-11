@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button, Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useFleetController } from "../hooks/useFleetController";
 import { FleetSummaryKpis } from "./Fleet/FleetSummaryKpis";
 import { FleetFilters } from "./Fleet/FleetFilters";
@@ -31,22 +32,23 @@ export function FleetScreen() {
         {announcement}
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap", marginBottom: "1.25rem" }}>
         <div>
-          <h2 style={{ margin: "0 0 0.25rem 0" }}>{t("title")}</h2>
-          <p className="np-fleet__desc" style={{ margin: 0, color: "var(--np-subtext, #94a3b8)" }}>
+          <h2 style={{ margin: "0 0 0.25rem 0", color: "var(--np-text)" }}>{t("title")}</h2>
+          <p className="np-fleet__desc" style={{ margin: 0, color: "var(--np-subtext)" }}>
             {t("desc")}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
           {lastSyncedTime && (
-            <span style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", fontFamily: "monospace" }}>
+            <span style={{ fontSize: "0.8rem", color: "var(--np-subtext)", fontFamily: "var(--np-font-mono)" }}>
               {t("sync_time", { time: lastSyncedTime })}
             </span>
           )}
           <Button variant="standard" busy={refreshing} disabled={refreshing} onClick={refresh}>
-            🔄 {refreshing ? t("actions.refreshing") : t("actions.refresh")}
+            <Icon name="fleet" style={{ width: 14, height: 14, marginRight: "0.4rem" }} />
+            {refreshing ? t("actions.refreshing") : t("actions.refresh")}
           </Button>
         </div>
       </div>

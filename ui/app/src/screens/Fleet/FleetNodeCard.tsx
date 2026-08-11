@@ -8,17 +8,17 @@ export interface FleetNodeCardProps {
 }
 
 const STATUS_COLORS: Record<FleetStatus, string> = {
-  online: "#10b981",
-  degraded: "#f59e0b",
-  offline: "#ef4444",
-  unknown: "#6b7280",
+  online: "var(--np-good)",
+  degraded: "var(--np-notable)",
+  offline: "var(--np-finding)",
+  unknown: "var(--np-subtext)",
 };
 
 export function FleetNodeCard({ host }: FleetNodeCardProps) {
   const { t } = useTranslation(["fleet"]);
   const { shows } = useDisclosure();
 
-  const statusColor = STATUS_COLORS[host.normalizedStatus] ?? "#6b7280";
+  const statusColor = STATUS_COLORS[host.normalizedStatus] ?? "var(--np-subtext)";
   const localizedStatus = t(`status.${host.normalizedStatus}` as any, { defaultValue: host.status });
 
   // Mask Agent ID unless intermediate/expert disclosure mode is enabled
@@ -31,33 +31,24 @@ export function FleetNodeCard({ host }: FleetNodeCardProps) {
       className="np-fleet__node"
       role="listitem"
       style={{
-        background: "var(--np-surface-1, #131b2a)",
-        border: `1px solid ${statusColor}33`,
         borderLeft: `4px solid ${statusColor}`,
-        borderRadius: "var(--np-radius-lg, 12px)",
-        padding: "1.1rem 1.25rem",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "1rem",
-        boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
       }}
     >
       <div>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>
-          <strong className="np-fleet__name" style={{ fontSize: "1.05rem", color: "var(--np-text, #e2e8f0)" }}>
+          <strong className="np-fleet__name" style={{ fontSize: "1.05rem", color: "var(--np-text)" }}>
             {host.friendlyName || host.hostname}
           </strong>
-          <span style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)" }}>
+          <span style={{ fontSize: "0.8rem", color: "var(--np-subtext)" }}>
             ({host.os} / {host.platform})
           </span>
         </div>
 
-        <p className="np-fleet__meta" style={{ margin: 0, fontSize: "0.85rem", color: "var(--np-subtext, #94a3b8)" }}>
-          {t("card.version")}: <span style={{ fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>{host.agentVersion}</span>
+        <p className="np-fleet__meta" style={{ margin: 0, fontSize: "0.85rem", color: "var(--np-subtext)" }}>
+          {t("card.version")}: <span style={{ fontWeight: 600, color: "var(--np-text)" }}>{host.agentVersion}</span>
           {" · "}
           {t("card.agent_id")}:{" "}
-          <span style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "var(--np-accent, #2fe0d6)" }}>
+          <span style={{ fontFamily: "monospace", fontSize: "0.8rem", color: "var(--np-accent)" }}>
             {shows("intermediate") ? host.hostId : maskedId}
           </span>
         </p>
@@ -69,10 +60,11 @@ export function FleetNodeCard({ host }: FleetNodeCardProps) {
           aria-label={`Status: ${localizedStatus}`}
           style={{
             background: statusColor,
-            color: "#000",
+            color: "var(--np-bg)",
             fontWeight: 700,
             fontSize: "0.8rem",
-            padding: "0.25rem 0.65rem",
+            padding: "0.3rem 0.75rem",
+            boxShadow: "var(--np-neu-sm)",
           }}
         >
           {localizedStatus}

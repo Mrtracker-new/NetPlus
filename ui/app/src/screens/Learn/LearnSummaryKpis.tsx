@@ -16,14 +16,14 @@ export function LearnSummaryKpis({
   const { t } = useTranslation(["learn"]);
 
   const items = [
-    { label: t("kpis.total"), value: total, color: "var(--np-text, #e2e8f0)" },
-    { label: t("kpis.grounded"), value: groundedCount, color: "#10b981" },
-    { label: t("kpis.examples"), value: exampleCount, color: "#60a5fa" },
-    { label: t("kpis.grounded_pct"), value: `${groundedPct}%`, color: "var(--np-accent, #2fe0d6)" },
+    { label: t("kpis.total"), value: total, color: "var(--np-text)" },
+    { label: t("kpis.grounded"), value: groundedCount, color: "var(--np-good)" },
+    { label: t("kpis.examples"), value: exampleCount, color: "var(--np-accent-2)" },
+    { label: t("kpis.grounded_pct"), value: `${groundedPct}%`, color: "var(--np-accent-strong)" },
   ];
 
   return (
-    <div className="np-kpis" style={{ marginBottom: "1.25rem" }}>
+    <div className="np-kpis">
       {items.map((item) => (
         <div key={item.label} className="np-kpi">
           <div className="np-kpi__label">{item.label}</div>
@@ -35,3 +35,4 @@ export function LearnSummaryKpis({
     </div>
   );
 }
+

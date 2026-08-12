@@ -24,7 +24,7 @@ export function Learn() {
   if (!loaded) {
     return (
       <section className="np-learn" aria-label="Lessons loading" aria-busy="true">
-        <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--np-4)" }}>
           <Skeleton height={120} width="100%" />
           <Skeleton height={120} width="100%" />
           <Skeleton height={120} width="100%" />
@@ -40,12 +40,14 @@ export function Learn() {
         {announcement}
       </div>
 
-      <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
-        {t("title")}
-      </h2>
-      <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: "0 0 1.25rem 0" }}>
-        {t("desc")}
-      </p>
+      <header className="np-learn__header">
+        <h2 className="np-learn__title">
+          {t("title")}
+        </h2>
+        <p className="np-learn__desc">
+          {t("desc")}
+        </p>
+      </header>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
@@ -85,3 +87,4 @@ export function Learn() {
     </section>
   );
 }
+

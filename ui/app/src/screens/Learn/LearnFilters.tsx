@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@netpulse/components";
 import type { LevelFilter } from "../../hooks/useLearnController";
 
 export interface LearnFiltersProps {
@@ -26,49 +27,35 @@ export function LearnFilters({
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "0.75rem",
-        marginBottom: "1.25rem",
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+    <div className="np-learn__filters">
+      <div className="np-learn__filter-group">
         {levels.map((lvl) => {
           const isActive = level === lvl.key;
           return (
-            <button
+            <Button
               key={lvl.key}
               type="button"
-              className={`np-btn ${isActive ? "np-btn--primary" : "np-btn--ghost"}`}
-              style={{
-                fontSize: "0.85rem",
-                padding: "0.35rem 0.75rem",
-                borderRadius: "var(--np-radius-md, 6px)",
-              }}
+              variant={isActive ? "primary" : "standard"}
+              className={`np-learn__filter ${isActive ? "np-learn__filter--active" : ""}`}
+              aria-pressed={isActive}
               onClick={() => onLevelChange(lvl.key)}
             >
               {lvl.label}
-            </button>
+            </Button>
           );
         })}
       </div>
 
-      <button
+      <Button
         type="button"
-        className={`np-btn ${groundedOnly ? "np-btn--primary" : "np-btn--ghost"}`}
-        style={{
-          fontSize: "0.85rem",
-          padding: "0.35rem 0.75rem",
-          border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-        }}
+        variant={groundedOnly ? "primary" : "standard"}
+        className={`np-learn__filter ${groundedOnly ? "np-learn__filter--active" : ""}`}
+        aria-pressed={groundedOnly}
         onClick={onToggleGrounded}
       >
         🎯 {groundedOnly ? t("filters.show_all") : `${t("filters.grounded_only")} (${groundedCount})`}
-      </button>
+      </Button>
     </div>
   );
 }
+

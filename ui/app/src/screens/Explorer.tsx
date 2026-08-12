@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton, Input, Button } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useExplorerController } from "../hooks/useExplorerController";
 import { ExplorerSummaryKpis } from "./Explorer/ExplorerSummaryKpis";
@@ -47,18 +48,19 @@ export function Explorer() {
         {announcement}
       </div>
 
-      <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
-        {t("title")}
-      </h2>
-      <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: "0 0 1.25rem 0" }}>
-        {t("desc")}
-      </p>
+      <header className="np-explorer__header">
+        <h2 className="np-explorer__title">{t("title")}</h2>
+        <p className="np-explorer__desc">{t("desc")}</p>
+      </header>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
-      {/* Search Input Bar */}
-      <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", marginBottom: "1.25rem" }}>
-        <div style={{ flex: 1 }}>
+      {/* Inset Search Bar Container */}
+      <div className="np-explorer__search-bar">
+        <span className="np-explorer__search-icon">
+          <Icon name="search" style={{ width: 16, height: 16, color: "var(--np-text-mute)" }} />
+        </span>
+        <div className="np-explorer__search-input-wrap">
           <Input
             ref={searchInputRef}
             className="np-explorer__search"
@@ -70,7 +72,11 @@ export function Explorer() {
           />
         </div>
         {term && (
-          <Button variant="standard" onClick={clearSearch} style={{ fontSize: "0.85rem", padding: "0.4rem 0.8rem" }}>
+          <Button
+            variant="standard"
+            className="np-explorer__search-clear"
+            onClick={clearSearch}
+          >
             ✕ {t("clear_search")}
           </Button>
         )}

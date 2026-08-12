@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@netpulse/components";
 import type { ProtocolCategory } from "../../hooks/useExplorerController";
 
 export interface ExplorerFiltersProps {
@@ -19,32 +20,22 @@ export function ExplorerFilters({ category, onCategoryChange }: ExplorerFiltersP
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: "0.5rem",
-        marginBottom: "1.25rem",
-        flexWrap: "wrap",
-      }}
-    >
+    <div className="np-explorer__filters">
       {categories.map((cat) => {
         const isActive = category === cat.key;
         return (
-          <button
+          <Button
             key={cat.key}
             type="button"
-            className={`np-btn ${isActive ? "np-btn--primary" : "np-btn--ghost"}`}
-            style={{
-              fontSize: "0.85rem",
-              padding: "0.35rem 0.75rem",
-              borderRadius: "var(--np-radius-md, 6px)",
-            }}
+            className="np-explorer__filter"
+            aria-pressed={isActive}
             onClick={() => onCategoryChange(cat.key)}
           >
             {cat.label}
-          </button>
+          </Button>
         );
       })}
     </div>
   );
 }
+

@@ -16,25 +16,19 @@ export function SuggestionChips({ onSelectSuggestion, disabled }: SuggestionChip
   ];
 
   return (
-    <div className="np-assistant__suggestions" style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "1.5rem" }}>
+    <div className="np-assistant__suggestions">
       {items.map((item) => (
         <button
           key={item.key}
           type="button"
-          className="np-suggestion np-btn np-btn--ghost"
+          className="np-suggestion"
           disabled={disabled}
           onClick={() => onSelectSuggestion(item.label)}
-          style={{
-            fontSize: "0.85rem",
-            padding: "0.4rem 0.8rem",
-            borderRadius: "16px",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-            color: "var(--np-subtext, #94a3b8)",
-          }}
         >
-          💡 {item.label}
+          <span>💡</span> {item.label}
         </button>
       ))}
     </div>
   );
 }
+

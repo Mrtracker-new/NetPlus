@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Button, Input, Notice } from "@netpulse/components";
+import { Button, Card, Input, Notice } from "@netpulse/components";
 import { useAssistantController } from "../hooks/useAssistantController";
 import { ConversationTurnCard } from "./Assistant/ConversationTurnCard";
 import { SuggestionChips } from "./Assistant/SuggestionChips";
@@ -29,34 +29,34 @@ export function Assistant() {
         {announcement}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
-        <div>
-          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
+      <header className="np-assistant__header">
+        <div className="np-assistant__title-group">
+          <h2 className="np-assistant__title">
             {t("title")}
           </h2>
-          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
+          <p className="np-assistant__desc">
             {t("desc")}
           </p>
         </div>
 
         {history.length > 0 && (
-          <button
+          <Button
             type="button"
-            className="np-btn np-btn--ghost"
-            style={{ fontSize: "0.82rem", padding: "0.35rem 0.75rem", border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}
+            className="np-assistant__clear-btn"
             onClick={actions.clearHistory}
           >
             🗑️ {t("clear_history")}
-          </button>
+          </Button>
         )}
-      </div>
+      </header>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
       {/* Question Prompt Form */}
-      <form className="np-assistant__form" onSubmit={handleSubmit} noValidate style={{ marginBottom: "1.25rem" }}>
-        <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
-          <div style={{ flex: 1 }}>
+      <form className="np-assistant__form" onSubmit={handleSubmit} noValidate>
+        <div className="np-assistant__bar">
+          <div className="np-assistant__input-wrapper">
+            <span className="np-assistant__input-icon" aria-hidden="true">💬</span>
             <Input
               className="np-assistant__input"
               type="text"
@@ -67,7 +67,13 @@ export function Assistant() {
               disabled={busy}
             />
           </div>
-          <Button type="submit" variant="primary" busy={busy} disabled={busy || !prompt.trim()}>
+          <Button
+            type="submit"
+            variant="primary"
+            className="np-assistant__ask"
+            busy={busy}
+            disabled={busy || !prompt.trim()}
+          >
             {busy ? t("thinking") : t("ask_button")}
           </Button>
         </div>
@@ -81,7 +87,7 @@ export function Assistant() {
 
       {/* Conversation History Thread or Capability Empty State */}
       {history.length > 0 ? (
-        <div className="np-assistant__thread" style={{ display: "flex", flexDirection: "column-reverse" }}>
+        <div className="np-assistant__thread">
           {history.slice().reverse().map((turn) => (
             <ConversationTurnCard
               key={turn.id}
@@ -92,24 +98,17 @@ export function Assistant() {
           ))}
         </div>
       ) : (
-        <div
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "2rem",
-            textAlign: "center",
-            color: "var(--np-subtext, #94a3b8)",
-          }}
-        >
-          <h3 style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+        <Card className="np-assistant__empty-card">
+          <div className="np-assistant__empty-icon" aria-hidden="true">🤖</div>
+          <h3 className="np-assistant__empty-title">
             🤖 {t("empty.title")}
           </h3>
-          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+          <p className="np-assistant__empty-desc">
             {t("empty.subtitle")}
           </p>
-        </div>
+        </Card>
       )}
     </section>
   );
 }
+

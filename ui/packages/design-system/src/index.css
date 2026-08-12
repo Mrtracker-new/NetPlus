@@ -3236,6 +3236,11 @@ button {
   gap: var(--np-3);
   align-items: center;
   flex-wrap: wrap;
+  padding: var(--np-4) var(--np-5);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-lg);
+  box-shadow: var(--np-neu);
 }
 .np-session-diff__fieldset {
   border: none;
@@ -3245,6 +3250,7 @@ button {
   gap: var(--np-3);
   align-items: center;
   flex-wrap: wrap;
+  width: 100%;
 }
 .np-session-diff__header {
   display: flex;
@@ -3262,16 +3268,24 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--np-3);
-  padding: var(--np-5);
+  padding: var(--np-5) var(--np-6);
   background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-lg);
-  box-shadow: var(--np-neu);
+  box-shadow: var(--np-neu-lg);
 }
 .np-session-diff__metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--np-3);
   margin-bottom: var(--np-4);
+}
+.np-session-diff__metric-card {
+  padding: 0.85rem 1rem;
+  background: var(--np-bg);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-md);
+  box-shadow: var(--np-neu-inset);
 }
 .np-session-diff__metric-label {
   color: var(--np-text-dim);
@@ -3290,13 +3304,29 @@ button {
   color: var(--np-accent-strong);
 }
 .np-session-diff__explanation {
-  padding: var(--np-3);
-  background: var(--np-surface-2);
+  padding: var(--np-4);
+  background: var(--np-bg);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-md);
+  box-shadow: var(--np-neu-inset);
   margin: var(--np-3) 0;
 }
 .np-session-diff__evidence {
-  color: var(--np-text-dim);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-md);
+  padding: 0.65rem 0.95rem;
+  font-size: 0.88rem;
+  color: var(--np-text);
+  box-shadow: var(--np-neu-sm);
+  cursor: pointer;
+  transition: all var(--np-t);
+}
+.np-session-diff__evidence:hover {
+  border-color: var(--np-accent);
+  color: var(--np-accent);
+  box-shadow: var(--np-neu);
+  transform: translateY(-1px);
 }
 
 .np-lang-toggle {

@@ -64,17 +64,8 @@ export function SessionDiffScreen() {
           <Skeleton height="160px" />
         </div>
       ) : diff ? (
-        <article
-          className="np-session-diff__panel"
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "1.25rem 1.5rem",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-          }}
-        >
-          <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
+        <article className="np-session-diff__panel">
+          <h3 style={{ margin: "0 0 1rem 0", fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
             {t("report_title", { a: diff.sessionIdA, b: diff.sessionIdB })}
           </h3>
 

@@ -33,17 +33,11 @@ export function CompareControls({
       <fieldset
         className="np-session-diff__fieldset"
         disabled={isComparing}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.75rem",
-          border: "none",
-          padding: 0,
-          margin: 0,
-          flexWrap: "wrap",
-        }}
       >
         <div style={{ flex: "1 1 200px" }}>
+          <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--np-subtext)", marginBottom: "0.35rem" }}>
+            {t("select_baseline")}
+          </label>
           <Input
             type="number"
             min={1}
@@ -54,17 +48,20 @@ export function CompareControls({
           />
         </div>
 
-        <button
-          type="button"
-          className="np-btn np-btn--ghost"
-          style={{ fontSize: "1rem", padding: "0.4rem 0.8rem", border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}
-          onClick={onSwap}
-          title={t("swap_btn")}
-        >
-          ⇄ {t("swap_btn")}
-        </button>
+        <div style={{ display: "flex", alignItems: "flex-end", height: "100%", paddingTop: "1.35rem" }}>
+          <Button
+            variant="standard"
+            onClick={onSwap}
+            title={t("swap_btn")}
+          >
+            ⇄ {t("swap_btn")}
+          </Button>
+        </div>
 
         <div style={{ flex: "1 1 200px" }}>
+          <label style={{ display: "block", fontSize: "0.75rem", fontWeight: 600, color: "var(--np-subtext)", marginBottom: "0.35rem" }}>
+            {t("select_target")}
+          </label>
           <Input
             type="number"
             min={1}
@@ -75,9 +72,11 @@ export function CompareControls({
           />
         </div>
 
-        <Button type="submit" variant="primary" busy={isComparing} disabled={isComparing}>
-          {t("run_diff")}
-        </Button>
+        <div style={{ display: "flex", alignItems: "flex-end", height: "100%", paddingTop: "1.35rem" }}>
+          <Button type="submit" variant="primary" busy={isComparing} disabled={isComparing}>
+            {t("run_diff")}
+          </Button>
+        </div>
       </fieldset>
     </form>
   );

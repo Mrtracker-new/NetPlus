@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Button } from "@netpulse/components";
 import type { FindingCategory } from "../../hooks/useSecurityController";
 
 export interface SecurityFiltersProps {
@@ -26,50 +27,29 @@ export function SecurityFilters({
   ];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "0.75rem",
-        marginBottom: "1.25rem",
-        flexWrap: "wrap",
-      }}
-    >
+    <div className="np-security__filters">
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
         {categories.map((cat) => {
           const isActive = category === cat.key;
           return (
-            <button
+            <Button
               key={cat.key}
-              type="button"
-              className={`np-btn ${isActive ? "np-btn--primary" : "np-btn--ghost"}`}
-              style={{
-                fontSize: "0.85rem",
-                padding: "0.35rem 0.75rem",
-                borderRadius: "var(--np-radius-md, 6px)",
-              }}
+              variant={isActive ? "primary" : "standard"}
               onClick={() => onCategoryChange(cat.key)}
             >
               {cat.label}
-            </button>
+            </Button>
           );
         })}
       </div>
 
       {expectedCount > 0 && (
-        <button
-          type="button"
-          className="np-btn np-btn--ghost"
-          style={{
-            fontSize: "0.85rem",
-            padding: "0.35rem 0.75rem",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-          }}
+        <Button
+          variant="standard"
           onClick={onToggleShowExpected}
         >
           {showExpected ? t("filters.hide_expected") : `${t("filters.show_expected")} (${expectedCount})`}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -83,7 +83,7 @@ export function Security() {
 
           {/* Incident Timeline Visualizer */}
           {filteredFindings.length > 0 && (
-            <div style={{ marginBottom: "1.5rem" }}>
+            <div className="np-security__timeline-container">
               <IncidentTimelineViz findings={filteredFindings} onNavigateEvidence={navigateToEvidence} />
             </div>
           )}

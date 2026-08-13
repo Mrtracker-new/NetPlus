@@ -29,16 +29,7 @@ export function PluginsFilters({ filter, counts, onFilterChange }: PluginsFilter
   ];
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Plugin Type Filters"
-      style={{
-        display: "flex",
-        gap: "0.5rem",
-        marginBottom: "1.25rem",
-        flexWrap: "wrap",
-      }}
-    >
+    <div className="np-plugins__filters" role="radiogroup" aria-label="Plugin Type Filters">
       {filters.map((flt) => {
         const isActive = filter === flt.key;
         return (
@@ -47,12 +38,7 @@ export function PluginsFilters({ filter, counts, onFilterChange }: PluginsFilter
             type="button"
             role="radio"
             aria-checked={isActive}
-            className={`np-btn ${isActive ? "np-btn--primary" : "np-btn--ghost"}`}
-            style={{
-              fontSize: "0.85rem",
-              padding: "0.35rem 0.75rem",
-              borderRadius: "var(--np-radius-md, 6px)",
-            }}
+            className="np-plugins__filter"
             onClick={() => onFilterChange(flt.key)}
           >
             {flt.label}
@@ -62,3 +48,4 @@ export function PluginsFilters({ filter, counts, onFilterChange }: PluginsFilter
     </div>
   );
 }
+

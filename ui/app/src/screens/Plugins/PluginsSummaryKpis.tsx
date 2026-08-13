@@ -16,14 +16,14 @@ export function PluginsSummaryKpis({
   const { t } = useTranslation(["plugins"]);
 
   const items = [
-    { label: t("kpis.total"), value: total ?? 0, color: "var(--np-text, #e2e8f0)" },
-    { label: t("kpis.active"), value: activeCount ?? 0, color: "var(--np-accent, #2fe0d6)" },
-    { label: t("kpis.first_party"), value: firstPartyCount ?? 0, color: "#10b981" },
-    { label: t("kpis.compatible"), value: compatibleCount ?? 0, color: "#60a5fa" },
+    { label: t("kpis.total"), value: total ?? 0, color: "var(--np-text)" },
+    { label: t("kpis.active"), value: activeCount ?? 0, color: "var(--np-accent-strong)" },
+    { label: t("kpis.first_party"), value: firstPartyCount ?? 0, color: "var(--np-good)" },
+    { label: t("kpis.compatible"), value: compatibleCount ?? 0, color: "var(--np-accent-2)" },
   ];
 
   return (
-    <div className="np-kpis" style={{ marginBottom: "1.25rem" }}>
+    <div className="np-kpis">
       {items.map((item) => (
         <div key={item.label} className="np-kpi">
           <div className="np-kpi__label">{item.label}</div>
@@ -35,3 +35,4 @@ export function PluginsSummaryKpis({
     </div>
   );
 }
+

@@ -34,14 +34,10 @@ export function Plugins() {
         {announcement}
       </div>
 
-      <div style={{ marginBottom: "1.25rem" }}>
-        <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
-          {t("title")}
-        </h2>
-        <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
-          {t("desc")}
-        </p>
-      </div>
+      <header className="np-plugins__header">
+        <h2 className="np-plugins__title">{t("title")}</h2>
+        <p className="np-plugins__desc">{t("desc")}</p>
+      </header>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice?.(null)} />}
 
@@ -54,20 +50,11 @@ export function Plugins() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : safeTotal === 0 ? (
-        <div
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "2.5rem 1.5rem",
-            textAlign: "center",
-            color: "var(--np-subtext, #94a3b8)",
-          }}
-        >
-          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+        <div className="np-plugins__empty">
+          <h3 className="np-plugins__empty-title">
             🔌 {t("empty.title")}
           </h3>
-          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+          <p className="np-plugins__empty-desc">
             {t("empty.subtitle")}
           </p>
         </div>
@@ -99,5 +86,6 @@ export function Plugins() {
       )}
     </section>
   );
+
 }
 

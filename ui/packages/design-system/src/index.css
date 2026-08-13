@@ -2277,25 +2277,228 @@ button {
 }
 
 /* ---- Replay ---- */
+.np-replay {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+}
+
+.np-replay__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+}
+
+.np-replay__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-1);
+}
+
+.np-replay__title {
+  font-size: var(--np-fs-xl);
+  font-weight: var(--np-fw-bold);
+  color: var(--np-text);
+  margin: 0;
+}
+
+.np-replay__desc {
+  font-size: var(--np-fs-base);
+  color: var(--np-text-dim);
+  margin: 0;
+}
+
+/* Playback Status Indicators */
+.np-replay__status {
+  font-size: var(--np-fs-sm);
+  padding: var(--np-1.5) var(--np-3.5);
+  border-radius: var(--np-radius-pill);
+  font-weight: var(--np-fw-semibold);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+
+.np-replay__status--playing {
+  background: var(--np-good-soft);
+  color: var(--np-good);
+}
+
+.np-replay__status--completed {
+  background: var(--np-surface-2);
+  color: var(--np-accent-2);
+}
+
+.np-replay__status--paused {
+  background: var(--np-finding-soft);
+  color: var(--np-notable);
+}
+
+.np-replay__status--idle {
+  background: var(--np-surface-2);
+  color: var(--np-text-dim);
+}
+
+/* Transport Container */
 .np-replay__transport {
   display: flex;
   align-items: center;
-  gap: var(--np-2);
+  justify-content: space-between;
+  gap: var(--np-3);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-4) var(--np-5);
   flex-wrap: wrap;
 }
-.np-replay__readout {
-  font-family: var(--np-font-mono);
-  font-size: var(--np-fs-sm);
-  color: var(--np-accent-strong);
+
+.np-replay__actions {
+  display: flex;
+  gap: var(--np-2);
+  align-items: center;
 }
-.np-replay__seek {
-  width: 100%;
-  accent-color: var(--np-accent);
-}
+
+/* Speed Controls Container & Chips */
 .np-replay__speeds {
   display: flex;
   gap: var(--np-2);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.np-replay__speed {
+  font-size: var(--np-fs-sm);
+  font-weight: var(--np-fw-medium);
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  color: var(--np-text-dim);
+  transition: color var(--np-t), background var(--np-t), box-shadow var(--np-t), transform var(--np-t);
+  cursor: pointer;
+}
+
+.np-replay__speed:hover:not(:disabled) {
+  color: var(--np-accent-strong);
+  background: var(--np-surface-2);
+}
+
+.np-replay__speed[aria-pressed="true"] {
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-accent-strong);
+  background: var(--np-surface-1);
+  font-weight: var(--np-fw-semibold);
+}
+
+.np-replay__speed:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  box-shadow: var(--np-glow);
+}
+
+/* Scrub Bar Container */
+.np-replay__scrub {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-5);
+}
+
+.np-replay__scrub-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+}
+
+.np-replay__scrub-progress {
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-accent-strong);
+}
+
+/* Seek Slider */
+.np-replay__seek {
+  width: 100%;
+  accent-color: var(--np-accent-strong);
+  background: var(--np-surface-2);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-inset);
+  height: 8px;
+  outline: none;
+  cursor: pointer;
+}
+
+.np-replay__seek:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.np-replay__seek:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+}
+
+.np-replay__readout {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+
+/* Empty State Surface */
+.np-replay__empty {
+  background: var(--np-surface-1);
+  border: 1px dashed var(--np-surface-2);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-8) var(--np-5);
+  text-align: center;
+  color: var(--np-text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--np-3);
+}
+
+.np-replay__empty-title {
+  font-size: var(--np-fs-lg);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  margin: 0;
+}
+
+.np-replay__empty-desc {
+  font-size: var(--np-fs-base);
+  color: var(--np-text-dim);
+  margin: 0;
+  max-width: 550px;
+  line-height: var(--np-lh);
+}
+
+/* Reduced Motion & Responsive Rules */
+@media (prefers-reduced-motion: reduce) {
+  .np-replay__transport,
+  .np-replay__speed,
+  .np-replay__scrub {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .np-replay__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .np-replay__transport {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* ---- Export ---- */

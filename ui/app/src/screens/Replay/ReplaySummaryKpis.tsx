@@ -16,14 +16,14 @@ export function ReplaySummaryKpis({
   const { t } = useTranslation(["replay"]);
 
   const items = [
-    { label: t("kpis.frame"), value: `#${frameIndex}`, color: "var(--np-text, #e2e8f0)" },
-    { label: t("kpis.position"), value: formattedPosition, color: "var(--np-accent, #2fe0d6)" },
-    { label: t("kpis.duration"), value: formattedTotal, color: "#60a5fa" },
-    { label: t("kpis.speed"), value: speedLabel, color: "#10b981" },
+    { label: t("kpis.frame"), value: `#${frameIndex}`, color: "var(--np-text)" },
+    { label: t("kpis.position"), value: formattedPosition, color: "var(--np-accent-strong)" },
+    { label: t("kpis.duration"), value: formattedTotal, color: "var(--np-accent-2)" },
+    { label: t("kpis.speed"), value: speedLabel, color: "var(--np-good)" },
   ];
 
   return (
-    <div className="np-kpis" style={{ marginBottom: "1.25rem" }}>
+    <div className="np-kpis">
       {items.map((item) => (
         <div key={item.label} className="np-kpi">
           <div className="np-kpi__label">{item.label}</div>
@@ -35,3 +35,4 @@ export function ReplaySummaryKpis({
     </div>
   );
 }
+

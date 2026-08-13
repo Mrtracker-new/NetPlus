@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Notice, Skeleton } from "@netpulse/components";
+import { Badge, Notice, Skeleton } from "@netpulse/components";
 import { useReplayController } from "../hooks/useReplayController";
 import { ReplaySummaryKpis } from "./Replay/ReplaySummaryKpis";
 import { ReplayTransport } from "./Replay/ReplayTransport";
@@ -27,7 +27,8 @@ export function Replay() {
   // Keyboard Shortcuts (Space = Play/Pause, ArrowLeft = Step Back / Seek, ArrowRight = Step Forward / Seek)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (document.activeElement?.tagName === "INPUT") return;
+      const targetTag = (e.target as HTMLElement)?.tagName || "";
+      if (["INPUT", "BUTTON", "SELECT", "TEXTAREA", "A"].includes(targetTag)) return;
 
       if (e.code === "Space") {
         e.preventDefault();
@@ -53,37 +54,17 @@ export function Replay() {
         {announcement}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
-        <div>
-          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
-            {t("title")}
-          </h2>
-          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
-            {t("desc")}
-          </p>
+      <header className="np-replay__header">
+        <div className="np-replay__title-group">
+          <h2 className="np-replay__title">{t("title")}</h2>
+          <p className="np-replay__desc">{t("desc")}</p>
         </div>
 
         {/* Playback Status Badge */}
-        <span
+        <Badge
           role="status"
-          style={{
-            fontSize: "0.85rem",
-            padding: "0.4rem 0.85rem",
-            borderRadius: "16px",
-            background:
-              status === "playing"
-                ? "rgba(16, 185, 129, 0.2)"
-                : status === "completed"
-                ? "rgba(59, 130, 246, 0.2)"
-                : "rgba(148, 163, 184, 0.2)",
-            color:
-              status === "playing"
-                ? "#10b981"
-                : status === "completed"
-                ? "#60a5fa"
-                : "#94a3b8",
-            fontWeight: 600,
-          }}
+          variant="posture"
+          className={`np-replay__status np-replay__status--${status}`}
         >
           {status === "playing"
             ? t("status.playing")
@@ -92,8 +73,8 @@ export function Replay() {
             : status === "paused"
             ? t("status.paused")
             : t("status.idle")}
-        </span>
-      </div>
+        </Badge>
+      </header>
 
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
@@ -104,20 +85,11 @@ export function Replay() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : !viewModel.hasRecording ? (
-        <div
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "2.5rem 1.5rem",
-            textAlign: "center",
-            color: "var(--np-subtext, #94a3b8)",
-          }}
-        >
-          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+        <div className="np-replay__empty">
+          <h3 className="np-replay__empty-title">
             📼 {t("empty.title")}
           </h3>
-          <p style={{ fontSize: "0.9rem", margin: 0, maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+          <p className="np-replay__empty-desc">
             {t("empty.subtitle")}
           </p>
         </div>
@@ -160,3 +132,4 @@ export function Replay() {
     </section>
   );
 }
+

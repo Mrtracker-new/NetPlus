@@ -37,24 +37,8 @@ export function ReplayTransport({
   ];
 
   return (
-    <div
-      className="np-replay__transport"
-      role="group"
-      aria-label="Transport Controls"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: "0.75rem",
-        marginBottom: "1.25rem",
-        background: "var(--np-surface-1, #131b2a)",
-        border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-        borderRadius: "var(--np-radius-lg, 12px)",
-        padding: "1rem 1.25rem",
-        flexWrap: "wrap",
-      }}
-    >
-      <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
+    <div className="np-replay__transport" role="group" aria-label="Transport Controls">
+      <div className="np-replay__actions">
         {playing ? (
           <Button variant="primary" disabled={busy || !canPause} onClick={onPause}>
             ⏸️ {t("controls.pause")}
@@ -65,28 +49,29 @@ export function ReplayTransport({
           </Button>
         )}
 
-        <Button variant="standard" disabled={busy || !canStep} onClick={onStep} style={{ border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}>
+        <Button variant="standard" disabled={busy || !canStep} onClick={onStep}>
           ⏭️ {t("controls.step")}
         </Button>
       </div>
 
-      <div className="np-replay__speeds" style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+      <div className="np-replay__speeds">
         {speeds.map((s) => {
           const isActive = activeSpeedPercent === s.percent;
           return (
-            <button
+            <Button
               key={s.percent}
               type="button"
               disabled={busy}
-              className={`np-btn ${isActive ? "np-btn--primary" : "np-btn--ghost"}`}
-              style={{ fontSize: "0.82rem", padding: "0.3rem 0.65rem" }}
+              className="np-replay__speed"
+              aria-pressed={isActive}
               onClick={() => onSetSpeed(s.percent)}
             >
               {s.label}
-            </button>
+            </Button>
           );
         })}
       </div>
     </div>
   );
 }
+

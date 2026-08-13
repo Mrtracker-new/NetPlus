@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Button, Notice, Skeleton } from "@netpulse/components";
+import { Badge, Button, Notice, Skeleton } from "@netpulse/components";
 import { useRecordingsController } from "../hooks/useRecordingsController";
 import { RecordingsSummaryKpis } from "./Recordings/RecordingsSummaryKpis";
 import { RecordingsFilters } from "./Recordings/RecordingsFilters";
@@ -32,34 +32,25 @@ export function Recordings() {
         {announcement}
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem", flexWrap: "wrap", gap: "0.75rem" }}>
-        <div>
-          <h2 style={{ fontSize: "1.35rem", fontWeight: 700, margin: "0 0 0.4rem 0", color: "var(--np-text, #e2e8f0)" }}>
-            {t("title")}
-          </h2>
-          <p style={{ fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", margin: 0 }}>
-            {t("desc")}
-          </p>
+      <header className="np-recordings__header">
+        <div className="np-recordings__title-group">
+          <h2 className="np-recordings__title">{t("title")}</h2>
+          <p className="np-recordings__desc">{t("desc")}</p>
         </div>
 
         {/* Live Recording Status Indicator */}
-        <span
+        <Badge
           role="status"
-          style={{
-            fontSize: "0.85rem",
-            padding: "0.4rem 0.85rem",
-            borderRadius: "16px",
-            background: isRecording ? "rgba(239, 68, 68, 0.2)" : "rgba(148, 163, 184, 0.2)",
-            color: isRecording ? "#ef4444" : "#94a3b8",
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: "0.4rem",
-          }}
+          variant="posture"
+          className={
+            isRecording
+              ? "np-recordings__status np-recordings__status--active"
+              : "np-recordings__status np-recordings__status--idle"
+          }
         >
           {isRecording ? t("status.active") : t("status.idle")}
-        </span>
-      </div>
+        </Badge>
+      </header>
 
       {notice && (
         <Notice
@@ -70,19 +61,7 @@ export function Recordings() {
       )}
 
       {/* Start / Stop Recording Control Toolbar */}
-      <div
-        className="np-recordings__controls"
-        style={{
-          display: "flex",
-          gap: "0.75rem",
-          alignItems: "center",
-          marginBottom: "1.5rem",
-          background: "var(--np-surface-1, #131b2a)",
-          border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-          borderRadius: "var(--np-radius-lg, 12px)",
-          padding: "1rem 1.25rem",
-        }}
-      >
+      <div className="np-recordings__controls">
         <Button
           variant="primary"
           disabled={busy || isRecording}
@@ -97,7 +76,6 @@ export function Recordings() {
           disabled={busy || !isRecording}
           busy={busy && !isRecording}
           onClick={() => void stopRecording()}
-          style={{ border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.15))" }}
         >
           ⏹️ {t("common:actions.stop_capture")}
         </Button>
@@ -110,20 +88,11 @@ export function Recordings() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : summary.total === 0 ? (
-        <div
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px dashed var(--np-surface-2, rgba(255, 255, 255, 0.15))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "2.5rem 1.5rem",
-            textAlign: "center",
-            color: "var(--np-subtext, #94a3b8)",
-          }}
-        >
-          <h3 style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)", margin: "0 0 0.5rem 0" }}>
+        <div className="np-recordings__empty">
+          <h3 className="np-recordings__empty-title">
             📹 {t("empty.title")}
           </h3>
-          <p style={{ fontSize: "0.9rem", margin: "0 0 1.25rem 0", maxWidth: "550px", marginLeft: "auto", marginRight: "auto", lineHeight: "1.6" }}>
+          <p className="np-recordings__empty-desc">
             {t("empty.subtitle")}
           </p>
           <Button variant="primary" disabled={busy} onClick={() => void startRecording()}>
@@ -152,3 +121,4 @@ export function Recordings() {
     </section>
   );
 }
+

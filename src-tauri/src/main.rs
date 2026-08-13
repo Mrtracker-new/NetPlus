@@ -363,6 +363,36 @@ pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
     }
 }
 
+pub(crate) fn start_recording(state: &AppState) -> Result<(), String> {
+    let is_running = match state.capture.lock() {
+        Ok(g) => g.is_some(),
+        Err(p) => p.into_inner().is_some(),
+    };
+    if !is_running {
+        return Err("recording requires a live capture source (platform backend is a stub)".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn stop_recording(state: &AppState) -> Result<(), String> {
+    let is_running = match state.capture.lock() {
+        Ok(g) => g.is_some(),
+        Err(p) => p.into_inner().is_some(),
+    };
+    if !is_running {
+        return Err("recording requires a live capture source (platform backend is a stub)".into());
+    }
+
+    let recorder = netpulse_capture::recording::Recorder::start(
+        netpulse_decode::LinkType::Ethernet,
+        netpulse_capture::recording::RecordingScope::default(),
+    );
+    let recording = recorder.finalize(1);
+    let mut recordings = state.recordings.lock().map_err(|_| "state poisoned")?;
+    recordings.push(recording);
+    Ok(())
+}
+
 struct HintGuard(Arc<AtomicBool>);
 
 impl Drop for HintGuard {

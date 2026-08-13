@@ -2321,6 +2321,7 @@ dependencies = [
  "netpulse-capture",
  "netpulse-capture-svc",
  "netpulse-core",
+ "netpulse-decode",
  "netpulse-engine",
  "netpulse-flow",
  "netpulse-learn",

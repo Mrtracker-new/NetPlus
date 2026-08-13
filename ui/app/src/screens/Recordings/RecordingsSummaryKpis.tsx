@@ -16,14 +16,14 @@ export function RecordingsSummaryKpis({
   const { t } = useTranslation(["recordings"]);
 
   const items = [
-    { label: t("kpis.total"), value: total, color: "var(--np-text, #e2e8f0)" },
-    { label: t("kpis.frames"), value: totalFrames.toLocaleString(), color: "var(--np-accent, #2fe0d6)" },
-    { label: t("kpis.safe_share"), value: safeToShareCount, color: "#10b981" },
-    { label: t("kpis.payloads"), value: payloadCount, color: "#f59e0b" },
+    { label: t("kpis.total"), value: total, color: "var(--np-text)" },
+    { label: t("kpis.frames"), value: totalFrames.toLocaleString(), color: "var(--np-accent-strong)" },
+    { label: t("kpis.safe_share"), value: safeToShareCount, color: "var(--np-good)" },
+    { label: t("kpis.payloads"), value: payloadCount, color: "var(--np-notable)" },
   ];
 
   return (
-    <div className="np-kpis" style={{ marginBottom: "1.25rem" }}>
+    <div className="np-kpis">
       {items.map((item) => (
         <div key={item.label} className="np-kpi">
           <div className="np-kpi__label">{item.label}</div>
@@ -35,3 +35,4 @@ export function RecordingsSummaryKpis({
     </div>
   );
 }
+

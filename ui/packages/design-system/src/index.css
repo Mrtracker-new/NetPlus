@@ -2014,42 +2014,266 @@ button {
 }
 
 /* ---- Recordings ---- */
+.np-recordings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+}
+
+.np-recordings__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+}
+
+.np-recordings__title-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-1);
+}
+
+.np-recordings__title {
+  font-size: var(--np-fs-xl);
+  font-weight: var(--np-fw-bold);
+  color: var(--np-text);
+  margin: 0;
+}
+
+.np-recordings__desc {
+  font-size: var(--np-fs-base);
+  color: var(--np-text-dim);
+  margin: 0;
+}
+
+.np-recordings__status {
+  font-size: var(--np-fs-sm);
+  padding: var(--np-1.5) var(--np-3.5);
+  border-radius: var(--np-radius-pill);
+  font-weight: var(--np-fw-semibold);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+
+.np-recordings__status--idle {
+  background: var(--np-surface-2);
+  color: var(--np-text-dim);
+}
+
+.np-recordings__status--active {
+  background: var(--np-finding-soft);
+  color: var(--np-finding);
+}
+
+/* Controls Toolbar */
 .np-recordings__controls {
+  display: flex;
+  gap: var(--np-3);
+  align-items: center;
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-4) var(--np-5);
+  flex-wrap: wrap;
+}
+
+/* Filters & Chips */
+.np-recordings__filters {
   display: flex;
   gap: var(--np-2);
   flex-wrap: wrap;
+  align-items: center;
 }
-.np-recordings__hint,
-.np-recordings__notice,
-.np-plugins__note,
-.np-plugins__notice,
-.np-replay__note,
-.np-replay__notice,
-.np-export__notice {
+
+.np-recordings__filter {
   font-size: var(--np-fs-sm);
-  color: var(--np-text-mute);
+  font-weight: var(--np-fw-medium);
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  color: var(--np-text-dim);
+  transition: color var(--np-t), background var(--np-t), box-shadow var(--np-t), transform var(--np-t);
+  cursor: pointer;
 }
+
+.np-recordings__filter:hover:not(:disabled) {
+  color: var(--np-accent-strong);
+  background: var(--np-surface-2);
+}
+
+.np-recordings__filter[aria-pressed="true"] {
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-accent-strong);
+  background: var(--np-surface-1);
+  font-weight: var(--np-fw-semibold);
+}
+
+.np-recordings__filter:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  box-shadow: var(--np-glow);
+}
+
+/* Empty State Informational Surface */
+.np-recordings__empty {
+  background: var(--np-surface-1);
+  border: 1px dashed var(--np-surface-2);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-8) var(--np-5);
+  text-align: center;
+  color: var(--np-text-dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--np-3);
+}
+
+.np-recordings__empty-title {
+  font-size: var(--np-fs-lg);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  margin: 0;
+}
+
+.np-recordings__empty-desc {
+  font-size: var(--np-fs-base);
+  color: var(--np-text-dim);
+  margin: 0;
+  max-width: 550px;
+  line-height: var(--np-lh);
+}
+
+/* Recording Card Presentation */
+.np-recording {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-5);
+  transition: box-shadow var(--np-t);
+}
+
 .np-recording__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--np-3);
   flex-wrap: wrap;
 }
+
 .np-recording__title {
+  margin: 0;
+  font-size: var(--np-fs-md);
   font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
 }
-.np-recording__level,
-.np-recording__meta,
-.np-recording__pins,
-.np-recording__privacy {
+
+.np-recording__level {
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
-  color: var(--np-text-mute);
+  padding: var(--np-1) var(--np-2.5);
+  border-radius: var(--np-radius-pill);
+  font-weight: var(--np-fw-semibold);
+  text-transform: capitalize;
 }
-.np-recording__incomplete,
-.np-replay__incomplete {
+
+.np-recording__level--metadata_only {
+  background: var(--np-good-soft);
+  color: var(--np-good);
+}
+
+.np-recording__level--headers {
+  background: var(--np-surface-2);
+  color: var(--np-accent-2);
+}
+
+.np-recording__level--full_payload {
+  background: var(--np-finding-soft);
   color: var(--np-notable);
+}
+
+.np-recording__meta {
+  display: flex;
+  gap: var(--np-4);
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+  flex-wrap: wrap;
+}
+
+.np-recording__incomplete {
+  color: var(--np-finding);
+  font-weight: var(--np-fw-semibold);
+}
+
+.np-recording__privacy {
+  font-size: var(--np-fs-sm);
+  line-height: var(--np-lh);
+  margin: 0;
+}
+
+.np-recording__privacy--safe {
+  color: var(--np-good);
+}
+
+.np-recording__privacy--payload {
+  color: var(--np-notable);
+}
+
+.np-recording__pins {
+  background: var(--np-surface-2);
+  border-radius: var(--np-radius-sm);
+  padding: var(--np-3) var(--np-4);
+  box-shadow: var(--np-neu-inset);
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+  transition: background var(--np-t);
+}
+
+.np-recording__pins summary {
+  cursor: pointer;
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  outline: none;
+}
+
+.np-recording__pins summary:focus-visible {
+  outline: 2px solid var(--np-accent-strong);
+  outline-offset: 2px;
+  border-radius: var(--np-radius-xs);
+}
+
+.np-recording__pins-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--np-2);
+  margin-top: var(--np-2);
+  font-size: var(--np-fs-xs);
+}
+
+/* Reduced Motion & Responsive Media Queries */
+@media (prefers-reduced-motion: reduce) {
+  .np-recordings__controls,
+  .np-recordings__filter,
+  .np-recording,
+  .np-recording__pins {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .np-recordings__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .np-recording__head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ---- Replay ---- */

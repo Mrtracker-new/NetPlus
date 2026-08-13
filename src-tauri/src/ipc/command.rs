@@ -11,9 +11,8 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
         }
         Command::StartCapture { iface_id } => crate::start_capture(state, iface_id),
         Command::StopCapture { .. } => crate::stop_capture(state),
-        Command::StartRecording | Command::StopRecording => {
-            Err("recording requires a live capture source (platform backend is a stub)".into())
-        }
+        Command::StartRecording => crate::start_recording(state),
+        Command::StopRecording => crate::stop_recording(state),
         Command::ReplayPlay
         | Command::ReplayPause
         | Command::ReplayStep

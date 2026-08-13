@@ -4,28 +4,17 @@ export function ZeroEgressBadge() {
   const { t } = useTranslation(["export"]);
 
   return (
-    <div
-      className="np-export__privacy-badge"
-      style={{
-        background: "rgba(16, 185, 129, 0.12)",
-        border: "1px solid rgba(16, 185, 129, 0.3)",
-        borderRadius: "var(--np-radius-md, 8px)",
-        padding: "0.85rem 1.1rem",
-        marginBottom: "1.25rem",
-        display: "flex",
-        alignItems: "center",
-        gap: "0.75rem",
-      }}
-    >
-      <span style={{ fontSize: "1.2rem" }}>🔒</span>
+    <div className="np-export__privacy-badge">
+      <span className="np-export__privacy-badge-icon">🔒</span>
       <div>
-        <div style={{ fontWeight: 600, fontSize: "0.9rem", color: "#10b981" }}>
+        <div className="np-export__privacy-badge-title">
           {t("zero_egress_badge")}
         </div>
-        <div style={{ fontSize: "0.82rem", color: "var(--np-subtext, #94a3b8)", marginTop: "0.2rem" }}>
+        <div className="np-export__privacy-badge-desc">
           {t("zero_egress_notice")}
         </div>
       </div>
     </div>
   );
 }
+

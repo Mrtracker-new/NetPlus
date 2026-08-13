@@ -10,13 +10,13 @@ export function ExportSummaryKpis({ flows, sessions, hosts }: ExportSummaryKpisP
   const { t } = useTranslation(["export"]);
 
   const items = [
-    { label: t("kpis.flows"), value: flows.toLocaleString(), color: "var(--np-accent, #2fe0d6)" },
-    { label: t("kpis.sessions"), value: sessions.toLocaleString(), color: "#60a5fa" },
-    { label: t("kpis.hosts"), value: hosts.toLocaleString(), color: "#10b981" },
+    { label: t("kpis.flows"), value: flows.toLocaleString(), color: "var(--np-accent-strong)" },
+    { label: t("kpis.sessions"), value: sessions.toLocaleString(), color: "var(--np-accent-2)" },
+    { label: t("kpis.hosts"), value: hosts.toLocaleString(), color: "var(--np-good)" },
   ];
 
   return (
-    <div className="np-kpis" style={{ marginBottom: "1.25rem" }}>
+    <div className="np-kpis">
       {items.map((item) => (
         <div key={item.label} className="np-kpi">
           <div className="np-kpi__label">{item.label}</div>
@@ -28,3 +28,4 @@ export function ExportSummaryKpis({ flows, sessions, hosts }: ExportSummaryKpisP
     </div>
   );
 }
+

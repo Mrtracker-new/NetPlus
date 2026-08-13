@@ -14,18 +14,18 @@ export function PayloadLevelSelector({
 }: PayloadLevelSelectorProps) {
   const { t } = useTranslation(["export"]);
 
-  const levels: Array<{ id: PayloadLevel; title: string; color: string }> = [
-    { id: "metadata_only", title: t("levels.metadata_only"), color: "#10b981" },
-    { id: "headers", title: t("levels.headers"), color: "#60a5fa" },
-    { id: "full_payload", title: t("levels.full_payload"), color: "#f59e0b" },
+  const levels: Array<{ id: PayloadLevel; title: string }> = [
+    { id: "metadata_only", title: t("levels.metadata_only") },
+    { id: "headers", title: t("levels.headers") },
+    { id: "full_payload", title: t("levels.full_payload") },
   ];
 
   return (
-    <div style={{ marginBottom: "1.25rem" }}>
-      <label style={{ display: "block", fontSize: "0.85rem", fontWeight: 600, color: "var(--np-subtext, #94a3b8)", marginBottom: "0.5rem" }}>
+    <div>
+      <label className="np-export__label">
         {t("level_label")}
       </label>
-      <div role="radiogroup" aria-label={t("level_label")} style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+      <div className="np-export__levels" role="radiogroup" aria-label={t("level_label")}>
         {levels.map((lvl) => {
           const isSelected = lvl.id === selectedLevel;
           return (
@@ -35,14 +35,8 @@ export function PayloadLevelSelector({
               role="radio"
               aria-checked={isSelected}
               disabled={disabled}
-              className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
+              className={`np-export__level np-export__level--${lvl.id}`}
               onClick={() => onLevelChange(lvl.id)}
-              style={{
-                fontSize: "0.85rem",
-                padding: "0.4rem 0.85rem",
-                borderRadius: "16px",
-                borderColor: isSelected ? lvl.color : undefined,
-              }}
             >
               {lvl.title}
             </button>
@@ -52,3 +46,4 @@ export function PayloadLevelSelector({
     </div>
   );
 }
+

@@ -140,8 +140,11 @@
   --np-monitor-grid: rgba(0, 0, 0, 0.06);
 
   /* ---- Layout ---- */
-  --np-rail: 76px;         /* slim icon rail (ref) */
-  --np-rail-right: 300px;  /* right context rail */
+  --np-rail: 76px;                     /* slim icon rail (ref) */
+  --np-rail-right-expanded: 300px;     /* right context rail expanded */
+  --np-rail-right-collapsed: 0px;     /* right context rail collapsed size (0px clean collapse) */
+  --np-rail-right: var(--np-rail-right-expanded);
+  --np-breakpoint-rail-mobile: 1120px; /* RightRail responsive mobile boundary */
 }
 
 /* ============================ Dark theme ============================

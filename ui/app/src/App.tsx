@@ -7,16 +7,13 @@
 import { Component, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { ProjectionDepth, Interface as InterfaceDto } from "@netpulse/contract";
-import { API_VERSION } from "@netpulse/contract";
+import type { Interface as InterfaceDto } from "@netpulse/contract";
 import { changeLanguage, type Language } from "./i18n";
-import { DisclosureProvider, useDisclosure, DEPTHS } from "./modes/DisclosureContext";
+import { DisclosureProvider, useDisclosure } from "./modes/DisclosureContext";
 import { useTheme } from "./modes/useTheme";
 import { useLiveData } from "./state/useLiveData";
-import { useStore } from "./state/store";
 import { command, query } from "./ipc";
 import { Icon, type IconName } from "./icons";
-import { humanBytes, primaryHostName } from "@netpulse/viz";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
 import { Monitoring } from "./screens/Monitoring";
@@ -35,6 +32,7 @@ import { ProtocolSandboxScreen } from "./screens/ProtocolSandbox";
 import { FleetScreen } from "./screens/Fleet";
 import { SessionDiffScreen } from "./screens/SessionDiff";
 import { EvidenceNavigationProvider, useEvidenceNavigation, type Screen } from "./context/EvidenceNavigationContext";
+import { SidebarProvider, useSidebar, RightRailToggle, RightRail } from "./components/RightRail";
 
 type NavItemDef = {
   icon: IconName;
@@ -89,27 +87,6 @@ const NAV_GROUPS: readonly NavGroupDef[] = [
     itemIds: ["recordings", "replay", "export", "plugins"],
   },
 ] as const;
-
-function ModeSwitch() {
-  const { depth, setDepth } = useDisclosure();
-  return (
-    <div className="np-modes" role="radiogroup" aria-label="Disclosure mode">
-      {DEPTHS.map((d: ProjectionDepth) => (
-        <button
-          key={d}
-          type="button"
-          role="radio"
-          aria-checked={d === depth}
-          title={d}
-          className={d === depth ? "np-mode np-mode--active" : "np-mode"}
-          onClick={() => setDepth(d)}
-        >
-          {d}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 // The live-capture control and its honest, always-visible state (: a
 // capture indicator is mandatory). Observe-only: this starts/stops a read-only
@@ -234,189 +211,17 @@ function LanguageToggle() {
   );
 }
 
-function CapabilityCard() {
-  const { t } = useTranslation("common");
-  const [handshake, setHandshake] = useState<{
-    apiVersion: number;
-    hostVersion: number;
-    compatible: boolean;
-  }>({
-    apiVersion: API_VERSION,
-    hostVersion: API_VERSION,
-    compatible: true,
-  });
-
-  const [capabilities, setCapabilities] = useState<string[]>([
-    "Live Capture",
-    "Flow Attribution",
-    "TLS Dissection",
-    "Security Engine",
-    "Replay Engine",
-  ]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    query({ kind: "handshake", client_version: API_VERSION })
-      .then((res) => {
-        if (!cancelled && res.kind === "handshake") {
-          setHandshake({
-            apiVersion: API_VERSION,
-            hostVersion: res.handshake.host_version,
-            compatible: res.handshake.compatible,
-          });
-        }
-      })
-      .catch(() => {
-        /* Keep fallback version info in preview mode */
-      });
-
-    query({ kind: "getCapabilityRegistry" })
-      .then((res) => {
-        if (!cancelled && res.kind === "capabilityRegistry" && res.registry) {
-          const list = Array.isArray(res.registry.capabilities)
-            ? res.registry.capabilities
-            : Array.isArray(res.registry)
-            ? res.registry
-            : capabilities;
-          setCapabilities(list);
-        }
-      })
-      .catch(() => {
-        /* Keep fallback capabilities in preview mode */
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  return (
-    <section className="np-rail-card np-capability-card">
-      <h2 className="np-rail-card__title">{t("rail.capability_registry")}</h2>
-      <ul className="np-rail-list" style={{ marginBottom: "0.5rem" }}>
-        <li>
-          API Version
-          <span className="np-rail-list__val">v{handshake.apiVersion}</span>
-        </li>
-        <li>
-          Engine Version
-          <span className="np-rail-list__val">v{handshake.hostVersion}</span>
-        </li>
-        <li>
-          Status
-          <span
-            className="np-rail-list__val"
-            style={{
-              color: handshake.compatible ? "#10b981" : "#ef4444",
-              fontWeight: 500,
-            }}
-          >
-            {handshake.compatible ? "Compatible" : "Incompatible"}
-          </span>
-        </li>
-      </ul>
-      <div
-        className="np-rail-card__title"
-        style={{ fontSize: "0.75rem", marginBottom: "0.4rem", textTransform: "uppercase" }}
-      >
-        Capabilities ({capabilities.length})
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.3rem" }}>
-        {capabilities.map((cap, i) => (
-          <span
-            key={i}
-            className="np-evidence np-evidence--static"
-            style={{ fontSize: "0.7rem", padding: "0.15rem 0.4rem" }}
-          >
-            {cap}
-          </span>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// The right context rail — real NetPulse content only (docs honesty: no invented
-// users/resources). Capture status, top observed hosts, and quick controls.
-function RightRail() {
-  const { t } = useTranslation("common");
-  const { monitor, feed } = useStore();
-  const hosts = monitor
-    ? [...monitor.by_host.rows].sort((a, b) => b.bytes - a.bytes).slice(0, 6)
-    : [];
-  const totalFlows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
-  const maxBytes = hosts.length > 0 ? Math.max(...hosts.map((h) => h.bytes), 1) : 1;
-
-  return (
-    <aside className="np-rail-right" aria-label="Context">
-      <section className="np-rail-card">
-        <h2 className="np-rail-card__title">{t("rail.this_session")}</h2>
-        <ul className="np-rail-list">
-          <li>
-            {t("rail.hosts_observed")}
-            <span className="np-rail-list__val">{monitor?.by_host.rows.length ?? 0}</span>
-          </li>
-          <li>
-            {t("rail.active_flows")}
-            <span className="np-rail-list__val">{totalFlows}</span>
-          </li>
-          <li>
-            {t("rail.narrative_cards")}
-            <span className="np-rail-list__val">{feed.length}</span>
-          </li>
-          <li>
-            {t("rail.capture_drops")}
-            <span className="np-rail-list__val">{monitor?.capture_drops ?? 0}</span>
-          </li>
-        </ul>
-      </section>
-
-      <section className="np-rail-card">
-        <h2 className="np-rail-card__title">{t("rail.top_hosts")}</h2>
-        {hosts.length === 0 ? (
-          <p className="np-cons__hint">{t("rail.quiet_no_hosts")}</p>
-        ) : (
-          <ul className="np-rail-list np-rail-list--hosts">
-            {hosts.map((h) => {
-              const nm = primaryHostName(h);
-              const pct = Math.min(100, Math.max(8, Math.round((h.bytes / maxBytes) * 100)));
-              return (
-                <li key={h.label} className="np-rail-host-item" style={{ "--host-pct": `${pct}%` } as React.CSSProperties}>
-                  <span
-                    className="np-rail-host-name"
-                    title={nm ? `${nm.name} · ${h.label}` : h.label}
-                  >
-                    {nm ? nm.name : h.label}
-                  </span>
-                  <span className="np-rail-list__val">{humanBytes(h.bytes)}</span>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
-
-      <section className="np-rail-card">
-        <h2 className="np-rail-card__title">{t("rail.view_density")}</h2>
-        <ModeSwitch />
-      </section>
-
-      <CapabilityCard />
-    </aside>
-  );
-}
-
 function Shell() {
   const { screen, setScreen } = useEvidenceNavigation();
   const { t } = useTranslation("common");
+  const { isCollapsed } = useSidebar();
   const [announcement, setAnnouncement] = useState("");
 
   useLiveData();
   const { depth } = useDisclosure();
 
   return (
-    <div className="np-app" data-depth={depth}>
+    <div className="np-app" data-depth={depth} data-right-rail-collapsed={isCollapsed}>
       {/* Top-level dedicated ARIA Live Region for accessibility announcements */}
       <div className="np-sr-only" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -471,6 +276,7 @@ function Shell() {
           <CaptureControl onAnnounce={setAnnouncement} />
           <ThemeToggle />
           <LanguageToggle />
+          <RightRailToggle />
         </header>
         {/* Force remount so entry animation runs on navigation */}
         <main key={screen}>
@@ -536,9 +342,11 @@ export function App() {
   return (
     <DisclosureProvider>
       <EvidenceNavigationProvider>
-        <ErrorBoundary>
-          <Shell />
-        </ErrorBoundary>
+        <SidebarProvider>
+          <ErrorBoundary>
+            <Shell />
+          </ErrorBoundary>
+        </SidebarProvider>
       </EvidenceNavigationProvider>
     </DisclosureProvider>
   );

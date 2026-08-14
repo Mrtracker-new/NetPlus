@@ -44,7 +44,14 @@ export type IconName =
   | "diagnostics"
   | "sandbox"
   | "fleet"
-  | "compare";
+  | "compare"
+  | "sidebar"
+  | "close"
+  | "chevronLeft"
+  | "chevronRight"
+  | "context"
+  | "session"
+  | "system";
 
 const PATHS: Record<IconName, ReactElement> = {
   dashboard: (
@@ -189,6 +196,44 @@ const PATHS: Record<IconName, ReactElement> = {
       <path d="M12 4v16" />
       <path d="M9 10l-2 2 2 2" />
       <path d="M15 10l2 2-2 2" />
+    </>
+  ),
+  sidebar: (
+    <>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <path d="M15 3v18" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="M18 6L6 18M6 6l12 12" />
+    </>
+  ),
+  chevronLeft: (
+    <>
+      <path d="M15 18l-6-6 6-6" />
+    </>
+  ),
+  chevronRight: (
+    <>
+      <path d="M9 18l6-6-6-6" />
+    </>
+  ),
+  context: (
+    <>
+      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+    </>
+  ),
+  session: (
+    <>
+      <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+    </>
+  ),
+  system: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3" />
     </>
   ),
 };

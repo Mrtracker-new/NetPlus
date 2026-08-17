@@ -18,21 +18,21 @@
     "@netpulse/design-system": "workspace:*",
     "@netpulse/viz": "workspace:*",
     "@tauri-apps/api": "^2.0.0",
-    "i18next": "^23.11.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-i18next": "^14.1.2"
+    "i18next": "^26.3.6",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-i18next": "^17.0.11"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.0.0",
-    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.7.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
     "jsdom": "^30.0.1",
-    "typescript": "^5.4.0",
-    "vite": "^6.4.3",
-    "vitest": "^3.2.6"
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
   }
 }

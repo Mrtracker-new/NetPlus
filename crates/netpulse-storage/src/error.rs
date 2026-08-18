@@ -45,8 +45,16 @@ pub enum StorageError {
         max: i64,
     },
 
-    #[error("Invalid stored value in SQLite database: field '{field}' contains negative signed value {value} which cannot be converted to u64")]
+    #[error(
+        "Invalid stored value in SQLite database: field '{field}' contains invalid value {value}"
+    )]
     InvalidStoredValue { field: &'static str, value: i64 },
+
+    #[error("Session {session_id} references flow {flow_id} which does not exist in SQLite")]
+    MissingFlowForSessionLink { session_id: u64, flow_id: u64 },
+
+    #[error("Storage referential integrity violation: {reason}")]
+    IntegrityViolation { reason: String },
 }
 
 pub type MigrationError = StorageError;

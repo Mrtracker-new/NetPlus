@@ -8,9 +8,13 @@
 use std::collections::HashMap;
 use std::net::IpAddr;
 
-use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session};
+use std::path::Path;
 
-use crate::repository::{CaptureRepository, MemoryCaptureStore};
+use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session};
+use serde::{Deserialize, Serialize};
+
+use crate::error::StorageError;
+use crate::repository::{CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository};
 use crate::{EvictionStats, PayloadPolicy, StorageConfig};
 
 // NOTE:
@@ -32,13 +36,24 @@ fn check_evidence_exists(
     }
 }
 
-/// A finding plus the retention annotation from.
-#[derive(Debug, Clone)]
+/// A finding plus the retention annotation from storage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct StoredFinding {
     pub finding: Finding,
     /// Set true when evidence it referenced was legitimately aged out; the UI
     /// then shows "evidence no longer retained" rather than a dead link.
     pub evidence_expired: bool,
+}
+
+/// Canonical, order-independent deterministic snapshot of all persisted runtime entities in [`CaptureStore`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CaptureStoreSnapshot {
+    pub flows: Vec<Flow>,
+    pub sessions: Vec<Session>,
+    pub proto_events: Vec<ProtoEvent>,
+    pub hosts: Vec<(u64, Host)>,
+    pub resolutions: Vec<(IpAddr, Vec<HostName>)>,
+    pub findings: Vec<StoredFinding>,
 }
 
 /// The indexed capture store generic over `R: CaptureRepository`.
@@ -603,6 +618,144 @@ impl<R: CaptureRepository> CaptureStore<R> {
         );
         Ok(())
     }
+
+    /// Produce a canonical, deterministic, order-independent snapshot of all 6 runtime entities.
+    pub fn snapshot(&self) -> CaptureStoreSnapshot {
+        let mut flows: Vec<Flow> = self.flows.values().cloned().collect();
+        flows.sort_by_key(|f| (f.first_ts.mono_nanos, f.id));
+
+        let mut sessions: Vec<Session> = self
+            .sessions
+            .values()
+            .cloned()
+            .map(|mut s| {
+                s.flow_ids.sort_unstable();
+                s
+            })
+            .collect();
+        sessions.sort_by_key(|s| (s.start_ts.mono_nanos, s.id));
+
+        let mut proto_events: Vec<ProtoEvent> = Vec::new();
+        for evs in self.events_by_flow.values() {
+            proto_events.extend(evs.iter().cloned());
+        }
+        proto_events.sort_by_key(|e| (e.ts.mono_nanos, e.flow_id));
+
+        let mut hosts: Vec<(u64, Host)> =
+            self.hosts.iter().map(|(&id, h)| (id, h.clone())).collect();
+        hosts.sort_by_key(|(id, _)| *id);
+
+        let mut resolutions: Vec<(IpAddr, Vec<HostName>)> = self
+            .resolutions
+            .iter()
+            .map(|(&ip, names)| {
+                let mut sorted_names = names.clone();
+                sorted_names.sort_by(|a, b| a.name.cmp(&b.name));
+                (ip, sorted_names)
+            })
+            .collect();
+        resolutions.sort_by_key(|(ip, _)| *ip);
+
+        let mut findings: Vec<StoredFinding> = self.findings.values().cloned().collect();
+        findings.sort_by_key(|f| f.finding.id);
+
+        CaptureStoreSnapshot {
+            flows,
+            sessions,
+            proto_events,
+            hosts,
+            resolutions,
+            findings,
+        }
+    }
+
+    /// Idempotently load and hydrate all 6 data entities from the underlying repository into memory.
+    /// Replaces previous in-memory state and verifies referential integrity.
+    pub async fn load_from_repository(&mut self) -> Result<(), StorageError> {
+        let raw_flows = self.repository.all_flows().await?;
+        let raw_sessions = self.repository.all_sessions().await?;
+        let raw_events = self.repository.all_proto_events().await?;
+        let raw_hosts = self.repository.all_hosts().await?;
+        let raw_resolutions = self.repository.resolutions().await?;
+        let raw_findings = self.repository.all_findings().await?;
+
+        // 1. Clear existing in-memory state for idempotent load
+        self.flows.clear();
+        self.sessions.clear();
+        self.events_by_flow.clear();
+        self.hosts.clear();
+        self.resolutions.clear();
+        self.findings.clear();
+
+        // 2. Populate flows
+        for flow in raw_flows {
+            self.flows.insert(flow.id, flow);
+        }
+
+        // 3. Populate proto events grouped by flow_id
+        for event in raw_events {
+            self.events_by_flow
+                .entry(event.flow_id)
+                .or_default()
+                .push(event);
+        }
+        for evs in self.events_by_flow.values_mut() {
+            evs.sort_by_key(|e| e.ts.mono_nanos);
+        }
+
+        // 4. Populate sessions & verify referential integrity
+        for session in raw_sessions {
+            // Verify session.flow_ids ⊆ flows.keys()
+            for &flow_id in &session.flow_ids {
+                if !self.flows.contains_key(&flow_id) {
+                    return Err(StorageError::IntegrityViolation {
+                        reason: format!(
+                            "Session {} references flow {} which is not present in flows",
+                            session.id, flow_id
+                        ),
+                    });
+                }
+            }
+            self.sessions.insert(session.id, session);
+        }
+
+        // 5. Populate hosts
+        for (id, host) in raw_hosts {
+            self.hosts.insert(id, host);
+        }
+
+        // 6. Populate resolutions
+        self.resolutions = raw_resolutions;
+
+        // 7. Populate findings
+        for finding in raw_findings {
+            self.findings.insert(finding.finding.id, finding);
+        }
+
+        Ok(())
+    }
+}
+
+impl CaptureStore<SqliteCaptureRepository> {
+    /// Open SQLite database at `path`, run migrations and schema validation,
+    /// construct CaptureStore, and hydrate all stored entities into memory.
+    pub async fn open_sqlite<P: AsRef<Path>>(
+        path: P,
+        policy: PayloadPolicy,
+    ) -> Result<Self, StorageError> {
+        let repo = SqliteCaptureRepository::connect(path).await?;
+        let mut store = Self::with_repository(policy, repo);
+        store.load_from_repository().await?;
+        Ok(store)
+    }
+
+    /// Ensure all pending writes are committed and trigger SQLite WAL checkpoint.
+    pub async fn flush_async(&mut self) -> Result<(), StorageError> {
+        sqlx::query("PRAGMA wal_checkpoint(PASSIVE);")
+            .execute(self.repository.pool())
+            .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -862,5 +1015,105 @@ mod tests {
         });
         assert!(res.is_err());
         assert!(store.finding(303).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sqlite_hydration_and_restart_snapshot_equality() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("restart_test.db");
+
+        let mut store = CaptureStore::open_sqlite(&db_path, PayloadPolicy::MetadataOnly)
+            .await
+            .unwrap();
+
+        let flow1 = flow(101, 100);
+        let event1 = ProtoEvent {
+            flow_id: 101,
+            ts: Timestamp::new(105, 105),
+            kind: netpulse_core::ProtoEventKind::DnsQuery,
+        };
+        store.insert_flow_async(flow1, vec![event1]).await;
+
+        let flow2 = flow(102, 120);
+        store.insert_flow_async(flow2, vec![]).await;
+
+        let session = Session {
+            id: 201,
+            process_id: 555,
+            start_ts: Timestamp::new(100, 100),
+            trigger: "test_session".into(),
+            flow_ids: vec![101, 102],
+        };
+        store.insert_session_async(session).await;
+
+        let host = Host {
+            ip: IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)),
+            names: vec!["example.com".into()],
+            geo: Some("US".into()),
+            asn: Some(15133),
+            org: Some("EDGECAST".into()),
+        };
+        store.insert_host_async(1, host).await;
+
+        store
+            .set_resolution_async(
+                IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)),
+                vec![HostName {
+                    name: "example.com".into(),
+                    source: netpulse_core::NameSource::Dns,
+                }],
+            )
+            .await;
+
+        let finding = Finding {
+            id: 301,
+            category: FindingCategory::Suspicious,
+            confidence: Confidence::new(0.95),
+            evidence_refs: vec![EvidenceRef::Flow(101), EvidenceRef::Session(201)],
+        };
+        store.insert_finding_async(finding).await.unwrap();
+
+        store.flush_async().await.unwrap();
+        let before_snapshot = store.snapshot();
+
+        drop(store);
+
+        // Re-open fresh CaptureStore from SQLite database
+        let mut reloaded_store = CaptureStore::open_sqlite(&db_path, PayloadPolicy::MetadataOnly)
+            .await
+            .unwrap();
+        let after_snapshot = reloaded_store.snapshot();
+
+        assert_eq!(before_snapshot, after_snapshot);
+
+        // Test idempotent hydration: reloading multiple times produces identical state
+        reloaded_store.load_from_repository().await.unwrap();
+        let idempotent_snapshot = reloaded_store.snapshot();
+        assert_eq!(after_snapshot, idempotent_snapshot);
+    }
+
+    #[tokio::test]
+    async fn test_hydration_referential_integrity_violation() {
+        let memory_repo = MemoryCaptureStore::new();
+        // Insert session 999 that references non-existent flow 888
+        memory_repo
+            .insert_session_sync(Session {
+                id: 999,
+                process_id: 1,
+                start_ts: Timestamp::new(100, 100),
+                trigger: "corrupt".into(),
+                flow_ids: vec![888],
+            })
+            .unwrap();
+
+        let mut store = CaptureStore::with_repository(PayloadPolicy::MetadataOnly, memory_repo);
+        let res = store.load_from_repository().await;
+        assert!(res.is_err());
+        match res.unwrap_err() {
+            StorageError::IntegrityViolation { reason } => {
+                assert!(reason.contains("Session 999 references flow 888"));
+            }
+            other => panic!("Expected IntegrityViolation, got {:?}", other),
+        }
     }
 }

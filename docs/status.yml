@@ -3,7 +3,7 @@
 # Synchronized with documentation via `python scripts/verify_docs_status.py`.
 
 version: 1
-last_updated: "2026-08-06"
+last_updated: "2026-08-18"
 
 status_legend:
   complete: "✅ Complete"
@@ -20,14 +20,14 @@ crates:
   netpulse-platform:
     layer: Platform
     design: complete
-    code: in_progress
-    runtime: in_progress
-    summary: "OS abstractions; Windows Npcap live capture & socket table behind `live-capture` feature gate."
+    code: complete
+    runtime: complete
+    summary: "OS abstractions; Windows Npcap live capture with adapter fallback & socket table behind `live-capture` feature gate."
   netpulse-capture:
     layer: Ingest
     design: complete
     code: complete
-    runtime: in_progress
+    runtime: complete
     summary: "PCAP/PCAPNG file parsing, ring buffer, shedding policy, recording & replay complete."
   netpulse-capture-svc:
     layer: Daemon
@@ -39,8 +39,8 @@ crates:
     layer: Decode
     design: complete
     code: complete
-    runtime: in_progress
-    summary: "Zero-copy dissection for Ethernet, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS complete & fuzzed."
+    runtime: complete
+    summary: "Zero-copy dissection for Ethernet, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS complete, fuzzed & hardened against hostile inputs."
   netpulse-flow:
     layer: Assembly
     design: complete
@@ -51,8 +51,8 @@ crates:
     layer: Persistence
     design: complete
     code: complete
-    runtime: in_progress
-    summary: "In-memory CaptureStore and query surface complete; durable SQLite backend planned."
+    runtime: complete
+    summary: "In-memory CaptureStore, WAL-mode durable SQLite repository, referential integrity hydration, atomic transactions, and snapshot equality."
   netpulse-narrative:
     layer: Presentation
     design: complete
@@ -93,8 +93,8 @@ crates:
     layer: Orchestrator
     design: complete
     code: complete
-    runtime: in_progress
-    summary: "Offline file analysis pipeline operational; live capture loop & event streaming in progress."
+    runtime: complete
+    summary: "Offline file analysis and incremental LivePipeline operational; verified against SQLite restart durability and presentation views."
 
 ui_workspace:
   contract:

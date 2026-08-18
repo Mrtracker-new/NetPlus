@@ -27,11 +27,11 @@ NetPulse capabilities are specified, implemented, and executed across three dist
 
 | Capability | Key Crates & Packages | Design | Code | Runtime | Description |
 |---|---|:---:|:---:|:---:|---|
-| **Capture & Decoding** | `netpulse-capture`, `netpulse-decode`, `netpulse-flow`, `netpulse-storage`, `netpulse-platform` | ✅ Complete | ✅ Complete | 🚧 In Progress | Zero-copy decoding (Ethernet, IPv4/6, TCP, UDP, DNS, HTTP, TLS), flow assembly, PCAP/PCAPNG parsing & replay complete. Live Npcap capture & durable SQLite storage in progress. |
-| **Narrative & Presentation** | `netpulse-narrative`, `netpulse-api`, `@netpulse/contract`, `ui/` | ✅ Complete | ✅ Complete | 🚧 In Progress | Session narrative card projection & v4 API DTO contract complete. Real-time bandwidth/latency monitoring UI & socket process attribution (`GetExtendedTcpTable`) in progress. |
-| **Education & Exploration** | `netpulse-learn`, `@netpulse/app` | ✅ Complete | ✅ Complete | ✅ Complete | Grounded interactive curriculum, Website Load Journey synthesizer, and Protocol Explorer reference content fully operational. |
+| **Capture & Decoding** | `netpulse-capture`, `netpulse-decode`, `netpulse-flow`, `netpulse-storage`, `netpulse-platform` | ✅ Complete | ✅ Complete | ✅ Complete | Zero-copy decoding (Ethernet, IPv4/6, TCP, UDP, DNS, HTTP, TLS), flow assembly, hostile input bounds, PCAP/PCAPNG parsing & replay, live Npcap capture with interface fallback, and durable SQLite storage with restart hydration fully operational. |
+| **Narrative & Presentation** | `netpulse-narrative`, `netpulse-api`, `@netpulse/contract`, `ui/` | ✅ Complete | 🚧 In Progress | 🚧 In Progress | Session narrative card projection & v4 API DTO contract complete. Real-time bandwidth/latency monitoring UI & socket process attribution (`GetExtendedTcpTable`) in progress. |
+| **Education & Exploration** | `netpulse-learn`, `@netpulse/app` | ✅ Complete | 🚧 In Progress | 🚧 In Progress | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer content complete. Frontend explorer & interactive UI integration in progress. |
 | **Intelligence & AI** | `netpulse-intel`, `netpulse-ai` | ✅ Complete | ✅ Complete | 🚧 In Progress | Threat detectors (DNS tunneling, port scans), statistical anomaly engine, grounded retrieval & `LocalTemplateBackend` complete. Local ONNX LLM backend planned. |
-| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `netpulse-capture-svc` | ✅ Complete | ✅ Complete | 🚧 In Progress | Session recording & deterministic replay, PCAPNG import/export, plugin seam traits & trust model complete. WASM runtime loader & privileged daemon loop in progress/planned. |
+| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `netpulse-capture-svc` | ✅ Complete | 🚧 In Progress | 🚧 In Progress | Session recording & deterministic replay, PCAPNG import/export, plugin seam traits & trust model complete. WASM runtime loader & privileged daemon loop in progress/planned. |
 
 ---
 

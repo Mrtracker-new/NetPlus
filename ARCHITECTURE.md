@@ -115,19 +115,19 @@ Progressive cards          Confidence scoring          protocol explorer        
 | Crate Name | Layer | Design | Code | Runtime | Purpose & Responsibility |
 |---|---|:---:|:---:|:---:|---|
 | [`netpulse-core`](crates/netpulse-core) | Base | ✅ Complete | ✅ Complete | ✅ Complete | Shared data models (`Flow`, `Session`, `Finding`, `Packet`), error taxonomy, progressive disclosure levels (`Beginner`, `Intermediate`, `Expert`), and core traits. |
-| [`netpulse-platform`](crates/netpulse-platform) | Platform | ✅ Complete | 🚧 In Progress | 🚧 In Progress | OS-specific network interface enumeration, process attribution (`GetExtendedTcpTable`), and Windows Npcap bindings (behind `live-capture` feature gate). |
-| [`netpulse-capture`](crates/netpulse-capture) | Ingest | ✅ Complete | ✅ Complete | 🚧 In Progress | Capture source abstractions (`PcapSource`, `LiveSource`), PCAP/PCAPNG file readers/writers, bounded ring buffer, shedding policy, recording & replay. |
+| [`netpulse-platform`](crates/netpulse-platform) | Platform | ✅ Complete | ✅ Complete | ✅ Complete | OS-specific network interface enumeration, process attribution (`GetExtendedTcpTable`), and Windows Npcap bindings with interface fallback (behind `live-capture` feature gate). |
+| [`netpulse-capture`](crates/netpulse-capture) | Ingest | ✅ Complete | ✅ Complete | ✅ Complete | Capture source abstractions (`PcapSource`, `LiveSource`), PCAP/PCAPNG file readers/writers, bounded ring buffer, shedding policy, recording & replay. |
 | [`netpulse-capture-svc`](crates/netpulse-capture-svc) | Daemon | ✅ Complete | 🚧 In Progress | 📋 Planned | Standalone privileged capture daemon binary scaffold and IPC frame-handoff transport. |
-| [`netpulse-decode`](crates/netpulse-decode) | Decode | ✅ Complete | ✅ Complete | 🚧 In Progress | Zero-copy dissectors (Ethernet, ARP, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS) complete & fuzzed. QUIC/HTTP3, DHCP, mDNS planned. |
+| [`netpulse-decode`](crates/netpulse-decode) | Decode | ✅ Complete | ✅ Complete | ✅ Complete | Zero-copy dissectors (Ethernet, ARP, IPv4/6, TCP, UDP, ICMP, DNS, HTTP/1.1, TLS) complete, fuzzed, and hardened with bounded loops against malformed traffic. |
 | [`netpulse-flow`](crates/netpulse-flow) | Assembly | ✅ Complete | ✅ Complete | ✅ Complete | Bi-directional flow state machine, 5-tuple tracking, session synthesis, causal event ordering, and connection metrics. |
-| [`netpulse-storage`](crates/netpulse-storage) | Persistence | ✅ Complete | ✅ Complete | 🚧 In Progress | Thread-safe in-memory `CaptureStore`, windowed queries, and time-series rollups complete. Durable SQLite backend planned. |
+| [`netpulse-storage`](crates/netpulse-storage) | Persistence | ✅ Complete | ✅ Complete | ✅ Complete | Thread-safe in-memory `CaptureStore`, durable WAL SQLite backend with referential integrity verification, atomic session linking, and restart snapshot equality. |
 | [`netpulse-narrative`](crates/netpulse-narrative) | Presentation | ✅ Complete | ✅ Complete | ✅ Complete | Session-to-story translation engine. Maps raw network flows and sessions into human-understandable narrative cards across disclosure levels. |
 | [`netpulse-intel`](crates/netpulse-intel) | Intelligence | ✅ Complete | ✅ Complete | ✅ Complete | Rules-based threat detectors (DNS tunneling, port scans) and statistical anomaly engines with calibrated confidence scores. |
 | [`netpulse-ai`](crates/netpulse-ai) | AI Engine | ✅ Complete | ✅ Complete | 🚧 In Progress | Grounded retrieval, citation validator, and `LocalTemplateBackend` complete. Local ONNX LLM backend planned. Holds sole egress capability. |
 | [`netpulse-learn`](crates/netpulse-learn) | Education | ✅ Complete | ✅ Complete | ✅ Complete | Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer reference content. |
 | [`netpulse-api`](crates/netpulse-api) | API | ✅ Complete | ✅ Complete | ✅ Complete | Versioned IPC DTO contract (`v4`), Query/Command definitions, stream message schemas, and TypeScript codegen. |
 | [`netpulse-plugin`](crates/netpulse-plugin) | Extensibility | ✅ Complete | ✅ Complete | 🚧 In Progress | Plugin seam traits (`Dissector`, `Detector`, `Enrichment`, `ExportPlugin`, `ViewPlugin`), capability model, Ed25519 signature verifier, registry, and config manager complete. WASM host loader planned. |
-| [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | ✅ Complete | ✅ Complete | 🚧 In Progress | Main engine binary, offline PCAP file pipeline complete. Live capture loop execution and streaming push events in progress. |
+| [`netpulse-engine`](crates/netpulse-engine) | Orchestrator | ✅ Complete | ✅ Complete | ✅ Complete | Main engine binary, offline PCAP file pipeline, incremental `LivePipeline` with SQLite durability, restart hydration, and presentation projections. |
 
 ---
 

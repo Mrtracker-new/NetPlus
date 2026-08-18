@@ -13,7 +13,7 @@ This directory contains the canonical documentation for NetPulse, including comp
 |---|---|
 | [`status.yml`](status.yml) | **Single Source of Truth** for component implementation maturity across Rust crates and UI packages. |
 | [`observability.md`](observability.md) | Telemetry, logging standards, event taxonomy, and health probe specifications. |
-| [`adr/`](adr/) | Architectural Decision Records (sandboxing, transport, provenance, registry). |
+| [`adr/`](adr/) | Architectural Decision Records (sandboxing, transport, provenance, registry, storage durability & hydration). |
 
 ---
 

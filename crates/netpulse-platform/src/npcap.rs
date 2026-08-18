@@ -90,15 +90,18 @@ pub fn open_capture(iface_id: u16) -> Result<LiveCapture> {
 
     let device = if iface_id == 0 {
         // Best-scoring non-loopback interface is first after the sort.
-        devices
-            .into_iter()
-            .find(|d| !d.flags.is_loopback())
-            .ok_or_else(|| {
+        // If no non-loopback device is present (e.g. isolated host or test container),
+        // fall back gracefully to the highest-scoring available adapter (including loopback).
+        let non_loopback = devices.iter().find(|d| !d.flags.is_loopback()).cloned();
+        match non_loopback {
+            Some(d) => d,
+            None => devices.into_iter().next().ok_or_else(|| {
                 NpError::Capability(
-                    "no active non-loopback capture interface found (is anything connected?)"
+                    "no capture interfaces found (is Npcap installed and running with appropriate permissions?)"
                         .into(),
                 )
-            })?
+            })?,
+        }
     } else {
         devices
             .into_iter()

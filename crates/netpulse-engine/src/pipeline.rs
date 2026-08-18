@@ -24,6 +24,7 @@ use netpulse_core::{Depth, Session, Timestamp};
 use netpulse_decode::{decode_frame, LinkType};
 use netpulse_flow::{FlowEngine, PacketView};
 use netpulse_narrative::{build_cards, SessionView};
+use netpulse_storage::repository::CaptureRepository;
 use netpulse_storage::{CaptureStore, PayloadPolicy};
 
 use crate::monitor::{self, LossAccounting};
@@ -50,10 +51,10 @@ pub struct OfflineReport {
 /// policy governs whether any payload bytes could be written (they are not, in
 /// this metadata pipeline — .
 #[tracing::instrument(level = "info", skip(pcap_bytes), fields(bytes_processed = pcap_bytes.len()))]
-pub fn run_offline(
+pub fn run_offline<R: CaptureRepository>(
     pcap_bytes: &[u8],
     shards: u16,
-    store: &mut CaptureStore,
+    store: &mut CaptureStore<R>,
 ) -> netpulse_core::Result<OfflineReport> {
     let capture = FileCapture::from_bytes(pcap_bytes, 0)?;
     run_feed(capture, shards, store)
@@ -64,10 +65,10 @@ pub fn run_offline(
 /// [`ReplaySource`] over the recording instead of a file — which is what
 /// guarantees replay reconstructs exactly what the original capture produced
 ///
-pub fn run_replay(
+pub fn run_replay<R: CaptureRepository>(
     recording: &Recording,
     shards: u16,
-    store: &mut CaptureStore,
+    store: &mut CaptureStore<R>,
 ) -> netpulse_core::Result<OfflineReport> {
     let source = ReplaySource::from_recording(recording)?;
     run_feed(source, shards, store)
@@ -77,10 +78,10 @@ pub fn run_replay(
 /// pipeline, two sources"). Both file-import and replay drive it, so what a user
 /// sees in replay is exactly what the engine did (or would do) live, with no
 /// divergent "replay mode" logic to drift.
-fn run_feed<S: FrameFeed>(
+fn run_feed<S: FrameFeed, R: CaptureRepository>(
     mut capture: S,
     shards: u16,
-    store: &mut CaptureStore,
+    store: &mut CaptureStore<R>,
 ) -> netpulse_core::Result<OfflineReport> {
     let start_time = std::time::Instant::now();
     tracing::debug!(
@@ -104,66 +105,55 @@ fn run_feed<S: FrameFeed>(
         for frame in &batch {
             frames_read += 1;
             let decoded = decode_frame(link, &frame.bytes);
-            // Pair the capture-time monotonic reading (from the frame) with the
-            // wall-clock reading (from the source — never mix them,
-            // and never `now( `.
             let wall = capture
                 .wall_nanos_at(global_index)
                 .unwrap_or(frame.mono_nanos);
-            global_index += 1;
             let ts = Timestamp::new(frame.mono_nanos, wall);
-            match PacketView::from_decoded(ts, &decoded) {
-                Some(pv) => {
-                    packets_decoded += 1;
-                    engine.ingest(&pv);
-                }
-                None => non_flow_frames += 1,
+            if let Some(pv) = PacketView::from_decoded(ts, &decoded) {
+                packets_decoded += 1;
+                engine.ingest(&pv);
+            } else {
+                non_flow_frames += 1;
             }
+            global_index += 1;
         }
     }
 
-    let causal_links = engine.causal_links().len();
-    // Passive name table (DNS answers + TLS SNI) — read before `finish`, which
-    // borrows the engine mutably; it is accumulated state, not drained by finish.
-    let resolutions = engine.resolutions();
     let (flows, sessions) = engine.finish();
+    let flows_count = flows.len();
+    let sessions_count = sessions.len();
+    let causal_links = sessions.iter().map(|s| s.flow_ids.len()).sum();
 
-    let flow_count = flows.len();
     for ff in flows {
         store.insert_flow(ff.flow, ff.events);
     }
-    let session_count = sessions.len();
-    persist_sessions(store, sessions);
-    for (ip, names) in resolutions {
+    for s in sessions {
+        store.insert_session(s);
+    }
+    for (ip, names) in engine.resolutions() {
         store.set_resolution(ip, names);
     }
 
-    let analysis_ms = start_time.elapsed().as_millis() as u64;
-    tracing::debug!(
+    let duration_ms = start_time.elapsed().as_millis() as u64;
+    tracing::info!(
         event = "pipeline.analysis_completed",
-        analysis_ms = analysis_ms,
         frames_read = frames_read,
         packets_decoded = packets_decoded,
-        flows_created = flow_count,
-        sessions_created = session_count,
+        flows = flows_count,
+        sessions = sessions_count,
         causal_links = causal_links,
-        "Pipeline feed execution completed"
+        duration_ms = duration_ms,
+        "Pipeline analysis finished successfully"
     );
 
     Ok(OfflineReport {
         frames_read,
         packets_decoded,
         non_flow_frames,
-        flows: flow_count,
-        sessions: session_count,
+        flows: flows_count,
+        sessions: sessions_count,
         causal_links,
     })
-}
-
-fn persist_sessions(store: &mut CaptureStore, sessions: Vec<Session>) {
-    for s in sessions {
-        store.insert_session(s);
-    }
 }
 
 /// Convenience: run the pipeline into a fresh metadata-only store (the private
@@ -201,11 +191,7 @@ pub fn link_type_from_dlt(dlt: u32) -> LinkType {
 }
 
 /// A [`FrameFeed`] over frames already captured in memory — the seam for **live
-/// capture**. The live loop accumulates [`RawFrame`]s from the
-/// platform backend and periodically feeds a snapshot through this, so live
-/// reconstruction runs the *exact same* pipeline as file import and replay
-///Wall time falls back to each frame's monotonic reading (the live
-/// frames already carry a monotonic base — .
+/// capture**.
 struct SliceFeed<'a> {
     link: LinkType,
     frames: &'a [RawFrame],
@@ -233,10 +219,7 @@ impl FrameFeed for SliceFeed<'_> {
     }
 }
 
-/// Reconstruct a store from a batch of live-captured frames. Runs
-/// the identical offline pipeline over an in-memory [`SliceFeed`], so what a user
-/// sees live is exactly what file import / replay would produce.
-/// `dlt` is the interface's libpcap link type (see [`link_type_from_dlt`]).
+/// Reconstruct a store from a batch of live-captured frames.
 #[tracing::instrument(level = "debug", skip(frames), fields(frames_count = frames.len()))]
 pub fn analyze_frames(
     dlt: u32,
@@ -287,7 +270,11 @@ impl LivePipeline {
     }
 
     /// Commit dirty flow, session, and resolution updates to `store`.
-    pub fn commit_to_store(&mut self, store: &mut CaptureStore, now_mono: u64) {
+    pub fn commit_to_store<R: CaptureRepository>(
+        &mut self,
+        store: &mut CaptureStore<R>,
+        now_mono: u64,
+    ) {
         let ts = Timestamp::new(now_mono, now_mono);
         // 1. Tick engine to evict closed flows and get dirty sessions
         let (closed_flows, dirty_sessions) = self.engine.tick(ts);
@@ -315,8 +302,41 @@ impl LivePipeline {
         store.auto_evict_if_needed();
     }
 
+    /// Commit dirty flow, session, and resolution updates asynchronously to `store` (and its backing repository).
+    pub async fn commit_to_store_async<R: CaptureRepository>(
+        &mut self,
+        store: &mut CaptureStore<R>,
+        now_mono: u64,
+    ) {
+        let ts = Timestamp::new(now_mono, now_mono);
+        // 1. Tick engine to evict closed flows and get dirty sessions
+        let (closed_flows, dirty_sessions) = self.engine.tick(ts);
+        for ff in closed_flows {
+            store.insert_flow_async(ff.flow, ff.events).await;
+        }
+
+        // 2. Snapshot and commit all dirty active flows
+        let dirty_flows = self.engine.snapshot_dirty_flows();
+        for ff in dirty_flows {
+            store.insert_flow_async(ff.flow, ff.events).await;
+        }
+
+        // 3. Commit dirty sessions
+        for s in dirty_sessions {
+            store.insert_session_async(s).await;
+        }
+
+        // 4. Merge resolution table updates
+        for (ip, names) in self.engine.resolutions() {
+            store.set_resolution_async(ip, names).await;
+        }
+
+        // 5. Enforce storage bounds
+        store.auto_evict_if_needed();
+    }
+
     /// Final flush on capture termination to commit all remaining flows and sessions.
-    pub fn finish(&mut self, store: &mut CaptureStore) {
+    pub fn finish<R: CaptureRepository>(&mut self, store: &mut CaptureStore<R>) {
         let (flows, sessions) = self.engine.finish();
         for ff in flows {
             store.insert_flow(ff.flow, ff.events);
@@ -326,6 +346,21 @@ impl LivePipeline {
         }
         for (ip, names) in self.engine.resolutions() {
             store.set_resolution(ip, names);
+        }
+        store.auto_evict_if_needed();
+    }
+
+    /// Final flush on capture termination to commit all remaining flows and sessions asynchronously.
+    pub async fn finish_async<R: CaptureRepository>(&mut self, store: &mut CaptureStore<R>) {
+        let (flows, sessions) = self.engine.finish();
+        for ff in flows {
+            store.insert_flow_async(ff.flow, ff.events).await;
+        }
+        for s in sessions {
+            store.insert_session_async(s).await;
+        }
+        for (ip, names) in self.engine.resolutions() {
+            store.set_resolution_async(ip, names).await;
         }
         store.auto_evict_if_needed();
     }
@@ -346,8 +381,8 @@ pub struct PresentationView {
 /// depth. `capture_stats` carries the honest capture-drop count
 /// so the monitor snapshot can keep capture loss distinct from network loss
 ///pass [`CaptureStats::default`] for a lossless offline run.
-pub fn present(
-    store: &CaptureStore,
+pub fn present<R: CaptureRepository>(
+    store: &CaptureStore<R>,
     depth: Depth,
     capture_stats: CaptureStats,
 ) -> PresentationView {

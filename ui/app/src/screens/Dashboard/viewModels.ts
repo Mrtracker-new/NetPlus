@@ -1,5 +1,3 @@
-import type { EvidenceRef, NarrativeCard } from "@netpulse/contract";
-
 export type NarrativeCategory =
   | "all"
   | "findings"
@@ -60,8 +58,5 @@ export interface HealthViewModel {
 }
 
 export type DashboardEvent =
-  | { type: "OPEN_DRAWER"; ref: EvidenceRef; card?: NarrativeCard }
-  | { type: "CLOSE_DRAWER" }
-  | { type: "EXPLAIN_FINDING"; card: NarrativeCard }
   | { type: "SET_CATEGORY"; category: NarrativeCategory }
   | { type: "SET_SEARCH"; search: string };

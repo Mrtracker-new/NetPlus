@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from "react";
-import type { EvidenceRef, NarrativeCard } from "@netpulse/contract";
 import { useStore } from "../../state/store";
 import { useDisclosure } from "../../modes/DisclosureContext";
 import { humanBytes } from "@netpulse/viz";
@@ -20,8 +19,6 @@ export function useDashboardController() {
   // Local UI states
   const [category, setCategory] = useState<NarrativeCategory>("all");
   const [search, setSearch] = useState("");
-  const [drawerRef, setDrawerRef] = useState<EvidenceRef | null>(null);
-  const [drawerCard, setDrawerCard] = useState<NarrativeCard | null>(null);
 
   // 1. Situation Summary Model
   const situationSummaryModel: SituationSummaryModel = useMemo(() => {
@@ -190,27 +187,11 @@ export function useDashboardController() {
   // 6. Central Event Dispatcher
   const dispatchEvent = useCallback((event: DashboardEvent) => {
     switch (event.type) {
-      case "OPEN_DRAWER":
-        setDrawerRef(event.ref);
-        setDrawerCard(event.card ?? null);
-        break;
-      case "CLOSE_DRAWER":
-        setDrawerRef(null);
-        setDrawerCard(null);
-        break;
       case "SET_CATEGORY":
         setCategory(event.category);
         break;
       case "SET_SEARCH":
         setSearch(event.search);
-        break;
-      case "EXPLAIN_FINDING":
-        if (event.card.evidence && event.card.evidence.length > 0) {
-          setDrawerRef(event.card.evidence[0]!);
-        } else {
-          setDrawerRef({ kind: "flow", id: 1 });
-        }
-        setDrawerCard(event.card);
         break;
     }
   }, []);
@@ -226,8 +207,6 @@ export function useDashboardController() {
     search,
     feedCount: feed.length,
     filteredNarratives,
-    drawerRef,
-    drawerCard,
     dispatchEvent,
   };
 }

@@ -1,4 +1,4 @@
-import { useSidebar } from "./useSidebar";
+import { useSidebar } from "./RightRailContext";
 import { Icon } from "../../icons";
 
 export function RightRailToggle() {

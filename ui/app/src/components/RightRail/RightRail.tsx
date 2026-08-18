@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useSidebar } from "./useSidebar";
+import { useSidebar } from "./RightRailContext";
 import { RightRailTabs } from "./RightRailTabs";
 import { ScreenContextCard } from "./ScreenContextCard";
 import { SessionCard } from "./SessionCard";

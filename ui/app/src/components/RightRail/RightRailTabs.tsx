@@ -1,4 +1,4 @@
-import { useSidebar, type RightRailTab } from "./useSidebar";
+import { useSidebar, type RightRailTab } from "./RightRailContext";
 import { Icon } from "../../icons";
 
 const TABS: { id: RightRailTab; label: string; icon: "context" | "session" | "system" }[] = [

@@ -223,9 +223,18 @@ def check_file_status_badges(file_path, manifest_data):
 
                 ui_pkgs_in_row = []
                 ui_map = manifest_data.get("ui_workspace", {})
-                if "ui/" in row_text or "@netpulse/" in row_text:
+                if "ui/" in row_text:
+                    ui_pkgs_in_row = list(ui_map.keys())
+                else:
                     for pkg in ui_map:
-                        if pkg in row_text or "@netpulse/" in row_text or "ui/" in row_text:
+                        pkg_dash = pkg.replace("_", "-")
+                        if (
+                            f"@netpulse/{pkg}" in row_text
+                            or f"@netpulse/{pkg_dash}" in row_text
+                            or f"ui/{pkg}" in row_text
+                            or f"ui/packages/{pkg}" in row_text
+                            or f"ui/packages/{pkg_dash}" in row_text
+                        ):
                             ui_pkgs_in_row.append(pkg)
 
                 if not crates_in_row and not ui_pkgs_in_row:

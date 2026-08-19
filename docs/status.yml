@@ -103,16 +103,16 @@ ui_workspace:
     runtime: complete
   design_system:
     design: complete
-    code: in_progress
-    runtime: in_progress
+    code: complete
+    runtime: complete
   components:
     design: complete
-    code: in_progress
-    runtime: in_progress
+    code: complete
+    runtime: complete
   viz:
     design: complete
-    code: in_progress
-    runtime: in_progress
+    code: complete
+    runtime: complete
   app:
     design: complete
     code: in_progress

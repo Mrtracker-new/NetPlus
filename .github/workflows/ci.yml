@@ -306,7 +306,7 @@ jobs:
         run: |
           mkdir -p artifacts
           echo "::group::Validating installer outputs"
-          find src-tauri/target/release/bundle -type f \( -name "*.deb" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.app" \) -exec cp {} artifacts/ \;
+          find src-tauri/target/release/bundle -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.app" \) -exec cp {} artifacts/ \;
           if [ -z "$(ls -A artifacts)" ]; then
             echo "ERROR: No installer packages found in src-tauri/target/release/bundle/"
             exit 1

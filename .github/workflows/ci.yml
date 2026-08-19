@@ -258,7 +258,7 @@ jobs:
         run: |
           sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="10"
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev patchelf || true
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev patchelf libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev || true
 
       - name: Setup Npcap SDK (Windows)
         if: matrix.os == 'windows-latest'
@@ -295,6 +295,7 @@ jobs:
 
       - name: Build Tauri Desktop Application
         env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
           NO_STRIP: "true"
         run: node ui/app/node_modules/@tauri-apps/cli/tauri.js build
 

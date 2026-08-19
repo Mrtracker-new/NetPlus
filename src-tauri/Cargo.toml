@@ -38,8 +38,8 @@ custom-protocol = ["tauri/custom-protocol"]
 live-capture = ["netpulse-platform/live-capture"]
 
 [profile.release]
-lto = true
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 strip = true
 panic = "abort"
 opt-level = "z"

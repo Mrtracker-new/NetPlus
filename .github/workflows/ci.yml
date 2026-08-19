@@ -194,8 +194,8 @@ jobs:
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
-          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="15"
+          sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="10"
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev
 
       - name: Setup Npcap SDK (Windows)
@@ -256,8 +256,8 @@ jobs:
       - name: Install Linux system dependencies
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
-          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="15"
+          sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="10"
           sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev
 
       - name: Setup Npcap SDK (Windows)

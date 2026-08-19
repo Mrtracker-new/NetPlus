@@ -7,6 +7,11 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
     match command {
         Command::SetDepth { depth } => {
             *state.depth.lock().map_err(|_| "state poisoned")? = crate::to_depth(depth);
+            let handle = match state.app_handle.lock() {
+                Ok(g) => g.clone(),
+                Err(p) => p.into_inner().clone(),
+            };
+            crate::emit_live_snapshot(&state.store, &state.stats, &state.depth, &handle);
             Ok(())
         }
         Command::StartCapture { iface_id } => crate::start_capture(state, iface_id),

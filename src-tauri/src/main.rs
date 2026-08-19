@@ -33,7 +33,7 @@ use netpulse_plugin::{
     ContractVersion, PluginManifest, PluginRegistry, PluginType, TrustMetadata, TrustStatus,
 };
 use netpulse_storage::{CaptureStore, PayloadPolicy};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 pub(crate) mod ipc;
 
@@ -80,7 +80,7 @@ pub(crate) struct AppState {
     // `Arc` so the background live-capture thread can share the same store/stats
     // the query handler reads (the thread swaps in fresh reconstructions).
     pub(crate) store: Arc<Mutex<CaptureStore>>,
-    pub(crate) depth: Mutex<Depth>,
+    pub(crate) depth: Arc<Mutex<Depth>>,
     pub(crate) stats: Arc<Mutex<CaptureStats>>,
     pub(crate) recordings: Mutex<Vec<Recording>>,
     pub(crate) replay: Mutex<Option<ReplayController>>,
@@ -95,6 +95,8 @@ pub(crate) struct AppState {
     pub(crate) sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
     /// Stop flag for the background HTTP health probe server.
     pub(crate) health_stop: Arc<AtomicBool>,
+    /// Optional Tauri application handle for emitting live events.
+    pub(crate) app_handle: Mutex<Option<tauri::AppHandle>>,
     /// Atomic once-guard guaranteeing shutdown sequence executes exactly once.
     pub(crate) shutting_down: AtomicBool,
 }
@@ -130,7 +132,7 @@ impl Default for AppState {
         let (store, stats) = seed_store_from_env();
         Self {
             store: Arc::new(Mutex::new(store)),
-            depth: Mutex::new(Depth::Beginner),
+            depth: Arc::new(Mutex::new(Depth::Beginner)),
             stats: Arc::new(Mutex::new(stats)),
             recordings: Mutex::new(Vec::new()),
             replay: Mutex::new(None),
@@ -139,6 +141,7 @@ impl Default for AppState {
             correlator: Arc::new(Mutex::new(Correlator::new())),
             sockets: netpulse_platform::socket_table(),
             health_stop: Arc::new(AtomicBool::new(false)),
+            app_handle: Mutex::new(None),
             shutting_down: AtomicBool::new(false),
         }
     }
@@ -157,10 +160,15 @@ pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), Strin
 
     let store = Arc::clone(&state.store);
     let stats = Arc::clone(&state.stats);
+    let depth = Arc::clone(&state.depth);
     let correlator = Arc::clone(&state.correlator);
     let sockets = state.sockets.clone();
     let stop = Arc::new(AtomicBool::new(false));
     let stop_thread = Arc::clone(&stop);
+    let app_handle = match state.app_handle.lock() {
+        Ok(g) => g.clone(),
+        Err(p) => p.into_inner().clone(),
+    };
     let (tx, rx) = std::sync::mpsc::channel::<Result<(), String>>();
     let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
 
@@ -173,10 +181,12 @@ pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), Strin
                 dlt,
                 store,
                 stats,
+                depth,
                 correlator,
                 sockets,
                 stop_thread,
                 done_tx,
+                app_handle,
             );
         }
         Err(e) => {
@@ -558,6 +568,35 @@ impl LiveLoopContext {
     }
 }
 
+pub(crate) fn emit_live_snapshot(
+    store: &Arc<Mutex<CaptureStore>>,
+    stats: &Arc<Mutex<CaptureStats>>,
+    depth: &Arc<Mutex<Depth>>,
+    app_handle: &Option<tauri::AppHandle>,
+) {
+    if let Some(handle) = app_handle {
+        let store_guard = match store.lock() {
+            Ok(g) => g,
+            Err(p) => p.into_inner(),
+        };
+        let stats_guard = match stats.lock() {
+            Ok(g) => *g,
+            Err(p) => *p.into_inner(),
+        };
+        let depth_guard = match depth.lock() {
+            Ok(g) => *g,
+            Err(p) => *p.into_inner(),
+        };
+        let view = netpulse_engine::pipeline::present(
+            &store_guard,
+            depth_guard,
+            stats_guard,
+        );
+        let _ = handle.emit("feed-delta", &view.narratives);
+        let _ = handle.emit("monitor-snapshot", &view.monitor);
+    }
+}
+
 /// The background live-capture loop. Drains frames from the backend
 /// into a bounded buffer and periodically commits incremental engine updates
 /// into the committed store via [`netpulse_engine::pipeline::LivePipeline`].
@@ -568,10 +607,12 @@ fn live_loop(
     dlt: u32,
     store: Arc<Mutex<CaptureStore>>,
     stats: Arc<Mutex<CaptureStats>>,
+    depth: Arc<Mutex<Depth>>,
     correlator: Arc<Mutex<Correlator>>,
     sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
     stop: Arc<AtomicBool>,
     done_tx: std::sync::mpsc::Sender<()>,
+    app_handle: Option<tauri::AppHandle>,
 ) {
     let _completion_guard = CompletionGuard(Some(done_tx));
     let config = LiveLoopConfig {
@@ -579,7 +620,7 @@ fn live_loop(
         hint_refresh_secs: 30,
     };
 
-    let mut ctx = LiveLoopContext::new(dlt, store, stats, stop.clone(), config);
+    let mut ctx = LiveLoopContext::new(dlt, store.clone(), stats.clone(), stop.clone(), config);
     let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(config.max_frames);
     let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
@@ -638,6 +679,8 @@ fn live_loop(
                     }
                 }
             }
+
+            emit_live_snapshot(&store, &stats, &depth, &app_handle);
         }
     }
 
@@ -648,6 +691,7 @@ fn live_loop(
         buffer.len(),
         buffer_drops,
     );
+    emit_live_snapshot(&store, &stats, &depth, &app_handle);
     // _completion_guard drops here, signaling done_tx
 }
 
@@ -931,6 +975,13 @@ fn main() {
     }
 
     let app = tauri::Builder::default()
+        .setup(|app| {
+            let state = app.state::<AppState>();
+            if let Ok(mut handle_guard) = state.app_handle.lock() {
+                *handle_guard = Some(app.handle().clone());
+            }
+            Ok(())
+        })
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![query, command])
         .build(tauri::generate_context!())

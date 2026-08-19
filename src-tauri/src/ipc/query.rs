@@ -11,8 +11,14 @@ use netpulse_engine::security::{ask_assistant, present_security};
 /// Execute a historical or aggregated read query against the shell app state.
 #[tracing::instrument(level = "debug", skip(state))]
 pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, String> {
-    let store = state.store.lock().map_err(|_| "state poisoned")?;
-    let stats = *state.stats.lock().map_err(|_| "state poisoned")?;
+    let store = match state.store.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    let stats = match state.stats.lock() {
+        Ok(g) => *g,
+        Err(p) => *p.into_inner(),
+    };
     match query {
         Query::NarrativeFeed { depth, .. } => {
             let view = present(&store, crate::to_depth(depth), stats);
@@ -21,7 +27,10 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             })
         }
         Query::MonitorSnapshot { .. } => {
-            let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
+            let depth = match state.depth.lock() {
+                Ok(g) => *g,
+                Err(p) => *p.into_inner(),
+            };
             let view = present(&store, depth, stats);
             Ok(QueryResponse::MonitorSnapshot {
                 snapshot: view.monitor,
@@ -106,7 +115,10 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             from_mono_nanos,
             to_mono_nanos,
         } => {
-            let depth = *state.depth.lock().map_err(|_| "state poisoned")?;
+            let depth = match state.depth.lock() {
+                Ok(g) => *g,
+                Err(p) => *p.into_inner(),
+            };
             Ok(QueryResponse::Findings {
                 findings: present_security(&store, from_mono_nanos, to_mono_nanos, depth),
             })

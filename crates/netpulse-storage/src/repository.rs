@@ -674,24 +674,19 @@ impl SqliteCaptureRepository {
         if let Some(parent) = path_ref.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let connection_str = format!("sqlite:{}?mode=rwc", path_ref.to_string_lossy());
+
+        let connect_options = sqlx::sqlite::SqliteConnectOptions::new()
+            .filename(path_ref)
+            .create_if_missing(true)
+            .journal_mode(sqlx::sqlite::SqliteJournalMode::Wal)
+            .synchronous(sqlx::sqlite::SqliteSynchronous::Normal)
+            .foreign_keys(true)
+            .busy_timeout(std::time::Duration::from_secs(30));
+
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
-            .connect(&connection_str)
-            .await?;
-
-        // Centralized PRAGMAs
-        sqlx::query("PRAGMA foreign_keys = ON;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA journal_mode = WAL;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA synchronous = NORMAL;")
-            .execute(&pool)
-            .await?;
-        sqlx::query("PRAGMA busy_timeout = 5000;")
-            .execute(&pool)
+            .acquire_timeout(std::time::Duration::from_secs(30))
+            .connect_with(connect_options)
             .await?;
 
         // Migrations & schema validation

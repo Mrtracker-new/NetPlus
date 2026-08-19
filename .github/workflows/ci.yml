@@ -258,7 +258,8 @@ jobs:
         run: |
           sudo sed -i 's|azure.archive.ubuntu.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt /etc/apt/sources.list /etc/apt/sources.list.d/* 2>/dev/null || true
           sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout="10"
-          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev patchelf libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev || true
+          sudo apt-get install -y --no-install-recommends libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev patchelf libfuse2t64 libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev || true
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
 
       - name: Setup Npcap SDK (Windows)
         if: matrix.os == 'windows-latest'

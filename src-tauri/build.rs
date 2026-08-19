@@ -36,12 +36,31 @@ fn main() {
 
         let mut found = false;
 
+        // 0. Check in-tree vendored libraries (guarantees offline & CI build reliability)
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let manifest_path = PathBuf::from(manifest_dir);
+            let in_tree_candidates = vec![
+                manifest_path.join("lib").join("x64"),
+                manifest_path.join("..").join("crates").join("netpulse-platform").join("lib").join("x64"),
+                manifest_path.join("..").join("lib").join("x64"),
+            ];
+            for candidate in in_tree_candidates {
+                if let Some(lib_dir) = find_lib_directory(&candidate) {
+                    println!("cargo:rustc-link-search=native={}", lib_dir.display());
+                    found = true;
+                    break;
+                }
+            }
+        }
+
         // 1. Check explicit NPCAP_SDK_PATH environment variable
-        if let Ok(sdk_var) = std::env::var("NPCAP_SDK_PATH") {
-            let base = PathBuf::from(sdk_var);
-            if let Some(lib_dir) = find_lib_directory(&base) {
-                println!("cargo:rustc-link-search=native={}", lib_dir.display());
-                found = true;
+        if !found {
+            if let Ok(sdk_var) = std::env::var("NPCAP_SDK_PATH") {
+                let base = PathBuf::from(sdk_var);
+                if let Some(lib_dir) = find_lib_directory(&base) {
+                    println!("cargo:rustc-link-search=native={}", lib_dir.display());
+                    found = true;
+                }
             }
         }
 

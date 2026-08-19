@@ -201,21 +201,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          $sdkDir = "C:\npcap-sdk"
-          New-Item -ItemType Directory -Force -Path $sdkDir | Out-Null
-          $ProgressPreference = 'SilentlyContinue'
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          $zip = "$env:TEMP\npcap-sdk.zip"
-          Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile $zip -UserAgent "Mozilla/5.0"
-          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\npcap-extract" -Force
-          $libFile = Get-ChildItem -Path "$env:TEMP\npcap-extract" -Recurse -Filter "wpcap.lib" | Select-Object -First 1
-          if ($libFile) {
-            $libDir = $libFile.Directory.FullName
-            New-Item -ItemType Directory -Force -Path "$sdkDir\Lib\x64" | Out-Null
-            Copy-Item -Path "$libDir\*" -Destination "$sdkDir\Lib\x64" -Recurse -Force
-          }
-          echo "NPCAP_SDK_PATH=$sdkDir" >> $env:GITHUB_ENV
-          echo "LIB=$sdkDir\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+          $repoLib = "$env:GITHUB_WORKSPACE\src-tauri\lib\x64"
+          echo "NPCAP_SDK_PATH=$env:GITHUB_WORKSPACE\src-tauri" >> $env:GITHUB_ENV
+          echo "LIB=$repoLib;$env:LIB" >> $env:GITHUB_ENV
 
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
@@ -274,21 +262,9 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: powershell
         run: |
-          $sdkDir = "C:\npcap-sdk"
-          New-Item -ItemType Directory -Force -Path $sdkDir | Out-Null
-          $ProgressPreference = 'SilentlyContinue'
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          $zip = "$env:TEMP\npcap-sdk.zip"
-          Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile $zip -UserAgent "Mozilla/5.0"
-          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\npcap-extract" -Force
-          $libFile = Get-ChildItem -Path "$env:TEMP\npcap-extract" -Recurse -Filter "wpcap.lib" | Select-Object -First 1
-          if ($libFile) {
-            $libDir = $libFile.Directory.FullName
-            New-Item -ItemType Directory -Force -Path "$sdkDir\Lib\x64" | Out-Null
-            Copy-Item -Path "$libDir\*" -Destination "$sdkDir\Lib\x64" -Recurse -Force
-          }
-          echo "NPCAP_SDK_PATH=$sdkDir" >> $env:GITHUB_ENV
-          echo "LIB=$sdkDir\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+          $repoLib = "$env:GITHUB_WORKSPACE\src-tauri\lib\x64"
+          echo "NPCAP_SDK_PATH=$env:GITHUB_WORKSPACE\src-tauri" >> $env:GITHUB_ENV
+          echo "LIB=$repoLib;$env:LIB" >> $env:GITHUB_ENV
 
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable

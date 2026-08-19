@@ -38,7 +38,20 @@ function subscribe(listener: () => void): () => void {
  *  detects the change. Used by the live event channel. */
 export function pushCards(cards: NarrativeCard[]): void {
   if (cards.length === 0) return;
-  const merged = [...cards, ...state.feed].slice(0, MAX_FEED);
+  const existingMap = new Map<string, NarrativeCard>();
+  for (const c of cards) {
+    const key = `${c.at_mono_nanos}-${c.headline}`;
+    existingMap.set(key, c);
+  }
+  for (const c of state.feed) {
+    const key = `${c.at_mono_nanos}-${c.headline}`;
+    if (!existingMap.has(key)) {
+      existingMap.set(key, c);
+    }
+  }
+  const merged = Array.from(existingMap.values())
+    .sort((a, b) => b.at_mono_nanos - a.at_mono_nanos)
+    .slice(0, MAX_FEED);
   state = { ...state, feed: merged };
   emit();
 }

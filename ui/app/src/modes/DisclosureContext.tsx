@@ -9,6 +9,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -44,11 +45,14 @@ export function DisclosureProvider({ children }: { children: ReactNode }) {
   const setDepth = useCallback((d: ProjectionDepth) => {
     setDepthState(d);
     localStorage.setItem(STORAGE_KEY, d);
-    // Tell the engine so its default projection depth follows the UI mode.
-    void command({ kind: "setDepth", depth: d }).catch(() => {
+  }, []);
+
+  // Keep engine projection depth synchronized on startup and on depth changes
+  useEffect(() => {
+    void command({ kind: "setDepth", depth }).catch(() => {
       /* Browser preview / test env without Tauri host */
     });
-  }, []);
+  }, [depth]);
 
   const value = useMemo<DisclosureState>(
     () => ({

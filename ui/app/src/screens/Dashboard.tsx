@@ -25,7 +25,6 @@ interface CardProps {
 }
 
 function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
-  const { shows } = useDashboardController();
   const [showExplain, setShowExplain] = useState(false);
 
   const handleCardNavigate = useCallback(
@@ -45,15 +44,6 @@ function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
       </header>
 
       {card.summary && <p className="np-card__summary">{card.summary}</p>}
-
-      {/* Expert mode surfaces detail lines beneath summary */}
-      {shows("expert") && card.lines.length > 0 && (
-        <ul className="np-card__lines">
-          {card.lines.map((line, i) => (
-            <li key={i}>{line}</li>
-          ))}
-        </ul>
-      )}
 
       {/* In-Card Collapsible Explanation & Technical Quick Peek Drawer */}
       {showExplain && (

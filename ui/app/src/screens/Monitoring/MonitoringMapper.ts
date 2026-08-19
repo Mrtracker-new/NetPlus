@@ -17,56 +17,40 @@ export class MonitoringMapper {
   ): ViewTelemetry {
     const evaluation = evaluateDiagnosticsRules(domain);
 
-    // Dynamic, meaningful X-axis timestamps & aggregation multipliers
+    // Dynamic, meaningful X-axis timestamps
     let timestamps: string[] = [];
-    let windowMultiplier = 1.0;
-    let rateSmoothingFactor = 1.0;
 
     switch (timeRange) {
       case "5m":
         timestamps = ["5m ago", "4m ago", "3m ago", "2m ago", "1m ago", "Now"];
-        windowMultiplier = 5 / 1440;
-        rateSmoothingFactor = 0.85;
         break;
       case "15m":
         timestamps = ["15m ago", "12m ago", "9m ago", "6m ago", "3m ago", "Now"];
-        windowMultiplier = 15 / 1440;
-        rateSmoothingFactor = 0.95;
         break;
       case "1h":
         timestamps = ["60m ago", "45m ago", "30m ago", "15m ago", "Now"];
-        windowMultiplier = 60 / 1440;
-        rateSmoothingFactor = 1.05;
         break;
       case "24h":
       default:
         timestamps = ["12 AM", "06 AM", "12 PM", "06 PM", "12 AM"];
-        windowMultiplier = 1.0;
-        rateSmoothingFactor = 1.0;
         break;
     }
 
     // Dynamic time-series window downsampling & rate calculation
-    const aggregatedIngress = this.downsampleSeries(domain.ingressHistory, rateSmoothingFactor);
-    const aggregatedEgress = this.downsampleSeries(domain.egressHistory, rateSmoothingFactor);
-    const aggregatedGains = this.downsampleSeries(domain.gainsHistory, rateSmoothingFactor);
+    const aggregatedIngress = this.downsampleSeries(domain.ingressHistory);
+    const aggregatedEgress = this.downsampleSeries(domain.egressHistory);
+    const aggregatedGains = this.downsampleSeries(domain.gainsHistory);
 
     const maxGain = Math.max(...aggregatedGains, 0);
-    const peakGainBadge = maxGain > 0 ? `+${((maxGain / 350) * 100).toFixed(1)}%` : "+0.0%";
-
-    // Calculate window-adjusted total traffic
-    const totalTrafficBytes =
-      timeRange === "24h"
-        ? domain.bytesSeen
-        : Math.round(domain.bytesSeen * windowMultiplier * 20);
+    const peakGainBadge = maxGain > 0 ? `+${humanBytes(maxGain * 1024)}/s` : "+0 B/s";
 
     return {
       engineState,
       error,
-      formattedTraffic: humanBytes(totalTrafficBytes),
+      formattedTraffic: humanBytes(domain.bytesSeen),
       activeProtocolsCount: String(domain.activeProtocols),
       activeHostsCount: String(domain.activeHosts),
-      activeFlowsCount: String(Math.round(domain.activeFlows * (timeRange === "5m" ? 0.75 : 1.0))),
+      activeFlowsCount: String(domain.activeFlows),
       throughputSeries: [
         { name: "Ingress", data: aggregatedIngress, color: "var(--np-monitor-primary, #00f2fe)" },
         { name: "Egress", data: aggregatedEgress, color: "var(--np-accent-2, #7c83f7)" },
@@ -85,7 +69,7 @@ export class MonitoringMapper {
     };
   }
 
-  private static downsampleSeries(series: number[], factor: number): number[] {
+  private static downsampleSeries(series: number[]): number[] {
     if (!series || series.length === 0) return Array(12).fill(0);
 
     const targetLen = 12;
@@ -97,11 +81,7 @@ export class MonitoringMapper {
         Math.floor((i / (targetLen - 1)) * (series.length - 1))
       );
       const val = series[srcIndex] ?? 0;
-      if (val === 0) {
-        result.push(0);
-      } else {
-        result.push(Math.round(val * factor * (1 + Math.sin(i * 0.5) * 0.08)));
-      }
+      result.push(val);
     }
 
     return result;

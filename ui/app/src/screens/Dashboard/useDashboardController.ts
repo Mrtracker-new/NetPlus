@@ -13,7 +13,7 @@ import type {
 } from "./viewModels";
 
 export function useDashboardController() {
-  const { monitor, feed } = useStore();
+  const { monitor, feed, throughput } = useStore();
   const { depth, shows } = useDisclosure();
 
   // Local UI states
@@ -72,26 +72,35 @@ export function useDashboardController() {
     const flows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
     const bytes = monitor?.by_protocol.rows.reduce((s, r) => s + r.bytes, 0) ?? 0;
 
-    const downRate = bytes > 0 ? (bytes / 1024 / 1024).toFixed(1) : "0.0";
-    const upRate = (bytes > 0 ? (bytes / 1024 / 1024) * 0.2 : 0).toFixed(1);
+    let currentRateBps = 0;
+    const throughputDeltas: number[] = [];
+    if (throughput && throughput.length >= 2) {
+      for (let i = 1; i < throughput.length; i++) {
+        const delta = Math.max(0, (throughput[i] ?? 0) - (throughput[i - 1] ?? 0));
+        throughputDeltas.push(delta);
+      }
+      currentRateBps = throughputDeltas[throughputDeltas.length - 1] ?? 0;
+    }
+    const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s";
+    const sparklineActivity = throughputDeltas.length > 0 ? throughputDeltas.slice(-8) : [0];
 
     return [
       {
         id: "activity",
         label: "Network Activity",
         value: humanBytes(bytes),
-        rateDown: `▼ ${downRate} MB/s`,
-        rateUp: `▲ ${upRate} MB/s`,
+        rateDown: `▼ ${rateFormatted}`,
+        rateUp: "▲ 0 B/s",
         statusBadge: {
           text: bytes > 5_000_000 ? "Spike" : "Healthy",
           variant: bytes > 5_000_000 ? "spike" : "healthy",
         },
-        sparklineData: [12, 18, 14, 25, 32, 28, 40, Math.min(100, Math.max(10, bytes / 100_000))],
+        sparklineData: sparklineActivity,
         tooltip: {
-          peak: `${(Number(downRate) * 1.4).toFixed(1)} MB/s`,
-          avg: `${(Number(downRate) * 0.7).toFixed(1)} MB/s`,
-          percentile: "p95: 4.1 MB/s",
-          trend: "+12% vs baseline",
+          peak: `${humanBytes(Math.max(...sparklineActivity, currentRateBps))}/s`,
+          avg: `${humanBytes(bytes)} total`,
+          percentile: `${hosts} hosts`,
+          trend: currentRateBps > 0 ? "Active" : "Standby",
         },
       },
       {
@@ -102,12 +111,12 @@ export function useDashboardController() {
           text: hosts > 8 ? "Spike" : "Healthy",
           variant: "healthy",
         },
-        sparklineData: [2, 3, 4, 4, 6, hosts],
+        sparklineData: [hosts],
         tooltip: {
-          peak: `${Math.max(hosts, 10)} hosts`,
-          avg: `${Math.max(1, Math.round(hosts * 0.8))} hosts`,
-          percentile: "p95: 12 hosts",
-          trend: "Normal range",
+          peak: `${hosts} hosts`,
+          avg: `${hosts} active`,
+          percentile: "Local and remote hosts",
+          trend: hosts > 0 ? "Observed" : "Standby",
         },
       },
       {
@@ -118,12 +127,12 @@ export function useDashboardController() {
           text: flows > 30 ? "Congested" : "Quiet",
           variant: flows > 30 ? "congested" : "quiet",
         },
-        sparklineData: [8, 14, 20, 18, flows],
+        sparklineData: [flows],
         tooltip: {
-          peak: `${Math.max(flows, 45)} flows`,
-          avg: `${Math.max(1, Math.round(flows * 0.7))} flows`,
-          percentile: "p95: 48 flows",
-          trend: "Stable",
+          peak: `${flows} flows`,
+          avg: `${flows} concurrent`,
+          percentile: "5-tuple sessions",
+          trend: flows > 0 ? "Active" : "Standby",
         },
       },
       {
@@ -134,25 +143,42 @@ export function useDashboardController() {
           text: feed.some((f) => f.severity === "finding") ? "Spike" : "Learning",
           variant: feed.some((f) => f.severity === "finding") ? "spike" : "learning",
         },
-        sparklineData: [1, 2, 4, 3, feed.length],
+        sparklineData: [feed.length],
         tooltip: {
           peak: `${feed.length} cards`,
           avg: "Real-time feed",
           percentile: "All evidence linked",
-          trend: "Active",
+          trend: feed.length > 0 ? "Active" : "Empty",
         },
       },
     ];
-  }, [monitor, feed]);
+  }, [monitor, feed, throughput]);
 
   // 4. Health Telemetry View Model
   const healthViewModel: HealthViewModel = useMemo(() => {
+    const isCapturing = (monitor?.by_protocol.rows.length ?? 0) > 0 || (monitor?.capture_stats?.buffer_frames ?? 0) > 0;
+    const hasDrops = (monitor?.capture_drops ?? 0) > 0;
     return {
-      capture: { connected: true, label: "Connected" },
-      flowEngine: { healthy: true, label: "Healthy" },
-      storage: { healthy: true, label: "Healthy" },
-      ai: { ready: true, label: "Ready" },
-      npcap: { connected: true, label: "Active" },
+      capture: {
+        connected: isCapturing,
+        label: isCapturing ? "Active" : "Standby",
+      },
+      flowEngine: {
+        healthy: !hasDrops,
+        label: hasDrops ? "Dropping" : "Healthy",
+      },
+      storage: {
+        healthy: true,
+        label: "Ready",
+      },
+      ai: {
+        ready: true,
+        label: "Ready",
+      },
+      npcap: {
+        connected: isCapturing,
+        label: isCapturing ? "Capturing" : "Standby",
+      },
       drops: monitor?.capture_drops ?? 0,
     };
   }, [monitor]);

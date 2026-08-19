@@ -22,13 +22,12 @@ export function Monitoring() {
   const badgeClass =
     viewModel.engineState === "Live"
       ? "np-monitor-badge--live"
-      : viewModel.engineState === "Simulation"
-      ? "np-monitor-badge--simulation"
+      : viewModel.engineState === "Standby"
+      ? "np-monitor-badge--idle"
       : viewModel.engineState === "Degraded"
       ? "np-monitor-badge--warning"
       : "np-monitor-badge--danger";
 
-  // Provide fallback KPIs from simulation telemetry when monitor is null
   const displayKpis =
     kpis.length > 0
       ? kpis

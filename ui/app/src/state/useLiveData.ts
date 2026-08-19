@@ -14,7 +14,7 @@
 import { useEffect } from "react";
 import type { NarrativeCard, MonitorSnapshot, ProjectionDepth } from "@netpulse/contract";
 import { query } from "../ipc";
-import { pushCards, setFeed, setMonitor } from "./store";
+import { setFeed, setMonitor } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
 
 // Whole-history window; the engine bounds what it returns.
@@ -66,7 +66,7 @@ export function useLiveData(): void {
       import("@tauri-apps/api/event")
         .then(({ listen }) => {
           if (done) return;
-          listen<NarrativeCard[]>("feed-delta", (e) => pushCards(e.payload)).then((u) =>
+          listen<NarrativeCard[]>("feed-delta", (e) => setFeed(e.payload)).then((u) =>
             unlisten.push(u),
           );
           listen<MonitorSnapshot>("monitor-snapshot", (e) => setMonitor(e.payload)).then((u) =>

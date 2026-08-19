@@ -49,13 +49,14 @@ function buildDomainFromSnapshot(
       const delta = Math.max(0, curr - prev);
       rates.push(Math.round(delta / 1024));
     }
+    const avgRate = rates.length > 0 ? rates.reduce((a, b) => a + b, 0) / rates.length : 0;
     const recent = rates.slice(-targetLen);
     for (let i = 0; i < recent.length; i++) {
       const idx = targetLen - recent.length + i;
       const rate = recent[i] ?? 0;
       ingressHistory[idx] = rate;
-      egressHistory[idx] = Math.round(rate * 0.45);
-      gainsHistory[idx] = Math.round(rate * 0.25);
+      egressHistory[idx] = 0;
+      gainsHistory[idx] = Math.max(0, Math.round(rate - avgRate));
     }
   }
 
@@ -109,16 +110,16 @@ function buildDomainFromSnapshot(
     const rateKb = Math.round(row.bytes / 1024);
 
     return {
-      id: `proc-${row.label}`,
-      name: `${row.label} Telemetry Stream`,
-      type: `${row.label} Protocol`,
+      id: `proto-${row.label}`,
+      name: row.label,
+      type: `${row.label} Stream`,
       bandwidthBytes: row.bytes,
       formattedBandwidth: humanBytes(row.bytes),
-      utilizationPercent: Math.min(100, Number(((row.bytes / (totalBytes || 1)) * 100).toFixed(1))),
-      cpuPercent: Math.min(100, Number(((row.flows / (activeFlows || 1)) * 15).toFixed(1))),
-      memoryMB: Math.min(1024, Math.round(64 + row.flows * 4)),
-      packetsPerSec: Math.round(row.flows * 12),
-      rttMs: Number((0.5 + idx * 0.3).toFixed(1)),
+      utilizationPercent: totalBytes > 0 ? Math.min(100, Number(((row.bytes / totalBytes) * 100).toFixed(1))) : 0,
+      cpuPercent: 0,
+      memoryMB: 0,
+      packetsPerSec: 0,
+      rttMs: 0,
       errors: 0,
       color,
       history: Array(10).fill(rateKb),
@@ -137,15 +138,15 @@ function buildDomainFromSnapshot(
     nodes,
     edges,
     processes,
-    bufferPercent: monitor.capture_stats
-      ? Math.round(
+    bufferPercent: monitor.capture_stats && monitor.capture_stats.buffer_capacity > 0
+      ? Math.min(100, Math.round(
           ((monitor.capture_stats.buffer_frames ?? 0) /
-            (monitor.capture_stats.buffer_capacity ?? 1000)) *
+            (monitor.capture_stats.buffer_capacity || 1)) *
             100
-        )
+        ))
       : 0,
     bufferFrames: monitor.capture_stats?.buffer_frames ?? 0,
-    bufferCapacity: monitor.capture_stats?.buffer_capacity ?? 1000,
+    bufferCapacity: monitor.capture_stats?.buffer_capacity ?? 0,
     dropCount: monitor.capture_drops,
     networkLossCount: monitor.network_loss_indicators,
     diagnoses: monitor.diagnoses ?? [],

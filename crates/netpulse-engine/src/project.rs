@@ -10,13 +10,14 @@
 use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
-    AttributionDto, BreakdownDto, BreakdownRowDto, CauseDto, DiagnosisDto, DimensionDto,
-    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    AttributionDto, BreakdownDto, BreakdownRowDto, CaptureStatsDto, CauseDto, DiagnosisDto,
+    DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
     HostNameDto, JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NameSourceDto,
     NarrativeCardDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto,
     PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto,
-    ReplayStateDto, SecurityFindingDto, SeverityDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto,
+    VisualEventDto,
 };
 use netpulse_capture::{Recording, RecordingPayloadLevel, ReplayState};
 use netpulse_core::{AttributionConfidence, Depth, EvidenceRef, FindingCategory};
@@ -91,6 +92,22 @@ pub fn monitor_dto(snap: &MonitorSnapshot) -> MonitorSnapshotDto {
         diagnoses: snap.diagnoses.iter().map(diagnosis_dto).collect(),
         network_loss_indicators: snap.loss.network_loss_indicators,
         capture_drops: snap.loss.capture_drops,
+        capture_stats: snap.capture_stats.as_ref().map(capture_stats_dto),
+    }
+}
+
+fn capture_stats_dto(cs: &netpulse_capture::CaptureStats) -> CaptureStatsDto {
+    CaptureStatsDto {
+        buffer_frames: cs.buffer_frames,
+        buffer_capacity: cs.buffer_capacity,
+        shed_stage: match cs.shed_stage {
+            netpulse_capture::ShedStage::None => ShedStageDto::None,
+            netpulse_capture::ShedStage::PayloadsOff => ShedStageDto::PayloadsOff,
+            netpulse_capture::ShedStage::SampleDissection => ShedStageDto::SampleDissection,
+            netpulse_capture::ShedStage::CoarsenMetrics => ShedStageDto::CoarsenMetrics,
+            netpulse_capture::ShedStage::DropPackets => ShedStageDto::DropPackets,
+        },
+        dropped: cs.dropped,
     }
 }
 
@@ -598,5 +615,41 @@ mod tests {
         assert_eq!(dto.pid, None);
         assert_eq!(dto.process_name, None, "no PID → no name");
         assert_eq!(dto.confidence, AttributionConfidenceDto::Unknown);
+    }
+
+    #[test]
+    fn monitor_dto_projects_capture_stats_and_shed_stage() {
+        let snap = MonitorSnapshot {
+            by_protocol: Breakdown {
+                dimension: Dimension::Protocol,
+                rows: Vec::new(),
+            },
+            by_host: Breakdown {
+                dimension: Dimension::Host,
+                rows: Vec::new(),
+            },
+            diagnoses: Vec::new(),
+            loss: crate::monitor::LossAccounting {
+                network_loss_indicators: 2,
+                capture_drops: 5,
+            },
+            capture_stats: Some(netpulse_capture::CaptureStats {
+                received: 100,
+                dropped: 5,
+                shed_stage: netpulse_capture::ShedStage::PayloadsOff,
+                buffer_frames: 450,
+                buffer_capacity: 1000,
+            }),
+        };
+
+        let dto = monitor_dto(&snap);
+        assert_eq!(dto.network_loss_indicators, 2);
+        assert_eq!(dto.capture_drops, 5);
+        assert!(dto.capture_stats.is_some());
+        let cs = dto.capture_stats.unwrap();
+        assert_eq!(cs.buffer_frames, 450);
+        assert_eq!(cs.buffer_capacity, 1000);
+        assert_eq!(cs.dropped, 5);
+        assert_eq!(cs.shed_stage, ShedStageDto::PayloadsOff);
     }
 }

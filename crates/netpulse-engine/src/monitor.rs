@@ -339,6 +339,7 @@ pub struct MonitorSnapshot {
     pub by_host: Breakdown,
     pub diagnoses: Vec<Diagnosis>,
     pub loss: LossAccounting,
+    pub capture_stats: Option<netpulse_capture::CaptureStats>,
 }
 
 /// Build a full monitoring snapshot from a window's flows and loss split.
@@ -347,12 +348,14 @@ pub fn snapshot(
     loss: LossAccounting,
     dns_setup_gap_nanos: Option<u64>,
     names: &NameMap,
+    capture_stats: Option<netpulse_capture::CaptureStats>,
 ) -> MonitorSnapshot {
     MonitorSnapshot {
         by_protocol: breakdown_by_protocol(flows),
         by_host: breakdown_by_host(flows, names),
         diagnoses: diagnose(flows, loss, dns_setup_gap_nanos),
         loss,
+        capture_stats,
     }
 }
 
@@ -483,7 +486,7 @@ mod tests {
             network_loss_indicators: 0,
             capture_drops: 42,
         };
-        let snap = snapshot(&[&f], loss, None, &NameMap::new());
+        let snap = snapshot(&[&f], loss, None, &NameMap::new(), None);
         assert_eq!(snap.loss.capture_drops, 42);
         assert_eq!(snap.loss.network_loss_indicators, 0);
         // Capture drops alone never manufacture a network diagnosis.

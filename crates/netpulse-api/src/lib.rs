@@ -27,14 +27,14 @@ pub mod dto;
 pub use dto::{
     handshake_codes, handshake_error_codes, AnimationKindDto, AnimationModelDto,
     AssistantAnswerDto, AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto,
-    CauseDto, ComponentCheckDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto,
-    ExerciseKindDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto, ExportSelectionDto,
-    FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto, HandshakeResponseDto,
-    HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto, LessonOfferDto,
-    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
-    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
-    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
-    StageKindDto, VersionPinsDto, VisualEventDto,
+    CaptureStatsDto, CauseDto, ComponentCheckDto, DiagnosisDto, DimensionDto, DirectionDto,
+    EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto,
+    ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
+    HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto,
+    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
+    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
+    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
+    SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI

@@ -143,6 +143,28 @@ pub struct DiagnosisDto {
     pub evidence: Vec<EvidenceRefDto>,
 }
 
+/// Staged traffic/capture shedding stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ShedStageDto {
+    #[default]
+    None,
+    PayloadsOff,
+    SampleDissection,
+    CoarsenMetrics,
+    DropPackets,
+}
+
+/// Capture pipeline buffer and health metrics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CaptureStatsDto {
+    pub buffer_frames: usize,
+    pub buffer_capacity: usize,
+    pub shed_stage: ShedStageDto,
+    pub dropped: u64,
+}
+
 /// A monitoring snapshot over a window. Note the two loss
 /// figures are separate fields — capture loss is never network loss
 ///
@@ -153,6 +175,8 @@ pub struct MonitorSnapshotDto {
     pub diagnoses: Vec<DiagnosisDto>,
     pub network_loss_indicators: u32,
     pub capture_drops: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub capture_stats: Option<CaptureStatsDto>,
 }
 
 /// How confident a flow's process attribution is.
@@ -719,6 +743,12 @@ mod tests {
             }],
             network_loss_indicators: 0,
             capture_drops: 3,
+            capture_stats: Some(CaptureStatsDto {
+                buffer_frames: 100,
+                buffer_capacity: 1000,
+                shed_stage: ShedStageDto::SampleDissection,
+                dropped: 3,
+            }),
         });
         roundtrip(&AttributionDto {
             pid: None,
@@ -730,6 +760,26 @@ mod tests {
             name: "\\Device\\NPF_{GUID}".into(),
             description: Some("Wi-Fi".into()),
         });
+    }
+
+    #[test]
+    fn shed_stage_uses_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&ShedStageDto::SampleDissection).unwrap(),
+            r#""sample_dissection""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ShedStageDto::PayloadsOff).unwrap(),
+            r#""payloads_off""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ShedStageDto::CoarsenMetrics).unwrap(),
+            r#""coarsen_metrics""#
+        );
+        assert_eq!(
+            serde_json::to_string(&ShedStageDto::DropPackets).unwrap(),
+            r#""drop_packets""#
+        );
     }
 
     #[test]

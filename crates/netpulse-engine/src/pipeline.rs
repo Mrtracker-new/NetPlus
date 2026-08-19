@@ -426,7 +426,13 @@ pub fn present<R: CaptureRepository>(
         network_loss_indicators: network_loss,
         capture_drops: capture_stats.dropped,
     };
-    let snap = monitor::snapshot(&all_flows, loss, None, store.resolutions());
+    let snap = monitor::snapshot(
+        &all_flows,
+        loss,
+        None,
+        store.resolutions(),
+        Some(capture_stats),
+    );
 
     PresentationView {
         narratives,

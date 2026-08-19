@@ -19,6 +19,8 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  RUSTFLAGS: "-C debuginfo=0"
 
 jobs:
   rust:
@@ -195,6 +197,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
+      - name: Setup Npcap SDK (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $sdkDir = "C:\npcap-sdk"
+          New-Item -ItemType Directory -Force -Path $sdkDir | Out-Null
+          $ProgressPreference = 'SilentlyContinue'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $zip = "$env:TEMP\npcap-sdk.zip"
+          Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile $zip -UserAgent "Mozilla/5.0"
+          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\npcap-extract" -Force
+          $libFile = Get-ChildItem -Path "$env:TEMP\npcap-extract" -Recurse -Filter "wpcap.lib" | Select-Object -First 1
+          if ($libFile) {
+            $libDir = $libFile.Directory.FullName
+            New-Item -ItemType Directory -Force -Path "$sdkDir\Lib\x64" | Out-Null
+            Copy-Item -Path "$libDir\*" -Destination "$sdkDir\Lib\x64" -Recurse -Force
+          }
+          echo "NPCAP_SDK_PATH=$sdkDir" >> $env:GITHUB_ENV
+          echo "LIB=$sdkDir\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -216,13 +238,10 @@ jobs:
       - name: Cache cargo (desktop shell)
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "src-tauri -> target"
+          workspaces: "src-tauri -> src-tauri/target"
 
       - name: Desktop shell Clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
-
-      - name: Desktop shell Check
-        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
 
       - name: Desktop shell Unit & Integration Tests
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked --no-default-features
@@ -251,6 +270,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
+      - name: Setup Npcap SDK (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: powershell
+        run: |
+          $sdkDir = "C:\npcap-sdk"
+          New-Item -ItemType Directory -Force -Path $sdkDir | Out-Null
+          $ProgressPreference = 'SilentlyContinue'
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          $zip = "$env:TEMP\npcap-sdk.zip"
+          Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile $zip -UserAgent "Mozilla/5.0"
+          Expand-Archive -Path $zip -DestinationPath "$env:TEMP\npcap-extract" -Force
+          $libFile = Get-ChildItem -Path "$env:TEMP\npcap-extract" -Recurse -Filter "wpcap.lib" | Select-Object -First 1
+          if ($libFile) {
+            $libDir = $libFile.Directory.FullName
+            New-Item -ItemType Directory -Force -Path "$sdkDir\Lib\x64" | Out-Null
+            Copy-Item -Path "$libDir\*" -Destination "$sdkDir\Lib\x64" -Recurse -Force
+          }
+          echo "NPCAP_SDK_PATH=$sdkDir" >> $env:GITHUB_ENV
+          echo "LIB=$sdkDir\Lib\x64;$env:LIB" >> $env:GITHUB_ENV
+
       - name: Install pinned toolchain (1.96.0)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -271,7 +310,7 @@ jobs:
       - name: Cache cargo (desktop shell)
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: "src-tauri -> target"
+          workspaces: "src-tauri -> src-tauri/target"
 
       - name: Build frontend app
         run: pnpm --filter @netpulse/app... build

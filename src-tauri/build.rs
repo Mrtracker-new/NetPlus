@@ -1,4 +1,30 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+fn find_lib_directory(root: &Path) -> Option<PathBuf> {
+    if root.join("wpcap.lib").exists() || root.join("Packet.lib").exists() {
+        return Some(root.to_path_buf());
+    }
+    if let Ok(entries) = std::fs::read_dir(root) {
+        let mut subdirs = Vec::new();
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                // Check if this subdirectory is an x64 lib directory containing wpcap.lib
+                let is_x64 = path.to_string_lossy().to_lowercase().contains("x64");
+                if is_x64 && (path.join("wpcap.lib").exists() || path.join("Packet.lib").exists()) {
+                    return Some(path);
+                }
+                subdirs.push(path);
+            }
+        }
+        for dir in subdirs {
+            if let Some(found) = find_lib_directory(&dir) {
+                return Some(found);
+            }
+        }
+    }
+    None
+}
 
 fn main() {
     tauri_build::build();
@@ -13,18 +39,9 @@ fn main() {
         // 1. Check explicit NPCAP_SDK_PATH environment variable
         if let Ok(sdk_var) = std::env::var("NPCAP_SDK_PATH") {
             let base = PathBuf::from(sdk_var);
-            let candidates = vec![
-                base.join("Lib").join("x64"),
-                base.join("lib").join("x64"),
-                base.join("Lib"),
-                base.clone(),
-            ];
-            for candidate in candidates {
-                if candidate.exists() {
-                    println!("cargo:rustc-link-search=native={}", candidate.display());
-                    found = true;
-                    break;
-                }
+            if let Some(lib_dir) = find_lib_directory(&base) {
+                println!("cargo:rustc-link-search=native={}", lib_dir.display());
+                found = true;
             }
         }
 
@@ -59,27 +76,16 @@ fn main() {
         if !found {
             let mut default_paths = Vec::new();
             if let Ok(prog_files) = std::env::var("ProgramFiles") {
-                default_paths.push(
-                    PathBuf::from(prog_files)
-                        .join("Npcap SDK")
-                        .join("Lib")
-                        .join("x64"),
-                );
+                default_paths.push(PathBuf::from(prog_files).join("Npcap SDK"));
             }
             if let Ok(prog_files_x86) = std::env::var("ProgramFiles(x86)") {
-                default_paths.push(
-                    PathBuf::from(prog_files_x86)
-                        .join("Npcap SDK")
-                        .join("Lib")
-                        .join("x64"),
-                );
+                default_paths.push(PathBuf::from(prog_files_x86).join("Npcap SDK"));
             }
-            default_paths.push(PathBuf::from(r"C:\npcap-sdk\Lib\x64"));
-            default_paths.push(PathBuf::from(r"C:\npcap-sdk\lib\x64"));
+            default_paths.push(PathBuf::from(r"C:\npcap-sdk"));
 
             for path in default_paths {
-                if path.exists() {
-                    println!("cargo:rustc-link-search=native={}", path.display());
+                if let Some(lib_dir) = find_lib_directory(&path) {
+                    println!("cargo:rustc-link-search=native={}", lib_dir.display());
                     found = true;
                     break;
                 }
@@ -92,17 +98,17 @@ fn main() {
             if let Ok(out_dir_var) = std::env::var("OUT_DIR") {
                 let out_dir = PathBuf::from(out_dir_var);
                 let sdk_dir = out_dir.join("npcap-sdk");
-                let lib_x64 = sdk_dir.join("Lib").join("x64");
 
-                if lib_x64.exists() {
-                    println!("cargo:rustc-link-search=native={}", lib_x64.display());
+                if let Some(lib_dir) = find_lib_directory(&sdk_dir) {
+                    println!("cargo:rustc-link-search=native={}", lib_dir.display());
                     found = true;
                 } else {
                     println!("cargo:warning=Npcap SDK not found locally. Downloading Npcap SDK for Windows build...");
                     let zip_path = out_dir.join("npcap-sdk.zip");
                     let ps_script = format!(
-                        "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
-                         Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile '{}'; \
+                        "$ProgressPreference = 'SilentlyContinue'; \
+                         [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; \
+                         Invoke-WebRequest -Uri 'https://npcap.com/dist/npcap-sdk-1.13.zip' -OutFile '{}' -UserAgent 'Mozilla/5.0'; \
                          Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
                         zip_path.display(),
                         zip_path.display(),
@@ -112,9 +118,11 @@ fn main() {
                         .args(["-NoProfile", "-Command", &ps_script])
                         .status();
 
-                    if status.map(|s| s.success()).unwrap_or(false) && lib_x64.exists() {
-                        println!("cargo:rustc-link-search=native={}", lib_x64.display());
-                        found = true;
+                    if status.map(|s| s.success()).unwrap_or(false) {
+                        if let Some(lib_dir) = find_lib_directory(&sdk_dir) {
+                            println!("cargo:rustc-link-search=native={}", lib_dir.display());
+                            found = true;
+                        }
                     }
                 }
             }

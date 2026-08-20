@@ -76,7 +76,7 @@ crates:
     design: complete
     code: complete
     runtime: complete
-    summary: "Interactive curriculum engine, Website Load Journey synthesizer, and Protocol Explorer content."
+    summary: "Interactive curriculum engine, Website Load Journey synthesizer, Protocol Explorer reference content, persistent local mastery engine, and interactive lesson player UI."
   netpulse-api:
     layer: API
     design: complete
@@ -115,5 +115,5 @@ ui_workspace:
     runtime: complete
   app:
     design: complete
-    code: in_progress
-    runtime: in_progress
+    code: complete
+    runtime: complete

@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton, Input, Button } from "@netpulse/components";
 import { Icon } from "../icons";
 import { useDisclosure } from "../modes/DisclosureContext";
+import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { useExplorerController } from "../hooks/useExplorerController";
 import { ExplorerSummaryKpis } from "./Explorer/ExplorerSummaryKpis";
 import { ExplorerFilters } from "./Explorer/ExplorerFilters";
@@ -11,6 +12,7 @@ import { ExplorerEntryCard } from "./Explorer/ExplorerEntryCard";
 export function Explorer() {
   const { t } = useTranslation(["explorer", "common"]);
   const { depth } = useDisclosure();
+  const { setScreen } = useEvidenceNavigation();
   const {
     term,
     setTerm,
@@ -113,6 +115,7 @@ export function Explorer() {
             entry={entry}
             depth={depth}
             onSelectRelated={selectRelated}
+            onOpenLesson={() => setScreen("learn")}
           />
         ))
       )}

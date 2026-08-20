@@ -7,6 +7,7 @@ export interface ExplorerEntryCardProps {
   entry: ExplorerEntry;
   depth: ProjectionDepth;
   onSelectRelated: (relatedKey: string) => void;
+  onOpenLesson?: (lessonId: string) => void;
 }
 
 function contentAt(entry: ExplorerEntry, depth: ProjectionDepth): string {
@@ -15,7 +16,12 @@ function contentAt(entry: ExplorerEntry, depth: ProjectionDepth): string {
   return entry.beginner;
 }
 
-export function ExplorerEntryCard({ entry, depth, onSelectRelated }: ExplorerEntryCardProps) {
+export function ExplorerEntryCard({
+  entry,
+  depth,
+  onSelectRelated,
+  onOpenLesson,
+}: ExplorerEntryCardProps) {
   const { t } = useTranslation(["explorer"]);
 
   return (
@@ -30,11 +36,19 @@ export function ExplorerEntryCard({ entry, depth, onSelectRelated }: ExplorerEnt
           </code>
         </div>
 
-        {entry.examples_available && (
-          <Badge variant="trust" className="np-ref__mine">
-            🎯 {t("card.example_tag")}
-          </Badge>
-        )}
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center", flexWrap: "wrap" }}>
+          {entry.layer && (
+            <Badge variant="level">
+              {entry.layer}
+            </Badge>
+          )}
+
+          {entry.examples_available && (
+            <Badge variant="trust" className="np-ref__mine">
+              🎯 {t("card.example_tag", { defaultValue: "Observed" })}
+            </Badge>
+          )}
+        </div>
       </header>
 
       {/* Main explanation body */}
@@ -46,12 +60,50 @@ export function ExplorerEntryCard({ entry, depth, onSelectRelated }: ExplorerEnt
       {depth !== "expert" && entry.expert && (
         <details className="np-ref__more">
           <summary>
-            🔬 {t("card.expert_detail")}
+            🔬 {t("card.expert_detail", { defaultValue: "Technical Detail" })}
           </summary>
           <p className="np-ref__more-content">
             {entry.expert}
           </p>
         </details>
+      )}
+
+      {/* RFC References */}
+      {entry.rfc_references && entry.rfc_references.length > 0 && (
+        <div style={{ fontSize: "0.8rem", color: "var(--np-text-mute)", marginTop: "0.5rem" }}>
+          <strong>Standards:</strong>{" "}
+          {entry.rfc_references.map((rfc, idx) => (
+            <span key={rfc}>
+              {idx > 0 && ", "}
+              <a
+                href={`https://datatracker.ietf.org/doc/html/rfc${rfc}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--np-accent)", textDecoration: "underline" }}
+              >
+                RFC {rfc}
+              </a>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Related Lessons Linkage */}
+      {entry.related_lessons && entry.related_lessons.length > 0 && (
+        <div style={{ fontSize: "0.8rem", color: "var(--np-text-mute)", marginTop: "0.5rem" }}>
+          <strong>Interactive Lessons:</strong>{" "}
+          {entry.related_lessons.map((lessonId) => (
+            <Button
+              key={lessonId}
+              type="button"
+              variant="standard"
+              style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", marginLeft: "0.4rem" }}
+              onClick={() => onOpenLesson && onOpenLesson(lessonId)}
+            >
+              📖 {lessonId}
+            </Button>
+          ))}
+        </div>
       )}
 
       {/* Interactive Related Topic Badges */}
@@ -77,4 +129,5 @@ export function ExplorerEntryCard({ entry, depth, onSelectRelated }: ExplorerEnt
     </Card>
   );
 }
+
 

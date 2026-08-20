@@ -37,11 +37,11 @@ pub use sandbox::{DecodedPacketInspection, FieldDiagnostic, PacketBuilderEngine}
 
 pub use anim::{fan_out, tcp_handshake, AnimationKind, AnimationModel, Direction, VisualEvent};
 pub use content::{
-    lesson, lesson_for_trigger, AnimationRef, Exercise, ExerciseKind, Lesson, Level, Module, Step,
-    Trigger, CURRICULUM,
+    lesson, lesson_for_trigger, validate_exercise_choice, AnimationRef, Exercise, ExerciseChoice,
+    ExerciseKind, ExerciseValidationResult, Lesson, Level, Module, Step, Trigger, CURRICULUM,
 };
 pub use engine::{detect_offers, GroundedExercise, LessonOffer, TrafficView};
 pub use explorer::{
     annotate, browse, content_at, entry, examples_for, search, AnnotatedField, ExplorerEntry,
 };
-pub use progress::{LessonStatus, Progress, ProgressStore, MASTERY_THRESHOLD};
+pub use progress::{CurriculumSummary, LessonStatus, Progress, ProgressStore, MASTERY_THRESHOLD};

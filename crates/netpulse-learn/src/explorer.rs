@@ -28,13 +28,19 @@ pub struct ExplorerEntry {
     pub key: &'static str,
     /// A humanized title derived from the key ("tcp.flags.syn" → "TCP flags syn").
     pub title: String,
+    /// Protocol layer designation (L2, L3, L4, L7, Security).
+    pub layer: &'static str,
+    /// Authoritative RFC numbers relevant to this field/protocol.
+    pub rfc_references: Vec<u32>,
+    /// Related curriculum lesson IDs covering this concept.
+    pub related_lessons: Vec<&'static str>,
     pub beginner: &'static str,
     pub intermediate: &'static str,
     pub expert: &'static str,
     /// Sibling keys under the same protocol, for cross-navigation.
     pub related: Vec<&'static str>,
     /// True once the caller has confirmed the learner has a real example
-    ///false by default so we never imply data we haven't checked.
+    /// false by default so we never imply data we haven't checked.
     pub examples_available: bool,
 }
 
@@ -48,24 +54,72 @@ pub struct AnnotatedField {
     pub explanation: String,
 }
 
-/// Resolve one key to its reference entry, or `None` for an unknown key
-///A pure projection of the content.
+/// Resolve layer for an explanation key.
+pub fn layer_for_key(key: &str) -> &'static str {
+    let family = key.split('.').next().unwrap_or("");
+    match family {
+        "eth" => "L2 (Data Link)",
+        "ip" => "L3 (Network)",
+        "tcp" | "udp" => "L4 (Transport)",
+        "tls" => "Security (TLS)",
+        "http" | "dns" => "L7 (Application)",
+        _ => "Application",
+    }
+}
+
+/// Authoritative RFC references relevant to the protocol key.
+pub fn rfcs_for_key(key: &str) -> Vec<u32> {
+    let family = key.split('.').next().unwrap_or("");
+    match family {
+        "eth" => vec![7042],
+        "ip" => vec![791, 8200],
+        "tcp" => vec![9293, 793],
+        "udp" => vec![768],
+        "tls" => vec![8446, 5246],
+        "dns" => vec![1035, 8484],
+        "http" => vec![9110, 9112, 9113, 9000],
+        _ => vec![],
+    }
+}
+
+/// Related curriculum lesson IDs for an explanation key.
+pub fn lessons_for_key(key: &str) -> Vec<&'static str> {
+    crate::content::CURRICULUM
+        .iter()
+        .flat_map(|m| m.lessons.iter())
+        .filter(|l| {
+            l.steps.iter().any(|s| s.body_key.as_str() == key)
+                || l.related_concepts.contains(&key)
+                || l.exercises
+                    .iter()
+                    .any(|e| e.answer_key.map(|k| k.as_str() == key).unwrap_or(false))
+        })
+        .map(|l| l.id)
+        .collect()
+}
+
+/// Resolve one key to its reference entry, or `None` for an unknown key.
+/// A pure projection of the content.
 pub fn entry(key: ExplanationKey) -> Option<ExplorerEntry> {
     let e = explain(key)?;
+    let k = key.as_str();
     Some(ExplorerEntry {
-        key: key.as_str(),
-        title: humanize(key.as_str()),
+        key: k,
+        title: humanize(k),
+        layer: layer_for_key(k),
+        rfc_references: rfcs_for_key(k),
+        related_lessons: lessons_for_key(k),
         beginner: e.beginner,
         intermediate: e.intermediate,
         expert: e.expert,
-        related: related_keys(key.as_str()),
+        related: related_keys(k),
         examples_available: false,
     })
 }
 
 /// Browse the whole reference — one entry per key the dissectors can emit
-///sorted by key for a stable, navigable index. This shares the
-///  coverage guarantee: if a key exists, it is browsable here.
+/// sorted by key for a stable, navigable index. This shares the
+/// coverage guarantee: if a key exists, it is browsable here.
 pub fn browse() -> Vec<ExplorerEntry> {
     let mut entries: Vec<ExplorerEntry> = ALL_KEYS.iter().filter_map(|&k| entry(k)).collect();
     entries.sort_by(|a, b| a.key.cmp(b.key));

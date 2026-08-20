@@ -254,16 +254,111 @@ pub struct LessonOfferDto {
 
 /// One reference entry in the Protocol Explorer: layered
 /// content plus navigation. `examples_available` reflects a real storage lookup
-///never a guess.
+/// never a guess.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ExplorerEntryDto {
     pub key: String,
     pub title: String,
+    pub layer: String,
+    pub rfc_references: Vec<u32>,
+    pub related_lessons: Vec<String>,
     pub beginner: String,
     pub intermediate: String,
     pub expert: String,
     pub related: Vec<String>,
     pub examples_available: bool,
+}
+
+/// One selectable option for an interactive exercise.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExerciseChoiceDto {
+    pub id: String,
+    pub text: String,
+}
+
+/// An interactive comprehension check for a lesson.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LessonExerciseDto {
+    pub id: String,
+    pub kind: ExerciseKindDto,
+    pub prompt: String,
+    pub choices: Vec<ExerciseChoiceDto>,
+    pub explanation: String,
+}
+
+/// One step in an educational walkthrough.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LessonStepDto {
+    pub id: String,
+    pub body_key: String,
+    pub title: String,
+    pub content: String,
+    pub anim: Option<String>,
+}
+
+/// A lesson summary item within a curriculum module.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CurriculumLessonDto {
+    pub id: String,
+    pub title: String,
+    pub level: ProjectionDepth,
+    pub prerequisites: Vec<String>,
+    pub objectives: Vec<String>,
+    pub related_concepts: Vec<String>,
+    pub status: String,
+    pub mastery: f32,
+    pub is_locked: bool,
+    pub is_grounded: bool,
+}
+
+/// A module containing a cohesive group of lessons.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CurriculumModuleDto {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub level: ProjectionDepth,
+    pub lessons: Vec<CurriculumLessonDto>,
+}
+
+/// Complete detail for one lesson workspace.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LessonDetailDto {
+    pub lesson_id: String,
+    pub title: String,
+    pub level: ProjectionDepth,
+    pub prerequisites: Vec<String>,
+    pub objectives: Vec<String>,
+    pub related_concepts: Vec<String>,
+    pub steps: Vec<LessonStepDto>,
+    pub exercises: Vec<LessonExerciseDto>,
+    pub animation: Option<AnimationModelDto>,
+    pub evidence: Vec<EvidenceRefDto>,
+    pub grounding: Vec<String>,
+    pub status: String,
+    pub mastery: f32,
+}
+
+/// High-level learning progress and mastery summary.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LearningProgressDto {
+    pub total_lessons: u32,
+    pub completed_lessons: u32,
+    pub mastered_lessons: u32,
+    pub in_progress_lessons: u32,
+    pub overall_mastery_pct: u32,
+    pub next_recommended_lesson_id: Option<String>,
+}
+
+/// Outcome of submitting an exercise answer choice.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ExerciseValidationOutcomeDto {
+    pub is_correct: bool,
+    pub feedback: String,
+    pub explanation: String,
+    pub correct_choice_index: u32,
+    pub new_mastery: f32,
+    pub status: String,
 }
 
 /// A stage of a website journey.
@@ -836,11 +931,48 @@ mod tests {
         roundtrip(&ExplorerEntryDto {
             key: "tcp.flags.syn".into(),
             title: "TCP flags syn".into(),
+            layer: "L4 (Transport)".into(),
+            rfc_references: vec![9293],
+            related_lessons: vec!["b4.handshake".into()],
             beginner: "starts a connection".into(),
             intermediate: "opens a connection".into(),
             expert: "TCP SYN control bit".into(),
             related: vec!["tcp.flags.ack".into()],
             examples_available: true,
+        });
+        roundtrip(&CurriculumModuleDto {
+            id: "m.basics".into(),
+            title: "How the web loads".into(),
+            description: "Core fundamentals".into(),
+            level: ProjectionDepth::Beginner,
+            lessons: vec![CurriculumLessonDto {
+                id: "b3.dns".into(),
+                title: "DNS".into(),
+                level: ProjectionDepth::Beginner,
+                prerequisites: vec![],
+                objectives: vec!["Learn DNS".into()],
+                related_concepts: vec!["dns.query".into()],
+                status: "not_started".into(),
+                mastery: 0.0,
+                is_locked: false,
+                is_grounded: true,
+            }],
+        });
+        roundtrip(&LearningProgressDto {
+            total_lessons: 5,
+            completed_lessons: 1,
+            mastered_lessons: 0,
+            in_progress_lessons: 1,
+            overall_mastery_pct: 20,
+            next_recommended_lesson_id: Some("b4.handshake".into()),
+        });
+        roundtrip(&ExerciseValidationOutcomeDto {
+            is_correct: true,
+            feedback: "Correct!".into(),
+            explanation: "RFC 9293".into(),
+            correct_choice_index: 0,
+            new_mastery: 0.34,
+            status: "in_progress".into(),
         });
         roundtrip(&PageJourneyDto {
             session_id: 1,

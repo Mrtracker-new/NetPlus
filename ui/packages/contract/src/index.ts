@@ -35,6 +35,10 @@ import type {
   PacketInspection,
   SessionDiff,
   FleetHost,
+  CurriculumModule,
+  LessonDetail,
+  LearningProgress,
+  ExerciseValidationOutcome,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -55,6 +59,10 @@ export type Query =
   | { kind: "packetsOfFlow"; flow_id: number }
   // Phase 3 education queries.
   | { kind: "lessonOffers"; session_id: number; depth: ProjectionDepth }
+  | { kind: "getCurriculum" }
+  | { kind: "getLessonDetail"; lesson_id: string }
+  | { kind: "getLearningProgress" }
+  | { kind: "validateExerciseChoice"; lesson_id: string; exercise_id: string; choice_index: number }
   | { kind: "journeyStagesOfSession"; session_id: number; depth: ProjectionDepth }
   | { kind: "explorerBrowse" }
   | { kind: "explorerSearch"; term: string }
@@ -88,6 +96,10 @@ export type QueryResponse =
   | { kind: "payloadsUnavailable" }
   // Phase 3 education answers.
   | { kind: "lessonOffers"; offers: LessonOffer[] }
+  | { kind: "curriculum"; modules: CurriculumModule[]; summary: LearningProgress }
+  | { kind: "lessonDetail"; lesson: LessonDetail }
+  | { kind: "learningProgress"; progress: LearningProgress }
+  | { kind: "exerciseValidation"; outcome: ExerciseValidationOutcome }
   | { kind: "pageJourney"; journey: PageJourney }
   | { kind: "explorerEntries"; entries: ExplorerEntry[] }
   | { kind: "animation"; animation: AnimationModel }
@@ -117,6 +129,9 @@ export type Command =
   | { kind: "startRecording" }
   | { kind: "stopRecording" }
   | { kind: "setDepth"; depth: ProjectionDepth }
+  | { kind: "startLesson"; lesson_id: string }
+  | { kind: "submitExerciseChoice"; lesson_id: string; exercise_id: string; choice_index: number }
+  | { kind: "resetLearningProgress" }
   // Phase 5 lifecycle commands. Replay transport,
   // explicit local export, and plugin
   // enable/disable as an explicit user choice.
@@ -131,3 +146,4 @@ export type Command =
   | { kind: "configurePlugin"; name: string; config: any }
   | { kind: "patchPluginConfig"; name: string; expected_version?: number; patch: any }
   | { kind: "resetPluginConfig"; name: string };
+

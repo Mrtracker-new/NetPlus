@@ -199,11 +199,103 @@ pub fn typescript_contract() -> String {
         &[
             ("key", "string"),
             ("title", "string"),
+            ("layer", "string"),
+            ("rfc_references", "number[]"),
+            ("related_lessons", "string[]"),
             ("beginner", "string"),
             ("intermediate", "string"),
             ("expert", "string"),
             ("related", "string[]"),
             ("examples_available", "boolean"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ExerciseChoice",
+        &[("id", "string"), ("text", "string")],
+    ));
+    s.push_str(&iface(
+        "LessonExercise",
+        &[
+            ("id", "string"),
+            ("kind", "ExerciseKind"),
+            ("prompt", "string"),
+            ("choices", "ExerciseChoice[]"),
+            ("explanation", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "LessonStep",
+        &[
+            ("id", "string"),
+            ("body_key", "string"),
+            ("title", "string"),
+            ("content", "string"),
+            ("anim", "string | null"),
+        ],
+    ));
+    s.push_str(&iface(
+        "CurriculumLesson",
+        &[
+            ("id", "string"),
+            ("title", "string"),
+            ("level", "ProjectionDepth"),
+            ("prerequisites", "string[]"),
+            ("objectives", "string[]"),
+            ("related_concepts", "string[]"),
+            ("status", "string"),
+            ("mastery", "number"),
+            ("is_locked", "boolean"),
+            ("is_grounded", "boolean"),
+        ],
+    ));
+    s.push_str(&iface(
+        "CurriculumModule",
+        &[
+            ("id", "string"),
+            ("title", "string"),
+            ("description", "string"),
+            ("level", "ProjectionDepth"),
+            ("lessons", "CurriculumLesson[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "LessonDetail",
+        &[
+            ("lesson_id", "string"),
+            ("title", "string"),
+            ("level", "ProjectionDepth"),
+            ("prerequisites", "string[]"),
+            ("objectives", "string[]"),
+            ("related_concepts", "string[]"),
+            ("steps", "LessonStep[]"),
+            ("exercises", "LessonExercise[]"),
+            ("animation", "AnimationModel | null"),
+            ("evidence", "EvidenceRef[]"),
+            ("grounding", "string[]"),
+            ("status", "string"),
+            ("mastery", "number"),
+        ],
+    ));
+    s.push_str(&iface(
+        "LearningProgress",
+        &[
+            ("total_lessons", "number"),
+            ("completed_lessons", "number"),
+            ("mastered_lessons", "number"),
+            ("in_progress_lessons", "number"),
+            ("overall_mastery_pct", "number"),
+            ("next_recommended_lesson_id", "string | null"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ExerciseValidationOutcome",
+        &[
+            ("is_correct", "boolean"),
+            ("feedback", "string"),
+            ("explanation", "string"),
+            ("correct_choice_index", "number"),
+            ("new_mastery", "number"),
+            ("status", "string"),
         ],
     ));
     s.push_str(&iface(

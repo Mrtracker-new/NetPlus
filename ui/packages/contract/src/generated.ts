@@ -113,11 +113,90 @@ export interface LessonOffer {
 export interface ExplorerEntry {
   key: string;
   title: string;
+  layer: string;
+  rfc_references: number[];
+  related_lessons: string[];
   beginner: string;
   intermediate: string;
   expert: string;
   related: string[];
   examples_available: boolean;
+}
+
+export interface ExerciseChoice {
+  id: string;
+  text: string;
+}
+
+export interface LessonExercise {
+  id: string;
+  kind: ExerciseKind;
+  prompt: string;
+  choices: ExerciseChoice[];
+  explanation: string;
+}
+
+export interface LessonStep {
+  id: string;
+  body_key: string;
+  title: string;
+  content: string;
+  anim: string | null;
+}
+
+export interface CurriculumLesson {
+  id: string;
+  title: string;
+  level: ProjectionDepth;
+  prerequisites: string[];
+  objectives: string[];
+  related_concepts: string[];
+  status: string;
+  mastery: number;
+  is_locked: boolean;
+  is_grounded: boolean;
+}
+
+export interface CurriculumModule {
+  id: string;
+  title: string;
+  description: string;
+  level: ProjectionDepth;
+  lessons: CurriculumLesson[];
+}
+
+export interface LessonDetail {
+  lesson_id: string;
+  title: string;
+  level: ProjectionDepth;
+  prerequisites: string[];
+  objectives: string[];
+  related_concepts: string[];
+  steps: LessonStep[];
+  exercises: LessonExercise[];
+  animation: AnimationModel | null;
+  evidence: EvidenceRef[];
+  grounding: string[];
+  status: string;
+  mastery: number;
+}
+
+export interface LearningProgress {
+  total_lessons: number;
+  completed_lessons: number;
+  mastered_lessons: number;
+  in_progress_lessons: number;
+  overall_mastery_pct: number;
+  next_recommended_lesson_id: string | null;
+}
+
+export interface ExerciseValidationOutcome {
+  is_correct: boolean;
+  feedback: string;
+  explanation: string;
+  correct_choice_index: number;
+  new_mastery: number;
+  status: string;
 }
 
 export interface JourneyStage {

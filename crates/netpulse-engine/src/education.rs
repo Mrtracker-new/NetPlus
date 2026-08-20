@@ -11,11 +11,16 @@
 //! requested [`Depth`], so a beginner journey never serializes expert detail
 //!No new capture, parse, or storage — one source of truth.
 
-use netpulse_api::dto::{AnimationModelDto, ExplorerEntryDto, LessonOfferDto, PageJourneyDto};
+use netpulse_api::dto::{
+    AnimationModelDto, CurriculumModuleDto, ExerciseChoiceDto, ExerciseValidationOutcomeDto,
+    ExplorerEntryDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
+    LessonStepDto, PageJourneyDto,
+};
 use netpulse_core::{Depth, Flow, ProtoEvent, Session};
 use netpulse_decode::ExplanationKey;
 use netpulse_learn::{
-    browse, detect_offers, examples_for, search, tcp_handshake, ExplorerEntry, TrafficView,
+    browse, detect_offers, examples_for, search, tcp_handshake, validate_exercise_choice,
+    ExplorerEntry, ProgressStore, TrafficView, CURRICULUM,
 };
 use netpulse_narrative::{build_page_journey, SessionView};
 use netpulse_storage::CaptureStore;
@@ -28,7 +33,7 @@ use crate::project;
 #[derive(Debug, Clone)]
 pub struct EducationView {
     /// Grounded lesson offers across every session's teachable moments
-    ///most-fundamental first.
+    /// most-fundamental first.
     pub offers: Vec<LessonOfferDto>,
     /// One staged website journey per session, depth-projected.
     pub journeys: Vec<PageJourneyDto>,
@@ -86,6 +91,224 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
     }
 }
 
+/// Project the full curriculum and progress summary.
+pub fn curriculum_view(
+    store: &CaptureStore,
+    progress_store: &ProgressStore,
+) -> (Vec<CurriculumModuleDto>, LearningProgressDto) {
+    let all_flows: Vec<Flow> = store
+        .flows_in_window(0, u64::MAX)
+        .into_iter()
+        .cloned()
+        .collect();
+
+    let mut grounded_ids = std::collections::HashSet::new();
+    for module in CURRICULUM {
+        for l in module.lessons {
+            let has_grounding = l
+                .steps
+                .iter()
+                .any(|step| !examples_for(step.body_key, &all_flows).is_empty());
+            if has_grounding {
+                grounded_ids.insert(l.id.to_string());
+            }
+        }
+    }
+
+    let modules = CURRICULUM
+        .iter()
+        .map(|m| project::curriculum_module_dto(m, progress_store, &grounded_ids))
+        .collect();
+
+    let summary = project::learning_progress_dto(&progress_store.summary());
+
+    (modules, summary)
+}
+
+/// Project detailed workspace data for one lesson.
+pub fn lesson_detail_view(
+    store: &CaptureStore,
+    progress_store: &ProgressStore,
+    lesson_id: &str,
+    depth: Depth,
+) -> Option<LessonDetailDto> {
+    let l = netpulse_learn::lesson(lesson_id)?;
+    let p = progress_store.get(lesson_id);
+    let status_str = match p.status {
+        netpulse_learn::LessonStatus::NotStarted => "not_started",
+        netpulse_learn::LessonStatus::InProgress => "in_progress",
+        netpulse_learn::LessonStatus::Completed => "completed",
+        netpulse_learn::LessonStatus::Mastered => "mastered",
+        _ => "not_started",
+    };
+
+    let d_depth = match depth {
+        Depth::Beginner => netpulse_decode::DisclosureDepth::Beginner,
+        Depth::Intermediate => netpulse_decode::DisclosureDepth::Intermediate,
+        Depth::Expert | _ => netpulse_decode::DisclosureDepth::Expert,
+    };
+
+    let steps: Vec<LessonStepDto> = l
+        .steps
+        .iter()
+        .map(|s| {
+            let expl = netpulse_decode::explain(s.body_key);
+            let content = expl
+                .as_ref()
+                .map(|e| e.at(d_depth))
+                .unwrap_or("")
+                .to_string();
+            let title = s.body_key.as_str().to_string();
+            let anim_str = s.anim.map(|a| {
+                match a {
+                    netpulse_learn::AnimationRef::TcpHandshake => "tcp_handshake",
+                    netpulse_learn::AnimationRef::TlsHandshake => "tls_handshake",
+                    netpulse_learn::AnimationRef::Multiplexing => "multiplexing",
+                    netpulse_learn::AnimationRef::FanOut => "fan_out",
+                    netpulse_learn::AnimationRef::Degradation => "degradation",
+                    _ => "tcp_handshake",
+                }
+                .to_string()
+            });
+
+            LessonStepDto {
+                id: s.id.to_string(),
+                body_key: s.body_key.as_str().to_string(),
+                title,
+                content,
+                anim: anim_str,
+            }
+        })
+        .collect();
+
+    let exercises: Vec<LessonExerciseDto> = l
+        .exercises
+        .iter()
+        .map(|e| {
+            let kind_dto = match e.kind {
+                netpulse_learn::ExerciseKind::Identify => {
+                    netpulse_api::dto::ExerciseKindDto::Identify
+                }
+                netpulse_learn::ExerciseKind::ExplainBack => {
+                    netpulse_api::dto::ExerciseKindDto::ExplainBack
+                }
+                netpulse_learn::ExerciseKind::Predict => {
+                    netpulse_api::dto::ExerciseKindDto::Predict
+                }
+                netpulse_learn::ExerciseKind::Diagnose => {
+                    netpulse_api::dto::ExerciseKindDto::Diagnose
+                }
+                _ => netpulse_api::dto::ExerciseKindDto::Identify,
+            };
+            let choices = e
+                .choices
+                .iter()
+                .map(|c| ExerciseChoiceDto {
+                    id: c.id.to_string(),
+                    text: c.text.to_string(),
+                })
+                .collect();
+
+            LessonExerciseDto {
+                id: e.id.to_string(),
+                kind: kind_dto,
+                prompt: e.prompt.to_string(),
+                choices,
+                explanation: e.explanation.to_string(),
+            }
+        })
+        .collect();
+
+    let (evidence, grounding, animation) = find_lesson_grounding(store, l);
+
+    Some(LessonDetailDto {
+        lesson_id: l.id.to_string(),
+        title: l.title.to_string(),
+        level: project::level_dto(l.level),
+        prerequisites: l.prerequisites.iter().map(|s| s.to_string()).collect(),
+        objectives: l.objectives.iter().map(|s| s.to_string()).collect(),
+        related_concepts: l.related_concepts.iter().map(|s| s.to_string()).collect(),
+        steps,
+        exercises,
+        animation,
+        evidence,
+        grounding,
+        status: status_str.to_string(),
+        mastery: p.mastery,
+    })
+}
+
+fn find_lesson_grounding(
+    store: &CaptureStore,
+    lesson: &netpulse_learn::Lesson,
+) -> (
+    Vec<netpulse_api::dto::EvidenceRefDto>,
+    Vec<String>,
+    Option<AnimationModelDto>,
+) {
+    let mut evidence = Vec::new();
+    let mut grounding = Vec::new();
+    let mut animation = None;
+
+    let all_flows: Vec<Flow> = store
+        .flows_in_window(0, u64::MAX)
+        .into_iter()
+        .cloned()
+        .collect();
+
+    for flow in &all_flows {
+        if let Some(rtt) = flow.stats.rtt_estimate_nanos {
+            if animation.is_none() && (lesson.id == "b4.handshake" || lesson.id == "b2.pageload") {
+                let model = tcp_handshake(rtt);
+                animation = Some(project::animation_model_dto(&model));
+            }
+        }
+        for step in lesson.steps {
+            if !examples_for(step.body_key, std::slice::from_ref(flow)).is_empty() {
+                evidence.push(netpulse_api::dto::EvidenceRefDto::Flow(flow.id));
+                grounding.push(format!(
+                    "Observed in flow {} ({}:{})",
+                    flow.id, flow.key.dst_ip, flow.key.dst_port
+                ));
+                break;
+            }
+        }
+    }
+
+    evidence.truncate(5);
+    grounding.truncate(3);
+
+    (evidence, grounding, animation)
+}
+
+/// Validate an exercise choice and update the user's progress.
+pub fn validate_choice(
+    progress_store: &mut ProgressStore,
+    lesson_id: &str,
+    exercise_id: &str,
+    choice_index: u32,
+) -> Option<ExerciseValidationOutcomeDto> {
+    let result = validate_exercise_choice(lesson_id, exercise_id, choice_index as usize)?;
+    progress_store.record_result(lesson_id, result.is_correct);
+    let p = progress_store.get(lesson_id);
+    let status_str = match p.status {
+        netpulse_learn::LessonStatus::NotStarted => "not_started",
+        netpulse_learn::LessonStatus::InProgress => "in_progress",
+        netpulse_learn::LessonStatus::Completed => "completed",
+        netpulse_learn::LessonStatus::Mastered => "mastered",
+        _ => "not_started",
+    };
+
+    Some(ExerciseValidationOutcomeDto {
+        is_correct: result.is_correct,
+        feedback: result.feedback,
+        explanation: result.explanation,
+        correct_choice_index: result.correct_choice_index as u32,
+        new_mastery: p.mastery,
+        status: status_str.to_string(),
+    })
+}
+
 /// Browse the whole protocol reference, with real "your examples" availability
 /// wired in from the learner's flows.
 pub fn explorer_browse(store: &CaptureStore) -> Vec<ExplorerEntryDto> {
@@ -122,7 +345,7 @@ fn entries_with_examples(
 
 /// Build the data-driven handshake animation model for one flow,
 /// projected to its wire DTO. `None` when the flow is unknown or its RTT was
-/// never observable (we never fabricate a timing .
+/// never observable (we never fabricate a timing).
 pub fn handshake_animation_for_flow(
     store: &CaptureStore,
     flow_id: u64,

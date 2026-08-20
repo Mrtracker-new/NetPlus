@@ -27,14 +27,16 @@ pub mod dto;
 pub use dto::{
     handshake_codes, handshake_error_codes, AnimationKindDto, AnimationModelDto,
     AssistantAnswerDto, AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto,
-    CaptureStatsDto, CauseDto, ComponentCheckDto, DiagnosisDto, DimensionDto, DirectionDto,
-    EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto,
+    CaptureStatsDto, CauseDto, ComponentCheckDto, CurriculumLessonDto, CurriculumModuleDto,
+    DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto, ExerciseChoiceDto, ExerciseKindDto,
+    ExerciseValidationOutcomeDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto,
     ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
     HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto,
-    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
-    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
-    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
-    SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto, LessonStepDto,
+    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
+    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
+    ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
@@ -177,9 +179,22 @@ pub enum Query {
     /// Fetch packets belonging to a flow — the deepest drill-down.
     PacketsOfFlow { flow_id: u64 },
     /// Grounded lesson offers for a session's teachable moments.
+    /// Grounded lesson offers for a session's teachable moments.
     LessonOffers {
         session_id: u64,
         depth: ProjectionDepth,
+    },
+    /// Fetch the full interactive curriculum with modules, lessons, and prerequisites.
+    GetCurriculum,
+    /// Fetch detailed workspace data for one lesson (steps, exercises, animation, grounding).
+    GetLessonDetail { lesson_id: String },
+    /// Fetch the user's local learning progress and mastery summary.
+    GetLearningProgress,
+    /// Validate an exercise choice and receive immediate educational feedback.
+    ValidateExerciseChoice {
+        lesson_id: String,
+        exercise_id: String,
+        choice_index: u32,
     },
     /// The staged website journey for a session.
     JourneyStagesOfSession {
@@ -251,7 +266,7 @@ pub enum Query {
 // `QueryResponse` union expects (`{ kind: "narrativeFeed", cards: [...] }`).
 // serde's internal tagging cannot wrap a newtype-of-`Vec`, so each variant names
 // its single payload field explicitly; the field name matches the TS contract
-//Regenerating the contract is not required — these envelopes are
+// Regenerating the contract is not required — these envelopes are
 // hand-authored in `ui/packages/contract/index.ts`, not emitted by codegen.
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[non_exhaustive]
@@ -273,6 +288,23 @@ pub enum QueryResponse {
     /// Grounded lesson offers.
     LessonOffers {
         offers: Vec<LessonOfferDto>,
+    },
+    /// The full curriculum structure with learner progress and recommendations.
+    Curriculum {
+        modules: Vec<CurriculumModuleDto>,
+        summary: LearningProgressDto,
+    },
+    /// Complete detail for one lesson workspace.
+    LessonDetail {
+        lesson: LessonDetailDto,
+    },
+    /// Overall learning progress summary.
+    LearningProgress {
+        progress: LearningProgressDto,
+    },
+    /// Immediate feedback and validation result for an exercise choice.
+    ExerciseValidation {
+        outcome: ExerciseValidationOutcomeDto,
     },
     /// The staged website journey.
     PageJourney {
@@ -425,7 +457,7 @@ pub struct HostIdentityDto {
 /// nothing here modifies network traffic.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 // Same wire discipline as `Query`: internally tagged on `kind`, camelCased
-// variants, snake_case fields unchanged (matches the TS contract .
+// variants, snake_case fields unchanged (matches the TS contract).
 #[serde(tag = "kind", rename_all = "camelCase")]
 #[non_exhaustive]
 pub enum Command {
@@ -442,6 +474,18 @@ pub enum Command {
     SetDepth {
         depth: ProjectionDepth,
     },
+    /// Mark a lesson as started in the user's progress store.
+    StartLesson {
+        lesson_id: String,
+    },
+    /// Submit an answer choice for an exercise and record progress.
+    SubmitExerciseChoice {
+        lesson_id: String,
+        exercise_id: String,
+        choice_index: u32,
+    },
+    /// Reset all local curriculum progress and mastery.
+    ResetLearningProgress,
     // ---- Phase 5 lifecycle commands ----
     /// Start replay playback of the selected recording.
     ReplayPlay,
@@ -453,13 +497,12 @@ pub enum Command {
     ReplaySeek {
         mono_nanos: u64,
     },
-    /// Set replay speed as a percentage of real time (100 = 1× .
+    /// Set replay speed as a percentage of real time (100 = 1×).
     ReplaySetSpeed {
         percent: u32,
     },
     /// Produce an export to a local file. Explicit, user-initiated, and
-    /// never auto-transmitted — the single egress boundary stays `netpulse-ai`
-    ///
+    /// never auto-transmitted — the single egress boundary stays `netpulse-ai`.
     StartExport {
         selection: ExportSelectionDto,
         format: ExportFormatDto,

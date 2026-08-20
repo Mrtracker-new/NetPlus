@@ -10,14 +10,14 @@
 use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
-    AttributionDto, BreakdownDto, BreakdownRowDto, CaptureStatsDto, CauseDto, DiagnosisDto,
-    DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
-    ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
-    HostNameDto, JourneyStageDto, LessonOfferDto, MonitorSnapshotDto, NameSourceDto,
-    NarrativeCardDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto,
-    PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto,
-    ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto,
-    VisualEventDto,
+    AttributionDto, BreakdownDto, BreakdownRowDto, CaptureStatsDto, CauseDto, CurriculumLessonDto,
+    CurriculumModuleDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto,
+    ExplorerEntryDto, ExportFormatDto, ExportPreviewDto, FanoutNodeDto, FindingCategoryDto,
+    FindingKindDto, GroundedExerciseDto, HostNameDto, JourneyStageDto, LearningProgressDto,
+    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
+    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
+    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
+    SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 use netpulse_capture::{Recording, RecordingPayloadLevel, ReplayState};
 use netpulse_core::{AttributionConfidence, Depth, EvidenceRef, FindingCategory};
@@ -185,7 +185,8 @@ pub fn attribution_dto(a: &Attribution, process_name: Option<String>) -> Attribu
 
 /// Map a learner `Level` to the wire projection depth — they share one ladder
 ///
-fn level_dto(level: Level) -> ProjectionDepth {
+/// Map a learner `Level` to the wire projection depth — they share one ladder.
+pub fn level_dto(level: Level) -> ProjectionDepth {
     match level {
         Level::Beginner => ProjectionDepth::Beginner,
         Level::Intermediate => ProjectionDepth::Intermediate,
@@ -231,11 +232,80 @@ pub fn explorer_entry_dto(entry: &ExplorerEntry) -> ExplorerEntryDto {
     ExplorerEntryDto {
         key: entry.key.to_string(),
         title: entry.title.clone(),
+        layer: entry.layer.to_string(),
+        rfc_references: entry.rfc_references.clone(),
+        related_lessons: entry
+            .related_lessons
+            .iter()
+            .map(|l| l.to_string())
+            .collect(),
         beginner: entry.beginner.to_string(),
         intermediate: entry.intermediate.to_string(),
         expert: entry.expert.to_string(),
         related: entry.related.iter().map(|k| k.to_string()).collect(),
         examples_available: entry.examples_available,
+    }
+}
+
+pub fn learning_progress_dto(summary: &netpulse_learn::CurriculumSummary) -> LearningProgressDto {
+    LearningProgressDto {
+        total_lessons: summary.total_lessons as u32,
+        completed_lessons: summary.completed_lessons as u32,
+        mastered_lessons: summary.mastered_lessons as u32,
+        in_progress_lessons: summary.in_progress_lessons as u32,
+        overall_mastery_pct: summary.overall_mastery_pct,
+        next_recommended_lesson_id: summary.next_recommended_lesson_id.clone(),
+    }
+}
+
+pub fn curriculum_lesson_dto(
+    lesson: &netpulse_learn::Lesson,
+    progress_store: &netpulse_learn::ProgressStore,
+    is_grounded: bool,
+) -> CurriculumLessonDto {
+    let p = progress_store.get(lesson.id);
+    let status_str = match p.status {
+        netpulse_learn::LessonStatus::NotStarted => "not_started",
+        netpulse_learn::LessonStatus::InProgress => "in_progress",
+        netpulse_learn::LessonStatus::Completed => "completed",
+        netpulse_learn::LessonStatus::Mastered => "mastered",
+        _ => "not_started",
+    };
+    let is_locked = !progress_store.are_prerequisites_met(lesson.id);
+
+    CurriculumLessonDto {
+        id: lesson.id.to_string(),
+        title: lesson.title.to_string(),
+        level: level_dto(lesson.level),
+        prerequisites: lesson.prerequisites.iter().map(|s| s.to_string()).collect(),
+        objectives: lesson.objectives.iter().map(|s| s.to_string()).collect(),
+        related_concepts: lesson
+            .related_concepts
+            .iter()
+            .map(|s| s.to_string())
+            .collect(),
+        status: status_str.to_string(),
+        mastery: p.mastery,
+        is_locked,
+        is_grounded,
+    }
+}
+
+pub fn curriculum_module_dto(
+    module: &netpulse_learn::Module,
+    progress_store: &netpulse_learn::ProgressStore,
+    grounded_lesson_ids: &std::collections::HashSet<String>,
+) -> CurriculumModuleDto {
+    CurriculumModuleDto {
+        id: module.id.to_string(),
+        title: module.title.to_string(),
+        description: module.description.to_string(),
+        level: level_dto(module.level),
+        lessons: module
+            .lessons
+            .iter()
+            .map(|l| curriculum_lesson_dto(l, progress_store, grounded_lesson_ids.contains(l.id)))
+            .collect(),
     }
 }
 

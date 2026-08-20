@@ -658,3 +658,201 @@ fn test_ipc_permission_manifests_parse() {
         "capabilities/default.json must explicitly grant application 'default' permission set"
     );
 }
+
+#[test]
+fn test_curriculum_queries_and_commands_lifecycle() {
+    let state = seeded_state();
+
+    // 1. Initial curriculum query
+    let cur_res = execute_query(&state, Query::GetCurriculum).unwrap();
+    if let QueryResponse::Curriculum { modules, summary } = cur_res {
+        assert!(!modules.is_empty());
+        assert!(summary.total_lessons >= 5);
+        assert_eq!(summary.completed_lessons, 0);
+        assert_eq!(summary.overall_mastery_pct, 0);
+        assert_eq!(
+            summary.next_recommended_lesson_id.as_deref(),
+            Some("b1.overview")
+        );
+    } else {
+        panic!("expected Curriculum response");
+    }
+
+    // 2. Lesson Detail query
+    let detail_res = execute_query(
+        &state,
+        Query::GetLessonDetail {
+            lesson_id: "b4.handshake".into(),
+        },
+    )
+    .unwrap();
+    if let QueryResponse::LessonDetail { lesson } = detail_res {
+        assert_eq!(lesson.lesson_id, "b4.handshake");
+        assert!(!lesson.steps.is_empty());
+        assert!(!lesson.exercises.is_empty());
+        assert_eq!(lesson.status, "not_started");
+    } else {
+        panic!("expected LessonDetail response");
+    }
+
+    // 3. Start lesson command
+    execute_command(
+        &state,
+        Command::StartLesson {
+            lesson_id: "b4.handshake".into(),
+        },
+    )
+    .unwrap();
+
+    let detail_res2 = execute_query(
+        &state,
+        Query::GetLessonDetail {
+            lesson_id: "b4.handshake".into(),
+        },
+    )
+    .unwrap();
+    if let QueryResponse::LessonDetail { lesson } = detail_res2 {
+        assert_eq!(lesson.status, "in_progress");
+    } else {
+        panic!("expected LessonDetail response");
+    }
+
+    // 4. Submit incorrect exercise choice
+    let val_res1 = execute_query(
+        &state,
+        Query::ValidateExerciseChoice {
+            lesson_id: "b4.handshake".into(),
+            exercise_id: "tcp.identify.syn".into(),
+            choice_index: 1,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::ExerciseValidation { outcome } = val_res1 {
+        assert!(!outcome.is_correct);
+        assert_eq!(outcome.correct_choice_index, 0);
+    } else {
+        panic!("expected ExerciseValidation response");
+    }
+
+    // 5. Submit correct exercise choice
+    let val_res2 = execute_query(
+        &state,
+        Query::ValidateExerciseChoice {
+            lesson_id: "b4.handshake".into(),
+            exercise_id: "tcp.identify.syn".into(),
+            choice_index: 0,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::ExerciseValidation { outcome } = val_res2 {
+        assert!(outcome.is_correct);
+        assert!(outcome.new_mastery > 0.0);
+        assert_eq!(outcome.status, "completed");
+    } else {
+        panic!("expected ExerciseValidation response");
+    }
+
+    // 6. Check Explorer entries have layer and RFC metadata
+    let exp_res = execute_query(&state, Query::ExplorerBrowse).unwrap();
+    if let QueryResponse::ExplorerEntries { entries } = exp_res {
+        assert!(!entries.is_empty());
+        let syn_entry = entries.iter().find(|e| e.key == "tcp.flags.syn").unwrap();
+        assert_eq!(syn_entry.layer, "L4 (Transport)");
+        assert!(syn_entry.rfc_references.contains(&9293));
+        assert!(syn_entry
+            .related_lessons
+            .contains(&"b4.handshake".to_string()));
+    } else {
+        panic!("expected ExplorerEntries response");
+    }
+
+    // 7. Reset progress
+    execute_command(&state, Command::ResetLearningProgress).unwrap();
+    let prog_res = execute_query(&state, Query::GetLearningProgress).unwrap();
+    if let QueryResponse::LearningProgress { progress } = prog_res {
+        assert_eq!(progress.completed_lessons, 0);
+        assert_eq!(progress.overall_mastery_pct, 0);
+    } else {
+        panic!("expected LearningProgress response");
+    }
+}
+
+#[test]
+fn test_learning_progress_disk_persistence_across_app_restart() {
+    let temp_dir = std::env::temp_dir().join(format!(
+        "netpulse_test_learn_{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let _ = std::fs::create_dir_all(&temp_dir);
+    let progress_file = temp_dir.join("learning_progress.json");
+
+    // 1. Session 1: Launch application (fresh AppState with custom test path)
+    let mut state1 = seeded_state();
+    state1.progress_path = Some(progress_file.clone());
+    *state1.progress_store.lock().unwrap() = crate::load_progress_store(Some(&progress_file));
+
+    let cur_res1 = execute_query(&state1, Query::GetCurriculum).unwrap();
+    if let QueryResponse::Curriculum { summary, .. } = cur_res1 {
+        assert_eq!(summary.completed_lessons, 0);
+    }
+
+    // Start lesson and complete exercise
+    execute_command(
+        &state1,
+        Command::StartLesson {
+            lesson_id: "b4.handshake".into(),
+        },
+    )
+    .unwrap();
+
+    let val_res = execute_query(
+        &state1,
+        Query::ValidateExerciseChoice {
+            lesson_id: "b4.handshake".into(),
+            exercise_id: "tcp.identify.syn".into(),
+            choice_index: 0,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::ExerciseValidation { outcome } = val_res {
+        assert!(outcome.is_correct);
+        assert_eq!(outcome.status, "completed");
+    }
+
+    // Verify file written to disk
+    assert!(progress_file.exists(), "Progress file must exist on disk");
+    let file_content = std::fs::read_to_string(&progress_file).unwrap();
+    assert!(file_content.contains("b4.handshake"));
+
+    // 2. Session 2: Simulating full Application Restart (Brand new AppState instance restoring from disk)
+    let mut state2 = seeded_state();
+    state2.progress_path = Some(progress_file.clone());
+    *state2.progress_store.lock().unwrap() = crate::load_progress_store(Some(&progress_file));
+
+    let cur_res2 = execute_query(&state2, Query::GetCurriculum).unwrap();
+    if let QueryResponse::Curriculum { modules, summary } = cur_res2 {
+        assert_eq!(
+            summary.completed_lessons, 1,
+            "Completed lessons must be restored from disk"
+        );
+        assert!(
+            summary.overall_mastery_pct > 0,
+            "Mastery must be restored from disk"
+        );
+        let handshake_lesson = modules
+            .iter()
+            .flat_map(|m| &m.lessons)
+            .find(|l| l.id == "b4.handshake")
+            .expect("b4.handshake lesson must exist");
+        assert_eq!(handshake_lesson.status, "completed");
+        assert!(handshake_lesson.mastery > 0.0);
+    } else {
+        panic!("expected Curriculum response");
+    }
+
+    // Clean up
+    let _ = std::fs::remove_dir_all(&temp_dir);
+}

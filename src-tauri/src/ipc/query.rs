@@ -86,6 +86,67 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 .collect();
             Ok(QueryResponse::LessonOffers { offers })
         }
+        Query::GetCurriculum => {
+            let progress_store = match state.progress_store.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            let (modules, summary) =
+                netpulse_engine::education::curriculum_view(&store, &progress_store);
+            Ok(QueryResponse::Curriculum { modules, summary })
+        }
+        Query::GetLessonDetail { lesson_id } => {
+            let progress_store = match state.progress_store.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            let depth = match state.depth.lock() {
+                Ok(g) => *g,
+                Err(p) => *p.into_inner(),
+            };
+            match netpulse_engine::education::lesson_detail_view(
+                &store,
+                &progress_store,
+                &lesson_id,
+                depth,
+            ) {
+                Some(lesson) => Ok(QueryResponse::LessonDetail { lesson }),
+                None => Err(format!("lesson '{lesson_id}' not found")),
+            }
+        }
+        Query::GetLearningProgress => {
+            let progress_store = match state.progress_store.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            let summary =
+                netpulse_engine::project::learning_progress_dto(&progress_store.summary());
+            Ok(QueryResponse::LearningProgress { progress: summary })
+        }
+        Query::ValidateExerciseChoice {
+            lesson_id,
+            exercise_id,
+            choice_index,
+        } => {
+            let mut progress_store = match state.progress_store.lock() {
+                Ok(g) => g,
+                Err(p) => p.into_inner(),
+            };
+            match netpulse_engine::education::validate_choice(
+                &mut progress_store,
+                &lesson_id,
+                &exercise_id,
+                choice_index,
+            ) {
+                Some(outcome) => {
+                    state.save_progress(&progress_store);
+                    Ok(QueryResponse::ExerciseValidation { outcome })
+                }
+                None => Err(format!(
+                    "exercise '{exercise_id}' in lesson '{lesson_id}' not found"
+                )),
+            }
+        }
         Query::JourneyStagesOfSession { session_id, depth } => {
             let view = present_education(&store, crate::to_depth(depth));
             let journey = view

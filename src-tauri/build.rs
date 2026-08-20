@@ -41,7 +41,12 @@ fn main() {
             let manifest_path = PathBuf::from(manifest_dir);
             let in_tree_candidates = vec![
                 manifest_path.join("lib").join("x64"),
-                manifest_path.join("..").join("crates").join("netpulse-platform").join("lib").join("x64"),
+                manifest_path
+                    .join("..")
+                    .join("crates")
+                    .join("netpulse-platform")
+                    .join("lib")
+                    .join("x64"),
                 manifest_path.join("..").join("lib").join("x64"),
             ];
             for candidate in in_tree_candidates {

@@ -14,6 +14,40 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
             crate::emit_live_snapshot(&state.store, &state.stats, &state.depth, &handle);
             Ok(())
         }
+        Command::StartLesson { lesson_id } => {
+            let mut progress_store = state.progress_store.lock().map_err(|_| "state poisoned")?;
+            progress_store.mark_started(&lesson_id);
+            state.save_progress(&progress_store);
+            Ok(())
+        }
+        Command::SubmitExerciseChoice {
+            lesson_id,
+            exercise_id,
+            choice_index,
+        } => {
+            let mut progress_store = state.progress_store.lock().map_err(|_| "state poisoned")?;
+            if netpulse_engine::education::validate_choice(
+                &mut progress_store,
+                &lesson_id,
+                &exercise_id,
+                choice_index,
+            )
+            .is_some()
+            {
+                state.save_progress(&progress_store);
+                Ok(())
+            } else {
+                Err(format!(
+                    "invalid exercise '{exercise_id}' in lesson '{lesson_id}'"
+                ))
+            }
+        }
+        Command::ResetLearningProgress => {
+            let mut progress_store = state.progress_store.lock().map_err(|_| "state poisoned")?;
+            progress_store.reset();
+            state.save_progress(&progress_store);
+            Ok(())
+        }
         Command::StartCapture { iface_id } => crate::start_capture(state, iface_id),
         Command::StopCapture { .. } => crate::stop_capture(state),
         Command::StartRecording => crate::start_recording(state),

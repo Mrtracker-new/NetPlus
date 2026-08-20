@@ -97,8 +97,19 @@ pub(crate) struct AppState {
     pub(crate) health_stop: Arc<AtomicBool>,
     /// Optional Tauri application handle for emitting live events.
     pub(crate) app_handle: Mutex<Option<tauri::AppHandle>>,
+    /// Local-first persistent learning progress and mastery store.
+    pub(crate) progress_store: Arc<Mutex<netpulse_learn::ProgressStore>>,
+    /// Custom path override for progress persistence (e.g. for deterministic isolated unit tests).
+    pub(crate) progress_path: Option<std::path::PathBuf>,
     /// Atomic once-guard guaranteeing shutdown sequence executes exactly once.
     pub(crate) shutting_down: AtomicBool,
+}
+
+impl AppState {
+    /// Save current learning progress to disk.
+    pub(crate) fn save_progress(&self, store: &netpulse_learn::ProgressStore) {
+        save_progress_store(store, self.progress_path.as_deref());
+    }
 }
 
 /// Scope guard that guarantees a completion signal is sent when live_loop exits
@@ -122,13 +133,65 @@ struct CaptureControl {
     handle: std::thread::JoinHandle<()>,
 }
 
+/// Resolve the canonical persistent file path for learning progress.
+pub(crate) fn progress_file_path() -> std::path::PathBuf {
+    if let Ok(env_path) = std::env::var("NETPULSE_LEARN_PROGRESS_FILE") {
+        return std::path::PathBuf::from(env_path);
+    }
+    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "NetPulse", "NetPulse") {
+        let data_dir = proj_dirs.data_local_dir();
+        let _ = std::fs::create_dir_all(data_dir);
+        data_dir.join("learning_progress.json")
+    } else {
+        std::path::PathBuf::from("learning_progress.json")
+    }
+}
+
+/// Load saved learning progress from disk, falling back to a clean progress store if absent or corrupt.
+pub(crate) fn load_progress_store(
+    custom_path: Option<&std::path::Path>,
+) -> netpulse_learn::ProgressStore {
+    let path = custom_path
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(progress_file_path);
+    if let Ok(data) = std::fs::read_to_string(&path) {
+        if let Ok(store) = serde_json::from_str::<netpulse_learn::ProgressStore>(&data) {
+            return store;
+        }
+    }
+    netpulse_learn::ProgressStore::new()
+}
+
+/// Save current learning progress to disk atomically using temporary file rename.
+pub(crate) fn save_progress_store(
+    store: &netpulse_learn::ProgressStore,
+    custom_path: Option<&std::path::Path>,
+) {
+    let path = custom_path
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(progress_file_path);
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(json) = serde_json::to_string_pretty(store) {
+        let tmp_path = path.with_extension(format!("tmp.{}", std::process::id()));
+        if std::fs::write(&tmp_path, &json).is_ok() {
+            if std::fs::rename(&tmp_path, &path).is_err() {
+                let _ = std::fs::write(&path, json);
+                let _ = std::fs::remove_file(&tmp_path);
+            }
+        } else {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+}
+
 impl Default for AppState {
     fn default() -> Self {
         // The shell boots empty; data arrives from live capture (Start capture in
         // the UI) or, for offline work, by setting `NETPULSE_PCAP=<path>` to seed
         // the store from a saved capture — the same import path the engine CLI
-        // uses. Without either, the UI shows its honest empty states
-//
+        // uses. Without either, the UI shows its honest empty states.
         let (store, stats) = seed_store_from_env();
         Self {
             store: Arc::new(Mutex::new(store)),
@@ -142,6 +205,8 @@ impl Default for AppState {
             sockets: netpulse_platform::socket_table(),
             health_stop: Arc::new(AtomicBool::new(false)),
             app_handle: Mutex::new(None),
+            progress_store: Arc::new(Mutex::new(load_progress_store(None))),
+            progress_path: None,
             shutting_down: AtomicBool::new(false),
         }
     }
@@ -216,7 +281,10 @@ pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), Strin
 
 impl AppState {
     fn shutdown_health(&self) -> bool {
-        tracing::info!(event = "health.stopping", "Signaling health probe HTTP server to stop");
+        tracing::info!(
+            event = "health.stopping",
+            "Signaling health probe HTTP server to stop"
+        );
         self.health_stop.store(true, Ordering::Release);
         true
     }
@@ -232,14 +300,23 @@ impl AppState {
             return Ok(false);
         }
 
-        tracing::info!(event = "capture.stopping", "Signaling live capture thread to stop");
+        tracing::info!(
+            event = "capture.stopping",
+            "Signaling live capture thread to stop"
+        );
         match stop_capture(self) {
             Ok(()) => {
-                tracing::info!(event = "capture.stopped", "Live capture stopped gracefully on shutdown");
+                tracing::info!(
+                    event = "capture.stopped",
+                    "Live capture stopped gracefully on shutdown"
+                );
                 Ok(true)
             }
             Err(e) => {
-                tracing::warn!(event = "shell.capture_stop_failed", "Live capture shutdown issue: {e}");
+                tracing::warn!(
+                    event = "shell.capture_stop_failed",
+                    "Live capture shutdown issue: {e}"
+                );
                 Err(ShutdownError::Capture(e))
             }
         }
@@ -287,14 +364,17 @@ impl AppState {
     /// 1. Signals background health probe HTTP server to terminate (`health_stop = true`, `Release` ordering).
     /// 2. Signals and joins live capture thread (up to 3s timeout), committing pipeline state into `store`.
     /// 3. Flushes persistent store (`Store::flush`, WAL commit / storage crash safety).
-///
+    ///
     /// Guarded by `shutting_down: AtomicBool` with `AcqRel` ordering to run exactly once.
     pub(crate) fn shutdown(&self) -> ShutdownReport {
         if self.shutting_down.swap(true, Ordering::AcqRel) {
             return ShutdownReport::already_done();
         }
 
-        tracing::info!(event = "shell.shutdown_start", "Initiating NetPulse desktop shell graceful shutdown");
+        tracing::info!(
+            event = "shell.shutdown_start",
+            "Initiating NetPulse desktop shell graceful shutdown"
+        );
 
         let mut errors = Vec::new();
 
@@ -587,11 +667,7 @@ pub(crate) fn emit_live_snapshot(
             Ok(g) => *g,
             Err(p) => *p.into_inner(),
         };
-        let view = netpulse_engine::pipeline::present(
-            &store_guard,
-            depth_guard,
-            stats_guard,
-        );
+        let view = netpulse_engine::pipeline::present(&store_guard, depth_guard, stats_guard);
         let _ = handle.emit("feed-delta", &view.narratives);
         let _ = handle.emit("monitor-snapshot", &view.monitor);
     }
@@ -726,7 +802,7 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
         Ok((store, report)) => {
             // An offline file is lossless: every frame read was "received" and none
             // was dropped, so the monitor keeps capture loss honestly at zero
-//
+            //
             let stats = CaptureStats {
                 received: report.frames_read as u64,
                 dropped: 0,
@@ -1365,7 +1441,10 @@ mod tests {
         let executed_count = reports.iter().filter(|r| !r.already_shutdown).count();
         let skipped_count = reports.iter().filter(|r| r.already_shutdown).count();
 
-        assert_eq!(executed_count, 1, "Exactly one thread executes shutdown sequence");
+        assert_eq!(
+            executed_count, 1,
+            "Exactly one thread executes shutdown sequence"
+        );
         assert_eq!(skipped_count, 9, "9 threads receive already_done report");
     }
 
@@ -1403,7 +1482,10 @@ mod tests {
         assert!(state.store.lock().is_err(), "Mutex must be poisoned");
 
         let report = state.shutdown();
-        assert!(report.store_flushed, "Shutdown flush must succeed via poison recovery into_inner()");
+        assert!(
+            report.store_flushed,
+            "Shutdown flush must succeed via poison recovery into_inner()"
+        );
         assert!(report.errors.is_empty());
     }
 
@@ -1429,10 +1511,15 @@ mod tests {
         let report = state.shutdown();
         assert!(report.health_signaled);
         assert!(!report.capture_stopped);
-        assert!(report.store_flushed, "Store flush must proceed even if capture stop fails");
+        assert!(
+            report.store_flushed,
+            "Store flush must proceed even if capture stop fails"
+        );
         assert_eq!(report.errors.len(), 1);
         match &report.errors[0] {
-            ShutdownError::Capture(err) => assert!(err.contains("did not terminate within 3 seconds")),
+            ShutdownError::Capture(err) => {
+                assert!(err.contains("did not terminate within 3 seconds"))
+            }
             _ => panic!("Expected ShutdownError::Capture"),
         }
     }

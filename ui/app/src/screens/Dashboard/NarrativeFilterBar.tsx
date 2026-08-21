@@ -85,15 +85,27 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
         </div>
       </div>
 
-      <div className="np-filter-tabs-row" role="tablist">
-        {CATEGORIES.map((cat) => (
+      <div className="np-filter-tabs-row" role="tablist" aria-label="Filter narratives by category">
+        {CATEGORIES.map((cat, idx) => (
           <button
             key={cat.id}
             type="button"
             role="tab"
+            tabIndex={category === cat.id ? 0 : -1}
             aria-selected={category === cat.id}
             className={`np-filter-tab-pill ${category === cat.id ? "np-filter-tab-pill--active" : ""}`}
             onClick={() => onSelectCategory(cat.id)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight") {
+                e.preventDefault();
+                const nextIdx = (idx + 1) % CATEGORIES.length;
+                onSelectCategory(CATEGORIES[nextIdx]!.id);
+              } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                const prevIdx = (idx - 1 + CATEGORIES.length) % CATEGORIES.length;
+                onSelectCategory(CATEGORIES[prevIdx]!.id);
+              }
+            }}
           >
             {cat.label}
           </button>

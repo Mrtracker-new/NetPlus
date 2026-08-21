@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useState, useEffect } from "react";
 import type { NarrativeCard, EvidenceRef } from "@netpulse/contract";
 import { formatEvidenceLabel } from "@netpulse/components";
 import { ConfidenceMeter } from "@netpulse/viz";
@@ -15,6 +15,16 @@ export const CardExplainBox = memo(function CardExplainBox({
   onClose,
 }: CardExplainBoxProps) {
   const [showInlineDrawer, setShowInlineDrawer] = useState(false);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
   // Grounded explanations based on severity and headline
   let whyText = "This card represents observed passive network telemetry on your local adapter.";
@@ -36,6 +46,13 @@ export const CardExplainBox = memo(function CardExplainBox({
     whyText = "This notable event recorded a transient change in throughput, host connectivity, or response timing.";
     actionText = "Monitor your active connections if performance degrades.";
   }
+
+  const isDns = lowerHead.includes("dns") || lowerSum.includes("dns");
+  const isTls = lowerHead.includes("tls") || lowerSum.includes("tls") || lowerHead.includes("https");
+  const isHttp = lowerHead.includes("http") || lowerSum.includes("http");
+  const isUdp = lowerHead.includes("udp") || isDns;
+  const protocolLabel = isDns ? "DNS (Port 53)" : isTls ? "TLS / HTTPS (Port 443)" : isHttp ? "HTTP (Port 80)" : isUdp ? "UDP Datagram" : "TCP Stream";
+  const transportSecurity = isTls ? "TLS Encrypted / Confidential" : isDns ? "Standard DNS / Unencrypted" : "Cleartext Transport";
 
   const evidenceRef = card.evidence && card.evidence.length > 0 ? card.evidence[0] : null;
   const label = evidenceRef ? formatEvidenceLabel(evidenceRef) : "Evidence Ref";
@@ -92,8 +109,8 @@ export const CardExplainBox = memo(function CardExplainBox({
               <ul className="np-inline-drawer__list">
                 <li><span>Kind:</span> <strong>{evidenceRef.kind}</strong></li>
                 <li><span>ID:</span> <code>#{evidenceRef.id}</code></li>
-                <li><span>IP Layer:</span> <strong>IPv4 / Ethernet II</strong></li>
-                <li><span>Transport Security:</span> <strong>TLS 1.3 / Encrypted Payload</strong></li>
+                <li><span>Protocol:</span> <strong>{protocolLabel}</strong></li>
+                <li><span>Transport Security:</span> <strong>{transportSecurity}</strong></li>
                 <li><span>Observation Mode:</span> <strong>Passive / Non-Intervening</strong></li>
               </ul>
             </div>
@@ -111,13 +128,10 @@ export const CardExplainBox = memo(function CardExplainBox({
           )}
 
           <div className="np-inline-drawer__section">
-            <h5 className="np-inline-drawer__sub">Raw Frame Hex Payload Inspection</h5>
-            <div className="np-explain-box__hex">
-              <pre>
-                {`0000   45 00 00 3c a4 19 40 00 40 06 b8 ce c0 a8 01 05   E..<..@.@.......
-0010   8c 52 74 13 e3 dc 00 50 a2 c1 a5 2e 00 00 00 00   .Rt....P........
-0020   a0 02 fa f0 e3 bf 00 00 02 04 05 b4 04 02 08 0a   ................`}
-              </pre>
+            <h5 className="np-inline-drawer__sub">Payload Policy & Telemetry Status</h5>
+            <div className="np-explain-box__payload-notice" style={{ padding: "0.75rem", background: "var(--np-surface-2, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", fontSize: "0.8rem", color: "var(--np-text-mute, #a0aec0)" }}>
+              <div><strong>Policy:</strong> Metadata-Only Capture (Payload bytes omitted by design for zero-leak privacy)</div>
+              <div style={{ marginTop: "0.25rem" }}><strong>Evidence Handle:</strong> {evidenceRef.kind} #{evidenceRef.id} (Monotonic Time: {card.at_mono_nanos ? `${(card.at_mono_nanos / 1_000_000_000).toFixed(3)}s` : "live"})</div>
             </div>
           </div>
 
@@ -145,11 +159,11 @@ export const CardExplainBox = memo(function CardExplainBox({
             {showInlineDrawer ? "Hide Quick Peek Drawer" : "Quick Peek Drawer 🔍"}
           </button>
         )}
-        {onNavigateToScreen && (
+        {onNavigateToScreen && evidenceRef && (
           <button
             type="button"
             className="np-btn np-btn--primary np-btn--sm"
-            onClick={() => onNavigateToScreen(evidenceRef || { kind: "flow", id: 1 })}
+            onClick={() => onNavigateToScreen(evidenceRef)}
           >
             Inspect Technical Evidence →
           </button>

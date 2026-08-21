@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useAppsController } from "../hooks/useAppsController";
 import { AppsSummary } from "./Apps/AppsSummary";
 import { AppsFilters } from "./Apps/AppsFilters";
@@ -82,9 +83,11 @@ export function Apps() {
 
       {/* Classified Empty Capture State */}
       {rows.length === 0 ? (
-        <EmptyState>
-          {targetFlowId !== null ? t("empty_filtered", { flowId: targetFlowId }) : t("empty_default")}
-        </EmptyState>
+        <EmptyState
+          icon={<Icon name="apps" />}
+          title="Application Process Lineage"
+          description={targetFlowId !== null ? t("empty_filtered", { flowId: targetFlowId }) : t("empty_default")}
+        />
       ) : (
         <>
           {/* Header Summary KPI Cards */}
@@ -101,10 +104,12 @@ export function Apps() {
           {/* Classified Filter Empty State vs Process Table */}
           {groupedProcesses.length === 0 ? (
             <div style={{ margin: "2rem 0" }}>
-              <EmptyState>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                  <div>{t("empty_search")}</div>
-                  {hasActiveFilters && (
+              <EmptyState
+                compact
+                title="No Matching Processes"
+                description={t("empty_search")}
+                action={
+                  hasActiveFilters ? (
                     <button
                       type="button"
                       className="np-btn np-btn--primary"
@@ -115,9 +120,9 @@ export function Apps() {
                     >
                       {t("clear_filter")}
                     </button>
-                  )}
-                </div>
-              </EmptyState>
+                  ) : undefined
+                }
+              />
             </div>
           ) : (
             <div

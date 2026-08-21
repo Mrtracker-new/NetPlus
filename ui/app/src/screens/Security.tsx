@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
+import { Icon } from "../icons";
 import { IncidentTimelineViz } from "@netpulse/viz";
 import { useSecurityController, getFindingKey } from "../hooks/useSecurityController";
 import { SecuritySummaryKpis } from "./Security/SecuritySummaryKpis";
@@ -61,7 +62,11 @@ export function Security() {
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
       {findings.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="security" />}
+          title="Zero Anomalies Detected"
+          description={t("empty")}
+        />
       ) : (
         <>
           {/* Summary KPI Cards */}
@@ -110,9 +115,18 @@ export function Security() {
               );
             })
           ) : (
-            <EmptyState>
-              {category !== "all" ? t("no_filter_matches") : t("all_suppressed")}
-            </EmptyState>
+            <EmptyState
+              compact
+              title="No Matching Findings"
+              description={category !== "all" ? t("no_filter_matches") : t("all_suppressed")}
+              action={
+                category !== "all" ? (
+                  <button type="button" className="np-btn np-btn--ghost np-btn--sm" onClick={() => setCategory("all")}>
+                    Show All Categories
+                  </button>
+                ) : undefined
+              }
+            />
           )}
         </>
       )}

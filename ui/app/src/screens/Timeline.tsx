@@ -5,6 +5,7 @@
 import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useTimelineController } from "../hooks/useTimelineController";
 import { TimeRibbon } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
@@ -73,7 +74,11 @@ export function Timeline() {
 
       {/* Classified Capture Empty State */}
       {events.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="timeline" />}
+          title="Timeline Awaiting Traffic"
+          description={t("empty")}
+        />
       ) : (
         <>
           {/* Summary KPI Header Card */}
@@ -92,14 +97,16 @@ export function Timeline() {
           {/* Classified Filter Empty State vs Ribbon View */}
           {filteredEvents.length === 0 ? (
             <div style={{ margin: "2rem 0" }}>
-              <EmptyState>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem" }}>
-                  <div>{t("no_match")}</div>
+              <EmptyState
+                compact
+                title="No Matching Events"
+                description={t("no_match")}
+                action={
                   <button type="button" className="np-btn np-btn--primary" onClick={actions.clearFilters}>
                     {t("clear_filter")}
                   </button>
-                </div>
-              </EmptyState>
+                }
+              />
             </div>
           ) : (
             <>

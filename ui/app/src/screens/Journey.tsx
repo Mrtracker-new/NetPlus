@@ -5,6 +5,7 @@ import { useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { EvidenceRef } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useJourneyController } from "../hooks/useJourneyController";
 import { JourneyFlow, STAGE_CONFIG_REGISTRY } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
@@ -198,7 +199,11 @@ export function Journey() {
       </div>
 
       {!journey ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="journey" />}
+          title={t("title", { defaultValue: "Page-Load Journey Reconstruction" })}
+          description={t("empty")}
+        />
       ) : (
         <>
           {/* 3. KPI Summary Grid */}

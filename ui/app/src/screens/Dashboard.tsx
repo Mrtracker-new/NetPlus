@@ -275,14 +275,16 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
               ))}
             </div>
           ) : filteredNarratives.length === 0 ? (
-            <EmptyState compact>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
-                <span>
-                  {search || category !== "all"
-                    ? "No narrative items match your search or filter criteria."
-                    : t("no_traffic")}
-                </span>
-                {(search || category !== "all") && (
+            <EmptyState
+              compact
+              title={search || category !== "all" ? "No Matching Narratives" : t("no_traffic")}
+              description={
+                search || category !== "all"
+                  ? "No narrative items match your search or filter criteria."
+                  : "Start packet capture or select an active network adapter in the header bar to observe real-time network activity."
+              }
+              action={
+                (search || category !== "all") ? (
                   <button
                     type="button"
                     className="np-btn np-btn--ghost np-btn--sm"
@@ -293,9 +295,9 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                   >
                     Reset Filters
                   </button>
-                )}
-              </div>
-            </EmptyState>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="np-feed">
               {filteredNarratives.map((card) => (

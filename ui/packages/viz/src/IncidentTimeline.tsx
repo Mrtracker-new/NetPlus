@@ -47,8 +47,20 @@ export const IncidentTimelineViz = memo(function IncidentTimelineViz({
     >
       <header style={{ marginBottom: "1rem" }}>
         <h3 className="np-panel__title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ color: "var(--np-accent-strong, #10b981)" }}>⚡</span>
-          {title}
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--np-accent-strong, #10b981)"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+          </svg>
+          <span>{title}</span>
         </h3>
         <p className="np-hero__sub" style={{ fontSize: "0.85rem", marginTop: "0.2rem" }}>
           {summary}

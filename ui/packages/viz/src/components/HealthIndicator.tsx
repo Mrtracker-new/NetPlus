@@ -29,17 +29,37 @@ export function HealthIndicator({
     }
   };
 
-  const getStatusIcon = () => {
+  const renderStatusIcon = () => {
     switch (status) {
       case "healthy":
-        return "●";
+        return (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill={color} aria-hidden="true">
+            <circle cx="5" cy="5" r="4.5" />
+          </svg>
+        );
       case "warning":
       case "degraded":
-        return "▲";
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+        );
       case "critical":
-        return "✖";
+        return (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+        );
       default:
-        return "○";
+        return (
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke={color} strokeWidth="2" aria-hidden="true">
+            <circle cx="5" cy="5" r="4" />
+          </svg>
+        );
     }
   };
 
@@ -50,8 +70,8 @@ export function HealthIndicator({
       <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }} role="status">
         <div style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
           {showIcon && (
-            <span aria-hidden="true" style={{ color, fontSize: "0.75rem", lineHeight: 1 }}>
-              {getStatusIcon()}
+            <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+              {renderStatusIcon()}
             </span>
           )}
           <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--np-text, #fff)" }}>
@@ -92,12 +112,12 @@ export function HealthIndicator({
         <span
           aria-hidden="true"
           style={{
-            color,
-            fontSize: "0.75rem",
-            lineHeight: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
-          {getStatusIcon()}
+          {renderStatusIcon()}
         </span>
       )}
       <span>{label}</span>

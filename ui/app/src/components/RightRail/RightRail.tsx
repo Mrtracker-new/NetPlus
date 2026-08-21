@@ -115,17 +115,15 @@ export function RightRail() {
           </button>
         </div>
 
-        {/* Desktop Header with Tabs */}
-        {!isCollapsed && (
+        {/* Header with Tabs (Desktop expanded or Mobile drawer) */}
+        {(!isCollapsed || isMobileOpen) && (
           <div className="np-rail-header">
-            <RightRailTabs isCollapsed={isCollapsed} />
+            <RightRailTabs isCollapsed={isCollapsed && !isMobileOpen} />
           </div>
         )}
 
-
-
-        {/* Expanded Content Panels */}
-        {!isCollapsed && (
+        {/* Content Panels */}
+        {(!isCollapsed || isMobileOpen) && (
           <div className="np-rail-content">
             {activeTab === "context" && (
               <div id="tabpanel-context" className="np-rail-tabpanel" role="tabpanel" aria-labelledby="tab-context">

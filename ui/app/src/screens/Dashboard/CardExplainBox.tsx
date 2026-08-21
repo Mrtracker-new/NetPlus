@@ -27,17 +27,18 @@ export const CardExplainBox = memo(function CardExplainBox({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Grounded explanations based on severity and headline
+  // Grounded explanations based on severity, headline, and detail lines
   let whyText = "This card represents observed passive network telemetry on your local adapter.";
   let actionText = "No immediate action required. NetPulse continues listening passively.";
 
   const lowerHead = card.headline.toLowerCase();
   const lowerSum = (card.summary || "").toLowerCase();
+  const allCardText = [lowerHead, lowerSum, ...card.lines.map((l) => l.toLowerCase())].join(" ");
 
-  if (lowerHead.includes("dns") || lowerSum.includes("dns")) {
+  if (allCardText.includes("dns") || allCardText.includes("domain")) {
     whyText = "DNS queries resolve domain names (like github.com) to IP addresses. Higher latency usually happens when your configured DNS server responds slowly or over a congested Wi-Fi link.";
     actionText = "If web pages load slowly, consider switching to a fast DNS resolver (like 1.1.1.1 or 8.8.8.8) or run a diagnostic test in the Diagnostics tab.";
-  } else if (lowerHead.includes("tls") || lowerSum.includes("tls") || lowerHead.includes("https")) {
+  } else if (allCardText.includes("tls") || allCardText.includes("https") || allCardText.includes("quic") || allCardText.includes("encrypt")) {
     whyText = "TLS handshakes establish encrypted connections to remote web servers. Spikes in TLS traffic indicate secure web browsing, streaming, or API requests.";
     actionText = "Your connection is encrypted and private. No action needed.";
   } else if (card.severity === "finding") {
@@ -48,12 +49,31 @@ export const CardExplainBox = memo(function CardExplainBox({
     actionText = "Monitor your active connections if performance degrades.";
   }
 
-  const isDns = lowerHead.includes("dns") || lowerSum.includes("dns");
-  const isTls = lowerHead.includes("tls") || lowerSum.includes("tls") || lowerHead.includes("https");
-  const isHttp = lowerHead.includes("http") || lowerSum.includes("http");
-  const isUdp = lowerHead.includes("udp") || isDns;
-  const protocolLabel = isDns ? "DNS (Port 53)" : isTls ? "TLS / HTTPS (Port 443)" : isHttp ? "HTTP (Port 80)" : isUdp ? "UDP Datagram" : "TCP Stream";
-  const transportSecurity = isTls ? "TLS Encrypted / Confidential" : isDns ? "Standard DNS / Unencrypted" : "Cleartext Transport";
+  const isDns = allCardText.includes("dns") || allCardText.includes("port 53");
+  const isQuic = allCardText.includes("quic") || allCardText.includes("http/3");
+  const isTls = allCardText.includes("tls") || allCardText.includes("https") || allCardText.includes("encrypt") || allCardText.includes("ssl");
+  const isHttp = allCardText.includes("http") && !isTls && !isQuic;
+  const isUdp = allCardText.includes("udp") || isDns || isQuic;
+
+  const protocolLabel = isDns
+    ? "DNS (Port 53)"
+    : isQuic
+    ? "QUIC / HTTP/3 (UDP Port 443)"
+    : isTls
+    ? "TLS / HTTPS (Port 443)"
+    : isHttp
+    ? "HTTP (Port 80)"
+    : isUdp
+    ? "UDP Datagram"
+    : "TCP Stream";
+
+  const transportSecurity = isQuic
+    ? "QUIC / TLS 1.3 Confidential"
+    : isTls
+    ? "TLS Encrypted / Confidential"
+    : isDns
+    ? "Standard DNS / Unencrypted"
+    : "Cleartext Transport";
 
   const evidenceRef = card.evidence && card.evidence.length > 0 ? card.evidence[0] : null;
   const label = evidenceRef ? formatEvidenceLabel(evidenceRef) : "Evidence Ref";
@@ -88,7 +108,7 @@ export const CardExplainBox = memo(function CardExplainBox({
 
       {/* Complete In-Card Quick Peek Drawer */}
       {showInlineDrawer && evidenceRef && (
-        <div className="np-inline-drawer" role="region" aria-label="Quick Peek Technical Evidence">
+        <div id="card-inline-drawer" className="np-inline-drawer" role="region" aria-label="Quick Peek Technical Evidence">
           <div className="np-inline-drawer__header">
             <span className="np-evidence np-evidence--static">{label}</span>
             <span className="np-inline-drawer__title">Quick Peek Technical Evidence</span>
@@ -159,6 +179,8 @@ export const CardExplainBox = memo(function CardExplainBox({
             type="button"
             className={`np-btn np-btn--sm ${showInlineDrawer ? "np-btn--primary" : "np-btn--ghost"}`}
             onClick={() => setShowInlineDrawer(!showInlineDrawer)}
+            aria-expanded={showInlineDrawer}
+            aria-controls="card-inline-drawer"
             style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
           >
             <Icon name="search" style={{ width: "12px", height: "12px" }} />

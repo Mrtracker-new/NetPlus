@@ -82,7 +82,12 @@ export function useDashboardController() {
       currentRateBps = throughputDeltas[throughputDeltas.length - 1] ?? 0;
     }
     const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s";
-    const sparklineActivity = throughputDeltas.length > 1 ? throughputDeltas.slice(-8) : [0, 0];
+    const sparklineActivity =
+      throughputDeltas.length > 1
+        ? throughputDeltas.slice(-8)
+        : throughputDeltas.length === 1
+        ? [0, throughputDeltas[0]!]
+        : [0, 0];
     const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [hosts, hosts];
     const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [flows, flows];
     const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [feed.length, feed.length];
@@ -191,23 +196,80 @@ export function useDashboardController() {
     return feed.filter((card) => {
       const head = card.headline.toLowerCase();
       const sum = (card.summary || "").toLowerCase();
+      const lines = card.lines.map((l) => l.toLowerCase());
+      const allText = [head, sum, ...lines].join(" ");
 
       // Category Filter
       if (category === "findings" && card.severity !== "finding") return false;
-      if (category === "performance" && !head.includes("latency") && !head.includes("rtt") && !head.includes("loss") && !sum.includes("ms")) return false;
-      if (category === "dns" && !head.includes("dns") && !sum.includes("dns")) return false;
-      if (category === "tls" && !head.includes("tls") && !head.includes("https") && !sum.includes("tls") && !sum.includes("ssl")) return false;
-      if (category === "applications" && !head.includes("app") && !head.includes("process") && !sum.includes("chrome") && !sum.includes("spotify")) return false;
-      if (category === "security" && card.severity !== "finding" && card.severity !== "notable" && !head.includes("security") && !head.includes("dns")) return false;
+      if (
+        category === "performance" &&
+        !allText.includes("latency") &&
+        !allText.includes("rtt") &&
+        !allText.includes("loss") &&
+        !allText.includes("delay") &&
+        !allText.includes("jitter") &&
+        !allText.includes("slow") &&
+        !allText.includes("retransmit") &&
+        !allText.includes(" ms") &&
+        !allText.includes("ms ")
+      ) {
+        return false;
+      }
+      if (
+        category === "dns" &&
+        !allText.includes("dns") &&
+        !allText.includes("domain") &&
+        !allText.includes("lookup") &&
+        !allText.includes("resolve")
+      ) {
+        return false;
+      }
+      if (
+        category === "tls" &&
+        !allText.includes("tls") &&
+        !allText.includes("https") &&
+        !allText.includes("ssl") &&
+        !allText.includes("quic") &&
+        !allText.includes("encrypt") &&
+        !allText.includes("certificate") &&
+        !allText.includes("cipher")
+      ) {
+        return false;
+      }
+      if (
+        category === "applications" &&
+        !allText.includes("app") &&
+        !allText.includes("process") &&
+        !allText.includes("chrome") &&
+        !allText.includes("spotify") &&
+        !allText.includes(".exe") &&
+        !card.evidence.some((e) => e.kind === "session")
+      ) {
+        return false;
+      }
+      if (
+        category === "security" &&
+        card.severity !== "finding" &&
+        card.severity !== "notable" &&
+        !allText.includes("security") &&
+        !allText.includes("anomal") &&
+        !allText.includes("scan") &&
+        !allText.includes("tunnel") &&
+        !allText.includes("threat")
+      ) {
+        return false;
+      }
       if (
         category === "network" &&
-        !head.includes("flow") &&
-        !head.includes("packet") &&
-        !head.includes("traffic") &&
-        !head.includes("port") &&
-        !head.includes("tcp") &&
-        !head.includes("udp") &&
-        !head.includes("ip") &&
+        !allText.includes("flow") &&
+        !allText.includes("packet") &&
+        !allText.includes("traffic") &&
+        !allText.includes("port") &&
+        !allText.includes("tcp") &&
+        !allText.includes("udp") &&
+        !allText.includes("ip") &&
+        !allText.includes("server") &&
+        !allText.includes("connect") &&
         !card.evidence.some((e) => e.kind === "flow" || e.kind === "packet")
       ) {
         return false;

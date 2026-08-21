@@ -17,9 +17,22 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
       <div className="np-health-strip__divider" aria-hidden="true">•</div>
 
       <div className="np-health-strip__item" title="Flow Attribution Engine">
-        <span className={`np-health-dot ${health.flowEngine.healthy ? "np-health-dot--active" : ""}`} aria-hidden="true" />
+        <span
+          className={`np-health-dot ${
+            health.flowEngine.healthy ? "np-health-dot--active" : "np-health-dot--warning"
+          }`}
+          aria-hidden="true"
+        />
         <span className="np-health-strip__label">Flow Engine:</span>
-        <span className="np-health-strip__val">{health.flowEngine.label}</span>
+        <span
+          className={
+            health.flowEngine.healthy
+              ? "np-health-strip__val"
+              : "np-health-strip__val np-health-strip__val--warning"
+          }
+        >
+          {health.flowEngine.label}
+        </span>
       </div>
 
       <div className="np-health-strip__divider" aria-hidden="true">•</div>

@@ -4,7 +4,8 @@ import type { NarrativeCard, Severity, EvidenceRef } from "@netpulse/contract";
 import { EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
 import { Constellation } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
-import { useStore, setMonitor, setError } from "../state/store";
+import { useDisclosure } from "../modes/DisclosureContext";
+import { useStore, setMonitor, setFeed, setError } from "../state/store";
 import { query } from "../ipc";
 import { useDashboardController } from "./Dashboard/useDashboardController";
 import { HealthStrip } from "./Dashboard/HealthStrip";
@@ -102,6 +103,7 @@ function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
           type="button"
           className={`np-btn np-btn--sm ${showExplain ? "np-btn--primary" : "np-btn--ghost"}`}
           onClick={() => setShowExplain(!showExplain)}
+          aria-expanded={showExplain}
           aria-label={`Explain ${card.headline}`}
         >
           {showExplain ? "Hide Explanation" : "Explain"}
@@ -119,6 +121,7 @@ export interface DashboardProps {
 
 export function Dashboard({ loading = false, error: propsError = null, onRetry }: DashboardProps) {
   const { t } = useTranslation("dashboard");
+  const { depth } = useDisclosure();
   const { monitor, error: storeError } = useStore();
   const { navigateToEvidence } = useEvidenceNavigation();
   const hostRows = monitor?.by_host.rows ?? [];
@@ -154,16 +157,24 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     if (onRetry) {
       onRetry();
     } else {
-      query({ kind: "monitorSnapshot", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER })
-        .then((res) => {
-          if (res.kind === "monitorSnapshot") {
-            setMonitor(res.snapshot);
-            setError(null);
+      Promise.all([
+        query({ kind: "narrativeFeed", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER, depth }),
+        query({ kind: "monitorSnapshot", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER }),
+      ])
+        .then(([feedRes, monRes]) => {
+          if (feedRes.kind === "narrativeFeed") {
+            setFeed(feedRes.cards);
           }
+          if (monRes.kind === "monitorSnapshot") {
+            setMonitor(monRes.snapshot);
+          }
+          setError(null);
         })
-        .catch(() => {});
+        .catch((e) => {
+          setError(String(e));
+        });
     }
-  }, [onRetry]);
+  }, [onRetry, depth]);
 
   return (
     <section className="np-dash" aria-label="Network Dashboard">
@@ -238,7 +249,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
 
       {/* 5. Filtered Narrative Feed ("What's Happening") */}
       <WidgetErrorBoundary title="Narrative Feed">
-        <section aria-labelledby="dashboard-feed-title" role="region">
+        <section id="dashboard-narrative-feed" aria-labelledby="dashboard-feed-title" role="region">
           <div className="np-dash__section-header">
             <h2 id="dashboard-feed-title" className="np-dash__section-title">
               {t("whats_happening")}

@@ -89,10 +89,12 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
         {CATEGORIES.map((cat, idx) => (
           <button
             key={cat.id}
+            id={`tab-${cat.id}`}
             type="button"
             role="tab"
             tabIndex={category === cat.id ? 0 : -1}
             aria-selected={category === cat.id}
+            aria-controls="dashboard-narrative-feed"
             className={`np-filter-tab-pill ${category === cat.id ? "np-filter-tab-pill--active" : ""}`}
             onClick={() => onSelectCategory(cat.id)}
             onKeyDown={(e) => {
@@ -104,6 +106,12 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
                 e.preventDefault();
                 const prevIdx = (idx - 1 + CATEGORIES.length) % CATEGORIES.length;
                 onSelectCategory(CATEGORIES[prevIdx]!.id);
+              } else if (e.key === "Home") {
+                e.preventDefault();
+                onSelectCategory(CATEGORIES[0]!.id);
+              } else if (e.key === "End") {
+                e.preventDefault();
+                onSelectCategory(CATEGORIES[CATEGORIES.length - 1]!.id);
               }
             }}
           >

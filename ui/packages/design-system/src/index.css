@@ -632,40 +632,178 @@ button {
 
 /* Empty / calm-idle states — never a void. */
 .np-empty {
-  display: grid;
-  place-items: center;
-  min-height: 46vh;
-  max-width: 44ch;
-  margin: var(--np-7) auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  max-width: 54ch;
+  margin: var(--np-6) auto;
+  padding: var(--np-6) var(--np-5);
   text-align: center;
   color: var(--np-text-dim);
-  font-size: var(--np-fs-md);
+  font-size: var(--np-fs-base);
+  animation: np-empty-fade-in 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  box-sizing: border-box;
 }
+
 .np-empty--compact {
   min-height: 0;
-  margin: var(--np-5) auto;
-  font-size: var(--np-fs-base);
+  margin: var(--np-3) auto;
+  padding: var(--np-4) var(--np-3);
+  max-width: 44ch;
 }
-.np-empty::before {
-  content: "";
-  display: block;
+
+.np-empty__visual {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  margin-bottom: var(--np-4);
+  flex-shrink: 0;
+}
+
+.np-empty--compact .np-empty__visual {
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--np-3);
+}
+
+/* Outer concentric radar pulse rings */
+.np-empty__ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.np-empty__ring--outer {
+  inset: -12px;
+  border: 1px dashed var(--np-accent-line);
+  opacity: 0.35;
+  animation: np-spin-slow 24s linear infinite;
+}
+
+.np-empty__ring--glow {
+  inset: -4px;
+  background: radial-gradient(circle, var(--np-accent-soft) 0%, transparent 70%);
+  opacity: 0.6;
+  animation: np-radar-glow 4s ease-in-out infinite alternate;
+}
+
+/* The central icon disc */
+.np-empty__icon-disc {
+  position: relative;
   width: 64px;
   height: 64px;
-  margin-bottom: var(--np-4);
   border-radius: 50%;
   background: var(--np-surface-1);
   box-shadow: var(--np-neu);
-  position: relative;
+  border: 1px solid var(--np-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--np-accent-strong);
+  transition: transform var(--np-t), box-shadow var(--np-t);
 }
-.np-empty::after {
-  content: "";
-  position: absolute;
-  width: 24px;
-  height: 24px;
-  margin-top: -44px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 50%, var(--np-accent), transparent 70%);
-  animation: np-pulse 3s ease-in-out infinite;
+
+.np-empty--compact .np-empty__icon-disc {
+  width: 48px;
+  height: 48px;
+  box-shadow: var(--np-neu-sm);
+}
+
+.np-empty__icon-disc svg {
+  width: 28px;
+  height: 28px;
+  stroke: var(--np-accent-strong);
+  filter: drop-shadow(0 2px 6px var(--np-accent-soft));
+}
+
+.np-empty--compact .np-empty__icon-disc svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* Title */
+.np-empty__title {
+  font-size: var(--np-fs-lg);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  margin: 0 0 var(--np-2) 0;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.np-empty--compact .np-empty__title {
+  font-size: var(--np-fs-md);
+  margin-bottom: var(--np-1);
+}
+
+/* Description */
+.np-empty__desc {
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-base);
+  line-height: 1.55;
+  margin: 0 0 var(--np-4) 0;
+  max-width: 46ch;
+}
+
+.np-empty--compact .np-empty__desc {
+  font-size: var(--np-fs-sm);
+  margin-bottom: var(--np-3);
+  max-width: 40ch;
+}
+
+/* Actions */
+.np-empty__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+  margin-top: var(--np-1);
+}
+
+.np-empty--compact .np-empty__actions {
+  gap: var(--np-2);
+  margin-top: 0;
+}
+
+@keyframes np-empty-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes np-spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes np-radar-glow {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1.08);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.35;
+  }
 }
 
 /* ---- Inline notice (error / success / warning) ---- */

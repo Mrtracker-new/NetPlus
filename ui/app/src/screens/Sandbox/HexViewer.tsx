@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { formatHexDump } from "../../hooks/useSandboxController";
+import { Icon } from "../../icons";
 
 export interface HexViewerProps {
   rawHex: string;
@@ -27,27 +28,30 @@ export function HexViewer({ rawHex, onCopyHex, onCopyJson, toast }: HexViewerPro
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           {toast && (
-            <span style={{ fontSize: "0.8rem", color: "var(--np-good)", fontWeight: 600, marginRight: "0.5rem" }}>
-              ✓ {t(toast as any)}
+            <span style={{ fontSize: "0.8rem", color: "var(--np-good)", fontWeight: 600, marginRight: "0.5rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+              <Icon name="check" style={{ width: "12px", height: "12px" }} />
+              <span>{t(toast as any)}</span>
             </span>
           )}
           <button
             type="button"
             className="np-btn np-btn--ghost"
-            style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem", border: "1px solid var(--np-border)" }}
+            style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem", border: "1px solid var(--np-border)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
             onClick={onCopyHex}
             aria-label="Copy raw hex bytes to clipboard"
           >
-            📋 {t("copy_hex")}
+            <Icon name="copy" style={{ width: "13px", height: "13px" }} />
+            <span>{t("copy_hex")}</span>
           </button>
           <button
             type="button"
             className="np-btn np-btn--ghost"
-            style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem", border: "1px solid var(--np-border)" }}
+            style={{ fontSize: "0.8rem", padding: "0.35rem 0.65rem", border: "1px solid var(--np-border)", display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
             onClick={onCopyJson}
             aria-label="Copy JSON packet structure to clipboard"
           >
-            {t("copy_json")}
+            <Icon name="copy" style={{ width: "13px", height: "13px" }} />
+            <span>{t("copy_json")}</span>
           </button>
         </div>
       </div>

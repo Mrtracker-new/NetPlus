@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button, Notice, Skeleton } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useExportController } from "../hooks/useExportController";
 import { ExportFormatSelector } from "./Export/ExportFormatSelector";
 import { PayloadLevelSelector } from "./Export/PayloadLevelSelector";
@@ -51,8 +52,15 @@ export function Export() {
       ) : null}
 
       <div className="np-export__actions">
-        <Button variant="primary" disabled={busy} busy={busy} onClick={() => void startExport()}>
-          📥 {busy ? t("exporting") : t("start_export")}
+        <Button
+          variant="primary"
+          disabled={busy}
+          busy={busy}
+          onClick={() => void startExport()}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+        >
+          <Icon name="download" style={{ width: "15px", height: "15px" }} />
+          {busy ? t("exporting") : t("start_export")}
         </Button>
       </div>
     </section>

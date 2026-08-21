@@ -75,8 +75,14 @@ export function Apps() {
           role="status"
         >
           <span>{t("filtered_banner", { flowId: targetFlowId })}</span>
-          <button type="button" className="np-btn np-btn--ghost" onClick={clearTargetFlow}>
-            ✕ {t("clear_filter")}
+          <button
+            type="button"
+            className="np-btn np-btn--ghost"
+            onClick={clearTargetFlow}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
+          >
+            <Icon name="close" style={{ width: "14px", height: "14px" }} />
+            {t("clear_filter")}
           </button>
         </div>
       )}

@@ -124,8 +124,9 @@ export function Learn() {
               }}
             >
               <div>
-                <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-accent)", fontWeight: 700, marginBottom: "0.25rem" }}>
-                  💡 {t("recommended_next", { defaultValue: "Recommended Next Step" })}
+                <div style={{ fontSize: "0.8rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-accent)", fontWeight: 700, marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
+                  <span>{t("recommended_next", { defaultValue: "Recommended Next Step" })}</span>
                 </div>
                 <h3 style={{ margin: "0 0 0.25rem 0", fontSize: "1.15rem" }}>{nextRecommendedLesson.title}</h3>
                 <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>

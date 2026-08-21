@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@netpulse/components";
+import { Icon } from "../../icons";
 
 export interface ReplayTransportProps {
   playing: boolean;
@@ -41,16 +42,25 @@ export function ReplayTransport({
       <div className="np-replay__actions">
         {playing ? (
           <Button variant="primary" disabled={busy || !canPause} onClick={onPause}>
-            ⏸️ {t("controls.pause")}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              <Icon name="pause" style={{ width: "13px", height: "13px" }} />
+              <span>{t("controls.pause")}</span>
+            </span>
           </Button>
         ) : (
           <Button variant="primary" disabled={busy || !canPlay} onClick={onPlay}>
-            ▶️ {t("controls.play")}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              <Icon name="play" style={{ width: "13px", height: "13px" }} />
+              <span>{t("controls.play")}</span>
+            </span>
           </Button>
         )}
 
         <Button variant="standard" disabled={busy || !canStep} onClick={onStep}>
-          ⏭️ {t("controls.step")}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="stepForward" style={{ width: "13px", height: "13px" }} />
+            <span>{t("controls.step")}</span>
+          </span>
         </Button>
       </div>
 

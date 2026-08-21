@@ -69,7 +69,10 @@ export function Recordings() {
           busy={busy && isRecording}
           onClick={() => void startRecording()}
         >
-          ▶️ {t("common:actions.start_capture")}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="play" style={{ width: "13px", height: "13px" }} />
+            <span>{t("common:actions.start_capture")}</span>
+          </span>
         </Button>
 
         <Button
@@ -78,7 +81,10 @@ export function Recordings() {
           busy={busy && !isRecording}
           onClick={() => void stopRecording()}
         >
-          ⏹️ {t("common:actions.stop_capture")}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="stop" style={{ width: "13px", height: "13px" }} />
+            <span>{t("common:actions.stop_capture")}</span>
+          </span>
         </Button>
       </div>
 
@@ -91,11 +97,14 @@ export function Recordings() {
       ) : summary.total === 0 ? (
         <EmptyState
           icon={<Icon name="recordings" />}
-          title={`📹 ${t("empty.title")}`}
+          title={t("empty.title")}
           description={t("empty.subtitle")}
           action={
             <Button variant="primary" disabled={busy} onClick={() => void startRecording()}>
-              ▶️ {t("common:actions.start_capture")}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+                <Icon name="play" style={{ width: "13px", height: "13px" }} />
+                <span>{t("common:actions.start_capture")}</span>
+              </span>
             </Button>
           }
         />

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button, Input, Notice, Skeleton } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useDiagnosticsController } from "../hooks/useDiagnosticsController";
 import { PingResultCard } from "./Diagnostics/PingResultCard";
 import { TracerouteCard } from "./Diagnostics/TracerouteCard";
@@ -93,8 +94,13 @@ export function DiagnosticsScreen() {
           {t("bufferbloat_btn")}
         </Button>
         {hasAnyResults && (
-          <Button variant="standard" onClick={actions.clearResults}>
-            ✕ {t("clear_all")}
+          <Button
+            variant="standard"
+            onClick={actions.clearResults}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
+          >
+            <Icon name="close" style={{ width: "13px", height: "13px" }} />
+            {t("clear_all")}
           </Button>
         )}
       </div>

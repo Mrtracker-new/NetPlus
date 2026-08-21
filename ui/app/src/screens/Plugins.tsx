@@ -53,7 +53,7 @@ export function Plugins() {
       ) : safeTotal === 0 ? (
         <EmptyState
           icon={<Icon name="plugins" />}
-          title={`🔌 ${t("empty.title")}`}
+          title={t("empty.title")}
           description={t("empty.subtitle")}
         />
       ) : (

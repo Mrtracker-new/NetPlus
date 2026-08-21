@@ -45,7 +45,10 @@ export function ExplorerEntryCard({
 
           {entry.examples_available && (
             <Badge variant="trust" className="np-ref__mine">
-              🎯 {t("card.example_tag", { defaultValue: "Observed" })}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <Icon name="target" style={{ width: "12px", height: "12px" }} />
+                {t("card.example_tag", { defaultValue: "Observed" })}
+              </span>
             </Badge>
           )}
         </div>
@@ -60,7 +63,10 @@ export function ExplorerEntryCard({
       {depth !== "expert" && entry.expert && (
         <details className="np-ref__more">
           <summary>
-            🔬 {t("card.expert_detail", { defaultValue: "Technical Detail" })}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+              <Icon name="microscope" style={{ width: "13px", height: "13px" }} />
+              {t("card.expert_detail", { defaultValue: "Technical Detail" })}
+            </span>
           </summary>
           <p className="np-ref__more-content">
             {entry.expert}
@@ -97,10 +103,11 @@ export function ExplorerEntryCard({
               key={lessonId}
               type="button"
               variant="standard"
-              style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", marginLeft: "0.4rem" }}
+              style={{ fontSize: "0.75rem", padding: "0.15rem 0.5rem", marginLeft: "0.4rem", display: "inline-flex", alignItems: "center", gap: "0.25rem" }}
               onClick={() => onOpenLesson && onOpenLesson(lessonId)}
             >
-              📖 {lessonId}
+              <Icon name="book" style={{ width: "12px", height: "12px" }} />
+              {lessonId}
             </Button>
           ))}
         </div>

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ExportPreview } from "@netpulse/contract";
+import { Icon } from "../../icons";
 import { ExportSummaryKpis } from "./ExportSummaryKpis";
 
 export interface ExportPreviewCardProps {
@@ -48,8 +49,9 @@ export function ExportPreviewCard({ preview }: ExportPreviewCardProps) {
           </strong>
         </div>
 
-        <div className="np-export__provenance">
-          📍 {displayProvenance}
+        <div className="np-export__provenance" style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+          <Icon name="pin" style={{ width: "13px", height: "13px" }} />
+          <span>{displayProvenance}</span>
         </div>
       </div>
 

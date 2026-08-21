@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Icon } from "../../icons";
 
 export interface SuggestionChipsProps {
   onSelectSuggestion: (promptText: string) => void;
@@ -24,8 +25,10 @@ export function SuggestionChips({ onSelectSuggestion, disabled }: SuggestionChip
           className="np-suggestion"
           disabled={disabled}
           onClick={() => onSelectSuggestion(item.label)}
+          style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
         >
-          <span>💡</span> {item.label}
+          <Icon name="sparkles" style={{ width: "13px", height: "13px", color: "var(--np-accent, #2fe0d6)" }} />
+          <span>{item.label}</span>
         </button>
       ))}
     </div>

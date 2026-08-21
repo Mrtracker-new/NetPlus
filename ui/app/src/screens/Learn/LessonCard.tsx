@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { CurriculumLesson, LessonOffer } from "@netpulse/contract";
 import { Badge, Button, Card } from "@netpulse/components";
+import { Icon } from "../../icons";
 
 export interface LessonCardProps {
   lesson: CurriculumLesson | LessonOffer;
@@ -35,9 +36,9 @@ export function LessonCard({ lesson, onSelect }: LessonCardProps) {
     >
       <header className="np-lesson__title-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "0.5rem" }}>
         <div>
-          <h3 className="np-lesson__title" style={{ fontSize: "1.1rem", fontWeight: 600, margin: "0 0 0.25rem 0" }}>
-            {isLocked && "🔒 "}
-            {lesson.title}
+          <h3 className="np-lesson__title" style={{ fontSize: "1.1rem", fontWeight: 600, margin: "0 0 0.25rem 0", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            {isLocked && <Icon name="lock" style={{ width: "14px", height: "14px", color: "var(--np-text-mute)" }} />}
+            <span>{lesson.title}</span>
           </h3>
           <code style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>{lessonId}</code>
         </div>
@@ -48,20 +49,36 @@ export function LessonCard({ lesson, onSelect }: LessonCardProps) {
           </Badge>
 
           <Badge variant="trust">
-            {status === "mastered"
-              ? "🏆 Mastered"
-              : status === "completed"
-              ? "✓ Completed"
-              : status === "in_progress"
-              ? "⏳ In Progress"
-              : "Not Started"}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+              {status === "mastered" ? (
+                <>
+                  <Icon name="trophy" style={{ width: "12px", height: "12px", color: "var(--np-notable, #f59e0b)" }} />
+                  Mastered
+                </>
+              ) : status === "completed" ? (
+                <>
+                  <Icon name="check" style={{ width: "12px", height: "12px", color: "var(--np-good, #10b981)" }} />
+                  Completed
+                </>
+              ) : status === "in_progress" ? (
+                <>
+                  <Icon name="clock" style={{ width: "12px", height: "12px", color: "var(--np-accent, #2fe0d6)" }} />
+                  In Progress
+                </>
+              ) : (
+                "Not Started"
+              )}
+            </span>
           </Badge>
 
           <Badge
             variant="posture"
             className={isGrounded ? "np-lesson__grounded-tag" : "np-lesson__example-tag"}
           >
-            {isGrounded ? `🎯 ${t("card.grounded_tag", { defaultValue: "Grounded" })}` : `📚 ${t("card.example_tag", { defaultValue: "Curated" })}`}
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+              <Icon name={isGrounded ? "target" : "book"} style={{ width: "12px", height: "12px" }} />
+              {isGrounded ? t("card.grounded_tag", { defaultValue: "Grounded" }) : t("card.example_tag", { defaultValue: "Curated" })}
+            </span>
           </Badge>
         </div>
       </header>

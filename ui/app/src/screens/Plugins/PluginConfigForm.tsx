@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import type { PluginDescriptor } from "@netpulse/contract";
 import { Button } from "@netpulse/components";
+import { Icon } from "../../icons";
 
 export interface PluginConfigFormProps {
   plugin: PluginDescriptor;
@@ -116,7 +117,8 @@ export function PluginConfigForm({ plugin, onSave, onReset, busy }: PluginConfig
             padding: 0,
           }}
         >
-          ⚙️ {isOpen ? "Hide Configuration" : "Configure Plugin"} (v{plugin.config_version})
+          <Icon name="settings" style={{ width: "14px", height: "14px" }} />
+          <span>{isOpen ? "Hide Configuration" : "Configure Plugin"} (v{plugin.config_version})</span>
         </button>
 
         {isOpen && (
@@ -183,7 +185,12 @@ export function PluginConfigForm({ plugin, onSave, onReset, busy }: PluginConfig
                   boxSizing: "border-box",
                 }}
               />
-              {jsonError && <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: "0.25rem" }}>⚠️ {jsonError}</div>}
+              {jsonError && (
+                <div style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: "0.25rem", display: "flex", alignItems: "center", gap: "0.3rem" }}>
+                  <Icon name="alertTriangle" style={{ width: "13px", height: "13px" }} />
+                  <span>{jsonError}</span>
+                </div>
+              )}
             </div>
           ) : propertyKeys.length === 0 ? (
             <div style={{ color: "#94a3b8", fontSize: "0.85rem", fontStyle: "italic" }}>
@@ -270,9 +277,13 @@ export function PluginConfigForm({ plugin, onSave, onReset, busy }: PluginConfig
                   fontSize: "0.75rem",
                   padding: "0.3rem 0.6rem",
                   cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
                 }}
               >
-                📥 Export
+                <Icon name="download" style={{ width: "12px", height: "12px" }} />
+                <span>Export</span>
               </button>
               <label
                 style={{
@@ -283,9 +294,13 @@ export function PluginConfigForm({ plugin, onSave, onReset, busy }: PluginConfig
                   fontSize: "0.75rem",
                   padding: "0.3rem 0.6rem",
                   cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "0.3rem",
                 }}
               >
-                📤 Import
+                <Icon name="upload" style={{ width: "12px", height: "12px" }} />
+                <span>Import</span>
                 <input type="file" accept=".json" onChange={handleImport} style={{ display: "none" }} />
               </label>
             </div>

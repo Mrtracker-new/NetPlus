@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { GroupedProcess } from "../../hooks/useAppsController";
+import { Icon } from "../../icons";
 
 export interface ProcessRowProps {
   group: GroupedProcess;
@@ -18,10 +19,10 @@ export function ProcessRow({
 
   const confidenceBadge =
     group.confidence === "high"
-      ? { label: t("confidence_labels.high"), color: "var(--np-good, #28926d)", icon: "🟢" }
+      ? { label: t("confidence_labels.high"), color: "var(--np-good, #28926d)" }
       : group.confidence === "low"
-      ? { label: t("confidence_labels.low"), color: "var(--np-notable, #b87a1f)", icon: "🟡" }
-      : { label: t("confidence_labels.unknown"), color: "var(--np-neutral, #97a0b4)", icon: "⚪" };
+      ? { label: t("confidence_labels.low"), color: "var(--np-notable, #b87a1f)" }
+      : { label: t("confidence_labels.unknown"), color: "var(--np-neutral, #97a0b4)" };
 
   const lineageRegionId = `flow-lineage-${group.key}`;
 
@@ -68,7 +69,7 @@ export function ProcessRow({
             }}
             aria-label={`Attribution confidence: ${confidenceBadge.label}`}
           >
-            <span aria-hidden="true">{confidenceBadge.icon}</span>
+            <span aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: confidenceBadge.color, display: "inline-block" }} />
             {confidenceBadge.label}
           </span>
         </td>
@@ -117,10 +118,11 @@ export function ProcessRow({
                   <button
                     type="button"
                     className="np-btn np-btn--ghost"
-                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", border: "1px solid var(--np-accent, #2fe0d6)", color: "var(--np-accent, #2fe0d6)" }}
+                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", border: "1px solid var(--np-accent, #2fe0d6)", color: "var(--np-accent, #2fe0d6)", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
                     onClick={() => onInspectFlow(flowId)}
                   >
-                    🔍 {t("inspect_flow")}
+                    <Icon name="search" style={{ width: "12px", height: "12px" }} />
+                    {t("inspect_flow")}
                   </button>
                 </div>
               ))}

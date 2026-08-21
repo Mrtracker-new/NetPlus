@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { SeverityFilter } from "../../utils/timeline.utils";
+import { Icon } from "../../icons";
 
 export interface TimelineFiltersProps {
   searchQuery: string;
@@ -132,6 +133,7 @@ export function TimelineFilters({
         <button
           type="button"
           className="np-btn np-btn--ghost"
+          onClick={onClearFilters}
           style={{
             fontSize: "0.8rem",
             padding: "0.35rem 0.75rem",
@@ -139,10 +141,13 @@ export function TimelineFilters({
             border: "1px solid var(--np-accent, #2fe0d6)",
             color: "var(--np-accent, #2fe0d6)",
             whiteSpace: "nowrap",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "0.3rem",
           }}
-          onClick={onClearFilters}
         >
-          ✕ {t("clear_filter")}
+          <Icon name="close" style={{ width: "12px", height: "12px" }} />
+          <span>{t("clear_filter")}</span>
         </button>
       )}
     </div>

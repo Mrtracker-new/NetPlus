@@ -320,7 +320,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
     if (this.state.hasError) {
       return (
         <div style={{ padding: "2rem", color: "#ef4444", background: "var(--np-bg, #0b1019)", minHeight: "100vh" }}>
-          <h2>⚠️ Something went wrong</h2>
+          <h2 style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+            <Icon name="alertTriangle" style={{ width: "22px", height: "22px" }} />
+            Something went wrong
+          </h2>
           <pre style={{ background: "rgba(255,255,255,0.05)", padding: "1rem", borderRadius: "8px", color: "#f59e0b" }}>
             {this.state.error}
           </pre>

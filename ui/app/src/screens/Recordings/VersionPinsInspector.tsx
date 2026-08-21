@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { RecordingSummary } from "@netpulse/contract";
+import { Icon } from "../../icons";
 
 export interface VersionPinsInspectorProps {
   versionPins: RecordingSummary["version_pins"];
@@ -10,8 +11,9 @@ export function VersionPinsInspector({ versionPins }: VersionPinsInspectorProps)
 
   return (
     <details className="np-recording__pins">
-      <summary>
-        📌 {t("card.version_pins")}
+      <summary style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem", cursor: "pointer" }}>
+        <Icon name="pin" style={{ width: "13px", height: "13px" }} />
+        <span>{t("card.version_pins")}</span>
       </summary>
       <div className="np-recording__pins-grid">
         <div><strong>Engine:</strong> <code>{versionPins.engine}</code></div>

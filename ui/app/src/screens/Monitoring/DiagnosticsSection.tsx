@@ -3,6 +3,7 @@ import { HealthIndicator } from "@netpulse/viz";
 import type { Diagnosis, EvidenceRef } from "@netpulse/contract";
 import type { SubsystemStatus, ActiveAlert, IntelligentRecommendation } from "./monitoringTypes";
 import { DiagnosisCard } from "./DiagnosisCard";
+import { Icon } from "../../icons";
 
 export interface DiagnosticsSectionProps {
   alerts: ActiveAlert[];
@@ -102,11 +103,15 @@ export function DiagnosticsSection({
                 border: "none",
                 color: "var(--np-text-mute)",
                 cursor: "pointer",
-                fontSize: "1rem",
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "4px",
               }}
               onClick={() => setSelectedSubsystem(null)}
+              aria-label="Close details"
             >
-              ✕
+              <Icon name="close" style={{ width: "14px", height: "14px" }} />
             </button>
           </div>
         )}
@@ -124,8 +129,9 @@ export function DiagnosticsSection({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
             {alerts.length === 0 ? (
-              <p style={{ color: "var(--np-good, #10b981)", fontSize: "0.85rem", margin: 0 }}>
-                ✓ No active telemetry alerts detected. System metrics nominal.
+              <p style={{ color: "var(--np-good, #10b981)", fontSize: "0.85rem", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                <Icon name="checkCircle" style={{ width: "14px", height: "14px" }} />
+                <span>No active telemetry alerts detected. System metrics nominal.</span>
               </p>
             ) : (
               alerts.map((a) => (
@@ -171,8 +177,9 @@ export function DiagnosticsSection({
                   boxShadow: "var(--np-neu-sm)",
                 }}
               >
-                <div style={{ fontWeight: 600, color: "var(--np-monitor-primary, #00f2fe)" }}>
-                  💡 {r.title}
+                <div style={{ fontWeight: 600, color: "var(--np-monitor-primary, #00f2fe)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                  <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
+                  <span>{r.title}</span>
                 </div>
                 <div style={{ color: "var(--np-text-dim)", marginTop: "3px" }}>{r.action}</div>
               </div>

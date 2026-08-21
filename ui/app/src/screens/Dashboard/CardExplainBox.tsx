@@ -2,6 +2,7 @@ import { memo, useState, useEffect } from "react";
 import type { NarrativeCard, EvidenceRef } from "@netpulse/contract";
 import { formatEvidenceLabel } from "@netpulse/components";
 import { ConfidenceMeter } from "@netpulse/viz";
+import { Icon } from "../../icons";
 
 interface CardExplainBoxProps {
   card: NarrativeCard;
@@ -61,14 +62,17 @@ export const CardExplainBox = memo(function CardExplainBox({
   return (
     <div className="np-explain-box" role="region" aria-label="Explanation details">
       <div className="np-explain-box__header">
-        <span className="np-explain-box__tag">💡 Explanation</span>
+        <span className="np-explain-box__tag" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
+          <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
+          Explanation
+        </span>
         <button
           type="button"
           className="np-explain-box__close"
           onClick={onClose}
           aria-label="Close explanation"
         >
-          ✕
+          <Icon name="close" style={{ width: "14px", height: "14px" }} />
         </button>
       </div>
 
@@ -94,7 +98,7 @@ export const CardExplainBox = memo(function CardExplainBox({
               onClick={() => setShowInlineDrawer(false)}
               aria-label="Close technical drawer"
             >
-              ✕
+              <Icon name="close" style={{ width: "14px", height: "14px" }} />
             </button>
           </div>
 
@@ -155,8 +159,10 @@ export const CardExplainBox = memo(function CardExplainBox({
             type="button"
             className={`np-btn np-btn--sm ${showInlineDrawer ? "np-btn--primary" : "np-btn--ghost"}`}
             onClick={() => setShowInlineDrawer(!showInlineDrawer)}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
           >
-            {showInlineDrawer ? "Hide Quick Peek Drawer" : "Quick Peek Drawer 🔍"}
+            <Icon name="search" style={{ width: "12px", height: "12px" }} />
+            {showInlineDrawer ? "Hide Quick Peek Drawer" : "Quick Peek Drawer"}
           </button>
         )}
         {onNavigateToScreen && evidenceRef && (

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@netpulse/components";
+import { Icon } from "../../icons";
 import type { LevelFilter } from "../../hooks/useLearnController";
 
 export interface LearnFiltersProps {
@@ -52,8 +53,10 @@ export function LearnFilters({
         className={`np-learn__filter ${groundedOnly ? "np-learn__filter--active" : ""}`}
         aria-pressed={groundedOnly}
         onClick={onToggleGrounded}
+        style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
       >
-        🎯 {groundedOnly ? t("filters.show_all") : `${t("filters.grounded_only")} (${groundedCount})`}
+        <Icon name="target" style={{ width: "13px", height: "13px" }} />
+        <span>{groundedOnly ? t("filters.show_all") : `${t("filters.grounded_only")} (${groundedCount})`}</span>
       </Button>
     </div>
   );

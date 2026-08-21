@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Sparkline } from "@netpulse/viz";
+import { Icon } from "../../icons";
 import type { ProcessMetricRow } from "./monitoringTypes";
 
 export interface ProcessAttributesCardProps {
@@ -117,7 +118,7 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
             padding: "1rem",
           }}
         >
-          <span style={{ fontSize: "1.5rem" }}>⚡</span>
+          <Icon name="zap" style={{ width: "24px", height: "24px", color: "var(--np-accent, #2fe0d6)" }} />
           <span>Capture Standby — No active process telemetry recorded.</span>
         </div>
       ) : (

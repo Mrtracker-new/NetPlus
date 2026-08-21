@@ -62,10 +62,11 @@ export function Timeline() {
               <button
                 type="button"
                 className="np-btn np-btn--ghost"
-                style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem" }}
+                style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
                 onClick={actions.clearFilters}
               >
-                ✕ {t("clear_filter")}
+                <Icon name="close" style={{ width: "12px", height: "12px" }} />
+                <span>{t("clear_filter")}</span>
               </button>
             </div>
           </Notice>

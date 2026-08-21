@@ -190,10 +190,14 @@ export function Journey() {
               border: "1px solid var(--np-accent)",
               color: "var(--np-accent)",
               whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "0.3rem",
             }}
             onClick={clearNavigationTarget}
           >
-            ✕ {t("clear_filter")}
+            <Icon name="close" style={{ width: "13px", height: "13px" }} />
+            {t("clear_filter")}
           </button>
         )}
       </div>

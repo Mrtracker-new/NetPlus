@@ -45,8 +45,10 @@ export function Assistant() {
             type="button"
             className="np-assistant__clear-btn"
             onClick={actions.clearHistory}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
           >
-            🗑️ {t("clear_history")}
+            <Icon name="trash" style={{ width: "14px", height: "14px" }} />
+            {t("clear_history")}
           </Button>
         )}
       </header>
@@ -57,7 +59,9 @@ export function Assistant() {
       <form className="np-assistant__form" onSubmit={handleSubmit} noValidate>
         <div className="np-assistant__bar">
           <div className="np-assistant__input-wrapper">
-            <span className="np-assistant__input-icon" aria-hidden="true">💬</span>
+            <span className="np-assistant__input-icon" aria-hidden="true">
+              <Icon name="chat" style={{ width: "16px", height: "16px" }} />
+            </span>
             <Input
               className="np-assistant__input"
               type="text"
@@ -101,7 +105,7 @@ export function Assistant() {
       ) : (
         <EmptyState
           icon={<Icon name="assistant" />}
-          title={`🤖 ${t("empty.title")}`}
+          title={t("empty.title")}
           description={t("empty.subtitle")}
         />
       )}

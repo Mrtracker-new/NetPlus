@@ -88,7 +88,7 @@ export function Replay() {
       ) : !viewModel.hasRecording ? (
         <EmptyState
           icon={<Icon name="replay" />}
-          title={`📼 ${t("empty.title")}`}
+          title={t("empty.title")}
           description={t("empty.subtitle")}
         />
       ) : (

@@ -78,8 +78,10 @@ export function Explorer() {
             variant="standard"
             className="np-explorer__search-clear"
             onClick={clearSearch}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
           >
-            ✕ {t("clear_search")}
+            <Icon name="close" style={{ width: "13px", height: "13px" }} />
+            {t("clear_search")}
           </Button>
         )}
       </div>

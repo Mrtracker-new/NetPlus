@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Badge, Button, Card, EvidenceChips, Spinner } from "@netpulse/components";
+import { Icon } from "../../icons";
 import type { ConversationTurn } from "../../hooks/useAssistantController";
 import { useEvidenceNavigation } from "../../context/EvidenceNavigationContext";
 import { DisclosurePanel } from "./DisclosurePanel";
@@ -31,8 +32,9 @@ export function ConversationTurnCard({ turn, onRetry, onDelete }: ConversationTu
     <Card className="np-assistant__turn">
       {/* User Question */}
       <div className="np-assistant__turn-header">
-        <h3 className="np-assistant__question">
-          💬 {turn.question}
+        <h3 className="np-assistant__question" style={{ display: "flex", alignItems: "center", gap: "0.4rem" }}>
+          <Icon name="chat" style={{ width: "16px", height: "16px", color: "var(--np-accent, #2fe0d6)", flexShrink: 0 }} />
+          <span>{turn.question}</span>
         </h3>
         <Button
           type="button"
@@ -41,7 +43,7 @@ export function ConversationTurnCard({ turn, onRetry, onDelete }: ConversationTu
           title={t("delete_turn")}
           aria-label={t("delete_turn")}
         >
-          ✕
+          <Icon name="close" style={{ width: "14px", height: "14px" }} />
         </Button>
       </div>
 
@@ -65,7 +67,10 @@ export function ConversationTurnCard({ turn, onRetry, onDelete }: ConversationTu
               variant="posture"
               className={turn.answer.is_remote ? "np-posture--remote" : "np-posture--local"}
             >
-              {turn.answer.is_remote ? t("posture.remote") : t("posture.local")} · {turn.answer.backend_id}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                <Icon name={turn.answer.is_remote ? "globe" : "lock"} style={{ width: "12px", height: "12px" }} />
+                {turn.answer.is_remote ? t("posture.remote") : t("posture.local")} · {turn.answer.backend_id}
+              </span>
             </Badge>
 
             {turn.answer.grounded ? (

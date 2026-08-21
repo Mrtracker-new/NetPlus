@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { LessonDetail } from "@netpulse/contract";
 import { Badge, Button, Card, EvidenceChips, Notice } from "@netpulse/components";
+import { Icon } from "../../icons";
 import { useEvidenceNavigation } from "../../context/EvidenceNavigationContext";
 
 export interface LessonWorkspaceProps {
@@ -68,17 +69,33 @@ export function LessonWorkspace({
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginTop: "0.5rem" }}>
             <Badge variant="level">{lesson.level}</Badge>
             <Badge variant="trust">
-              {lesson.status === "mastered"
-                ? "🏆 Mastered"
-                : lesson.status === "completed"
-                ? "✓ Completed"
-                : lesson.status === "in_progress"
-                ? "⏳ In Progress"
-                : "Not Started"}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                {lesson.status === "mastered" ? (
+                  <>
+                    <Icon name="trophy" style={{ width: "12px", height: "12px", color: "var(--np-notable, #f59e0b)" }} />
+                    Mastered
+                  </>
+                ) : lesson.status === "completed" ? (
+                  <>
+                    <Icon name="check" style={{ width: "12px", height: "12px", color: "var(--np-good, #10b981)" }} />
+                    Completed
+                  </>
+                ) : lesson.status === "in_progress" ? (
+                  <>
+                    <Icon name="clock" style={{ width: "12px", height: "12px", color: "var(--np-accent, #2fe0d6)" }} />
+                    In Progress
+                  </>
+                ) : (
+                  "Not Started"
+                )}
+              </span>
             </Badge>
             {lesson.grounding && lesson.grounding.length > 0 && (
               <Badge variant="posture" className="np-lesson__grounded-tag">
-                🎯 {t("card.grounded_tag", { defaultValue: "Grounded in your traffic" })}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+                  <Icon name="target" style={{ width: "12px", height: "12px" }} />
+                  {t("card.grounded_tag", { defaultValue: "Grounded in your traffic" })}
+                </span>
               </Badge>
             )}
           </div>
@@ -98,8 +115,9 @@ export function LessonWorkspace({
       {/* 2. Learning Objectives */}
       {lesson.objectives && lesson.objectives.length > 0 && (
         <Card style={{ padding: "1rem", background: "var(--np-surface-2)" }}>
-          <h4 style={{ fontSize: "0.9rem", fontWeight: 600, margin: "0 0 0.5rem 0", color: "var(--np-accent)" }}>
-            🎯 {t("learning_objectives", { defaultValue: "Learning Objectives" })}
+          <h4 style={{ fontSize: "0.9rem", fontWeight: 600, margin: "0 0 0.5rem 0", color: "var(--np-accent)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="target" style={{ width: "14px", height: "14px" }} />
+            <span>{t("learning_objectives", { defaultValue: "Learning Objectives" })}</span>
           </h4>
           <ul style={{ margin: 0, paddingLeft: "1.25rem", fontSize: "0.875rem", color: "var(--np-text)" }}>
             {lesson.objectives.map((obj, i) => (
@@ -115,8 +133,9 @@ export function LessonWorkspace({
       {lesson.steps.length > 0 && (
         <section aria-labelledby="steps-heading" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h3 id="steps-heading" style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0 }}>
-              📖 {t("steps_title", { defaultValue: "Interactive Concept Walkthrough" })}
+            <h3 id="steps-heading" style={{ fontSize: "1.1rem", fontWeight: 600, margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Icon name="book" style={{ width: "16px", height: "16px" }} />
+              <span>{t("steps_title", { defaultValue: "Interactive Concept Walkthrough" })}</span>
             </h3>
             <div style={{ fontSize: "0.85rem", color: "var(--np-text-mute)" }}>
               Step {activeStepIndex + 1} of {lesson.steps.length}
@@ -174,7 +193,7 @@ export function LessonWorkspace({
                     gap: "0.75rem",
                   }}
                 >
-                  <span style={{ fontSize: "1.2rem" }}>🎬</span>
+                  <Icon name="play" style={{ width: "18px", height: "18px", color: "var(--np-accent)", flexShrink: 0 }} />
                   <div style={{ fontSize: "0.85rem", color: "var(--np-text)" }}>
                     <strong>Interactive Flow Diagram:</strong> Visualizing {activeStep.anim.replace(/_/g, " ")} sequence from live capture.
                   </div>
@@ -209,8 +228,9 @@ export function LessonWorkspace({
       {activeExercise && (
         <section aria-labelledby="exercise-heading" style={{ marginTop: "0.5rem" }}>
           <Card style={{ padding: "1.5rem", border: "1px solid var(--np-accent)" }}>
-            <h3 id="exercise-heading" style={{ fontSize: "1.1rem", fontWeight: 700, margin: "0 0 0.75rem 0", color: "var(--np-accent)" }}>
-              ❓ {t("comprehension_check", { defaultValue: "Comprehension Check" })}
+            <h3 id="exercise-heading" style={{ fontSize: "1.1rem", fontWeight: 700, margin: "0 0 0.75rem 0", color: "var(--np-accent)", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <Icon name="help" style={{ width: "16px", height: "16px" }} />
+              <span>{t("comprehension_check", { defaultValue: "Comprehension Check" })}</span>
             </h3>
 
             <p style={{ fontSize: "1rem", fontWeight: 500, margin: "0 0 1rem 0", color: "var(--np-text)" }}>
@@ -276,8 +296,12 @@ export function LessonWorkspace({
               <div style={{ marginTop: "1rem" }}>
                 <Notice level={validationOutcome.is_correct ? "success" : "warning"}>
                   <div>
-                    <div style={{ fontWeight: 700, marginBottom: "0.25rem" }}>
-                      {validationOutcome.is_correct ? "🎉 Correct!" : "⚠️ Not quite."}
+                    <div style={{ fontWeight: 700, marginBottom: "0.25rem", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                      <Icon
+                        name={validationOutcome.is_correct ? "checkCircle" : "alertTriangle"}
+                        style={{ width: "16px", height: "16px" }}
+                      />
+                      <span>{validationOutcome.is_correct ? "Correct!" : "Not quite."}</span>
                     </div>
                     <div style={{ fontSize: "0.9rem", marginBottom: "0.5rem" }}>
                       {validationOutcome.feedback}
@@ -305,8 +329,9 @@ export function LessonWorkspace({
       {/* 5. Real Grounded Evidence References */}
       {lesson.evidence && lesson.evidence.length > 0 && (
         <footer style={{ marginTop: "0.5rem" }}>
-          <h4 style={{ fontSize: "0.85rem", fontWeight: 600, margin: "0 0 0.5rem 0", color: "var(--np-text-mute)" }}>
-            🔍 {t("card.observed_evidence", { defaultValue: "Captured Evidence in Your Data" })}:
+          <h4 style={{ fontSize: "0.85rem", fontWeight: 600, margin: "0 0 0.5rem 0", color: "var(--np-text-mute)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="search" style={{ width: "13px", height: "13px" }} />
+            <span>{t("card.observed_evidence", { defaultValue: "Captured Evidence in Your Data" })}:</span>
           </h4>
           <EvidenceChips evidence={lesson.evidence} onNavigate={navigateToEvidence} />
         </footer>

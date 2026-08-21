@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Button } from "@netpulse/components";
+import { Icon } from "../../icons";
 import { AVAILABLE_LAYERS } from "../../hooks/useSandboxController";
 
 export interface LayerBuilderProps {
@@ -135,13 +136,13 @@ export function LayerBuilder({
                   <button
                     type="button"
                     className="np-btn np-btn--ghost"
-                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", color: "var(--np-finding)" }}
+                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", color: "var(--np-finding)", display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                     disabled={isOnlyOne || isBuilding}
                     onClick={() => onRemoveLayer(index)}
                     aria-label={`Remove ${layer} layer`}
                     title={`Remove ${layer} layer`}
                   >
-                    ✕
+                    <Icon name="close" style={{ width: "12px", height: "12px" }} />
                   </button>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import type { PluginDescriptor } from "@netpulse/contract";
 import { Button } from "@netpulse/components";
+import { Icon } from "../../icons";
 import { PluginConfigForm } from "./PluginConfigForm";
 
 export interface PluginCardProps {
@@ -22,8 +23,9 @@ export function PluginCard({ p, busy, onToggle, onConfigure, onReset }: PluginCa
     <article className={p.enabled ? "np-plugin np-plugin--on" : "np-plugin"}>
       <header className="np-plugin__head">
         <div className="np-plugin__title-group">
-          <h3 className="np-plugin__name">
-            🔌 {p.name}
+          <h3 className="np-plugin__name" style={{ display: "flex", alignItems: "center", gap: "0.35rem" }}>
+            <Icon name="plugins" style={{ width: "16px", height: "16px", color: "var(--np-accent, #2fe0d6)", flexShrink: 0 }} />
+            <span>{p.name}</span>
           </h3>
           <span className="np-plugin__type-badge">
             {t(`types.${pluginType}` as any, { defaultValue: pluginType })}
@@ -52,15 +54,17 @@ export function PluginCard({ p, busy, onToggle, onConfigure, onReset }: PluginCa
           {p.compatible ? t("card.compatible") : t("card.incompatible")}
         </span>
         {p.disabled_reason && (
-          <span className="np-plugin__reason">
-            ⚠️ {p.disabled_reason}
+          <span className="np-plugin__reason" style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+            <Icon name="alertTriangle" style={{ width: "13px", height: "13px" }} />
+            <span>{p.disabled_reason}</span>
           </span>
         )}
       </div>
 
       <footer className="np-plugin__foot">
-        <span className="np-plugin__source">
-          📍 {p.source}
+        <span className="np-plugin__source" style={{ display: "inline-flex", alignItems: "center", gap: "0.3rem" }}>
+          <Icon name="pin" style={{ width: "13px", height: "13px" }} />
+          <span>{p.source}</span>
         </span>
 
         <Button

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { TopologyGraph, type TopologyNode, type TopologyEdge } from "@netpulse/viz";
+import { Icon } from "../../icons";
 
 export interface ApplicationsLineageCardProps {
   nodes: TopologyNode[];
@@ -139,7 +140,7 @@ export function ApplicationsLineageCard({
             padding: "1rem",
           }}
         >
-          <span style={{ fontSize: "1.5rem" }}>📡</span>
+          <Icon name="radio" style={{ width: "24px", height: "24px", color: "var(--np-accent, #2fe0d6)" }} />
           <span>Capture Standby — Start a packet capture to observe live network flow lineage.</span>
         </div>
       ) : (
@@ -182,13 +183,16 @@ export function ApplicationsLineageCard({
               background: "transparent",
               border: "none",
               color: "var(--np-text-mute)",
-              fontSize: "1rem",
               cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "4px",
             }}
             onClick={() => onSelectNode?.(null)}
             aria-label="Close node details"
           >
-            ✕
+            <Icon name="close" style={{ width: "14px", height: "14px" }} />
           </button>
         </div>
       )}

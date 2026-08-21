@@ -12,6 +12,7 @@ import { SituationSummary } from "./Dashboard/SituationSummary";
 import { NarrativeFilterBar } from "./Dashboard/NarrativeFilterBar";
 import { KpiCards } from "./Dashboard/KpiCards";
 import { CardExplainBox } from "./Dashboard/CardExplainBox";
+import { Icon } from "../icons";
 
 export class WidgetErrorBoundary extends Component<
   { children: ReactNode; title: string },
@@ -30,24 +31,14 @@ export class WidgetErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div
-          role="alert"
-          style={{
-            padding: "var(--np-4)",
-            background: "var(--np-surface-1)",
-            border: "1px solid var(--np-finding, #ef4444)",
-            borderRadius: "var(--np-radius-lg)",
-            color: "var(--np-text)",
-            margin: "var(--np-2) 0",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-            <div>
-              <strong>{this.props.title} Unavailable</strong>
-              <div style={{ fontSize: "0.85rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
-                {this.state.error || "An unexpected error occurred while rendering this widget."}
-              </div>
-            </div>
+        <div className="np-panel" style={{ border: "1px dashed var(--np-finding, #ef4444)", padding: "1.5rem" }}>
+          <h3 style={{ color: "var(--np-finding, #ef4444)", margin: "0 0 0.5rem 0", fontSize: "0.95rem" }}>
+            Widget Failure: {this.props.title}
+          </h3>
+          <p style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", margin: "0 0 1rem 0" }}>
+            {this.state.error}
+          </p>
+          <div>
             <button
               type="button"
               className="np-btn np-btn--ghost np-btn--sm"
@@ -63,10 +54,10 @@ export class WidgetErrorBoundary extends Component<
   }
 }
 
-const SEVERITY_ICON: Record<Severity, string> = {
+const SEVERITY_ICON: Record<Severity, ReactNode> = {
   neutral: "•",
   notable: "◆",
-  finding: "⚠",
+  finding: <Icon name="alertTriangle" style={{ width: "12px", height: "12px", display: "inline-block", verticalAlign: "middle" }} />,
 };
 
 interface CardProps {

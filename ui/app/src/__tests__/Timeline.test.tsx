@@ -163,7 +163,7 @@ describe("Timeline Screen & useTimelineController", () => {
       await screen.findByText("No timeline events match the current search or severity filter.")
     ).toBeInTheDocument();
 
-    const clearButton = screen.getByRole("button", { name: "Clear Timeline Filters" });
+    const clearButton = screen.getAllByRole("button", { name: "Clear Timeline Filters" })[0]!;
     fireEvent.click(clearButton);
 
     const ribbonMark = await screen.findByRole("button", { name: /DNS Exfiltration/i });

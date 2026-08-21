@@ -31,7 +31,7 @@ describe("Assistant Screen & useAssistantController", () => {
   it("renders empty capability guide when conversation history is empty", () => {
     render(<AssistantTestWrapper />);
 
-    expect(screen.getByText("🤖 Ask NetPulse Assistant")).toBeInTheDocument();
+    expect(screen.getByText("Ask NetPulse Assistant")).toBeInTheDocument();
     expect(
       screen.getByText("Query captured traffic, isolate latency causes, and audit protocol behaviors with zero data egress.")
     ).toBeInTheDocument();
@@ -58,11 +58,11 @@ describe("Assistant Screen & useAssistantController", () => {
     const askBtn = screen.getByRole("button", { name: "Ask" });
     fireEvent.click(askBtn);
 
-    expect(await screen.findByText("💬 Which host used the most bandwidth?")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Which host used the most bandwidth/i })).toBeInTheDocument();
     expect(
       screen.getByText("The highest bandwidth host was 192.168.1.105 generating 45MB over HTTPS.")
     ).toBeInTheDocument();
-    expect(screen.getByText("🔒 Local (Zero Egress) · llama3-local")).toBeInTheDocument();
+    expect(screen.getByText("Local (Zero Egress) · llama3-local")).toBeInTheDocument();
     expect(screen.getByText("flow #flow-42")).toBeInTheDocument();
   });
 
@@ -81,10 +81,10 @@ describe("Assistant Screen & useAssistantController", () => {
 
     render(<AssistantTestWrapper />);
 
-    const suggestionBtn = screen.getByRole("button", { name: "💡 What protocols am I using?" });
+    const suggestionBtn = screen.getByRole("button", { name: /What protocols am I using/i });
     fireEvent.click(suggestionBtn);
 
-    expect(await screen.findByText("💬 What protocols am I using?")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /What protocols am I using/i })).toBeInTheDocument();
     expect(screen.getByText("Active protocols include TLS 1.3, QUIC, and DNS.")).toBeInTheDocument();
   });
 
@@ -103,15 +103,15 @@ describe("Assistant Screen & useAssistantController", () => {
 
     render(<AssistantTestWrapper />);
 
-    const suggestionBtn = screen.getByRole("button", { name: "💡 Summarize my traffic" });
+    const suggestionBtn = screen.getByRole("button", { name: /Summarize my traffic/i });
     fireEvent.click(suggestionBtn);
 
-    expect(await screen.findByText("💬 Summarize my traffic")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /Summarize my traffic/i })).toBeInTheDocument();
 
-    const clearBtn = screen.getByRole("button", { name: "🗑️ Clear Chat" });
+    const clearBtn = screen.getByRole("button", { name: /Clear Chat/i });
     fireEvent.click(clearBtn);
 
-    expect(screen.queryByText("💬 Summarize my traffic")).not.toBeInTheDocument();
-    expect(screen.getByText("🤖 Ask NetPulse Assistant")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Summarize my traffic/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Ask NetPulse Assistant")).toBeInTheDocument();
   });
 });

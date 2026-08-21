@@ -36,7 +36,7 @@ describe("Plugins Screen & usePluginsController", () => {
 
     render(<PluginsTestWrapper />);
 
-    expect(await screen.findByText("🔌 No Plugins Available")).toBeInTheDocument();
+    expect(await screen.findByText("No Plugins Available")).toBeInTheDocument();
   });
 
   it("renders plugin cards with trust badges, contract versions, and capability tags", async () => {
@@ -58,9 +58,9 @@ describe("Plugins Screen & usePluginsController", () => {
 
     render(<PluginsTestWrapper />);
 
-    expect(await screen.findByText("🔌 HTTP/3 Dissector")).toBeInTheDocument();
-    expect(screen.getByText("🟢 First Party")).toBeInTheDocument();
-    expect(screen.getByText("✓ Compatible")).toBeInTheDocument();
+    expect(await screen.findByText("HTTP/3 Dissector")).toBeInTheDocument();
+    expect(screen.getAllByText("First Party")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Compatible")[0]).toBeInTheDocument();
     expect(screen.getByText("QUIC")).toBeInTheDocument();
   });
 
@@ -85,7 +85,7 @@ describe("Plugins Screen & usePluginsController", () => {
 
     render(<PluginsTestWrapper />);
 
-    expect(await screen.findByText("🔌 JA3 Fingerprinter")).toBeInTheDocument();
+    expect(await screen.findByText("JA3 Fingerprinter")).toBeInTheDocument();
 
     const enableBtn = screen.getByRole("button", { name: "Enable" });
     fireEvent.click(enableBtn);

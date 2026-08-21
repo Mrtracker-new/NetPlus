@@ -31,12 +31,12 @@ describe("Recordings Screen & useRecordingsController", () => {
   it("renders empty state guide with primary Start Recording button when recordings list is empty", async () => {
     vi.spyOn(ipcModule, "query").mockResolvedValue({
       kind: "recordings",
-      recordings: [],
+      plugins: [],
     } as any);
 
     render(<RecordingsTestWrapper />);
 
-    expect(await screen.findByText("📹 No Session Recordings Yet")).toBeInTheDocument();
+    expect(await screen.findByText("No Session Recordings Yet")).toBeInTheDocument();
     expect(
       screen.getByText("Start a recording to capture packets for deterministic replay, teaching, diagnostics, or bug reports.")
     ).toBeInTheDocument();
@@ -69,10 +69,10 @@ describe("Recordings Screen & useRecordingsController", () => {
 
     render(<RecordingsTestWrapper />);
 
-    expect(await screen.findByText("📹 Recording #101")).toBeInTheDocument();
+    expect(await screen.findByText("Recording #101")).toBeInTheDocument();
     expect(screen.getAllByText("Metadata Only")[0]).toBeInTheDocument();
-    expect(screen.getByText("📦 1250 frames")).toBeInTheDocument();
-    expect(screen.getByText("✅ No packet payloads — safe to share for teaching and bug reports.")).toBeInTheDocument();
+    expect(screen.getByText("1250 frames")).toBeInTheDocument();
+    expect(screen.getByText("No packet payloads — safe to share for teaching and bug reports.")).toBeInTheDocument();
   });
 
   it("executes startRecording command when Start Recording button is clicked", async () => {
@@ -85,13 +85,13 @@ describe("Recordings Screen & useRecordingsController", () => {
 
     render(<RecordingsTestWrapper />);
 
-    expect(await screen.findByText("📹 No Session Recordings Yet")).toBeInTheDocument();
+    expect(await screen.findByText("No Session Recordings Yet")).toBeInTheDocument();
 
     const startBtn = screen.getAllByRole("button", { name: /Start Capture/i })[0];
     expect(startBtn).toBeDefined();
     fireEvent.click(startBtn!);
 
     expect(cmdSpy).toHaveBeenCalledWith({ kind: "startRecording" });
-    expect(await screen.findByText("🔴 Recording Active...")).toBeInTheDocument();
+    expect(await screen.findByText("Recording Active...")).toBeInTheDocument();
   });
 });

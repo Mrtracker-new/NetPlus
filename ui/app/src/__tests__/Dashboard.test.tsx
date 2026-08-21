@@ -170,9 +170,9 @@ describe("Dashboard Screen", () => {
     fireEvent.click(explainBtn);
 
     expect(screen.getByText("Why is this happening?")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Quick Peek Drawer 🔍" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Quick Peek Drawer/i })).toBeInTheDocument();
 
-    const drawerBtn = screen.getByRole("button", { name: "Quick Peek Drawer 🔍" });
+    const drawerBtn = screen.getByRole("button", { name: /Quick Peek Drawer/i });
     fireEvent.click(drawerBtn);
 
     expect(screen.getByText("Quick Peek Technical Evidence")).toBeInTheDocument();

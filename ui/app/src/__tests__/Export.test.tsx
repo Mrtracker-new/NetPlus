@@ -45,7 +45,7 @@ describe("Export Screen & useExportController", () => {
 
     render(<ExportTestWrapper />);
 
-    expect(await screen.findByText("🔒 Local File Only — NetPulse does not automatically transmit exported files.")).toBeInTheDocument();
+    expect(await screen.findByText(/Local File Only — NetPulse does not automatically transmit exported files/i)).toBeInTheDocument();
     expect(screen.getByText("pcapng")).toBeInTheDocument();
     expect(screen.getByText("JSON")).toBeInTheDocument();
     expect(screen.getByText("Metadata Only")).toBeInTheDocument();
@@ -68,12 +68,12 @@ describe("Export Screen & useExportController", () => {
 
     render(<ExportTestWrapper />);
 
-    expect(await screen.findByText("📍 NetPulse 0.1.0 · metadata-only")).toBeInTheDocument();
+    expect(await screen.findByText(/NetPulse 0.1.0 · metadata-only/i)).toBeInTheDocument();
 
     const fullPayloadBtn = screen.getByRole("radio", { name: "Full Payload" });
     fireEvent.click(fullPayloadBtn);
 
-    expect(await screen.findByText("📍 NetPulse 0.1.0 · full-payload")).toBeInTheDocument();
+    expect(await screen.findByText(/NetPulse 0.1.0 · full-payload/i)).toBeInTheDocument();
     expect(screen.getByText("full payload: packet payloads included")).toBeInTheDocument();
   });
 
@@ -96,9 +96,9 @@ describe("Export Screen & useExportController", () => {
 
     render(<ExportTestWrapper />);
 
-    expect(await screen.findByText("📥 Export to File")).toBeInTheDocument();
+    expect(await screen.findByText(/Export to File/i)).toBeInTheDocument();
 
-    const exportBtn = screen.getByRole("button", { name: "📥 Export to File" });
+    const exportBtn = screen.getByRole("button", { name: /Export to File/i });
     fireEvent.click(exportBtn);
 
     await waitFor(() => {

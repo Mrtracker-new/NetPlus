@@ -51,7 +51,7 @@ describe("Explorer Screen & useExplorerController", () => {
 
     expect(await screen.findByText("TLS Handshake")).toBeInTheDocument();
     expect(screen.getByText("tls_handshake")).toBeInTheDocument();
-    expect(screen.getByText("🎯 You have an example")).toBeInTheDocument();
+    expect(screen.getByText(/You have an example/i)).toBeInTheDocument();
     expect(screen.getByText("Establishes an encrypted connection with a server.")).toBeInTheDocument();
   });
 

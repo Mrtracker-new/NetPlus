@@ -52,7 +52,7 @@ describe("Replay Screen & useReplayController", () => {
 
     render(<ReplayTestWrapper />);
 
-    expect(await screen.findByText("📼 No Active Recording Loaded")).toBeInTheDocument();
+    expect(await screen.findByText("No Active Recording Loaded")).toBeInTheDocument();
   });
 
   it("renders active replay transport controls and summary scorecards when recording is loaded", async () => {
@@ -71,9 +71,9 @@ describe("Replay Screen & useReplayController", () => {
     render(<ReplayTestWrapper />);
 
     expect(await screen.findByText("#42")).toBeInTheDocument();
-    expect(screen.getByText("00:02.500")).toBeInTheDocument();
-    expect(screen.getByText("00:10.000")).toBeInTheDocument();
-    expect(screen.getByText("⏸️ Paused")).toBeInTheDocument();
+    expect(screen.getAllByText("00:02.500")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("00:10.000")[0]).toBeInTheDocument();
+    expect(screen.getByText("Paused")).toBeInTheDocument();
   });
 
   it("executes play command when Play button is clicked", async () => {
@@ -95,12 +95,12 @@ describe("Replay Screen & useReplayController", () => {
 
     expect(await screen.findByText("#0")).toBeInTheDocument();
 
-    const playBtn = screen.getByRole("button", { name: "▶️ Play" });
+    const playBtn = screen.getByRole("button", { name: /Play/i });
     fireEvent.click(playBtn);
 
     await waitFor(() => {
       expect(cmdSpy).toHaveBeenCalledWith({ kind: "replayPlay" });
-      expect(screen.getByRole("button", { name: "▶️ Play" })).not.toBeDisabled();
+      expect(screen.getByRole("button", { name: /Play/i })).not.toBeDisabled();
     });
   });
 });

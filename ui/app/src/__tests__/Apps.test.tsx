@@ -111,7 +111,7 @@ describe("Apps Screen & useAppsController", () => {
     fireEvent.click(expandButton);
 
     expect(await screen.findByText("Flow #202")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "🔍 Inspect Flow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Inspect Flow/i })).toBeInTheDocument();
   });
 
   it("filters process groups by search query and confidence level buttons", async () => {

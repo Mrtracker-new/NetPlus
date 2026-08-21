@@ -190,7 +190,7 @@ describe("Learn Screen & useLearnController", () => {
       choice_index: 0,
     });
 
-    expect(await screen.findByText("🎉 Correct!")).toBeInTheDocument();
-    expect(screen.getByText("Correct! SYN establishes sync.")).toBeInTheDocument();
+    expect(await screen.findByText("Correct! SYN establishes sync.")).toBeInTheDocument();
+    expect(screen.getByText("Correct!")).toBeInTheDocument();
   });
 });

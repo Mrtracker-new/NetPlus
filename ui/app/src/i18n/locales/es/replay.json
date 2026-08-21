@@ -6,10 +6,10 @@
     "subtitle": "Selecciona una sesión grabada para iniciar la reproducción determinista."
   },
   "status": {
-    "playing": "▶️ Reproduciendo",
-    "paused": "⏸️ En Pausa",
-    "completed": "🏁 Reproducción Completa",
-    "idle": "⏹ Sin Grabación Cargada"
+    "playing": "Reproduciendo",
+    "paused": "En Pausa",
+    "completed": "Reproducción Completa",
+    "idle": "Sin Grabación Cargada"
   },
   "kpis": {
     "frame": "Trama Actual",

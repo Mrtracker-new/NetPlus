@@ -7,8 +7,8 @@
     "subtitle": "Inicia una grabación para capturar paquetes para reproducción determinista, enseñanza o reportes de errores."
   },
   "status": {
-    "active": "🔴 Grabación Activa...",
-    "idle": "⏹ Captura Inactiva"
+    "active": "Grabación Activa...",
+    "idle": "Captura Inactiva"
   },
   "kpis": {
     "total": "Grabaciones Totales",

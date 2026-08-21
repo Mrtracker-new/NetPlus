@@ -15,8 +15,8 @@
     "capabilities": "Try asking:"
   },
   "posture": {
-    "local": "🔒 Local (Zero Egress)",
-    "remote": "🌐 Remote",
+    "local": "Local (Zero Egress)",
+    "remote": "Remote",
     "grounded_one": "Grounded ({{count}} citation)",
     "grounded_other": "Grounded ({{count}} citations)",
     "ungrounded": "No evidence to cite",

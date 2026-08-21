@@ -1,7 +1,7 @@
 {
   "title": "Exportar Artefactos",
   "desc": "Exporta datos de sesiones en formatos interoperables abiertos con controles granulares de privacidad.",
-  "zero_egress_badge": "🔒 Solo Archivo Local — NetPulse no transmite automáticamente los archivos exportados.",
+  "zero_egress_badge": "Solo Archivo Local — NetPulse no transmite automáticamente los archivos exportados.",
   "zero_egress_notice": "Esta operación de exportación se escribe directamente en tu dispositivo local.",
   "selection_label": "Rango de Selección",
   "format_label": "Formato de Exportación",

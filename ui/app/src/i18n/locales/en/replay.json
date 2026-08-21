@@ -6,10 +6,10 @@
     "subtitle": "Select a recorded session to initiate offline deterministic replay."
   },
   "status": {
-    "playing": "▶️ Playing",
-    "paused": "⏸️ Paused",
-    "completed": "🏁 Replay Complete",
-    "idle": "⏹ No Recording Loaded"
+    "playing": "Playing",
+    "paused": "Paused",
+    "completed": "Replay Complete",
+    "idle": "No Recording Loaded"
   },
   "kpis": {
     "frame": "Current Frame",

@@ -15,8 +15,8 @@
     "capabilities": "Prueba a preguntar:"
   },
   "posture": {
-    "local": "🔒 Local (Sin Salida)",
-    "remote": "🌐 Remoto",
+    "local": "Local (Sin Salida)",
+    "remote": "Remoto",
     "grounded_one": "Fundamentado ({{count}} cita)",
     "grounded_other": "Fundamentado ({{count}} citas)",
     "ungrounded": "Sin evidencia para citar",

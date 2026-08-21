@@ -1,7 +1,7 @@
 {
   "title": "Export Artifacts",
   "desc": "Export session data in open, interoperable formats with granular privacy consent controls.",
-  "zero_egress_badge": "🔒 Local File Only — NetPulse does not automatically transmit exported files.",
+  "zero_egress_badge": "Local File Only — NetPulse does not automatically transmit exported files.",
   "zero_egress_notice": "This export operation writes directly to your local device. Files remain on your local machine unless explicitly shared.",
   "selection_label": "Selection Range",
   "format_label": "Export Format",

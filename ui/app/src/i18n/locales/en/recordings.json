@@ -7,8 +7,8 @@
     "subtitle": "Start a recording to capture packets for deterministic replay, teaching, diagnostics, or bug reports."
   },
   "status": {
-    "active": "🔴 Recording Active...",
-    "idle": "⏹ Capture Idle"
+    "active": "Recording Active...",
+    "idle": "Capture Idle"
   },
   "kpis": {
     "total": "Total Recordings",

@@ -10,7 +10,7 @@
   "status_disabled": "Deshabilitado",
   "enable_action": "Habilitar Complemento",
   "disable_action": "Deshabilitar Complemento",
-  "zero_egress_badge": "🔒 Costuras de Extensión Limitadas — Los complementos no tienen acceso a la red y no pueden transmitir datos.",
+  "zero_egress_badge": "Costuras de Extensión Limitadas — Los complementos no tienen acceso a la red y no pueden transmitir datos.",
   "empty": {
     "title": "No Hay Complementos Disponibles",
     "subtitle": "Instala complementos para extender la decodificación de protocolos, análisis o capacidades de exportación."
@@ -37,14 +37,14 @@
     "export": "Exportación · formato de salida"
   },
   "trust": {
-    "first_party": "🟢 Oficial",
-    "reviewed": "🔵 Revisado",
-    "unreviewed": "🟠 No Revisado"
+    "first_party": "Oficial",
+    "reviewed": "Revisado",
+    "unreviewed": "No Revisado"
   },
   "card": {
     "contract": "contrato v{{version}}",
-    "compatible": "✓ Compatible",
-    "incompatible": "⚠ Actualización Requerida",
+    "compatible": "Compatible",
+    "incompatible": "Actualización Requerida",
     "status_enabled": "Habilitado",
     "status_disabled": "Deshabilitado",
     "enable_action": "Habilitar",

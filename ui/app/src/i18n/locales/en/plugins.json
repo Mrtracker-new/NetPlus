@@ -10,7 +10,7 @@
   "status_disabled": "Disabled",
   "enable_action": "Enable Plugin",
   "disable_action": "Disable Plugin",
-  "zero_egress_badge": "🔒 Bounded Extension Seams — Plugins have zero network access and cannot transmit data externally.",
+  "zero_egress_badge": "Bounded Extension Seams — Plugins have zero network access and cannot transmit data externally.",
   "empty": {
     "title": "No Plugins Available",
     "subtitle": "Install plugins to extend protocol decoding, analysis, or export capabilities."
@@ -37,14 +37,14 @@
     "export": "Export · output format"
   },
   "trust": {
-    "first_party": "🟢 First Party",
-    "reviewed": "🔵 Reviewed",
-    "unreviewed": "🟠 Unreviewed"
+    "first_party": "First Party",
+    "reviewed": "Reviewed",
+    "unreviewed": "Unreviewed"
   },
   "card": {
     "contract": "contract v{{version}}",
-    "compatible": "✓ Compatible",
-    "incompatible": "⚠ Update Required",
+    "compatible": "Compatible",
+    "incompatible": "Update Required",
     "status_enabled": "Enabled",
     "status_disabled": "Disabled",
     "enable_action": "Enable",

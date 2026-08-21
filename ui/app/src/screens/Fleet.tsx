@@ -74,9 +74,29 @@ export function FleetScreen() {
           <Skeleton height="80px" />
         </div>
       ) : hosts.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="fleet" />}
+          title="Standalone Local Node"
+          description={t("empty")}
+        />
       ) : filteredHosts.length === 0 ? (
-        <EmptyState>{t("no_filter_matches")}</EmptyState>
+        <EmptyState
+          compact
+          title="No Matching Nodes"
+          description={t("no_filter_matches")}
+          action={
+            <button
+              type="button"
+              className="np-btn np-btn--ghost np-btn--sm"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+              }}
+            >
+              Reset Filters
+            </button>
+          }
+        />
       ) : (
         <div className="np-fleet__grid" role="list" style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
           {filteredHosts.map((h) => (

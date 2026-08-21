@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton, Card, Button, Badge } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useLearnController } from "../hooks/useLearnController";
 import { LearnSummaryKpis } from "./Learn/LearnSummaryKpis";
 import { LearnFilters } from "./Learn/LearnFilters";
@@ -91,7 +92,11 @@ export function Learn() {
       {notice && <Notice message={notice} level="error" onDismiss={() => setNotice(null)} />}
 
       {allLessons.length === 0 ? (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="learn" />}
+          title="Interactive Curriculum"
+          description={t("empty")}
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
           {/* 1. Summary KPI Cards */}
@@ -172,9 +177,24 @@ export function Learn() {
               </section>
             ))
           ) : (
-            <EmptyState>
-              {level !== "all" ? t("no_filter_matches") : t("empty")}
-            </EmptyState>
+            <EmptyState
+              compact
+              title="No Matching Lessons"
+              description={level !== "all" ? t("no_filter_matches") : t("empty")}
+              action={
+                (level !== "all" || groundedOnly) ? (
+                  <Button
+                    variant="standard"
+                    onClick={() => {
+                      setLevel("all");
+                      if (groundedOnly) toggleGrounded();
+                    }}
+                  >
+                    Show All Lessons
+                  </Button>
+                ) : undefined
+              }
+            />
           )}
         </div>
       )}

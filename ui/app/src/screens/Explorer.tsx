@@ -105,9 +105,24 @@ export function Explorer() {
           <Skeleton height={110} width="100%" />
         </div>
       ) : filteredEntries.length === 0 ? (
-        <EmptyState>
-          {category !== "all" ? t("no_filter_matches") : t("empty")}
-        </EmptyState>
+        <EmptyState
+          icon={<Icon name="explorer" />}
+          title="No Protocol Entries Found"
+          description={category !== "all" ? t("no_filter_matches") : t("empty")}
+          action={
+            (category !== "all" || term) ? (
+              <Button
+                variant="standard"
+                onClick={() => {
+                  setCategory("all");
+                  setTerm("");
+                }}
+              >
+                Reset Filters
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         filteredEntries.map((entry) => (
           <ExplorerEntryCard

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useCompareController } from "../hooks/useCompareController";
 import { CompareControls } from "./Compare/CompareControls";
 import { CompareScorecards } from "./Compare/CompareScorecards";
@@ -86,7 +87,11 @@ export function SessionDiffScreen() {
           <EvidenceList evidence={diff.evidence} />
         </article>
       ) : (
-        <EmptyState>{t("empty")}</EmptyState>
+        <EmptyState
+          icon={<Icon name="compare" />}
+          title="Differential Session Comparison"
+          description={t("empty")}
+        />
       )}
     </section>
   );

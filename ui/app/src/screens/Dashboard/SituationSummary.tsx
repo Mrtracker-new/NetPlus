@@ -45,14 +45,29 @@ export const SituationSummary = memo(function SituationSummary({
 
           {rec && (
             <div className="np-situation-card__rec">
-              <button
-                type="button"
-                className={`np-rec-tag ${recClass} np-rec-btn`}
-                onClick={() => onSelectCategory?.("findings")}
-                aria-label={`Recommendation: ${rec.text}`}
-              >
-                <span className="np-rec-tag__prefix">Recommendation:</span> {rec.text}
-              </button>
+              {rec.type === "investigate" ? (
+                <button
+                  type="button"
+                  className={`np-rec-tag ${recClass} np-rec-btn`}
+                  onClick={() => onSelectCategory?.("findings")}
+                  aria-label={`Recommendation: ${rec.text}`}
+                >
+                  <span className="np-rec-tag__prefix">Recommendation:</span> {rec.text}
+                </button>
+              ) : rec.type === "monitor" ? (
+                <button
+                  type="button"
+                  className={`np-rec-tag ${recClass} np-rec-btn`}
+                  onClick={() => onSelectCategory?.("all")}
+                  aria-label={`Recommendation: ${rec.text}`}
+                >
+                  <span className="np-rec-tag__prefix">Action:</span> {rec.text}
+                </button>
+              ) : (
+                <span className={`np-rec-tag ${recClass}`} role="status">
+                  <span className="np-rec-tag__prefix">Status:</span> {rec.text}
+                </span>
+              )}
             </div>
           )}
         </div>

@@ -13,7 +13,7 @@ import type {
 } from "./viewModels";
 
 export function useDashboardController() {
-  const { monitor, feed, throughput } = useStore();
+  const { monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory } = useStore();
   const { depth, shows } = useDisclosure();
 
   // Local UI states
@@ -82,15 +82,18 @@ export function useDashboardController() {
       currentRateBps = throughputDeltas[throughputDeltas.length - 1] ?? 0;
     }
     const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s";
-    const sparklineActivity = throughputDeltas.length > 0 ? throughputDeltas.slice(-8) : [0];
+    const sparklineActivity = throughputDeltas.length > 1 ? throughputDeltas.slice(-8) : [0, 0];
+    const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [hosts, hosts];
+    const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [flows, flows];
+    const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [feed.length, feed.length];
 
     return [
       {
         id: "activity",
         label: "Network Activity",
         value: humanBytes(bytes),
-        rateDown: `▼ ${rateFormatted}`,
-        rateUp: "▲ 0 B/s",
+        rateDown: currentRateBps > 0 ? `▼ ${rateFormatted}` : "▼ 0 B/s",
+        rateUp: undefined,
         statusBadge: {
           text: bytes > 5_000_000 ? "Spike" : "Healthy",
           variant: bytes > 5_000_000 ? "spike" : "healthy",
@@ -111,7 +114,7 @@ export function useDashboardController() {
           text: hosts > 8 ? "Spike" : "Healthy",
           variant: "healthy",
         },
-        sparklineData: [hosts],
+        sparklineData: sparklineHosts,
         tooltip: {
           peak: `${hosts} hosts`,
           avg: `${hosts} active`,
@@ -127,7 +130,7 @@ export function useDashboardController() {
           text: flows > 30 ? "Congested" : "Quiet",
           variant: flows > 30 ? "congested" : "quiet",
         },
-        sparklineData: [flows],
+        sparklineData: sparklineFlows,
         tooltip: {
           peak: `${flows} flows`,
           avg: `${flows} concurrent`,
@@ -143,7 +146,7 @@ export function useDashboardController() {
           text: feed.some((f) => f.severity === "finding") ? "Spike" : "Learning",
           variant: feed.some((f) => f.severity === "finding") ? "spike" : "learning",
         },
-        sparklineData: [feed.length],
+        sparklineData: sparklineCards,
         tooltip: {
           peak: `${feed.length} cards`,
           avg: "Real-time feed",
@@ -152,7 +155,7 @@ export function useDashboardController() {
         },
       },
     ];
-  }, [monitor, feed, throughput]);
+  }, [monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory]);
 
   // 4. Health Telemetry View Model
   const healthViewModel: HealthViewModel = useMemo(() => {
@@ -169,11 +172,11 @@ export function useDashboardController() {
       },
       storage: {
         healthy: true,
-        label: "Ready",
+        label: "Active (Ring Buffer)",
       },
       ai: {
         ready: true,
-        label: "Ready",
+        label: "Local Heuristics",
       },
       npcap: {
         connected: isCapturing,
@@ -196,6 +199,19 @@ export function useDashboardController() {
       if (category === "tls" && !head.includes("tls") && !head.includes("https") && !sum.includes("tls") && !sum.includes("ssl")) return false;
       if (category === "applications" && !head.includes("app") && !head.includes("process") && !sum.includes("chrome") && !sum.includes("spotify")) return false;
       if (category === "security" && card.severity !== "finding" && card.severity !== "notable" && !head.includes("security") && !head.includes("dns")) return false;
+      if (
+        category === "network" &&
+        !head.includes("flow") &&
+        !head.includes("packet") &&
+        !head.includes("traffic") &&
+        !head.includes("port") &&
+        !head.includes("tcp") &&
+        !head.includes("udp") &&
+        !head.includes("ip") &&
+        !card.evidence.some((e) => e.kind === "flow" || e.kind === "packet")
+      ) {
+        return false;
+      }
 
       // Search Query Filter
       if (search.trim()) {

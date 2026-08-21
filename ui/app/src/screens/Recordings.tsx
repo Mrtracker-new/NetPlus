@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Badge, Button, Notice, Skeleton } from "@netpulse/components";
+import { Badge, Button, Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useRecordingsController } from "../hooks/useRecordingsController";
 import { RecordingsSummaryKpis } from "./Recordings/RecordingsSummaryKpis";
 import { RecordingsFilters } from "./Recordings/RecordingsFilters";
@@ -88,17 +89,16 @@ export function Recordings() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : summary.total === 0 ? (
-        <div className="np-recordings__empty">
-          <h3 className="np-recordings__empty-title">
-            📹 {t("empty.title")}
-          </h3>
-          <p className="np-recordings__empty-desc">
-            {t("empty.subtitle")}
-          </p>
-          <Button variant="primary" disabled={busy} onClick={() => void startRecording()}>
-            ▶️ {t("common:actions.start_capture")}
-          </Button>
-        </div>
+        <EmptyState
+          icon={<Icon name="recordings" />}
+          title={`📹 ${t("empty.title")}`}
+          description={t("empty.subtitle")}
+          action={
+            <Button variant="primary" disabled={busy} onClick={() => void startRecording()}>
+              ▶️ {t("common:actions.start_capture")}
+            </Button>
+          }
+        />
       ) : (
         <>
           {/* Summary KPI Scorecards */}

@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Notice, Skeleton } from "@netpulse/components";
+import { Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { usePluginsController } from "../hooks/usePluginsController";
 import { PluginsSummaryKpis } from "./Plugins/PluginsSummaryKpis";
 import { PluginsFilters } from "./Plugins/PluginsFilters";
@@ -50,14 +51,11 @@ export function Plugins() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : safeTotal === 0 ? (
-        <div className="np-plugins__empty">
-          <h3 className="np-plugins__empty-title">
-            🔌 {t("empty.title")}
-          </h3>
-          <p className="np-plugins__empty-desc">
-            {t("empty.subtitle")}
-          </p>
-        </div>
+        <EmptyState
+          icon={<Icon name="plugins" />}
+          title={`🔌 ${t("empty.title")}`}
+          description={t("empty.subtitle")}
+        />
       ) : (
         <>
           {/* Summary KPI Scorecards */}

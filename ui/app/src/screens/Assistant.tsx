@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
-import { Button, Card, Input, Notice } from "@netpulse/components";
+import { Button, Input, Notice, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useAssistantController } from "../hooks/useAssistantController";
 import { ConversationTurnCard } from "./Assistant/ConversationTurnCard";
 import { SuggestionChips } from "./Assistant/SuggestionChips";
@@ -98,15 +99,11 @@ export function Assistant() {
           ))}
         </div>
       ) : (
-        <Card className="np-assistant__empty-card">
-          <div className="np-assistant__empty-icon" aria-hidden="true">🤖</div>
-          <h3 className="np-assistant__empty-title">
-            🤖 {t("empty.title")}
-          </h3>
-          <p className="np-assistant__empty-desc">
-            {t("empty.subtitle")}
-          </p>
-        </Card>
+        <EmptyState
+          icon={<Icon name="assistant" />}
+          title={`🤖 ${t("empty.title")}`}
+          description={t("empty.subtitle")}
+        />
       )}
     </section>
   );

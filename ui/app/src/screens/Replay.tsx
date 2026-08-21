@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Badge, Notice, Skeleton } from "@netpulse/components";
+import { Badge, Notice, Skeleton, EmptyState } from "@netpulse/components";
+import { Icon } from "../icons";
 import { useReplayController } from "../hooks/useReplayController";
 import { ReplaySummaryKpis } from "./Replay/ReplaySummaryKpis";
 import { ReplayTransport } from "./Replay/ReplayTransport";
@@ -85,14 +86,11 @@ export function Replay() {
           <Skeleton height={140} width="100%" />
         </div>
       ) : !viewModel.hasRecording ? (
-        <div className="np-replay__empty">
-          <h3 className="np-replay__empty-title">
-            📼 {t("empty.title")}
-          </h3>
-          <p className="np-replay__empty-desc">
-            {t("empty.subtitle")}
-          </p>
-        </div>
+        <EmptyState
+          icon={<Icon name="replay" />}
+          title={`📼 ${t("empty.title")}`}
+          description={t("empty.subtitle")}
+        />
       ) : (
         <>
           {/* Replay Summary KPI Cards */}

@@ -5376,8 +5376,9 @@ svg path {
 .np-health-strip {
   display: flex;
   align-items: center;
-  gap: var(--np-3);
-  padding: var(--np-2) var(--np-4);
+  justify-content: space-between;
+  gap: var(--np-2);
+  padding: 6px var(--np-4);
   background: var(--np-surface-1);
   border: 1px solid var(--np-border-strong);
   border-radius: var(--np-radius-pill);
@@ -5397,7 +5398,8 @@ svg path {
 .np-health-strip__item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  flex-shrink: 0;
 }
 
 .np-health-dot {
@@ -5412,6 +5414,11 @@ svg path {
 .np-health-dot--active {
   background: var(--np-good);
   box-shadow: 0 0 8px var(--np-good);
+}
+
+.np-health-dot--warning {
+  background: var(--np-finding);
+  box-shadow: 0 0 8px var(--np-finding);
 }
 
 .np-health-strip__label {
@@ -5432,7 +5439,9 @@ svg path {
 .np-health-strip__divider {
   color: var(--np-border-strong);
   user-select: none;
-  opacity: 0.6;
+  opacity: 0.4;
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 /* 2. Situation Summary & Dynamic Hero Header */
@@ -5643,6 +5652,15 @@ svg path {
   gap: var(--np-2);
   font-family: var(--np-font-mono);
   font-size: var(--np-fs-xs);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.np-kpi-rate {
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 .np-kpi-rate--down { color: var(--np-accent-strong); }

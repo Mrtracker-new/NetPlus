@@ -14,7 +14,7 @@
 import { useEffect } from "react";
 import type { NarrativeCard, MonitorSnapshot, ProjectionDepth } from "@netpulse/contract";
 import { query } from "../ipc";
-import { setFeed, setMonitor } from "./store";
+import { setFeed, setMonitor, setError } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
 
 // Whole-history window; the engine bounds what it returns.
@@ -30,19 +30,34 @@ function inTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+let isRefreshing = false;
+
 async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promise<void> {
+  if (isRefreshing || cancelled()) return;
+  isRefreshing = true;
   try {
     const res = await query({ kind: "narrativeFeed", from_mono_nanos: FROM, to_mono_nanos: TO, depth });
-    if (!cancelled() && res.kind === "narrativeFeed") setFeed(res.cards);
-  } catch {
-    // Browser preview (no backend) or a transient IPC error — screens keep their
-    // honest empty states rather than crashing.
+    if (!cancelled() && res.kind === "narrativeFeed") {
+      setFeed(res.cards);
+      setError(null);
+    }
+  } catch (e) {
+    if (!cancelled() && inTauri()) {
+      setError(String(e));
+    }
   }
   try {
     const res = await query({ kind: "monitorSnapshot", from_mono_nanos: FROM, to_mono_nanos: TO });
-    if (!cancelled() && res.kind === "monitorSnapshot") setMonitor(res.snapshot);
-  } catch {
-    /* see above */
+    if (!cancelled() && res.kind === "monitorSnapshot") {
+      setMonitor(res.snapshot);
+      setError(null);
+    }
+  } catch (e) {
+    if (!cancelled() && inTauri()) {
+      setError(String(e));
+    }
+  } finally {
+    isRefreshing = false;
   }
 }
 
@@ -66,12 +81,14 @@ export function useLiveData(): void {
       import("@tauri-apps/api/event")
         .then(({ listen }) => {
           if (done) return;
-          listen<NarrativeCard[]>("feed-delta", (e) => setFeed(e.payload)).then((u) =>
-            unlisten.push(u),
-          );
-          listen<MonitorSnapshot>("monitor-snapshot", (e) => setMonitor(e.payload)).then((u) =>
-            unlisten.push(u),
-          );
+          listen<NarrativeCard[]>("feed-delta", (e) => setFeed(e.payload)).then((u) => {
+            if (done) u();
+            else unlisten.push(u);
+          });
+          listen<MonitorSnapshot>("monitor-snapshot", (e) => setMonitor(e.payload)).then((u) => {
+            if (done) u();
+            else unlisten.push(u);
+          });
         })
         .catch(() => {
           /* events unavailable — polling still covers us */

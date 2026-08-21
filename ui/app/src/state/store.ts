@@ -16,12 +16,28 @@ interface State {
   /** Rolling total-bytes-observed samples, one per snapshot, for a throughput
    *  trend. Bounded — a sparkline, not a historian. */
   throughput: number[];
+  /** Rolling host count samples for KPI sparkline trends. */
+  hostsHistory: number[];
+  /** Rolling active flow count samples for KPI sparkline trends. */
+  flowsHistory: number[];
+  /** Rolling card count samples for KPI sparkline trends. */
+  cardsHistory: number[];
+  /** Last connection or IPC error, or null when healthy. */
+  error: string | null;
 }
 
 const MAX_FEED = 1000;
 const MAX_SAMPLES = 60;
 
-let state: State = { feed: [], monitor: null, throughput: [] };
+let state: State = {
+  feed: [],
+  monitor: null,
+  throughput: [],
+  hostsHistory: [],
+  flowsHistory: [],
+  cardsHistory: [],
+  error: null,
+};
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -52,7 +68,8 @@ export function pushCards(cards: NarrativeCard[]): void {
   const merged = Array.from(existingMap.values())
     .sort((a, b) => b.at_mono_nanos - a.at_mono_nanos)
     .slice(0, MAX_FEED);
-  state = { ...state, feed: merged };
+  const cardsHistory = [...state.cardsHistory, merged.length].slice(-MAX_SAMPLES);
+  state = { ...state, feed: merged, cardsHistory };
   emit();
 }
 
@@ -60,17 +77,39 @@ export function pushCards(cards: NarrativeCard[]): void {
  *  returns the full current feed newest-first, so a poll *replaces* rather than
  *  prepends — otherwise re-polling would duplicate every card. */
 export function setFeed(cards: NarrativeCard[]): void {
-  state = { ...state, feed: cards.slice(0, MAX_FEED) };
+  const feed = cards.slice(0, MAX_FEED);
+  const cardsHistory = [...state.cardsHistory, feed.length].slice(-MAX_SAMPLES);
+  state = { ...state, feed, cardsHistory };
   emit();
 }
 
-/** Replace the current monitoring snapshot and append a throughput
- *  sample (total bytes across protocols) to the bounded trend history. */
+/** Replace the current monitoring snapshot and append samples
+ *  (total bytes, hosts count, flows count) to bounded trend histories. */
 export function setMonitor(snapshot: MonitorSnapshot): void {
   const total = snapshot.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
+  const hosts = snapshot.by_host.rows.length;
+  const flows = snapshot.by_host.rows.reduce((s, r) => s + r.flows, 0);
+
   const throughput = [...state.throughput, total].slice(-MAX_SAMPLES);
-  state = { ...state, monitor: snapshot, throughput };
+  const hostsHistory = [...state.hostsHistory, hosts].slice(-MAX_SAMPLES);
+  const flowsHistory = [...state.flowsHistory, flows].slice(-MAX_SAMPLES);
+
+  state = {
+    ...state,
+    monitor: snapshot,
+    throughput,
+    hostsHistory,
+    flowsHistory,
+  };
   emit();
+}
+
+/** Set or clear connection/engine error state. */
+export function setError(error: string | null): void {
+  if (state.error !== error) {
+    state = { ...state, error };
+    emit();
+  }
 }
 
 function getSnapshot(): State {
@@ -84,5 +123,13 @@ export function useStore(): State {
 
 // Test-only reset; not used by the app at runtime.
 export function __resetForTest(): void {
-  state = { feed: [], monitor: null, throughput: [] };
+  state = {
+    feed: [],
+    monitor: null,
+    throughput: [],
+    hostsHistory: [],
+    flowsHistory: [],
+    cardsHistory: [],
+    error: null,
+  };
 }

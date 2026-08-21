@@ -69,7 +69,7 @@ export const TimeRibbon = memo(function TimeRibbon({
   );
 
   if (events.length === 0) {
-    return <EmptyState>No timeline events to display.</EmptyState>;
+    return <EmptyState compact description="No timeline events to display." />;
   }
 
   const times = events.map((e) => e.at);

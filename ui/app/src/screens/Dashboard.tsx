@@ -1,16 +1,67 @@
-import { useCallback, useState } from "react";
+import { Component, type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity, EvidenceRef } from "@netpulse/contract";
 import { EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
 import { Constellation } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
-import { useStore } from "../state/store";
+import { useStore, setMonitor, setError } from "../state/store";
+import { query } from "../ipc";
 import { useDashboardController } from "./Dashboard/useDashboardController";
 import { HealthStrip } from "./Dashboard/HealthStrip";
 import { SituationSummary } from "./Dashboard/SituationSummary";
 import { NarrativeFilterBar } from "./Dashboard/NarrativeFilterBar";
 import { KpiCards } from "./Dashboard/KpiCards";
 import { CardExplainBox } from "./Dashboard/CardExplainBox";
+
+export class WidgetErrorBoundary extends Component<
+  { children: ReactNode; title: string },
+  { hasError: boolean; error: string }
+> {
+  state = { hasError: false, error: "" };
+
+  static getDerivedStateFromError(error: unknown) {
+    return { hasError: true, error: error instanceof Error ? error.message : String(error) };
+  }
+
+  componentDidCatch(error: unknown, info: unknown) {
+    console.error(`Widget Error in [${this.props.title}]:`, error, info);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          role="alert"
+          style={{
+            padding: "var(--np-4)",
+            background: "var(--np-surface-1)",
+            border: "1px solid var(--np-finding, #ef4444)",
+            borderRadius: "var(--np-radius-lg)",
+            color: "var(--np-text)",
+            margin: "var(--np-2) 0",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+            <div>
+              <strong>{this.props.title} Unavailable</strong>
+              <div style={{ fontSize: "0.85rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
+                {this.state.error || "An unexpected error occurred while rendering this widget."}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="np-btn np-btn--ghost np-btn--sm"
+              onClick={() => this.setState({ hasError: false, error: "" })}
+            >
+              Retry Widget
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const SEVERITY_ICON: Record<Severity, string> = {
   neutral: "•",
@@ -75,11 +126,12 @@ export interface DashboardProps {
   onRetry?: () => void;
 }
 
-export function Dashboard({ loading = false, error = null, onRetry }: DashboardProps) {
+export function Dashboard({ loading = false, error: propsError = null, onRetry }: DashboardProps) {
   const { t } = useTranslation("dashboard");
-  const { monitor } = useStore();
+  const { monitor, error: storeError } = useStore();
   const { navigateToEvidence } = useEvidenceNavigation();
   const hostRows = monitor?.by_host.rows ?? [];
+  const error = propsError ?? storeError;
 
   const {
     heroViewModel,
@@ -107,17 +159,36 @@ export function Dashboard({ loading = false, error = null, onRetry }: DashboardP
     [navigateToEvidence]
   );
 
+  const handleRetry = useCallback(() => {
+    if (onRetry) {
+      onRetry();
+    } else {
+      query({ kind: "monitorSnapshot", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER })
+        .then((res) => {
+          if (res.kind === "monitorSnapshot") {
+            setMonitor(res.snapshot);
+            setError(null);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [onRetry]);
+
   return (
     <section className="np-dash" aria-label="Network Dashboard">
       {/* 1. Capture & System Health Telemetry Strip */}
-      <HealthStrip health={healthViewModel} />
+      <WidgetErrorBoundary title="System Health">
+        <HealthStrip health={healthViewModel} />
+      </WidgetErrorBoundary>
 
       {/* 2. Situation Summary & Dynamic Hero Header */}
-      <SituationSummary
-        hero={heroViewModel}
-        summary={situationSummaryModel}
-        onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
-      />
+      <WidgetErrorBoundary title="Situation Summary">
+        <SituationSummary
+          hero={heroViewModel}
+          summary={situationSummaryModel}
+          onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
+        />
+      </WidgetErrorBoundary>
 
       {error && (
         <div style={{ marginBottom: "var(--np-4)" }}>
@@ -127,97 +198,118 @@ export function Dashboard({ loading = false, error = null, onRetry }: DashboardP
                 <strong>{t("error_backend_disconnected_title")}:</strong>{" "}
                 {error || t("error_backend_disconnected_desc")}
               </div>
-              {onRetry && (
-                <button type="button" className="np-btn np-btn--ghost" onClick={onRetry}>
-                  {t("retry_connection")}
-                </button>
-              )}
+              <button type="button" className="np-btn np-btn--ghost" onClick={handleRetry}>
+                {t("retry_connection")}
+              </button>
             </div>
           </Notice>
         </div>
       )}
 
-      {/* 3. Smart Narrative Feed Filter & Search Bar */}
-      <NarrativeFilterBar
-        category={category}
-        search={search}
-        onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
-        onSearchChange={(s) => dispatchEvent({ type: "SET_SEARCH", search: s })}
-        count={filteredNarratives.length}
-        totalCount={feedCount}
-      />
+      {/* 3. Dynamic KPI Cards with Micro-Sparklines & Status Badges */}
+      <WidgetErrorBoundary title="KPI Metrics">
+        <KpiCards kpis={kpiViewModels} loading={loading} />
+      </WidgetErrorBoundary>
 
-      {/* 4. Dynamic KPI Cards with Micro-Sparklines & Status Badges */}
-      <KpiCards kpis={kpiViewModels} loading={loading} />
-
-      {/* 5. Live Network Constellation Visualization */}
-      <section aria-labelledby="dashboard-live-title" role="region">
-        <div className="np-dash__section-header">
-          <h2 id="dashboard-live-title" className="np-dash__section-title">
-            {t("live_traffic")}
-          </h2>
-          <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
-            ● REAL-TIME MATRIX
-          </span>
-        </div>
-        {loading ? (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              height: "400px",
-              background: "var(--np-surface-1)",
-              borderRadius: "var(--np-radius-lg)",
-            }}
-          >
-            <Skeleton variant="circular" width="280px" height="280px" />
+      {/* 4. Live Network Constellation Visualization */}
+      <WidgetErrorBoundary title="Network Constellation">
+        <section aria-labelledby="dashboard-live-title" role="region">
+          <div className="np-dash__section-header">
+            <h2 id="dashboard-live-title" className="np-dash__section-title">
+              {t("live_traffic")}
+            </h2>
+            <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
+              ● REAL-TIME MATRIX
+            </span>
           </div>
-        ) : (
-          <Constellation
-            hosts={hostRows}
-            lossIndicators={monitor?.network_loss_indicators ?? 0}
-            onNavigate={handleConstellationNavigate}
+          {loading ? (
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                height: "400px",
+                background: "var(--np-surface-1)",
+                borderRadius: "var(--np-radius-lg)",
+              }}
+            >
+              <Skeleton variant="circular" width="280px" height="280px" />
+            </div>
+          ) : (
+            <Constellation
+              hosts={hostRows}
+              lossIndicators={monitor?.network_loss_indicators ?? 0}
+              onNavigate={handleConstellationNavigate}
+            />
+          )}
+        </section>
+      </WidgetErrorBoundary>
+
+      {/* 5. Filtered Narrative Feed ("What's Happening") */}
+      <WidgetErrorBoundary title="Narrative Feed">
+        <section aria-labelledby="dashboard-feed-title" role="region">
+          <div className="np-dash__section-header">
+            <h2 id="dashboard-feed-title" className="np-dash__section-title">
+              {t("whats_happening")}
+            </h2>
+          </div>
+
+          {/* Narrative Feed Filter & Search Toolbar */}
+          <NarrativeFilterBar
+            category={category}
+            search={search}
+            onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
+            onSearchChange={(s) => dispatchEvent({ type: "SET_SEARCH", search: s })}
+            count={filteredNarratives.length}
+            totalCount={feedCount}
           />
-        )}
-      </section>
 
-      {/* 6. Filtered Narrative Feed ("What's Happening") */}
-      <section aria-labelledby="dashboard-feed-title" role="region">
-        <div className="np-dash__section-header">
-          <h2 id="dashboard-feed-title" className="np-dash__section-title">
-            {t("whats_happening")}
-          </h2>
-        </div>
-        {loading ? (
-          <div className="np-feed">
-            {[1, 2].map((i) => (
-              <div key={i} className="np-card" style={{ padding: "var(--np-5)" }}>
-                <Skeleton variant="text" width="50%" height="16px" style={{ marginBottom: "12px" }} />
-                <Skeleton variant="text" width="85%" height="14px" style={{ marginBottom: "8px" }} />
-                <Skeleton variant="text" width="30%" height="12px" />
+          {loading ? (
+            <div className="np-feed">
+              {[1, 2].map((i) => (
+                <div key={i} className="np-card" style={{ padding: "var(--np-5)" }}>
+                  <Skeleton variant="text" width="50%" height="16px" style={{ marginBottom: "12px" }} />
+                  <Skeleton variant="text" width="85%" height="14px" style={{ marginBottom: "8px" }} />
+                  <Skeleton variant="text" width="30%" height="12px" />
+                </div>
+              ))}
+            </div>
+          ) : filteredNarratives.length === 0 ? (
+            <EmptyState compact>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" }}>
+                <span>
+                  {search || category !== "all"
+                    ? "No narrative items match your search or filter criteria."
+                    : t("no_traffic")}
+                </span>
+                {(search || category !== "all") && (
+                  <button
+                    type="button"
+                    className="np-btn np-btn--ghost np-btn--sm"
+                    onClick={() => {
+                      dispatchEvent({ type: "SET_CATEGORY", category: "all" });
+                      dispatchEvent({ type: "SET_SEARCH", search: "" });
+                    }}
+                  >
+                    Reset Filters
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        ) : filteredNarratives.length === 0 ? (
-          <EmptyState compact>
-            {search || category !== "all"
-              ? "No narrative items match your search or filter criteria."
-              : t("no_traffic")}
-          </EmptyState>
-        ) : (
-          <div className="np-feed">
-            {filteredNarratives.map((card) => (
-              <Card
-                key={`${card.at_mono_nanos}-${card.headline}`}
-                card={card}
-                onNavigate={handleNavigateToScreen}
-                onNavigateToScreen={handleNavigateToScreen}
-              />
-            ))}
-          </div>
-        )}
-      </section>
+            </EmptyState>
+          ) : (
+            <div className="np-feed">
+              {filteredNarratives.map((card) => (
+                <Card
+                  key={`${card.at_mono_nanos}-${card.headline}`}
+                  card={card}
+                  onNavigate={handleNavigateToScreen}
+                  onNavigateToScreen={handleNavigateToScreen}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      </WidgetErrorBoundary>
     </section>
   );
 }

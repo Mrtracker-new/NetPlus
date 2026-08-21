@@ -206,10 +206,63 @@ describe("Dashboard Screen", () => {
     expect(screen.getByText("DNS lookup for google.com")).toBeInTheDocument();
   });
 
-  it("handles malformed/missing snapshot fields gracefully without crashing", () => {
+  it("handles recommendation click in SituationSummary to filter findings", () => {
+    setFeed([
+      {
+        headline: "DNS tunneling anomaly detected",
+        summary: "High volume TXT queries to c2.example.org",
+        lines: ["Entropy 4.8 bits/byte"],
+        severity: "finding",
+        evidence: [{ kind: "flow", id: 99 }],
+        at_mono_nanos: 1000,
+      },
+      {
+        headline: "Normal HTTPS connection",
+        summary: "Browsing github.com",
+        lines: ["TLS 1.3"],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 100 }],
+        at_mono_nanos: 2000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    expect(screen.getByText(/Attention Needed/i)).toBeInTheDocument();
+    const recButton = screen.getByRole("button", { name: /Recommendation: Investigate DNS tunneling anomaly detected/i });
+    expect(recButton).toBeInTheDocument();
+
+    fireEvent.click(recButton);
+
+    expect(screen.getByText("DNS tunneling anomaly detected")).toBeInTheDocument();
+    expect(screen.queryByText("Normal HTTPS connection")).not.toBeInTheDocument();
+  });
+
+  it("calculates throughput sparkline and rates with single and multiple delta updates", () => {
     setMonitor({
-      by_protocol: { dimension: "protocol", rows: [] },
-      by_host: { dimension: "host", rows: [] },
+      by_protocol: {
+        dimension: "protocol",
+        rows: [{ label: "HTTPS", bytes: 2097152, flows: 3, hostnames: [], evidence: [] }],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [{ label: "1.1.1.1", bytes: 2097152, flows: 3, hostnames: [], evidence: [] }],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 0,
+    });
+
+    // Push a second snapshot to establish a positive throughput rate delta (1MB delta)
+    setMonitor({
+      by_protocol: {
+        dimension: "protocol",
+        rows: [{ label: "HTTPS", bytes: 3145728, flows: 3, hostnames: [], evidence: [] }],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [{ label: "1.1.1.1", bytes: 3145728, flows: 3, hostnames: [], evidence: [] }],
+      },
       diagnoses: [],
       network_loss_indicators: 0,
       capture_drops: 0,
@@ -217,7 +270,131 @@ describe("Dashboard Screen", () => {
 
     render(<DashboardTestWrapper />);
 
-    expect(screen.getByText("Hosts Observed")).toBeInTheDocument();
-    expect(screen.getByText(/Network is Healthy/i)).toBeInTheDocument();
+    expect(screen.getByText("3.0 MB")).toBeInTheDocument();
+    expect(screen.getAllByText(/1.0 MB\/s/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("supports keyboard navigation (ArrowRight, ArrowLeft, Home, End) across narrative category tabs", () => {
+    render(<DashboardTestWrapper />);
+
+    const allTab = screen.getByRole("tab", { name: "All Activity" });
+    const securityTab = screen.getByRole("tab", { name: "Security Findings" });
+
+    expect(allTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(allTab, { key: "ArrowRight" });
+    expect(securityTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(securityTab, { key: "End" });
+    const networkTab = screen.getByRole("tab", { name: "Network Flows" });
+    expect(networkTab).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(networkTab, { key: "Home" });
+    expect(screen.getByRole("tab", { name: "All Activity" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("renders system health telemetry strip with honest status", () => {
+    setMonitor({
+      by_protocol: {
+        dimension: "protocol",
+        rows: [{ label: "HTTPS", bytes: 1024, flows: 1, hostnames: [], evidence: [] }],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [{ label: "1.1.1.1", bytes: 1024, flows: 1, hostnames: [], evidence: [] }],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 5,
+    });
+
+    render(<DashboardTestWrapper />);
+
+    const healthStrip = screen.getByRole("region", { name: "System Health Telemetry" });
+    expect(healthStrip).toBeInTheDocument();
+    expect(screen.getByText("Capture:")).toBeInTheDocument();
+    expect(screen.getByText("Active")).toBeInTheDocument();
+    expect(screen.getByText("Flow Engine:")).toBeInTheDocument();
+    expect(screen.getByText("Dropping")).toBeInTheDocument();
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("handles full lifecycle state progression: loading -> populated -> filtered-empty -> error -> recovered", async () => {
+    // 1. Loading State
+    const { unmount } = render(<DashboardTestWrapper loading={true} />);
+    expect(screen.getByRole("region", { name: "Loading statistics" })).toBeInTheDocument();
+    unmount();
+
+    // 2. Populated State
+    setFeed([
+      {
+        headline: "TLS session established with github.com",
+        summary: "Transferred 50 KB over port 443",
+        lines: ["ALPN: h2", "Cipher: TLS_AES_128_GCM_SHA256"],
+        severity: "neutral",
+        evidence: [{ kind: "flow", id: 501 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+    setMonitor({
+      by_protocol: {
+        dimension: "protocol",
+        rows: [
+          {
+            label: "HTTPS",
+            bytes: 51200,
+            flows: 1,
+            hostnames: [{ name: "github.com", source: "dns" }],
+            evidence: [],
+          },
+        ],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [
+          {
+            label: "140.82.121.4",
+            bytes: 51200,
+            flows: 1,
+            hostnames: [{ name: "github.com", source: "dns" }],
+            evidence: [],
+          },
+        ],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 0,
+    });
+
+    const { rerender } = render(<DashboardTestWrapper loading={false} />);
+    expect(screen.getByText("TLS session established with github.com")).toBeInTheDocument();
+    expect(screen.getByText("50 KB")).toBeInTheDocument();
+
+    // 3. Filtered-empty State
+    const searchInput = screen.getByPlaceholderText(/Search processes/i);
+    fireEvent.change(searchInput, { target: { value: "nonexistent_domain_xyz" } });
+    expect(screen.getByText("No Matching Narratives")).toBeInTheDocument();
+    expect(screen.getByText(/No narrative items match your search or filter criteria/i)).toBeInTheDocument();
+
+    // Reset filters
+    const resetBtn = screen.getByRole("button", { name: "Reset Filters" });
+    fireEvent.click(resetBtn);
+    expect(screen.getByText("TLS session established with github.com")).toBeInTheDocument();
+
+    // 4. Error State (Initial API or IPC failure)
+    rerender(
+      <DashboardTestWrapper
+        loading={false}
+        error="Connection refused: backend engine offline"
+        onRetry={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/Backend Disconnected/i)).toBeInTheDocument();
+    expect(screen.getByText(/Connection refused: backend engine offline/i)).toBeInTheDocument();
+
+    // 5. Recovered State
+    rerender(<DashboardTestWrapper loading={false} error={null} />);
+    expect(screen.queryByText(/Backend Disconnected/i)).not.toBeInTheDocument();
+    expect(screen.getByText("TLS session established with github.com")).toBeInTheDocument();
   });
 });

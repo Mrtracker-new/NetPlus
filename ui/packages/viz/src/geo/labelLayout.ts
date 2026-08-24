@@ -57,8 +57,8 @@ export function computeLabelLayout(
   const placements = new Map<string, LabelPlacement>();
   if (nodes.length === 0) return placements;
 
-  // Scale maximum label budget with zoom level (more room at high zoom)
-  const effectiveMaxLabels = Math.min(64, Math.round(maxLabels * Math.min(2.5, Math.sqrt(zoomScale))));
+  // Enforce configured hard visual budget ceiling
+  const effectiveMaxLabels = Math.max(0, Math.floor(maxLabels));
 
   // Score and prioritize nodes
   interface ScoredNode {

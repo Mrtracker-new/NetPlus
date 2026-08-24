@@ -140,4 +140,38 @@ describe("Deterministic Collision-Free Label Layout", () => {
     expect(selectedPlacement!.visible).toBe(true);
     expect(selectedPlacement!.priority).toBeGreaterThanOrEqual(100_000);
   });
+
+  it("strictly enforces hard maxLabels budget regardless of zoom scale", () => {
+    // Generate 30 well-spaced nodes that wouldn't collide
+    const nodes: GeoAggregateNode[] = Array.from({ length: 30 }, (_, i) => ({
+      id: `node-${i}`,
+      entityId: `entity-host-10.0.0.${i}`,
+      geoCellId: `geocell-${i}`,
+      nodeKind: "endpoint",
+      label: `Service Node ${i}`,
+      countryCode: "US",
+      latitude: 10 + i * 2,
+      longitude: -100 + (i % 5) * 20,
+      x: 50 + (i % 5) * 120,
+      y: 30 + Math.floor(i / 5) * 50,
+      totalBytes: (30 - i) * 10_000,
+      totalFlows: 5,
+      endpointIps: [`10.0.0.${i}`],
+      asns: [13335],
+      freshness: "active",
+      deltaBytes: 1000,
+    }));
+
+    // With maxLabels = 10 and high zoom scale (e.g. 8.0)
+    const placements = computeLabelLayout(nodes, {
+      maxLabels: 10,
+      zoomScale: 8.0,
+      viewportWidth: 1200,
+      viewportHeight: 800,
+    });
+
+    const visibleLabels = Array.from(placements.values()).filter((p) => p.visible);
+    expect(visibleLabels.length).toBeLessThanOrEqual(10);
+    expect(visibleLabels.length).toBe(10);
+  });
 });

@@ -75,10 +75,15 @@ export interface MapViewModel {
 }
 
 /**
- * Snapshot-level telemetry enrichment and delta computation.
- * Pure and independent of viewport zoom/pan or layout options.
+ * Authoritative deterministic telemetry enrichment and delta computation pipeline.
+ * Pure state transition function: (input, previousSnapshot) -> nextSnapshot.
+ * Caller holds immutable snapshot references; no hidden internal mutable state.
  *
- * Enforces Invariants 1, 2, and 4.
+ * Enforces Invariants 1, 2, and 4:
+ * - Session baseline priming (S0 -> delta = 0)
+ * - Mid-session host arrival baseline priming (delta = 0)
+ * - Counter rollover safety (current < prev -> delta = 0)
+ * - Stale/duplicate snapshot rejection (seq <= prevSeq in same session -> return prev)
  */
 export function deriveHostEnrichmentSnapshot(
   input: MapViewModelInput,

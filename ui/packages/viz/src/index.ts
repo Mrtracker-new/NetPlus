@@ -46,7 +46,6 @@ export * from "./geo/worldGeometry";
 export * from "./geo/trafficArcs";
 export * from "./geo/spatialClustering";
 export * from "./geo/labelLayout";
-export * from "./geo/useTelemetryDeltas";
 export * from "./geo/mapViewModel";
 
 export {

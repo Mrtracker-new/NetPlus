@@ -1,0 +1,114 @@
+[
+  {
+    "cidr": "1.1.1.0/24",
+    "provider": "Cloudflare, Inc.",
+    "service": "1.1.1.1 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS13335#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "1.0.0.0/24",
+    "provider": "Cloudflare, Inc.",
+    "service": "1.0.0.1 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS13335#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "8.8.8.0/24",
+    "provider": "Google LLC",
+    "service": "8.8.8.8 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS15169#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "8.8.4.0/24",
+    "provider": "Google LLC",
+    "service": "8.8.4.4 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS15169#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "9.9.9.0/24",
+    "provider": "Quad9",
+    "service": "9.9.9.9 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS19281#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "9.9.9.10/31",
+    "provider": "Quad9",
+    "service": "9.9.9.10 Public DNS (ECS)",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS19281#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "149.112.112.0/24",
+    "provider": "Quad9",
+    "service": "149.112.112.112 Public DNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS19281#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "104.16.0.0/13",
+    "provider": "Cloudflare, Inc.",
+    "service": "Cloudflare CDN",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS13335#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "104.24.0.0/14",
+    "provider": "Cloudflare, Inc.",
+    "service": "Cloudflare CDN",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS13335#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "208.67.222.0/24",
+    "provider": "Cisco OpenDNS LLC",
+    "service": "OpenDNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS36692#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "208.67.220.0/24",
+    "provider": "Cisco OpenDNS LLC",
+    "service": "OpenDNS",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS36692#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "151.101.0.0/16",
+    "provider": "Fastly, Inc.",
+    "service": "Fastly CDN",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS54113#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "185.199.108.0/22",
+    "provider": "Fastly, Inc.",
+    "service": "GitHub Pages / Fastly",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS54113#_prefixes",
+    "verifiedAt": "2026-08-01"
+  },
+  {
+    "cidr": "199.232.0.0/16",
+    "provider": "Fastly, Inc.",
+    "service": "Fastly CDN",
+    "source": "bgp.he.net",
+    "sourceUrl": "https://bgp.he.net/AS54113#_prefixes",
+    "verifiedAt": "2026-08-01"
+  }
+]

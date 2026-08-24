@@ -4,8 +4,18 @@
   "private": true,
   "description": "NetPulse UI workspace root (pnpm).",
   "license": "MIT OR Apache-2.0",
+  "type": "module",
   "packageManager": "pnpm@9.0.0",
   "engines": {
     "node": ">=20"
+  },
+  "scripts": {
+    "geoip:update": "tsx scripts/build-geoip-db.ts",
+    "geoip:verify": "tsx scripts/verify-geoip-db.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^5.4.0"
   }
 }

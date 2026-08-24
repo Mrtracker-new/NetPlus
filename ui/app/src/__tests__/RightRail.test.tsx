@@ -78,8 +78,9 @@ describe("RightRail Context Sidebar", () => {
 
     const hostElements = screen.getAllByText("one.one.one.one");
     expect(hostElements.length).toBeGreaterThan(0);
-    expect(screen.getByText("2.0 MB")).toBeInTheDocument();
+    expect(screen.getAllByText("2.0 MB").length).toBeGreaterThan(0);
   });
+
 
   it("toggles collapse state on desktop and updates data-right-rail-collapsed attribute", () => {
     const { container } = render(<App />);

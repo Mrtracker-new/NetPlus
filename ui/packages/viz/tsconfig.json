@@ -15,6 +15,5 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["src/__tests__/**/*"]
+  "include": ["src/**/*"]
 }

@@ -137,9 +137,14 @@ function layout(hosts: BreakdownRow[]): Placed[] {
   return placed;
 }
 
+import type { SelectedEntity } from "./geo/geoTypes";
+import { enrichHost } from "./geo/geoDatabase";
+
 export interface ConstellationProps {
   hosts: BreakdownRow[];
   lossIndicators?: number;
+  selectedEntity?: SelectedEntity | null;
+  onSelectEntity?: (entity: SelectedEntity | null) => void;
   onNavigate?: (ref: EvidenceRef, source?: any) => void;
 }
 
@@ -173,6 +178,8 @@ function interactionReducer(state: InteractionState, action: InteractionAction):
 export const Constellation = memo(function Constellation({
   hosts,
   lossIndicators = 0,
+  selectedEntity: controlledSelection,
+  onSelectEntity,
   onNavigate,
 }: ConstellationProps) {
   const baseId = useId().replace(/:/g, "_");
@@ -192,6 +199,36 @@ export const Constellation = memo(function Constellation({
   });
 
   const { playing, hovered, selected } = state;
+
+  const selectedKey = useMemo(() => {
+    if (controlledSelection !== undefined) {
+      if (!controlledSelection) return null;
+      if (controlledSelection.kind === "endpoint") return controlledSelection.ip;
+      return null;
+    }
+    return selected;
+  }, [controlledSelection, selected]);
+
+  const handleToggleSelect = useCallback(
+    (p: Placed) => {
+      if (controlledSelection !== undefined) {
+        if (controlledSelection?.kind === "endpoint" && controlledSelection.ip === p.row.label) {
+          onSelectEntity?.(null);
+        } else {
+          const enriched = enrichHost(p.row);
+          onSelectEntity?.({
+            kind: "endpoint",
+            ip: p.row.label,
+            entityId: `entity-host-${p.row.label}`,
+            host: enriched,
+          });
+        }
+      } else {
+        dispatch({ type: "TOGGLE_SELECT", key: p.key });
+      }
+    },
+    [controlledSelection, onSelectEntity]
+  );
 
   // Imperative animation state refs
   const nodeRefs = useRef<Array<SVGGElement | null>>([]);
@@ -411,7 +448,7 @@ export const Constellation = memo(function Constellation({
           <g className="np-cons__layer-packets">
             {placed.map((p, i) => {
               const isHov = hovered === i;
-              const isSel = p.key === selected;
+              const isSel = p.key === selectedKey;
               const isDimmed = hovered != null && !isHov;
               return (
                 <circle
@@ -436,10 +473,10 @@ export const Constellation = memo(function Constellation({
             {placed.map((p, i) => {
               const x0 = CX + Math.cos(p.angle) * p.radius;
               const y0 = CY + Math.sin(p.angle) * p.radius;
-              const isSel = p.key === selected;
+              const isSel = p.key === selectedKey;
               const isHov = hovered === i;
               const isDimmed =
-                (hovered != null && !isHov) || (selected != null && !isSel && hovered == null);
+                (hovered != null && !isHov) || (selectedKey != null && !isSel && hovered == null);
               const nodeColor = getStatusColor(p.semanticStatus);
               const hostNameStr = primaryHostName(p.row)?.name ?? p.row.label;
 
@@ -458,11 +495,11 @@ export const Constellation = memo(function Constellation({
                   transform={`translate(${x0} ${y0})`}
                   onMouseEnter={() => hostHover(i)}
                   onMouseLeave={hostLeave}
-                  onClick={() => dispatch({ type: "TOGGLE_SELECT", key: p.key })}
+                  onClick={() => handleToggleSelect(p)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      dispatch({ type: "TOGGLE_SELECT", key: p.key });
+                      handleToggleSelect(p);
                     }
                   }}
                 >

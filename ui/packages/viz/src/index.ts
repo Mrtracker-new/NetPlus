@@ -22,6 +22,9 @@ export type { ConfidenceMeterProps } from "./ConfidenceMeter";
 export { Constellation } from "./Constellation";
 export type { ConstellationProps } from "./Constellation";
 
+export { GlobalTrafficMap } from "./GlobalTrafficMap";
+export type { GlobalTrafficMapProps } from "./GlobalTrafficMap";
+
 export { IncidentTimelineViz } from "./IncidentTimeline";
 export type { IncidentTimelineVizProps } from "./IncidentTimeline";
 
@@ -36,6 +39,16 @@ export type { HealthIndicatorProps } from "./components/HealthIndicator";
 
 export { buildBezierPath, buildBezierAreaPath } from "./geometry/spline";
 
+export * from "./geo/geoTypes";
+export * from "./geo/ipClassifier";
+export * from "./geo/geoDatabase";
+export * from "./geo/worldGeometry";
+export * from "./geo/trafficArcs";
+export * from "./geo/spatialClustering";
+export * from "./geo/labelLayout";
+export * from "./geo/useTelemetryDeltas";
+export * from "./geo/mapViewModel";
+
 export {
   hostSourceRank,
   hostSourceLabel,
@@ -47,4 +60,5 @@ export {
 } from "./utils";
 
 export type { Slice, RibbonEvent } from "./types";
+
 

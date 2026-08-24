@@ -68,6 +68,47 @@ function usePrefersReducedMotion(): boolean {
 const MIN_ZOOM = 1.0;
 const MAX_ZOOM = 8.0;
 
+/** Pure, authoritative node selection evaluation */
+export function isNodeSelected(
+  node: GeoAggregateNode | undefined,
+  activeSelection: SelectedEntity | null | undefined
+): boolean {
+  if (!node || !activeSelection) return false;
+  if (activeSelection.kind === "endpoint") {
+    return Boolean(node.endpointIps.includes(activeSelection.ip));
+  }
+  if (activeSelection.kind === "cluster") {
+    return (
+      node.entityId === activeSelection.entityId ||
+      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId)
+    );
+  }
+  if (activeSelection.kind === "countryAggregate") {
+    return (
+      node.entityId === activeSelection.entityId ||
+      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
+      (Boolean(node.countryCode) && activeSelection.countryCode === node.countryCode)
+    );
+  }
+  if (activeSelection.kind === "cityAggregate") {
+    return (
+      node.entityId === activeSelection.entityId ||
+      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
+      activeSelection.cityName === node.label.replace(/\s*\(\d+\)$/, "")
+    );
+  }
+  if (
+    activeSelection.kind === "otherResolvedAggregate" ||
+    activeSelection.kind === "otherResolvedGroup"
+  ) {
+    return (
+      node.nodeKind === "otherResolvedAggregate" ||
+      node.entityId === OTHER_RESOLVED_ENTITY_ID
+    );
+  }
+  return false;
+}
+
 export const GlobalTrafficMap = memo(function GlobalTrafficMap({
   hosts,
   captureSessionId,
@@ -239,45 +280,16 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     return aggregateNodes.reduce((max, n) => Math.max(max, n.totalBytes), 1);
   }, [aggregateNodes]);
 
+  const nodeById = useMemo(() => new Map(aggregateNodes.map((n) => [n.id, n])), [aggregateNodes]);
+
   // Enhanced Arc Models with Selection Opacity
   const arcModels = useMemo(() => {
     if (origin.status !== "resolved") return [];
 
-    return baseArcModels.map((arc, idx) => {
-      const node = aggregateNodes[idx];
-      let isSelected = false;
-
-      if (activeSelection?.kind === "endpoint") {
-        isSelected = Boolean(node?.endpointIps.includes(activeSelection.ip));
-      } else if (activeSelection?.kind === "cityAggregate") {
-        isSelected = Boolean(
-          node &&
-            (node.entityId === activeSelection.entityId ||
-              (activeSelection.node && node.entityId === activeSelection.node.entityId))
-        );
-      } else if (activeSelection?.kind === "countryAggregate") {
-        isSelected = Boolean(
-          node &&
-            (node.entityId === activeSelection.entityId ||
-              (activeSelection.node && node.entityId === activeSelection.node.entityId))
-        );
-      } else if (activeSelection?.kind === "cluster") {
-        isSelected = Boolean(
-          node &&
-            (node.entityId === activeSelection.entityId ||
-              (activeSelection.node && node.entityId === activeSelection.node.entityId))
-        );
-      } else if (
-        activeSelection?.kind === "otherResolvedAggregate" ||
-        activeSelection?.kind === "otherResolvedGroup"
-      ) {
-        isSelected = Boolean(
-          node &&
-            (node.entityId === OTHER_RESOLVED_ENTITY_ID ||
-              node.nodeKind === "otherResolvedAggregate")
-        );
-      }
-
+    return baseArcModels.map((arc) => {
+      const nodeId = arc.id.replace(/^arc-/, "");
+      const node = nodeById.get(nodeId);
+      const isSelected = isNodeSelected(node, activeSelection);
       const opacity = activeSelection ? (isSelected ? 1.0 : 0.25) : arc.opacity;
 
       return {
@@ -286,7 +298,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         isSelected,
       };
     });
-  }, [origin, baseArcModels, aggregateNodes, activeSelection]);
+  }, [origin, baseArcModels, nodeById, activeSelection]);
 
   // 5. Imperative 60fps particle loop mutating SVG circle positions directly
   const particleRefs = useRef<Array<SVGCircleElement | null>>([]);
@@ -328,8 +340,30 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     }
   }, [resolvedActiveSelection]);
 
+  // Window mouseup listener for pan/drag gestures
   useEffect(() => {
-    if (reduced || arcModels.length === 0) return;
+    const handleGlobalMouseUp = () => {
+      isDraggingRef.current = false;
+    };
+    window.addEventListener("mouseup", handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalMouseUp);
+    };
+  }, []);
+
+  // Sync particle element refs with current arcModels length
+  useEffect(() => {
+    particleRefs.current.length = arcModels.length;
+  }, [arcModels.length]);
+
+  useEffect(() => {
+    if (reduced || arcModels.length === 0) {
+      for (let i = 0; i < particleRefs.current.length; i++) {
+        const el = particleRefs.current[i];
+        if (el) el.setAttribute("opacity", "0");
+      }
+      return;
+    }
 
     let raf = 0;
     let last = 0;
@@ -819,32 +853,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
             {/* Layer 5: Aggregated Geographic Destination Nodes & Labels */}
             <g className="np-geomap__nodes">
               {aggregateNodes.map((node) => {
-                let isSelected = false;
-                if (activeSelection?.kind === "endpoint") {
-                  isSelected = node.endpointIps.includes(activeSelection.ip);
-                } else if (activeSelection?.kind === "cluster") {
-                  isSelected =
-                    node.entityId === activeSelection.entityId ||
-                    (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId);
-                } else if (activeSelection?.kind === "countryAggregate") {
-                  isSelected =
-                    node.entityId === activeSelection.entityId ||
-                    (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
-                    (Boolean(node.countryCode) && activeSelection.countryCode === node.countryCode);
-                } else if (activeSelection?.kind === "cityAggregate") {
-                  isSelected =
-                    node.entityId === activeSelection.entityId ||
-                    (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
-                    activeSelection.cityName === node.label.replace(/\s*\(\d+\)$/, "");
-                } else if (
-                  activeSelection?.kind === "otherResolvedAggregate" ||
-                  activeSelection?.kind === "otherResolvedGroup"
-                ) {
-                  isSelected =
-                    node.nodeKind === "otherResolvedAggregate" ||
-                    node.entityId === OTHER_RESOLVED_ENTITY_ID;
-                }
-
+                const isSelected = isNodeSelected(node, activeSelection);
                 const hasSelectionActive = activeSelection !== null;
                 const nodeOpacity = hasSelectionActive ? (isSelected ? 1.0 : 0.3) : 1.0;
 

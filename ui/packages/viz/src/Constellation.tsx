@@ -137,7 +137,7 @@ function layout(hosts: BreakdownRow[]): Placed[] {
   return placed;
 }
 
-import type { SelectedEntity } from "./geo/geoTypes";
+import { makeHostEntityId, type SelectedEntity } from "./geo/geoTypes";
 import { enrichHost } from "./geo/geoDatabase";
 
 export interface ConstellationProps {
@@ -219,7 +219,7 @@ export const Constellation = memo(function Constellation({
           onSelectEntity?.({
             kind: "endpoint",
             ip: p.row.label,
-            entityId: `entity-host-${p.row.label}`,
+            entityId: makeHostEntityId(p.row.label),
             host: enriched,
           });
         }

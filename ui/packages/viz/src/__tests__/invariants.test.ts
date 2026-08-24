@@ -389,6 +389,13 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           maxVisibleArcs: 60,
           clusterRadiusPx: 1,
           selectedEntityId: targetEntityId,
+          origin: {
+            status: "resolved",
+            label: "Local Origin",
+            latitude: 37.7749,
+            longitude: -122.4194,
+            source: "configured",
+          },
         }
       );
 
@@ -806,6 +813,45 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         expect(arc.particleSplitT).toBeDefined();
         expect(arc.particleSplitT!).toBeGreaterThan(0.0);
         expect(arc.particleSplitT!).toBeLessThan(1.0);
+      }
+    });
+
+    it("Invariant 5.9: Semantic Origin Integrity - Unresolved origin produces zero geographic arcs without fabricating (0,0) centroid routing", () => {
+      const rows: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 10000, flows: 2, hostnames: [], evidence: [] },
+        { label: "31.0.0.1", bytes: 20000, flows: 4, hostnames: [], evidence: [] },
+      ];
+
+      // Default (unresolved) origin
+      const modelUnresolved = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-origin", snapshotSequence: 1 },
+        null
+      );
+
+      // Invariant: Unresolved origin -> 0 geographic arcs (no false Greenwich/map center arcs)
+      expect(modelUnresolved.arcModels).toEqual([]);
+      expect(modelUnresolved.aggregateNodes.length).toBeGreaterThan(0);
+
+      // Resolved origin -> valid arcs originating strictly from configured coordinates
+      const sfOrigin = {
+        status: "resolved" as const,
+        label: "San Francisco, CA",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        source: "configured" as const,
+      };
+
+      const modelResolved = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-origin", snapshotSequence: 1 },
+        null,
+        { origin: sfOrigin }
+      );
+
+      expect(modelResolved.arcModels.length).toBeGreaterThan(0);
+      const [sfX, sfY] = projectGeo(sfOrigin.latitude, sfOrigin.longitude);
+      for (const arc of modelResolved.arcModels) {
+        expect(arc.ox).toBeCloseTo(sfX, 1);
+        expect(arc.oy).toBeCloseTo(sfY, 1);
       }
     });
   });

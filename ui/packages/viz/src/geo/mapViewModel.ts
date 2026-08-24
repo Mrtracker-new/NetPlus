@@ -257,68 +257,68 @@ export function deriveClusteredMapModel(
     selectedEntityId || (selectedIp ? `entity-host-${selectedIp}` : null);
 
   // Generate traffic arcs with focal target preservation (Invariant 5: Pacific antimeridian shortest-path routing)
-  const arcCandidateNodes = (() => {
-    if (aggregateNodes.length <= maxVisibleArcs) return aggregateNodes;
-    if (!targetEntityId) return aggregateNodes.slice(0, maxVisibleArcs);
-
-    const isTargetNode = (n: GeoAggregateNode) =>
-      n.entityId === targetEntityId ||
-      n.id === targetEntityId ||
-      (selectedIp != null && selectedIp !== "" && n.endpointIps.includes(selectedIp)) ||
-      (targetEntityId.startsWith("entity-host-") &&
-        n.endpointIps.includes(targetEntityId.replace("entity-host-", "")));
-
-    const selectedArcNodes = aggregateNodes.filter(isTargetNode);
-    const unselectedArcNodes = aggregateNodes.filter((n) => !isTargetNode(n));
-    const remainingArcBudget = Math.max(0, maxVisibleArcs - selectedArcNodes.length);
-    return [...selectedArcNodes, ...unselectedArcNodes.slice(0, remainingArcBudget)];
-  })();
-
+  // Semantic Integrity: If origin is unresolved, do not fabricate synthetic geographic arcs from (0°,0°) / map centroid
   const arcModels: ArcPathModel[] = [];
-  const [ox, oy] =
-    origin.status === "resolved"
-      ? projectGeo(origin.latitude, origin.longitude)
-      : [360, 180]; // Default origin centroid
 
-  const originLng = origin.status === "resolved" ? origin.longitude : 0;
+  if (origin.status === "resolved") {
+    const arcCandidateNodes = (() => {
+      if (aggregateNodes.length <= maxVisibleArcs) return aggregateNodes;
+      if (!targetEntityId) return aggregateNodes.slice(0, maxVisibleArcs);
 
-  for (const node of arcCandidateNodes) {
-    const geometry = calculateArcBezier(ox, oy, node.x, node.y, {
-      originLng,
-      destLng: node.longitude,
-    });
+      const isTargetNode = (n: GeoAggregateNode) =>
+        n.entityId === targetEntityId ||
+        n.id === targetEntityId ||
+        (selectedIp != null && selectedIp !== "" && n.endpointIps.includes(selectedIp)) ||
+        (targetEntityId.startsWith("entity-host-") &&
+          n.endpointIps.includes(targetEntityId.replace("entity-host-", "")));
 
-    const hasParticles =
-      !reducedMotion && (node.freshness === "active" || node.deltaBytes > 0);
+      const selectedArcNodes = aggregateNodes.filter(isTargetNode);
+      const unselectedArcNodes = aggregateNodes.filter((n) => !isTargetNode(n));
+      const remainingArcBudget = Math.max(0, maxVisibleArcs - selectedArcNodes.length);
+      return [...selectedArcNodes, ...unselectedArcNodes.slice(0, remainingArcBudget)];
+    })();
 
-    const firstSeg = geometry.segments[0]!;
+    const [ox, oy] = projectGeo(origin.latitude, origin.longitude);
+    const originLng = origin.longitude;
 
-    arcModels.push({
-      id: `arc-${node.id}`,
-      geometry,
-      strokeWidth: getArcStrokeWidth(node.totalBytes),
-      opacity: getArcOpacity(node.freshness),
-      freshness: node.freshness,
-      hasParticles,
-      deltaBytes: node.deltaBytes,
-      d: geometry.d,
-      crossesAntimeridian: geometry.crossesAntimeridian,
-      shortestDeltaLng: geometry.shortestDeltaLng,
-      splitT: geometry.splitT,
-      particleSplitT: geometry.particleSplitT,
-      segments: geometry.segments,
-      ox: geometry.origin.x,
-      oy: geometry.origin.y,
-      dx: geometry.destination.x,
-      dy: geometry.destination.y,
-      midX: firstSeg.control.x,
-      midY: firstSeg.control.y,
-      effectiveDx: geometry.crossesAntimeridian
-        ? geometry.crossingDirection === "west"
-          ? geometry.destination.x - 720
-          : geometry.destination.x + 720
-        : geometry.destination.x,
-    });
+    for (const node of arcCandidateNodes) {
+      const geometry = calculateArcBezier(ox, oy, node.x, node.y, {
+        originLng,
+        destLng: node.longitude,
+      });
+
+      const hasParticles =
+        !reducedMotion && (node.freshness === "active" || node.deltaBytes > 0);
+
+      const firstSeg = geometry.segments[0]!;
+
+      arcModels.push({
+        id: `arc-${node.id}`,
+        geometry,
+        strokeWidth: getArcStrokeWidth(node.totalBytes),
+        opacity: getArcOpacity(node.freshness),
+        freshness: node.freshness,
+        hasParticles,
+        deltaBytes: node.deltaBytes,
+        d: geometry.d,
+        crossesAntimeridian: geometry.crossesAntimeridian,
+        shortestDeltaLng: geometry.shortestDeltaLng,
+        splitT: geometry.splitT,
+        particleSplitT: geometry.particleSplitT,
+        segments: geometry.segments,
+        ox: geometry.origin.x,
+        oy: geometry.origin.y,
+        dx: geometry.destination.x,
+        dy: geometry.destination.y,
+        midX: firstSeg.control.x,
+        midY: firstSeg.control.y,
+        effectiveDx: geometry.crossesAntimeridian
+          ? geometry.crossingDirection === "west"
+            ? geometry.destination.x - 720
+            : geometry.destination.x + 720
+          : geometry.destination.x,
+      });
+    }
   }
 
   // Deterministic collision label layout

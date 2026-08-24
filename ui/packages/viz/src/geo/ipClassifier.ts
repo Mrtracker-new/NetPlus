@@ -1,4 +1,5 @@
 import type { IpCategory, IpClassification } from "./geoTypes";
+import { BoundedCache } from "./boundedCache";
 
 /**
  * Parses an IPv4 dotted-decimal string into an unsigned 32-bit integer.
@@ -1259,8 +1260,14 @@ export function classifyIpv6(
   };
 }
 
-const CLASSIFY_CACHE = new Map<string, IpClassification>();
-const MAX_CLASSIFY_CACHE = 32768;
+const classifyCache = new BoundedCache<string, IpClassification>(32768);
+
+/**
+ * Clears the IP classification cache (useful for testing and memory resets).
+ */
+export function clearClassifierCache(): void {
+  classifyCache.clear();
+}
 
 /**
  * Parses and classifies an arbitrary IP string (IPv4 or IPv6).
@@ -1280,7 +1287,7 @@ export function classifyIpAddress(ip: string): IpClassification {
   }
 
   const trimmed = ip.trim();
-  const cached = CLASSIFY_CACHE.get(trimmed);
+  const cached = classifyCache.get(trimmed);
   if (cached) return cached;
 
   let result: IpClassification;
@@ -1308,9 +1315,6 @@ export function classifyIpAddress(ip: string): IpClassification {
     }
   }
 
-  if (CLASSIFY_CACHE.size >= MAX_CLASSIFY_CACHE) {
-    CLASSIFY_CACHE.clear();
-  }
-  CLASSIFY_CACHE.set(trimmed, result);
+  classifyCache.set(trimmed, result);
   return result;
 }

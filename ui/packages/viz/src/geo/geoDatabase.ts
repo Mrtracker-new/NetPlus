@@ -9,7 +9,8 @@ import type {
   OriginResolution,
   TelemetryFreshness,
 } from "./geoTypes";
-import { classifyIpAddress, parseIpv4ToUint32 } from "./ipClassifier";
+import { classifyIpAddress, parseIpv4ToUint32, clearClassifierCache } from "./ipClassifier";
+import { BoundedCache } from "./boundedCache";
 import { IPV4_GEO_INTERVALS } from "./generatedGeoIntervals";
 import { IPV4_ASN_INTERVALS } from "./generatedAsnIntervals";
 import { ANYCAST_PREFIXES } from "./generatedAnycastPrefixes";
@@ -68,31 +69,7 @@ export interface AsnRecord {
   asName: string | null;
 }
 
-// --- Bounded LRU cache ---------------------------------------------------------
-
-class BoundedCache<K, V> {
-  private readonly max: number;
-  private readonly map = new Map<K, V>();
-
-  constructor(maxSize = 32768) {
-    this.max = maxSize;
-  }
-
-  get(key: K): V | undefined {
-    return this.map.get(key);
-  }
-
-  set(key: K, val: V): void {
-    if (this.map.size >= this.max && !this.map.has(key)) {
-      const oldest = this.map.keys().next().value;
-      if (oldest !== undefined) this.map.delete(oldest);
-    }
-    this.map.set(key, val);
-  }
-
-  clear(): void { this.map.clear(); }
-  size(): number { return this.map.size; }
-}
+// --- Bounded LRU caches --------------------------------------------------------
 
 const geoCache     = new BoundedCache<string, GeoResolution>(32768);
 const asnCache     = new BoundedCache<string, AsnResolution>(32768);
@@ -466,4 +443,5 @@ export function clearGeoCaches(): void {
   geoCache.clear();
   asnCache.clear();
   anycastCache.clear();
+  clearClassifierCache();
 }

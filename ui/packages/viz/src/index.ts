@@ -40,6 +40,7 @@ export type { HealthIndicatorProps } from "./components/HealthIndicator";
 export { buildBezierPath, buildBezierAreaPath } from "./geometry/spline";
 
 export * from "./geo/geoTypes";
+export * from "./geo/boundedCache";
 export * from "./geo/ipClassifier";
 export * from "./geo/geoDatabase";
 export * from "./geo/worldGeometry";

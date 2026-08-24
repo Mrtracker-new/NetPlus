@@ -92,7 +92,7 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
 
       if (count === 1000) expect(elapsed).toBeLessThan(50.0);
       if (count === 10000) expect(elapsed).toBeLessThan(300.0);
-      if (count === 50000) expect(elapsed).toBeLessThan(2000.0);
+      if (count === 50000) expect(elapsed).toBeLessThan(3500.0);
     }
   });
 

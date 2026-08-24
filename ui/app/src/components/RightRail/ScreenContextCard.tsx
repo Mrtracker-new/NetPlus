@@ -1,6 +1,8 @@
 import { useTranslation } from "react-i18next";
 import { useEvidenceNavigation, type Screen } from "../../context/EvidenceNavigationContext";
 import { useStore } from "../../state/store";
+import { useSidebar } from "./RightRailContext";
+import { GeoContextCard } from "./GeoContextCard";
 import { Icon } from "../../icons";
 
 export interface ContextTelemetry {
@@ -164,6 +166,11 @@ export function ScreenContextCard() {
   const { screen, setScreen } = useEvidenceNavigation();
   const { t } = useTranslation("common");
   const { monitor, feed } = useStore();
+  const { selectedEntity, setSelectedEntity } = useSidebar();
+
+  if (selectedEntity) {
+    return <GeoContextCard entity={selectedEntity} onClearSelection={() => setSelectedEntity(null)} />;
+  }
 
   const descriptor = SCREEN_CONTEXTS[screen] ?? FALLBACK_DESCRIPTOR;
   const title = t(descriptor.titleKey as any, descriptor.defaultTitle);

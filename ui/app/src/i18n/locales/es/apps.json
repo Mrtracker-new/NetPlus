@@ -7,6 +7,7 @@
   "kpi_unattributed": "Sin Atribuir",
   "search_placeholder": "Buscar aplicaciones por nombre de proceso, PID o ID de flujo...",
   "filter_all": "Todas",
+  "unattributed_hint": "Flujos sin atribución de proceso del SO",
   "filter_confident": "Alta Confianza",
   "filter_tentative": "Tentativa",
   "filter_unknown": "Propietario Desconocido",

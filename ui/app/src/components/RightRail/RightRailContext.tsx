@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
+import type { SelectedEntity } from "@netpulse/viz";
 
 export type RightRailTab = "context" | "session" | "system";
 
@@ -6,12 +7,14 @@ export interface SidebarContextValue {
   isCollapsed: boolean;
   isMobileOpen: boolean;
   activeTab: RightRailTab;
+  selectedEntity: SelectedEntity | null;
   setCollapsed: (value: boolean) => void;
   toggleCollapsed: () => void;
   openMobile: () => void;
   closeMobile: () => void;
   toggleMobile: () => void;
   setActiveTab: (tab: RightRailTab) => void;
+  setSelectedEntity: (entity: SelectedEntity | null) => void;
 }
 
 const STORAGE_KEY = "netpulse.sidebar.collapsed.v1";
@@ -33,6 +36,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsedState] = useState<boolean>(getInitialCollapsed);
   const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
   const [activeTab, setActiveTabState] = useState<RightRailTab>("context");
+  const [selectedEntity, setSelectedEntityState] = useState<SelectedEntity | null>(null);
 
   const setCollapsed = useCallback((value: boolean) => {
     setIsCollapsedState(value);
@@ -61,6 +65,13 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
 
   const setActiveTab = useCallback((tab: RightRailTab) => {
     setActiveTabState(tab);
+  }, []);
+
+  const setSelectedEntity = useCallback((entity: SelectedEntity | null) => {
+    setSelectedEntityState(entity);
+    if (entity) {
+      setActiveTabState("context");
+    }
   }, []);
 
   // Global Keyboard Shortcut: Ctrl+\ or Cmd+\
@@ -100,23 +111,27 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
       isCollapsed,
       isMobileOpen,
       activeTab,
+      selectedEntity,
       setCollapsed,
       toggleCollapsed,
       openMobile,
       closeMobile,
       toggleMobile,
       setActiveTab,
+      setSelectedEntity,
     }),
     [
       isCollapsed,
       isMobileOpen,
       activeTab,
+      selectedEntity,
       setCollapsed,
       toggleCollapsed,
       openMobile,
       closeMobile,
       toggleMobile,
       setActiveTab,
+      setSelectedEntity,
     ]
   );
 
@@ -130,3 +145,8 @@ export function useSidebar(): SidebarContextValue {
   }
   return ctx;
 }
+
+export function useOptionalSidebar(): SidebarContextValue | null {
+  return useContext(SidebarContext);
+}
+

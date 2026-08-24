@@ -2,7 +2,8 @@ import { Component, type ReactNode, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity, EvidenceRef } from "@netpulse/contract";
 import { EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
-import { Constellation } from "@netpulse/viz";
+import { Constellation, GlobalTrafficMap, type SelectedEntity } from "@netpulse/viz";
+
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore, setMonitor, setFeed, setError } from "../state/store";
@@ -134,6 +135,10 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     kpiViewModels,
     category,
     search,
+    vizMode,
+    selectedEntity,
+    captureSessionId,
+    snapshotSequence,
     feedCount,
     filteredNarratives,
     dispatchEvent,
@@ -213,16 +218,36 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         <KpiCards kpis={kpiViewModels} loading={loading} />
       </WidgetErrorBoundary>
 
-      {/* 4. Live Network Constellation Visualization */}
-      <WidgetErrorBoundary title="Network Constellation">
+      {/* 4. Live Global Traffic Map / Constellation Topology Switcher */}
+      <WidgetErrorBoundary title="Live Network Telemetry">
         <section aria-labelledby="dashboard-live-title" role="region">
-          <div className="np-dash__section-header">
-            <h2 id="dashboard-live-title" className="np-dash__section-title">
-              {t("live_traffic")}
-            </h2>
-            <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
-              ● REAL-TIME MATRIX
-            </span>
+          <div className="np-dash__section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--np-2)" }}>
+              <h2 id="dashboard-live-title" className="np-dash__section-title">
+                {vizMode === "map" ? "Global Traffic Map" : t("live_traffic")}
+              </h2>
+              <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
+                ● LIVE TELEMETRY
+              </span>
+            </div>
+            <div className="np-viz-mode-toggle" role="group" aria-label="Traffic visualization mode">
+              <button
+                type="button"
+                className={`np-viz-mode-btn ${vizMode === "map" ? "np-viz-mode-btn--active" : ""}`}
+                onClick={() => dispatchEvent({ type: "SET_VIZ_MODE", mode: "map" })}
+                aria-pressed={vizMode === "map"}
+              >
+                🌍 GLOBAL MAP
+              </button>
+              <button
+                type="button"
+                className={`np-viz-mode-btn ${vizMode === "topology" ? "np-viz-mode-btn--active" : ""}`}
+                onClick={() => dispatchEvent({ type: "SET_VIZ_MODE", mode: "topology" })}
+                aria-pressed={vizMode === "topology"}
+              >
+                🕸 TOPOLOGY
+              </button>
+            </div>
           </div>
           {loading ? (
             <div
@@ -237,10 +262,21 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
             >
               <Skeleton variant="circular" width="280px" height="280px" />
             </div>
+          ) : vizMode === "map" ? (
+            <GlobalTrafficMap
+              hosts={hostRows}
+              captureSessionId={captureSessionId}
+              snapshotSequence={snapshotSequence}
+              selectedEntity={selectedEntity}
+              onSelectEntity={(entity: SelectedEntity | null) => dispatchEvent({ type: "SET_SELECTED_ENTITY", entity })}
+              onNavigate={handleConstellationNavigate}
+            />
           ) : (
             <Constellation
               hosts={hostRows}
               lossIndicators={monitor?.network_loss_indicators ?? 0}
+              selectedEntity={selectedEntity}
+              onSelectEntity={(entity: SelectedEntity | null) => dispatchEvent({ type: "SET_SELECTED_ENTITY", entity })}
               onNavigate={handleConstellationNavigate}
             />
           )}

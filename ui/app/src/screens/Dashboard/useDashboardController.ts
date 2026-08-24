@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from "react";
 import { useStore } from "../../state/store";
 import { useDisclosure } from "../../modes/DisclosureContext";
-import { humanBytes } from "@netpulse/viz";
+import { useOptionalSidebar } from "../../components/RightRail";
+import { humanBytes, type SelectedEntity } from "@netpulse/viz";
 import { generateSituationSummary } from "./SummaryEngine";
 import type {
   NarrativeCategory,
@@ -10,15 +11,21 @@ import type {
   KpiViewModel,
   HealthViewModel,
   DashboardEvent,
+  VizMode,
 } from "./viewModels";
 
 export function useDashboardController() {
-  const { monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory } = useStore();
+  const { monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
   const { depth, shows } = useDisclosure();
+  const sidebar = useOptionalSidebar();
 
   // Local UI states
   const [category, setCategory] = useState<NarrativeCategory>("all");
   const [search, setSearch] = useState("");
+  const [vizMode, setVizMode] = useState<VizMode>("map");
+  const [localSelectedEntity, setLocalSelectedEntity] = useState<SelectedEntity | null>(null);
+
+  const selectedEntity = sidebar ? sidebar.selectedEntity : localSelectedEntity;
 
   // 1. Situation Summary Model
   const situationSummaryModel: SituationSummaryModel = useMemo(() => {
@@ -297,8 +304,17 @@ export function useDashboardController() {
       case "SET_SEARCH":
         setSearch(event.search);
         break;
+      case "SET_VIZ_MODE":
+        setVizMode(event.mode);
+        break;
+      case "SET_SELECTED_ENTITY":
+        if (sidebar) {
+          sidebar.setSelectedEntity(event.entity);
+        }
+        setLocalSelectedEntity(event.entity);
+        break;
     }
-  }, []);
+  }, [sidebar]);
 
   return {
     depth,
@@ -309,8 +325,13 @@ export function useDashboardController() {
     kpiViewModels,
     category,
     search,
+    vizMode,
+    selectedEntity,
+    captureSessionId,
+    snapshotSequence,
     feedCount: feed.length,
     filteredNarratives,
     dispatchEvent,
   };
 }
+

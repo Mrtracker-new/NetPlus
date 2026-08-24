@@ -13,6 +13,10 @@ interface State {
   feed: NarrativeCard[];
   /** Latest monitoring snapshot, or null before the first arrives. */
   monitor: MonitorSnapshot | null;
+  /** Authoritative capture session identifier (changes on restart/reconnect). */
+  captureSessionId: string | null;
+  /** Monotonically increasing snapshot ingestion sequence number. */
+  snapshotSequence: number;
   /** Rolling total-bytes-observed samples, one per snapshot, for a throughput
    *  trend. Bounded — a sparkline, not a historian. */
   throughput: number[];
@@ -32,6 +36,8 @@ const MAX_SAMPLES = 60;
 let state: State = {
   feed: [],
   monitor: null,
+  captureSessionId: `session-${Date.now()}`,
+  snapshotSequence: 0,
   throughput: [],
   hostsHistory: [],
   flowsHistory: [],
@@ -47,6 +53,16 @@ function emit() {
 function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/** Reset capture session lineage on reconnect, restart, or interface change. */
+export function resetSession(newSessionId?: string): void {
+  state = {
+    ...state,
+    captureSessionId: newSessionId || `session-${Date.now()}`,
+    snapshotSequence: 0,
+  };
+  emit();
 }
 
 /** Apply a batch of new feed cards as a delta: prepend newest,
@@ -84,7 +100,8 @@ export function setFeed(cards: NarrativeCard[]): void {
 }
 
 /** Replace the current monitoring snapshot and append samples
- *  (total bytes, hosts count, flows count) to bounded trend histories. */
+ *  (total bytes, hosts count, flows count) to bounded trend histories.
+ *  Assigns authoritative snapshotSequence exactly once upon ingestion. */
 export function setMonitor(snapshot: MonitorSnapshot): void {
   const total = snapshot.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
   const hosts = snapshot.by_host.rows.length;
@@ -97,6 +114,7 @@ export function setMonitor(snapshot: MonitorSnapshot): void {
   state = {
     ...state,
     monitor: snapshot,
+    snapshotSequence: state.snapshotSequence + 1,
     throughput,
     hostsHistory,
     flowsHistory,
@@ -131,5 +149,7 @@ export function __resetForTest(): void {
     flowsHistory: [],
     cardsHistory: [],
     error: null,
+    captureSessionId: "default-session",
+    snapshotSequence: 0,
   };
 }

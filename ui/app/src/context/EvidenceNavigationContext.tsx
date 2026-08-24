@@ -46,38 +46,26 @@ export interface EvidenceNavigationContextValue {
   clearNavigationTarget: () => void;
 }
 
-const EvidenceNavigationContext = createContext<EvidenceNavigationContextValue | null>(null);
+export const EvidenceNavigationContext = createContext<EvidenceNavigationContextValue | null>(null);
 
 export function EvidenceNavigationProvider({ children }: { children: ReactNode }) {
   const [screen, setScreenState] = useState<Screen>("dashboard");
   const [navigationTarget, setNavigationTarget] = useState<NavigationTarget>(null);
 
-  const setScreen = useCallback((nextScreen: Screen) => {
-    setScreenState(nextScreen);
-    setNavigationTarget(null);
+  const setScreen = useCallback((newScreen: Screen) => {
+    setScreenState(newScreen);
   }, []);
 
   const navigateToEvidence = useCallback((ref: EvidenceRef, _source?: NavigationSource) => {
-    if (!ref || typeof ref !== "object" || !("kind" in ref)) {
-      setScreenState("explorer");
-      return;
-    }
-    switch (ref.kind) {
-      case "flow":
-        setNavigationTarget({ screen: "apps", flowId: ref.id });
-        setScreenState("apps");
-        break;
-      case "session":
-        setNavigationTarget({ screen: "journey", sessionId: ref.id });
-        setScreenState("journey");
-        break;
-      case "packet":
-        setNavigationTarget({ screen: "timeline", packetId: ref.id });
-        setScreenState("timeline");
-        break;
-      default:
-        setScreenState("explorer");
-        break;
+    if (ref.kind === "flow") {
+      setNavigationTarget({ screen: "apps", flowId: ref.id });
+      setScreenState("apps");
+    } else if (ref.kind === "session") {
+      setNavigationTarget({ screen: "journey", sessionId: ref.id });
+      setScreenState("journey");
+    } else if (ref.kind === "packet") {
+      setNavigationTarget({ screen: "timeline", packetId: ref.id });
+      setScreenState("timeline");
     }
   }, []);
 
@@ -109,4 +97,8 @@ export function useEvidenceNavigation(): EvidenceNavigationContextValue {
     throw new Error("useEvidenceNavigation must be used within an EvidenceNavigationProvider");
   }
   return context;
+}
+
+export function useOptionalEvidenceNavigation(): EvidenceNavigationContextValue | null {
+  return useContext(EvidenceNavigationContext);
 }

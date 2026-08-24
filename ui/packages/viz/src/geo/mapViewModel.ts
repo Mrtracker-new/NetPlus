@@ -15,6 +15,7 @@ import {
   type SelectedEntity,
   type TelemetryFreshness,
   type TombstoneDetails,
+  type TombstoneRecord,
 } from "./geoTypes";
 import { enrichHost, getLocalOrigin } from "./geoDatabase";
 import { buildSpatialClusters } from "./spatialClustering";
@@ -72,6 +73,7 @@ export interface MapViewModel {
   coverageStats: CoverageStats;
   activeSelection: ResolvedSelection | null;
   lastUpdatedTs: number;
+  tombstones: Map<string, TombstoneRecord>;
 }
 
 /**
@@ -326,444 +328,11 @@ export function deriveClusteredMapModel(
     zoomScale,
   });
 
-  // Invariant 3, Invariant E, and Invariant F: Authoritative Semantic Selection Resolution & Tombstone Handling
-  let activeSelection: ResolvedSelection | null = null;
+  // Authoritative entity-keyed tombstone derivation (Invariant 3 & Invariant F: independent of activeSelection)
+  const tombstones = deriveTombstonesSnapshot(snapshot, aggregateNodes, previousModel);
 
-  if (targetEntityId) {
-    if (targetEntityId.startsWith("entity-host-")) {
-      const targetIp = targetEntityId.replace("entity-host-", "");
-      const host = hostsById.get(targetIp);
-      if (host) {
-        // Authoritative live host endpoint selection
-        activeSelection = {
-          entityId: targetEntityId,
-          status: "active",
-          isSelected: true,
-          label: host.hostnames[0]?.name || host.ip,
-          subLabel: host.ip,
-          selectedEntity: {
-            kind: "endpoint",
-            ip: host.ip,
-            entityId: makeHostEntityId(host.ip),
-            host,
-          },
-        };
-      } else {
-        // Transition host to endpoint tombstone
-        const prevSelection = previousModel?.activeSelection;
-        if (
-          prevSelection &&
-          prevSelection.selectedEntity &&
-          prevSelection.entityId === targetEntityId
-        ) {
-          const prev = prevSelection.selectedEntity;
-          const lastObservedBytes =
-            prev.kind === "endpoint" && prev.host
-              ? prev.host.bytes
-              : "node" in prev && prev.node
-              ? prev.node.totalBytes
-              : prev.tombstone?.lastObservedBytes ?? 0;
-          const lastObservedFlows =
-            prev.kind === "endpoint" && prev.host
-              ? prev.host.flows
-              : "node" in prev && prev.node
-              ? prev.node.totalFlows
-              : prev.tombstone?.lastObservedFlows ?? 0;
-
-          const prevTombstoneTs =
-            prev.tombstone?.lastObservedTs ??
-            prevSelection.tombstoneDetails?.lastObservedTs;
-          const baseLabel = prevSelection.label.replace(/\s*\(Inactive\)$/, "");
-          const tombstone: TombstoneDetails = {
-            isInactive: true,
-            lastObservedTs:
-              prevTombstoneTs ??
-              (previousModel?.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0),
-            lastObservedBytes,
-            lastObservedFlows,
-          };
-
-          activeSelection = {
-            entityId: targetEntityId,
-            status: "tombstone",
-            isSelected: true,
-            label: `${baseLabel} (Inactive)`,
-            subLabel: "No longer active in live window",
-            tombstoneDetails: tombstone,
-            selectedEntity: {
-              kind: "endpoint",
-              ip: targetIp,
-              entityId: makeHostEntityId(targetIp),
-              tombstone,
-            },
-          };
-        }
-      }
-    } else if (targetEntityId === OTHER_RESOLVED_ENTITY_ID) {
-      const matchingNode = aggregateNodes.find(
-        (n) => n.entityId === OTHER_RESOLVED_ENTITY_ID || n.nodeKind === "otherResolvedAggregate"
-      );
-      if (matchingNode) {
-        const memberHosts = matchingNode.endpointIps
-          .map((ip) => hostsById.get(ip))
-          .filter((h): h is EnrichedHost => Boolean(h));
-
-        activeSelection = {
-          entityId: targetEntityId,
-          status: "active",
-          isSelected: true,
-          label: matchingNode.label,
-          subLabel: matchingNode.subLabel,
-          selectedEntity: {
-            kind: "otherResolvedAggregate",
-            title: matchingNode.label,
-            entityId: OTHER_RESOLVED_ENTITY_ID,
-            node: matchingNode,
-            memberHosts,
-          },
-        };
-      } else {
-        const prevSelection = previousModel?.activeSelection;
-        if (
-          prevSelection &&
-          prevSelection.selectedEntity &&
-          prevSelection.entityId === targetEntityId
-        ) {
-          const prev = prevSelection.selectedEntity;
-          const lastObservedBytes =
-            "node" in prev && prev.node ? prev.node.totalBytes : prev.tombstone?.lastObservedBytes ?? 0;
-          const lastObservedFlows =
-            "node" in prev && prev.node ? prev.node.totalFlows : prev.tombstone?.lastObservedFlows ?? 0;
-          const prevTombstoneTs =
-            prev.tombstone?.lastObservedTs ?? prevSelection.tombstoneDetails?.lastObservedTs;
-          const baseLabel = prevSelection.label.replace(/\s*\(Inactive\)$/, "");
-          const tombstone: TombstoneDetails = {
-            isInactive: true,
-            lastObservedTs:
-              prevTombstoneTs ??
-              (previousModel?.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0),
-            lastObservedBytes,
-            lastObservedFlows,
-          };
-
-          activeSelection = {
-            entityId: targetEntityId,
-            status: "tombstone",
-            isSelected: true,
-            label: `${baseLabel} (Inactive)`,
-            subLabel: "No longer active in live window",
-            tombstoneDetails: tombstone,
-            selectedEntity: {
-              kind: "otherResolvedAggregate",
-              title: baseLabel,
-              entityId: OTHER_RESOLVED_ENTITY_ID,
-              memberHosts: [],
-              tombstone,
-            },
-          };
-        }
-      }
-    } else if (targetEntityId.startsWith("entity-city-")) {
-      const matchingNode = aggregateNodes.find((n) => n.entityId === targetEntityId);
-      if (matchingNode) {
-        const memberHosts = matchingNode.endpointIps
-          .map((ip) => hostsById.get(ip))
-          .filter((h): h is EnrichedHost => Boolean(h));
-
-        activeSelection = {
-          entityId: targetEntityId,
-          status: "active",
-          isSelected: true,
-          label: matchingNode.label,
-          subLabel: matchingNode.subLabel,
-          selectedEntity: {
-            kind: "cityAggregate",
-            cityName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-            countryCode: matchingNode.countryCode || undefined,
-            entityId: matchingNode.entityId as CityAggregateEntityId,
-            node: matchingNode,
-            memberHosts,
-          },
-        };
-      } else {
-        const prevSelection = previousModel?.activeSelection;
-        if (
-          prevSelection &&
-          prevSelection.selectedEntity &&
-          prevSelection.entityId === targetEntityId
-        ) {
-          const prev = prevSelection.selectedEntity;
-          const lastObservedBytes =
-            "node" in prev && prev.node ? prev.node.totalBytes : prev.tombstone?.lastObservedBytes ?? 0;
-          const lastObservedFlows =
-            "node" in prev && prev.node ? prev.node.totalFlows : prev.tombstone?.lastObservedFlows ?? 0;
-          const prevTombstoneTs =
-            prev.tombstone?.lastObservedTs ?? prevSelection.tombstoneDetails?.lastObservedTs;
-          const baseLabel = prevSelection.label.replace(/\s*\(Inactive\)$/, "");
-          const tombstone: TombstoneDetails = {
-            isInactive: true,
-            lastObservedTs:
-              prevTombstoneTs ??
-              (previousModel?.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0),
-            lastObservedBytes,
-            lastObservedFlows,
-          };
-
-          const prevCity = prev.kind === "cityAggregate" ? prev.cityName : baseLabel;
-          const prevCountry = prev.kind === "cityAggregate" ? prev.countryCode : undefined;
-
-          activeSelection = {
-            entityId: targetEntityId,
-            status: "tombstone",
-            isSelected: true,
-            label: `${baseLabel} (Inactive)`,
-            subLabel: "No longer active in live window",
-            tombstoneDetails: tombstone,
-            selectedEntity: {
-              kind: "cityAggregate",
-              cityName: prevCity,
-              countryCode: prevCountry,
-              entityId: targetEntityId as CityAggregateEntityId,
-              memberHosts: [],
-              tombstone,
-            },
-          };
-        }
-      }
-    } else if (targetEntityId.startsWith("entity-country-")) {
-      const matchingNode = aggregateNodes.find((n) => n.entityId === targetEntityId);
-      if (matchingNode) {
-        const memberHosts = matchingNode.endpointIps
-          .map((ip) => hostsById.get(ip))
-          .filter((h): h is EnrichedHost => Boolean(h));
-
-        activeSelection = {
-          entityId: targetEntityId,
-          status: "active",
-          isSelected: true,
-          label: matchingNode.label,
-          subLabel: matchingNode.subLabel,
-          selectedEntity: {
-            kind: "countryAggregate",
-            countryCode: matchingNode.countryCode || "XX",
-            countryName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-            entityId: matchingNode.entityId as CountryAggregateEntityId,
-            node: matchingNode,
-            memberHosts,
-          },
-        };
-      } else {
-        const prevSelection = previousModel?.activeSelection;
-        if (
-          prevSelection &&
-          prevSelection.selectedEntity &&
-          prevSelection.entityId === targetEntityId
-        ) {
-          const prev = prevSelection.selectedEntity;
-          const lastObservedBytes =
-            "node" in prev && prev.node ? prev.node.totalBytes : prev.tombstone?.lastObservedBytes ?? 0;
-          const lastObservedFlows =
-            "node" in prev && prev.node ? prev.node.totalFlows : prev.tombstone?.lastObservedFlows ?? 0;
-          const prevTombstoneTs =
-            prev.tombstone?.lastObservedTs ?? prevSelection.tombstoneDetails?.lastObservedTs;
-          const baseLabel = prevSelection.label.replace(/\s*\(Inactive\)$/, "");
-          const tombstone: TombstoneDetails = {
-            isInactive: true,
-            lastObservedTs:
-              prevTombstoneTs ??
-              (previousModel?.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0),
-            lastObservedBytes,
-            lastObservedFlows,
-          };
-
-          const prevCc = prev.kind === "countryAggregate" ? prev.countryCode : "XX";
-          const prevCn = prev.kind === "countryAggregate" ? prev.countryName : baseLabel;
-
-          activeSelection = {
-            entityId: targetEntityId,
-            status: "tombstone",
-            isSelected: true,
-            label: `${baseLabel} (Inactive)`,
-            subLabel: "No longer active in live window",
-            tombstoneDetails: tombstone,
-            selectedEntity: {
-              kind: "countryAggregate",
-              countryCode: prevCc,
-              countryName: prevCn,
-              entityId: targetEntityId as CountryAggregateEntityId,
-              memberHosts: [],
-              tombstone,
-            },
-          };
-        }
-      }
-    } else {
-      // Spatial Cluster Aggregate (entity-cluster-...) or generic aggregate target
-      const matchingNode = aggregateNodes.find(
-        (n) =>
-          n.entityId === targetEntityId ||
-          n.id === targetEntityId ||
-          n.geoCellId === targetEntityId.replace("entity-cluster-", "")
-      );
-      if (matchingNode) {
-        const memberHosts = matchingNode.endpointIps
-          .map((ip) => hostsById.get(ip))
-          .filter((h): h is EnrichedHost => Boolean(h));
-
-        if (matchingNode.nodeKind === "cityAggregate") {
-          activeSelection = {
-            entityId: matchingNode.entityId,
-            status: "active",
-            isSelected: true,
-            label: matchingNode.label,
-            subLabel: matchingNode.subLabel,
-            selectedEntity: {
-              kind: "cityAggregate",
-              cityName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-              countryCode: matchingNode.countryCode || undefined,
-              entityId: matchingNode.entityId as CityAggregateEntityId,
-              node: matchingNode,
-              memberHosts,
-            },
-          };
-        } else if (matchingNode.nodeKind === "countryAggregate") {
-          activeSelection = {
-            entityId: matchingNode.entityId,
-            status: "active",
-            isSelected: true,
-            label: matchingNode.label,
-            subLabel: matchingNode.subLabel,
-            selectedEntity: {
-              kind: "countryAggregate",
-              countryCode: matchingNode.countryCode || "XX",
-              countryName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-              entityId: matchingNode.entityId as CountryAggregateEntityId,
-              node: matchingNode,
-              memberHosts,
-            },
-          };
-        } else if (matchingNode.nodeKind === "otherResolvedAggregate") {
-          activeSelection = {
-            entityId: matchingNode.entityId,
-            status: "active",
-            isSelected: true,
-            label: matchingNode.label,
-            subLabel: matchingNode.subLabel,
-            selectedEntity: {
-              kind: "otherResolvedAggregate",
-              title: matchingNode.label,
-              entityId: OTHER_RESOLVED_ENTITY_ID,
-              node: matchingNode,
-              memberHosts,
-            },
-          };
-        } else {
-          activeSelection = {
-            entityId: matchingNode.entityId,
-            status: "active",
-            isSelected: true,
-            label: matchingNode.label,
-            subLabel: matchingNode.subLabel,
-            selectedEntity: {
-              kind: "cluster",
-              clusterId: matchingNode.id,
-              entityId: matchingNode.entityId as ClusterEntityId,
-              geoCellId: matchingNode.geoCellId,
-              label: matchingNode.label,
-              node: matchingNode,
-              memberHosts,
-            },
-          };
-        }
-      } else {
-        const prevSelection = previousModel?.activeSelection;
-        if (
-          prevSelection &&
-          prevSelection.selectedEntity &&
-          prevSelection.entityId === targetEntityId
-        ) {
-          const prev = prevSelection.selectedEntity;
-          const lastObservedBytes =
-            "node" in prev && prev.node ? prev.node.totalBytes : prev.tombstone?.lastObservedBytes ?? 0;
-          const lastObservedFlows =
-            "node" in prev && prev.node ? prev.node.totalFlows : prev.tombstone?.lastObservedFlows ?? 0;
-          const prevTombstoneTs =
-            prev.tombstone?.lastObservedTs ?? prevSelection.tombstoneDetails?.lastObservedTs;
-          const baseLabel = prevSelection.label.replace(/\s*\(Inactive\)$/, "");
-          const tombstone: TombstoneDetails = {
-            isInactive: true,
-            lastObservedTs:
-              prevTombstoneTs ??
-              (previousModel?.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0),
-            lastObservedBytes,
-            lastObservedFlows,
-          };
-
-          let tombstoneEntity: SelectedEntity;
-          if (prev.kind === "endpoint") {
-            tombstoneEntity = {
-              kind: "endpoint",
-              entityId: makeHostEntityId(prev.ip),
-              ip: prev.ip,
-              tombstone,
-            };
-          } else if (prev.kind === "cityAggregate") {
-            tombstoneEntity = {
-              kind: "cityAggregate",
-              entityId: prev.entityId,
-              cityName: prev.cityName,
-              countryCode: prev.countryCode,
-              memberHosts: [],
-              tombstone,
-            };
-          } else if (prev.kind === "countryAggregate") {
-            tombstoneEntity = {
-              kind: "countryAggregate",
-              entityId: prev.entityId,
-              countryCode: prev.countryCode,
-              countryName: prev.countryName,
-              memberHosts: [],
-              tombstone,
-            };
-          } else if (prev.kind === "cluster") {
-            tombstoneEntity = {
-              kind: "cluster",
-              entityId: prev.entityId,
-              geoCellId: prev.geoCellId,
-              clusterId: prev.clusterId,
-              label: prev.label,
-              memberHosts: [],
-              tombstone,
-            };
-          } else if (prev.kind === "otherResolvedAggregate") {
-            tombstoneEntity = {
-              kind: "otherResolvedAggregate",
-              entityId: OTHER_RESOLVED_ENTITY_ID,
-              title: prev.title,
-              memberHosts: [],
-              tombstone,
-            };
-          } else {
-            tombstoneEntity = {
-              ...prev,
-              memberHosts: [],
-              tombstone,
-            };
-          }
-
-          activeSelection = {
-            entityId: targetEntityId,
-            status: "tombstone",
-            isSelected: true,
-            label: `${baseLabel} (Inactive)`,
-            subLabel: "No longer active in live window",
-            tombstoneDetails: tombstone,
-            selectedEntity: tombstoneEntity,
-          };
-        }
-      }
-    }
-  }
+  // Authoritative semantic selection resolution
+  const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones);
 
   return {
     captureSessionId,
@@ -777,7 +346,415 @@ export function deriveClusteredMapModel(
     coverageStats,
     activeSelection,
     lastUpdatedTs: snapshot.snapshotTimestamp ?? 0,
+    tombstones,
   };
+}
+
+/**
+ * Factory for creating an immutable host TombstoneRecord from a previously live host.
+ */
+export function createHostTombstone(
+  host: EnrichedHost,
+  lastObservedTs: number
+): TombstoneRecord {
+  const hostEntityId = makeHostEntityId(host.ip);
+  const tombstone: TombstoneDetails = {
+    isInactive: true,
+    lastObservedTs,
+    lastObservedBytes: host.bytes,
+    lastObservedFlows: host.flows,
+  };
+  const baseLabel = host.hostnames[0]?.name || host.ip;
+  return {
+    entityId: hostEntityId,
+    kind: "endpoint",
+    label: baseLabel,
+    subLabel: host.ip,
+    tombstone,
+    selectedEntity: {
+      kind: "endpoint",
+      ip: host.ip,
+      entityId: hostEntityId,
+      tombstone,
+    },
+  };
+}
+
+/**
+ * Factory for creating an immutable aggregate TombstoneRecord from a previously rendered aggregate node.
+ * Bounds and metrics are frozen from the final rendered frame.
+ */
+export function createAggregateTombstone(
+  node: GeoAggregateNode,
+  lastObservedTs: number
+): TombstoneRecord {
+  const tombstone: TombstoneDetails = {
+    isInactive: true,
+    lastObservedTs,
+    lastObservedBytes: node.totalBytes,
+    lastObservedFlows: node.totalFlows,
+  };
+  const baseLabel = node.label.replace(/\s*\(\d+\)$/, "");
+  let tombstoneEntity: SelectedEntity;
+
+  if (node.nodeKind === "cityAggregate") {
+    tombstoneEntity = {
+      kind: "cityAggregate",
+      entityId: node.entityId as CityAggregateEntityId,
+      cityName: baseLabel,
+      countryCode: node.countryCode || undefined,
+      memberHosts: [],
+      tombstone,
+    };
+  } else if (node.nodeKind === "countryAggregate") {
+    tombstoneEntity = {
+      kind: "countryAggregate",
+      entityId: node.entityId as CountryAggregateEntityId,
+      countryCode: node.countryCode || "XX",
+      countryName: baseLabel,
+      memberHosts: [],
+      tombstone,
+    };
+  } else if (node.nodeKind === "otherResolvedAggregate") {
+    tombstoneEntity = {
+      kind: "otherResolvedAggregate",
+      entityId: OTHER_RESOLVED_ENTITY_ID,
+      title: node.label,
+      memberHosts: [],
+      tombstone,
+    };
+  } else if (node.nodeKind === "cluster") {
+    tombstoneEntity = {
+      kind: "cluster",
+      entityId: node.entityId as ClusterEntityId,
+      geoCellId: node.geoCellId,
+      clusterId: node.id,
+      label: node.label,
+      memberHosts: [],
+      tombstone,
+    };
+  } else {
+    // endpoint nodeKind
+    const ip = node.endpointIps[0] || "";
+    tombstoneEntity = {
+      kind: "endpoint",
+      entityId: makeHostEntityId(ip),
+      ip,
+      tombstone,
+    };
+  }
+
+  return {
+    entityId: node.entityId,
+    kind: tombstoneEntity.kind,
+    label: baseLabel,
+    subLabel: node.subLabel,
+    tombstone,
+    selectedEntity: tombstoneEntity,
+  };
+}
+
+/**
+ * Pure, deterministic derivation of the authoritative tombstone snapshot.
+ * Keyed strictly by entityId, independent of activeSelection.
+ *
+ * Invariants:
+ * - E live now => E ∉ tombstones
+ * - E dead now and previously observed in this session => E ∈ tombstones
+ * - E dead across subsequent frames => tombstones[E] is unchanged (frozen historical metrics & timestamp)
+ * - E resurrected => E ∉ tombstones
+ * - session changed => previous-session tombstones are cleared
+ */
+export function deriveTombstonesSnapshot(
+  snapshot: HostEnrichmentSnapshot,
+  aggregateNodes: GeoAggregateNode[],
+  previousModel: MapViewModel | null
+): Map<string, TombstoneRecord> {
+  const sameSession =
+    previousModel !== null &&
+    previousModel.captureSessionId === snapshot.captureSessionId;
+
+  const previousTombstones = sameSession
+    ? previousModel?.tombstones ?? new Map<string, TombstoneRecord>()
+    : new Map<string, TombstoneRecord>();
+
+  const nextTombstones = new Map<string, TombstoneRecord>();
+
+  if (!sameSession || !previousModel) {
+    return nextTombstones;
+  }
+
+  // Authoritative set of currently live entity IDs
+  const liveEntityIds = new Set<string>();
+  for (const host of snapshot.enrichedHosts) {
+    liveEntityIds.add(makeHostEntityId(host.ip));
+    liveEntityIds.add(host.ip);
+  }
+  for (const node of aggregateNodes) {
+    liveEntityIds.add(node.entityId);
+    if (node.geoCellId) {
+      liveEntityIds.add(`entity-cluster-${node.geoCellId}`);
+    }
+  }
+
+  // 1. Inherit previously recorded tombstones (frozen state preserved for dead entities)
+  for (const [entityId, record] of previousTombstones) {
+    if (!liveEntityIds.has(entityId)) {
+      nextTombstones.set(entityId, record);
+    }
+  }
+
+  // 2. Capture newly deceased hosts from previous model
+  if (previousModel.enrichedHosts) {
+    const lastTs = previousModel.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0;
+    for (const prevHost of previousModel.enrichedHosts) {
+      const hostEntityId = makeHostEntityId(prevHost.ip);
+      if (!liveEntityIds.has(hostEntityId) && !nextTombstones.has(hostEntityId)) {
+        nextTombstones.set(hostEntityId, createHostTombstone(prevHost, lastTs));
+      }
+    }
+  }
+
+  // 3. Capture newly deceased aggregates from previous model (frozen at last rendered snapshot)
+  if (previousModel.aggregateNodes) {
+    const lastTs = previousModel.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0;
+    for (const prevNode of previousModel.aggregateNodes) {
+      const aggregateEntityId = prevNode.entityId;
+      if (!liveEntityIds.has(aggregateEntityId) && !nextTombstones.has(aggregateEntityId)) {
+        nextTombstones.set(aggregateEntityId, createAggregateTombstone(prevNode, lastTs));
+      }
+    }
+  }
+
+  // 4. Backward-compatibility fallback for legacy activeSelection tombstones
+  if (previousModel.activeSelection?.status === "tombstone") {
+    const prevSel = previousModel.activeSelection;
+    if (!nextTombstones.has(prevSel.entityId) && !liveEntityIds.has(prevSel.entityId)) {
+      const baseLabel = prevSel.label.replace(/\s*\(Inactive\)$/, "");
+      const tombstoneDetails: TombstoneDetails = prevSel.tombstoneDetails ||
+        prevSel.selectedEntity?.tombstone || {
+          isInactive: true,
+          lastObservedTs: previousModel.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0,
+          lastObservedBytes: 0,
+          lastObservedFlows: 0,
+        };
+      let tombstoneEntity: SelectedEntity;
+      if (prevSel.selectedEntity.kind === "endpoint") {
+        tombstoneEntity = {
+          kind: "endpoint",
+          entityId: prevSel.selectedEntity.entityId,
+          ip: prevSel.selectedEntity.ip,
+          tombstone: tombstoneDetails,
+        };
+      } else {
+        tombstoneEntity = {
+          ...prevSel.selectedEntity,
+          memberHosts: [],
+          tombstone: tombstoneDetails,
+        };
+      }
+
+      nextTombstones.set(prevSel.entityId, {
+        entityId: prevSel.entityId,
+        kind: prevSel.selectedEntity.kind,
+        label: baseLabel,
+        subLabel: prevSel.subLabel,
+        tombstone: tombstoneDetails,
+        selectedEntity: tombstoneEntity,
+      });
+    }
+  }
+
+  return nextTombstones;
+}
+
+export function resolveLiveHostSelection(
+  targetEntityId: string,
+  hostsById: Map<string, EnrichedHost>
+): ResolvedSelection | null {
+  const ip = targetEntityId.startsWith("entity-host-")
+    ? targetEntityId.replace("entity-host-", "")
+    : hostsById.has(targetEntityId)
+    ? targetEntityId
+    : null;
+
+  if (ip) {
+    const host = hostsById.get(ip);
+    if (host) {
+      return {
+        entityId: makeHostEntityId(host.ip),
+        status: "active",
+        isSelected: true,
+        label: host.hostnames[0]?.name || host.ip,
+        subLabel: host.ip,
+        selectedEntity: {
+          kind: "endpoint",
+          ip: host.ip,
+          entityId: makeHostEntityId(host.ip),
+          host,
+        },
+      };
+    }
+  }
+  return null;
+}
+
+export function resolveLiveAggregateSelection(
+  targetEntityId: string,
+  aggregateNodes: GeoAggregateNode[],
+  hostsById: Map<string, EnrichedHost>
+): ResolvedSelection | null {
+  const matchingNode = aggregateNodes.find(
+    (n) =>
+      n.entityId === targetEntityId ||
+      n.id === targetEntityId ||
+      n.geoCellId === targetEntityId.replace("entity-cluster-", "") ||
+      (targetEntityId === OTHER_RESOLVED_ENTITY_ID && n.nodeKind === "otherResolvedAggregate")
+  );
+
+  if (!matchingNode) return null;
+
+  const memberHosts = matchingNode.endpointIps
+    .map((ip) => hostsById.get(ip))
+    .filter((h): h is EnrichedHost => Boolean(h));
+
+  if (matchingNode.nodeKind === "endpoint") {
+    const ip = matchingNode.endpointIps[0] || "";
+    const host = hostsById.get(ip);
+    return {
+      entityId: matchingNode.entityId,
+      status: "active",
+      isSelected: true,
+      label: matchingNode.label,
+      subLabel: matchingNode.subLabel,
+      selectedEntity: {
+        kind: "endpoint",
+        ip,
+        entityId: makeHostEntityId(ip),
+        ...(host ? { host } : {}),
+      } as SelectedEntity,
+    };
+  }
+
+  if (matchingNode.nodeKind === "cityAggregate") {
+    return {
+      entityId: matchingNode.entityId,
+      status: "active",
+      isSelected: true,
+      label: matchingNode.label,
+      subLabel: matchingNode.subLabel,
+      selectedEntity: {
+        kind: "cityAggregate",
+        cityName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
+        countryCode: matchingNode.countryCode || undefined,
+        entityId: matchingNode.entityId as CityAggregateEntityId,
+        node: matchingNode,
+        memberHosts,
+      },
+    };
+  }
+
+  if (matchingNode.nodeKind === "countryAggregate") {
+    return {
+      entityId: matchingNode.entityId,
+      status: "active",
+      isSelected: true,
+      label: matchingNode.label,
+      subLabel: matchingNode.subLabel,
+      selectedEntity: {
+        kind: "countryAggregate",
+        countryCode: matchingNode.countryCode || "XX",
+        countryName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
+        entityId: matchingNode.entityId as CountryAggregateEntityId,
+        node: matchingNode,
+        memberHosts,
+      },
+    };
+  }
+
+  if (matchingNode.nodeKind === "otherResolvedAggregate" || targetEntityId === OTHER_RESOLVED_ENTITY_ID) {
+    return {
+      entityId: matchingNode.entityId,
+      status: "active",
+      isSelected: true,
+      label: matchingNode.label,
+      subLabel: matchingNode.subLabel,
+      selectedEntity: {
+        kind: "otherResolvedAggregate",
+        title: matchingNode.label,
+        entityId: OTHER_RESOLVED_ENTITY_ID,
+        node: matchingNode,
+        memberHosts,
+      },
+    };
+  }
+
+  return {
+    entityId: matchingNode.entityId,
+    status: "active",
+    isSelected: true,
+    label: matchingNode.label,
+    subLabel: matchingNode.subLabel,
+    selectedEntity: {
+      kind: "cluster",
+      clusterId: matchingNode.id,
+      entityId: matchingNode.entityId as ClusterEntityId,
+      geoCellId: matchingNode.geoCellId,
+      label: matchingNode.label,
+      node: matchingNode,
+      memberHosts,
+    },
+  };
+}
+
+export function resolveSelection(
+  targetEntityId: string | null,
+  snapshot: HostEnrichmentSnapshot,
+  aggregateNodes: GeoAggregateNode[],
+  tombstones: Map<string, TombstoneRecord>
+): ResolvedSelection | null {
+  if (!targetEntityId) return null;
+
+  const liveSelection =
+    resolveLiveHostSelection(targetEntityId, snapshot.hostsById) ??
+    resolveLiveAggregateSelection(targetEntityId, aggregateNodes, snapshot.hostsById);
+
+  if (liveSelection) {
+    return liveSelection;
+  }
+
+  let tombstone = tombstones.get(targetEntityId);
+  if (!tombstone && !targetEntityId.startsWith("entity-host-")) {
+    tombstone = tombstones.get(`entity-host-${targetEntityId}`);
+  }
+  if (!tombstone && targetEntityId.startsWith("entity-cluster-")) {
+    const cellId = targetEntityId.replace("entity-cluster-", "");
+    for (const record of tombstones.values()) {
+      if (
+        record.kind === "cluster" &&
+        "geoCellId" in record.selectedEntity &&
+        record.selectedEntity.geoCellId === cellId
+      ) {
+        tombstone = record;
+        break;
+      }
+    }
+  }
+
+  if (tombstone) {
+    const baseLabel = tombstone.label.replace(/\s*\(Inactive\)$/, "");
+    return {
+      entityId: tombstone.entityId,
+      status: "tombstone",
+      isSelected: true,
+      label: `${baseLabel} (Inactive)`,
+      subLabel: tombstone.subLabel ?? "No longer active in live window",
+      selectedEntity: tombstone.selectedEntity,
+      tombstoneDetails: tombstone.tombstone,
+    };
+  }
+
+  return null;
 }
 
 /**

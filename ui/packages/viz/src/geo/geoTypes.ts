@@ -491,3 +491,16 @@ export type SelectedEntity =
   | SelectedUnresolvedGroup
   | SelectedLocalNetworkGroup;
 
+/**
+ * Immutable snapshot record of an entity's frozen state upon becoming inactive.
+ */
+export interface TombstoneRecord {
+  readonly entityId: string;
+  readonly kind: SelectedEntity["kind"];
+  readonly label: string;
+  readonly subLabel?: string;
+  readonly tombstone: TombstoneDetails;
+  readonly selectedEntity: SelectedEntity;
+}
+
+

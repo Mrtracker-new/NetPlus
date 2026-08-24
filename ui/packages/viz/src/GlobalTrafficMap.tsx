@@ -80,6 +80,8 @@ export function isNodeSelected(
   if (activeSelection.kind === "cluster") {
     return (
       node.entityId === activeSelection.entityId ||
+      node.id === activeSelection.clusterId ||
+      (Boolean(node.geoCellId) && node.geoCellId === activeSelection.geoCellId) ||
       (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId)
     );
   }

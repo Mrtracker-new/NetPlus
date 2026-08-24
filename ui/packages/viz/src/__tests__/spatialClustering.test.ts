@@ -1156,6 +1156,158 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       }
     });
 
+    it("12b. Aggregate Tombstone Persistence: switching between multiple dead aggregates and endpoints across frames without dropping tombstone state", () => {
+      const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 5000, 5, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+      const h2 = createCustomHost("1.1.1.2", 50.12, 8.67, 4000, 4, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+      const h3 = createCustomHost("2.2.2.1", 35.67, 139.65, 7000, 7, { city: "Tokyo", countryCode: "JP", locationLevel: "city" });
+
+      const snapshot1 = {
+        captureSessionId: "s-multi-agg",
+        snapshotSequence: 1,
+        snapshotTimestamp: 1000,
+        enrichedHosts: [h1, h2, h3],
+        hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2], ["2.2.2.1", h3]]),
+        coverageStats: {
+          totalObservedHosts: 3,
+          publicHostsCount: 3,
+          resolvedHostsCount: 3,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 16000,
+          resolvedBytes: 16000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+        selectedEntityId: "entity-city-de-frankfurt",
+      });
+      expect(vm1.activeSelection?.status).toBe("active");
+
+      // Snapshot 2: all hosts disappear
+      const snapshot2 = {
+        captureSessionId: "s-multi-agg",
+        snapshotSequence: 2,
+        snapshotTimestamp: 2000,
+        enrichedHosts: [],
+        hostsById: new Map(),
+        coverageStats: {
+          totalObservedHosts: 0,
+          publicHostsCount: 0,
+          resolvedHostsCount: 0,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 0,
+          resolvedBytes: 0,
+          unresolvedBytes: 0,
+          coveragePercent: 0,
+          resolvedBytesPercent: 0,
+        },
+      };
+
+      // Select Frankfurt tombstone
+      const vm2 = deriveClusteredMapModel(snapshot2, vm1, {
+        selectedEntityId: "entity-city-de-frankfurt",
+      });
+      expect(vm2.activeSelection?.status).toBe("tombstone");
+      expect(vm2.activeSelection?.entityId).toBe("entity-city-de-frankfurt");
+      expect(vm2.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(9000);
+
+      // Select Tokyo host 2.2.2.1 tombstone
+      const vm3 = deriveClusteredMapModel(snapshot2, vm2, {
+        selectedEntityId: "entity-host-2.2.2.1",
+      });
+      expect(vm3.activeSelection?.status).toBe("tombstone");
+      expect(vm3.activeSelection?.entityId).toBe("entity-host-2.2.2.1");
+      expect(vm3.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(7000);
+
+      // Select Frankfurt tombstone again
+      const vm4 = deriveClusteredMapModel(snapshot2, vm3, {
+        selectedEntityId: "entity-city-de-frankfurt",
+      });
+      expect(vm4.activeSelection?.status).toBe("tombstone");
+      expect(vm4.activeSelection?.entityId).toBe("entity-city-de-frankfurt");
+      expect(vm4.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(9000);
+      expect(vm4.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+    });
+
+    it("12c. Cluster Aggregate Tombstone Transition: Selected spatial cluster transitions to cluster tombstone with preserved geoCellId and label", () => {
+      // Create hosts in generic spatial cluster (different cities in same cell)
+      const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 3000, 3, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+      const h2 = createCustomHost("1.1.1.2", 50.12, 8.67, 2000, 2, { city: "Offenbach", countryCode: "DE", locationLevel: "city" });
+
+      const snapshot1 = {
+        captureSessionId: "s-cluster",
+        snapshotSequence: 1,
+        snapshotTimestamp: 1000,
+        enrichedHosts: [h1, h2],
+        hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+        coverageStats: {
+          totalObservedHosts: 2,
+          publicHostsCount: 2,
+          resolvedHostsCount: 2,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 5000,
+          resolvedBytes: 5000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      const vm1 = deriveClusteredMapModel(snapshot1, null);
+      const clusterNode = vm1.aggregateNodes[0]!;
+      expect(clusterNode.nodeKind).toBe("cluster");
+      const clusterEntityId = clusterNode.entityId;
+
+      // Select cluster while live
+      const vm1Sel = deriveClusteredMapModel(snapshot1, null, {
+        selectedEntityId: clusterEntityId,
+      });
+      expect(vm1Sel.activeSelection?.status).toBe("active");
+      expect(vm1Sel.activeSelection?.selectedEntity.kind).toBe("cluster");
+
+      // Transition to empty snapshot
+      const snapshot2 = {
+        captureSessionId: "s-cluster",
+        snapshotSequence: 2,
+        snapshotTimestamp: 2000,
+        enrichedHosts: [],
+        hostsById: new Map(),
+        coverageStats: {
+          totalObservedHosts: 0,
+          publicHostsCount: 0,
+          resolvedHostsCount: 0,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 0,
+          resolvedBytes: 0,
+          unresolvedBytes: 0,
+          coveragePercent: 0,
+          resolvedBytesPercent: 0,
+        },
+      };
+
+      const vm2 = deriveClusteredMapModel(snapshot2, vm1Sel, {
+        selectedEntityId: clusterEntityId,
+      });
+      expect(vm2.activeSelection?.status).toBe("tombstone");
+      expect(vm2.activeSelection?.entityId).toBe(clusterEntityId);
+      expect(vm2.activeSelection?.selectedEntity.kind).toBe("cluster");
+      if (vm2.activeSelection?.selectedEntity.kind === "cluster") {
+        expect(vm2.activeSelection.selectedEntity.tombstone?.isInactive).toBe(true);
+        expect(vm2.activeSelection.selectedEntity.tombstone?.lastObservedBytes).toBe(5000);
+        expect(vm2.activeSelection.selectedEntity.tombstone?.lastObservedTs).toBe(1000);
+      }
+    });
+
     it("13. Four-Point 4D Traffic and Membership Conservation Validation", () => {
       // Create 40 distinct hosts across different cities and countries with randomized multi-dimensional metrics
       const hosts: EnrichedHost[] = [];

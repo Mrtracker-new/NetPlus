@@ -315,6 +315,413 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       }
     });
 
+    it("Authoritative Tombstone Invariant: Entity A dies while unselected, then selecting A resolves its frozen tombstone", () => {
+      const rowsA: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 5000, flows: 5, hostnames: [{ name: "host-a.com", source: "dns" }], evidence: [] },
+        { label: "2.2.2.2", bytes: 3000, flows: 3, hostnames: [{ name: "host-b.com", source: "dns" }], evidence: [] },
+      ];
+
+      // T1: A and B are live. B is selected.
+      const m1 = deriveMapViewModel(
+        { hosts: rowsA, captureSessionId: "s-tomb-1", snapshotSequence: 1, snapshotTimestamp: 1000 },
+        null,
+        { selectedEntityId: "entity-host-2.2.2.2" }
+      );
+      expect(m1.activeSelection?.status).toBe("active");
+      expect(m1.activeSelection?.entityId).toBe("entity-host-2.2.2.2");
+
+      // T2: A disappears, only B remains. B is selected.
+      const rowsB: BreakdownRow[] = [
+        { label: "2.2.2.2", bytes: 4000, flows: 4, hostnames: [{ name: "host-b.com", source: "dns" }], evidence: [] },
+      ];
+      const m2 = deriveMapViewModel(
+        { hosts: rowsB, captureSessionId: "s-tomb-1", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1,
+        { selectedEntityId: "entity-host-2.2.2.2" }
+      );
+      expect(m2.activeSelection?.status).toBe("active");
+      expect(m2.tombstones.has("entity-host-1.1.1.1")).toBe(true);
+
+      // T3: Select A (which died while unselected)
+      const m3 = deriveMapViewModel(
+        { hosts: rowsB, captureSessionId: "s-tomb-1", snapshotSequence: 3, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m3.activeSelection?.status).toBe("tombstone");
+      expect(m3.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m3.activeSelection?.label).toBe("host-a.com (Inactive)");
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(5000);
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedFlows).toBe(5);
+    });
+
+    it("Authoritative Tombstone Invariant: Multiple tombstones independent switching preserves individual frozen metrics", () => {
+      // T1: A (1.1.1.1) and B (2.2.2.2) live
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "host-a.net", source: "dns" }], evidence: [] },
+            { label: "2.2.2.2", bytes: 2000, flows: 2, hostnames: [{ name: "host-b.net", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-multi",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null
+      );
+
+      // T2: A dies at T2 (timestamp 2000)
+      const m2 = deriveMapViewModel(
+        {
+          hosts: [{ label: "2.2.2.2", bytes: 2500, flows: 3, hostnames: [{ name: "host-b.net", source: "dns" }], evidence: [] }],
+          captureSessionId: "s-multi",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1
+      );
+      expect(m2.tombstones.get("entity-host-1.1.1.1")?.tombstone.lastObservedTs).toBe(1000);
+      expect(m2.tombstones.get("entity-host-1.1.1.1")?.tombstone.lastObservedBytes).toBe(1000);
+
+      // T3: B dies at T3 (timestamp 3000)
+      const m3 = deriveMapViewModel(
+        {
+          hosts: [],
+          captureSessionId: "s-multi",
+          snapshotSequence: 3,
+          snapshotTimestamp: 3000,
+        },
+        m2
+      );
+      expect(m3.tombstones.get("entity-host-1.1.1.1")?.tombstone.lastObservedTs).toBe(1000);
+      expect(m3.tombstones.get("entity-host-2.2.2.2")?.tombstone.lastObservedTs).toBe(2000);
+      expect(m3.tombstones.get("entity-host-2.2.2.2")?.tombstone.lastObservedBytes).toBe(2500);
+
+      // T4: Select A
+      const m4 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-multi", snapshotSequence: 4, snapshotTimestamp: 4000 },
+        m3,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m4.activeSelection?.status).toBe("tombstone");
+      expect(m4.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m4.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+
+      // T5: Select B
+      const m5 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-multi", snapshotSequence: 5, snapshotTimestamp: 5000 },
+        m4,
+        { selectedEntityId: "entity-host-2.2.2.2" }
+      );
+      expect(m5.activeSelection?.status).toBe("tombstone");
+      expect(m5.activeSelection?.entityId).toBe("entity-host-2.2.2.2");
+      expect(m5.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(2000);
+
+      // T6: Select A again -> original timestamp/bytes survive unchanged
+      const m6 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-multi", snapshotSequence: 6, snapshotTimestamp: 6000 },
+        m5,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m6.activeSelection?.status).toBe("tombstone");
+      expect(m6.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m6.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+      expect(m6.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(1000);
+    });
+
+    it("Authoritative Tombstone Invariant: Aggregate dies while unselected and freezes final live rendered frame", () => {
+      // Frankfurt aggregate with 2 hosts
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-agg",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null
+      );
+      const frankfurtNode = m1.aggregateNodes.find((n) => n.entityId === "entity-city-de-frankfurt-am-main");
+      expect(frankfurtNode).toBeDefined();
+      expect(frankfurtNode?.totalBytes).toBe(10000);
+
+      // S2: All hosts disappear. No selection active.
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-agg", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1
+      );
+      expect(m2.tombstones.has("entity-city-de-frankfurt-am-main")).toBe(true);
+
+      // S3: Select Frankfurt -> resolves to frozen aggregate snapshot
+      const m3 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-agg", snapshotSequence: 3, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-city-de-frankfurt-am-main" }
+      );
+      expect(m3.activeSelection?.status).toBe("tombstone");
+      expect(m3.activeSelection?.entityId).toBe("entity-city-de-frankfurt-am-main");
+      expect(m3.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+      if (m3.activeSelection?.selectedEntity.kind === "cityAggregate") {
+        expect(m3.activeSelection.selectedEntity.cityName).toBe("Frankfurt am Main");
+        expect(m3.activeSelection.selectedEntity.tombstone?.lastObservedBytes).toBe(10000);
+        expect(m3.activeSelection.selectedEntity.tombstone?.lastObservedFlows).toBe(10);
+        expect(m3.activeSelection.selectedEntity.tombstone?.lastObservedTs).toBe(1000);
+      }
+    });
+
+    it("Authoritative Tombstone Invariant: Aggregate membership changes before death freezes final state, not older state", () => {
+      // S1: Frankfurt has 2 hosts (10,000 bytes)
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-agg-change",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null
+      );
+
+      // S2: Frankfurt membership changes (2 hosts with 2000 + 1000 = 3,000 bytes)
+      const m2 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 2000, flows: 2, hostnames: [], evidence: [] },
+            { label: "31.0.0.2", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-agg-change",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1
+      );
+
+      // S3: All hosts disappear
+      const m3 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-agg-change", snapshotSequence: 3, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-city-de-frankfurt-am-main" }
+      );
+
+      // Tombstone must reflect S2 (3000 bytes, ts 2000), not S1 (10000 bytes)
+      expect(m3.activeSelection?.status).toBe("tombstone");
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(3000);
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedFlows).toBe(3);
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(2000);
+    });
+
+    it("Authoritative Tombstone Invariant: Resurrection removes tombstone and re-death captures new state", () => {
+      // S1: Host A live (1000 bytes)
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "host1", source: "dns" }], evidence: [] }],
+          captureSessionId: "s-res",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null
+      );
+
+      // S2: Host A dies
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-res", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1
+      );
+      expect(m2.tombstones.has("entity-host-1.1.1.1")).toBe(true);
+
+      // S3: Host A resurrects with new volume (8000 bytes)
+      const m3 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 8000, flows: 8, hostnames: [{ name: "host1", source: "dns" }], evidence: [] }],
+          captureSessionId: "s-res",
+          snapshotSequence: 3,
+          snapshotTimestamp: 3000,
+        },
+        m2,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m3.tombstones.has("entity-host-1.1.1.1")).toBe(false);
+      expect(m3.activeSelection?.status).toBe("active");
+
+      // S4: Host A dies again
+      const m4 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-res", snapshotSequence: 4, snapshotTimestamp: 4000 },
+        m3,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m4.tombstones.has("entity-host-1.1.1.1")).toBe(true);
+      expect(m4.activeSelection?.status).toBe("tombstone");
+      expect(m4.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(3000);
+      expect(m4.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(8000);
+    });
+
+    it("Authoritative Tombstone Invariant: Session boundary cleanly flushes previous-session tombstones", () => {
+      // Session 1: Host A dies -> tombstone created
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] }],
+          captureSessionId: "session-1",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null
+      );
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "session-1", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1
+      );
+      expect(m2.tombstones.has("entity-host-1.1.1.1")).toBe(true);
+
+      // Session 2 starts: Host A absent -> must NOT inherit Session 1 tombstone
+      const m3 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "session-2", snapshotSequence: 1, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m3.tombstones.has("entity-host-1.1.1.1")).toBe(false);
+      expect(m3.activeSelection).toBeNull();
+    });
+
+    it("Authoritative Tombstone Invariant: Changing activeSelection every frame does not corrupt or drop tombstones", () => {
+      // S1: 3 hosts (A, B, C)
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "a.com", source: "dns" }], evidence: [] },
+            { label: "2.2.2.2", bytes: 2000, flows: 2, hostnames: [{ name: "b.com", source: "dns" }], evidence: [] },
+            { label: "3.3.3.3", bytes: 3000, flows: 3, hostnames: [{ name: "c.com", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-chaos",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+
+      // S2: All hosts disappear. Selection changed to B.
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-chaos", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1,
+        { selectedEntityId: "entity-host-2.2.2.2" }
+      );
+      expect(m2.activeSelection?.entityId).toBe("entity-host-2.2.2.2");
+      expect(m2.activeSelection?.status).toBe("tombstone");
+
+      // S3: Selection changed to C.
+      const m3 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-chaos", snapshotSequence: 3, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-host-3.3.3.3" }
+      );
+      expect(m3.activeSelection?.entityId).toBe("entity-host-3.3.3.3");
+      expect(m3.activeSelection?.status).toBe("tombstone");
+
+      // S4: Selection cleared (null).
+      const m4 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-chaos", snapshotSequence: 4, snapshotTimestamp: 4000 },
+        m3,
+        { selectedEntityId: null }
+      );
+      expect(m4.activeSelection).toBeNull();
+      expect(m4.tombstones.size).toBe(3);
+
+      // S5: Selection set back to A.
+      const m5 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-chaos", snapshotSequence: 5, snapshotTimestamp: 5000 },
+        m4,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m5.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m5.activeSelection?.status).toBe("tombstone");
+      expect(m5.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+    });
+
+    it("Authoritative Tombstone Invariant: No active-selection dependency for tombstone creation", () => {
+      // Disappearance with previousModel having NO activeSelection
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "node-x", source: "dns" }], evidence: [] }],
+          captureSessionId: "s-nosel",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { selectedEntityId: null }
+      );
+      expect(m1.activeSelection).toBeNull();
+
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-nosel", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1,
+        { selectedEntityId: null }
+      );
+      expect(m2.activeSelection).toBeNull();
+      expect(m2.tombstones.has("entity-host-1.1.1.1")).toBe(true);
+
+      const m3 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-nosel", snapshotSequence: 3, snapshotTimestamp: 3000 },
+        m2,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m3.activeSelection?.status).toBe("tombstone");
+      expect(m3.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+    });
+
+    it("Authoritative Tombstone Invariant: Bare IP in selectedEntityId resolves both live and tombstone selections identically to entity-host- prefix", () => {
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 5000, flows: 5, hostnames: [{ name: "my-node", source: "dns" }], evidence: [] }],
+          captureSessionId: "s-bare",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { selectedEntityId: "1.1.1.1" }
+      );
+      expect(m1.activeSelection?.status).toBe("active");
+      expect(m1.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m1.activeSelection?.selectedEntity.kind).toBe("endpoint");
+
+      // Death in S2
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-bare", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1,
+        { selectedEntityId: "1.1.1.1" }
+      );
+      expect(m2.activeSelection?.status).toBe("tombstone");
+      expect(m2.activeSelection?.entityId).toBe("entity-host-1.1.1.1");
+      expect(m2.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(1000);
+    });
+
+    it("Authoritative Tombstone Invariant: Zero timestamp (ts=0) is preserved faithfully without falling through to later timestamps", () => {
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] }],
+          captureSessionId: "s-zero",
+          snapshotSequence: 1,
+          snapshotTimestamp: 0,
+        },
+        null
+      );
+      expect(m1.lastUpdatedTs).toBe(0);
+
+      // Death at ts=2000
+      const m2 = deriveMapViewModel(
+        { hosts: [], captureSessionId: "s-zero", snapshotSequence: 2, snapshotTimestamp: 2000 },
+        m1,
+        { selectedEntityId: "entity-host-1.1.1.1" }
+      );
+      expect(m2.activeSelection?.status).toBe("tombstone");
+      // Must preserve 0, not fall through to 2000
+      expect(m2.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(0);
+    });
+
     it("Invariant 3: Selected endpoints are guaranteed to survive maxVisibleNodes and remain focal targets", () => {
       const enrichedHosts: EnrichedHost[] = [];
       const hostsById = new Map<string, EnrichedHost>();

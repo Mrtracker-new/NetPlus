@@ -308,4 +308,78 @@ describe("deriveHostEnrichmentSnapshot — Authoritative Delta Engine Test Suite
     expect(consumerA_S2.hostsById.get("10.0.0.1")?.deltaBytes).toBe(60);
     expect(consumerB_S2.hostsById.get("10.0.0.1")?.deltaBytes).toBe(200);
   });
+
+  it("9. Coverage telemetry: correctly calculates endpoint-count coverage and resolvedBytesPercent exclusively from public traffic", () => {
+    // 19 resolved public endpoints carrying 100 bytes each (1,900 bytes total)
+    const resolvedRows: BreakdownRow[] = Array.from({ length: 19 }, (_, i) => ({
+      label: `1.1.1.${i + 1}`,
+      bytes: 100,
+      flows: 1,
+      hostnames: [],
+      evidence: [],
+    }));
+
+    // 1 unmapped/unresolved public endpoint carrying 17,100 bytes (90% of public traffic)
+    const unresolvedPublicRow: BreakdownRow = {
+      label: "93.184.216.34",
+      bytes: 17_100,
+      flows: 10,
+      hostnames: [],
+      evidence: [],
+    };
+
+    // Private LAN & Special endpoints (must not skew public coverage metrics)
+    const privateRow: BreakdownRow = {
+      label: "192.168.1.1",
+      bytes: 50_000,
+      flows: 5,
+      hostnames: [],
+      evidence: [],
+    };
+    const multicastRow: BreakdownRow = {
+      label: "239.255.255.250",
+      bytes: 25_000,
+      flows: 2,
+      hostnames: [],
+      evidence: [],
+    };
+    const docSpecialRow: BreakdownRow = {
+      label: "192.0.2.1",
+      bytes: 10_000,
+      flows: 1,
+      hostnames: [],
+      evidence: [],
+    };
+
+    const snapshot = deriveHostEnrichmentSnapshot(
+      {
+        hosts: [...resolvedRows, unresolvedPublicRow, privateRow, multicastRow, docSpecialRow],
+        captureSessionId: "coverage-test",
+        snapshotSequence: 1,
+      },
+      null
+    );
+
+    const stats = snapshot.coverageStats;
+
+    // Total observed hosts includes public + LAN + special
+    expect(stats.totalObservedHosts).toBe(23);
+    expect(stats.publicHostsCount).toBe(20);
+    expect(stats.resolvedHostsCount).toBe(19);
+    expect(stats.unresolvedHostsCount).toBe(1);
+    expect(stats.localLanHostsCount).toBe(2);
+    expect(stats.specialHostsCount).toBe(1);
+
+    // Total traffic vs public traffic segregation
+    expect(stats.totalBytes).toBe(1900 + 17_100 + 50_000 + 25_000 + 10_000);
+    expect(stats.resolvedBytes).toBe(1900);
+    expect(stats.unresolvedBytes).toBe(17_100);
+
+    // Endpoint-count coverage: 19 / 20 = 95%
+    expect(stats.coveragePercent).toBe(95);
+
+    // Byte-weighted coverage: 1,900 / (1,900 + 17,100) = 1,900 / 19,000 = 10%
+    // Operationally highlighting that 90% of public traffic is unmapped despite 95% endpoint coverage
+    expect(stats.resolvedBytesPercent).toBe(10);
+  });
 });

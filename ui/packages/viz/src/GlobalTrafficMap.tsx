@@ -626,7 +626,10 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           <span className="np-geomap-hud__label">TOTAL VOLUME</span>
           <span className="np-geomap-hud__val">{humanBytes(coverageStats.totalBytes)}</span>
         </div>
-        <div className="np-geomap-hud__item" title="Percentage of observed public destinations with geographic coordinate resolution">
+        <div
+          className="np-geomap-hud__item"
+          title={`Percentage of observed public destinations with geographic coordinate resolution (${coverageStats.resolvedHostsCount}/${coverageStats.publicHostsCount} endpoints, ${coverageStats.resolvedBytesPercent.toFixed(0)}% bytes)`}
+        >
           <span className="np-geomap-hud__label">GEOGRAPHIC COVERAGE</span>
           <span
             className="np-geomap-hud__val"
@@ -640,6 +643,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
             }}
           >
             {coverageStats.coveragePercent}%
+            <span className="np-geomap-hud__sub"> ({coverageStats.resolvedBytesPercent.toFixed(0)}% bytes)</span>
           </span>
         </div>
         <div

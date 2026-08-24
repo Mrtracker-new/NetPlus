@@ -183,6 +183,10 @@ export function deriveHostEnrichmentSnapshot(
   const coveragePercent =
     publicHostsCount > 0 ? (resolvedHostsCount / publicHostsCount) * 100 : 0;
 
+  const totalPublicBytes = resolvedBytes + unresolvedBytes;
+  const resolvedBytesPercent =
+    totalPublicBytes > 0 ? (resolvedBytes / totalPublicBytes) * 100 : 0;
+
   const coverageStats: CoverageStats = {
     totalObservedHosts: hosts.length,
     publicHostsCount,
@@ -194,6 +198,7 @@ export function deriveHostEnrichmentSnapshot(
     resolvedBytes,
     unresolvedBytes,
     coveragePercent,
+    resolvedBytesPercent,
   };
 
   return {

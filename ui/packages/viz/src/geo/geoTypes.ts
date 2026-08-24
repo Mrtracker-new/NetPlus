@@ -358,6 +358,7 @@ export interface CoverageStats {
   resolvedBytes: number;
   unresolvedBytes: number;
   coveragePercent: number;
+  resolvedBytesPercent: number;
 }
 
 /**

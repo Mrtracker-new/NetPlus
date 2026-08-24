@@ -377,6 +377,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           resolvedBytes: 2000000,
           unresolvedBytes: 0,
           coveragePercent: 100,
+          resolvedBytesPercent: 100,
         },
       };
 

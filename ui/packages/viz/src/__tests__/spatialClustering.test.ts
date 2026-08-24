@@ -1110,6 +1110,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           resolvedBytes: 9000,
           unresolvedBytes: 0,
           coveragePercent: 100,
+          resolvedBytesPercent: 100,
         },
       };
 
@@ -1138,6 +1139,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           resolvedBytes: 0,
           unresolvedBytes: 0,
           coveragePercent: 0,
+          resolvedBytesPercent: 0,
         },
       };
 
@@ -1245,6 +1247,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           resolvedBytes: totalInputBytes,
           unresolvedBytes: 0,
           coveragePercent: 100,
+          resolvedBytesPercent: 100,
         },
       };
 

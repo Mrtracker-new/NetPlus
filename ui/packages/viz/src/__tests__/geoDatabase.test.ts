@@ -424,5 +424,25 @@ describe("Group G -- enrichHost produces complete EnrichedHost", () => {
       expect(reEval.lastSeenTs).toBe(1_700_000_000_000);
     }
   });
+
+  it("enrichHost safely sanitizes NaN, negative, and undefined numeric fields", () => {
+    const malformedRow = {
+      label: "  8.8.8.8  ",
+      bytes: NaN,
+      flows: -5,
+      hostnames: undefined,
+      evidence: undefined,
+    } as unknown as BreakdownRow;
+
+    const enriched = enrichHost(malformedRow, -100, NaN);
+    expect(enriched.ip).toBe("8.8.8.8");
+    expect(enriched.bytes).toBe(0);
+    expect(enriched.flows).toBe(0);
+    expect(enriched.deltaBytes).toBe(0);
+    expect(enriched.lastSeenTs).toBe(0);
+    expect(enriched.freshness).toBe("stale");
+    expect(enriched.hostnames).toEqual([]);
+    expect(enriched.evidence).toEqual([]);
+  });
 });
 

@@ -398,15 +398,20 @@ export function resolveAsn(ip: string): AsnResolution {
  * never from evaluation wall-clock time.
  */
 export function enrichHost(row: BreakdownRow, deltaBytes = 0, timestamp = 0): EnrichedHost {
-  const ip = row.label.trim();
+  const ip = (row.label || "").trim();
   const classification = classifyIpAddress(ip);
   const geo = resolveGeo(ip);
   const asn = resolveAsn(ip);
   const anycast = resolveAnycast(ip);
 
+  const currentBytes = typeof row.bytes === "number" && Number.isFinite(row.bytes) ? Math.max(0, row.bytes) : 0;
+  const currentFlows = typeof row.flows === "number" && Number.isFinite(row.flows) ? Math.max(0, row.flows) : 0;
+  const safeDelta = typeof deltaBytes === "number" && Number.isFinite(deltaBytes) ? Math.max(0, deltaBytes) : 0;
+  const safeTs = typeof timestamp === "number" && Number.isFinite(timestamp) ? Math.max(0, timestamp) : 0;
+
   let freshness: TelemetryFreshness = "stale";
-  if (deltaBytes > 0) freshness = "active";
-  else if (row.bytes > 0 || row.flows > 0) freshness = "recent";
+  if (safeDelta > 0) freshness = "active";
+  else if (currentBytes > 0 || currentFlows > 0) freshness = "recent";
 
   return {
     ip,
@@ -415,13 +420,13 @@ export function enrichHost(row: BreakdownRow, deltaBytes = 0, timestamp = 0): En
     geo,
     asn,
     anycast,
-    hostnames: row.hostnames || [],
-    bytes: row.bytes,
-    deltaBytes,
-    flows: row.flows,
-    evidence: row.evidence || [],
+    hostnames: Array.isArray(row.hostnames) ? row.hostnames : [],
+    bytes: currentBytes,
+    deltaBytes: safeDelta,
+    flows: currentFlows,
+    evidence: Array.isArray(row.evidence) ? row.evidence : [],
     freshness,
-    lastSeenTs: timestamp,
+    lastSeenTs: safeTs,
   };
 }
 

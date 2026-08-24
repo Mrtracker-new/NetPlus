@@ -149,9 +149,9 @@ export type OriginResolution =
     };
 
 /**
- * Telemetry freshness state based on time and observed delta.
+ * Telemetry freshness state based on observed delta and volume.
  */
-export type TelemetryFreshness = "active" | "recent" | "stale" | "expired";
+export type TelemetryFreshness = "active" | "recent" | "stale";
 
 /**
  * Normalized enriched host entity.

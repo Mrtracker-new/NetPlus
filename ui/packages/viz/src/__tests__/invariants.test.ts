@@ -986,4 +986,82 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       expect(model2.activeSelection?.selectedEntity?.tombstone?.isInactive).toBe(true);
     });
   });
+
+  describe("Invariant 7: Telemetry Freshness & Particle Dynamics Lifecycle", () => {
+    it("Invariant 7.1: Strict 3-state freshness partition and honest particle gating across snapshot lifecycle", () => {
+      const origin = {
+        status: "resolved" as const,
+        label: "Local Origin",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        source: "configured" as const,
+      };
+
+      const s0Rows: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 10_000, flows: 2, hostnames: [], evidence: [] },
+        { label: "8.8.8.8", bytes: 20_000, flows: 4, hostnames: [], evidence: [] },
+        { label: "0.0.0.0", bytes: 0, flows: 0, hostnames: [], evidence: [] },
+      ];
+
+      // S0 Baseline: All deltas must be 0, no particles
+      const m0 = deriveMapViewModel(
+        { hosts: s0Rows, captureSessionId: "sess-fresh", snapshotSequence: 0 },
+        null,
+        { origin, reducedMotion: false, zoomScale: 10.0, clusterRadiusPx: 1 }
+      );
+
+      const h1S0 = m0.hostsById.get("1.1.1.1")!;
+      const h8S0 = m0.hostsById.get("8.8.8.8")!;
+      const h0S0 = m0.hostsById.get("0.0.0.0")!;
+
+      expect(h1S0.freshness).toBe("recent");
+      expect(h1S0.deltaBytes).toBe(0);
+      expect(h8S0.freshness).toBe("recent");
+      expect(h8S0.deltaBytes).toBe(0);
+      expect(h0S0.freshness).toBe("stale");
+      expect(h0S0.deltaBytes).toBe(0);
+
+      for (const arc of m0.arcModels) {
+        expect(arc.hasParticles).toBe(false);
+        expect(["active", "recent", "stale"]).toContain(arc.freshness);
+      }
+
+      // S1: Positive burst on 1.1.1.1 (+5000), 8.8.8.8 is idle (+0)
+      const s1Rows: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 15_000, flows: 3, hostnames: [], evidence: [] },
+        { label: "8.8.8.8", bytes: 20_000, flows: 4, hostnames: [], evidence: [] },
+        { label: "0.0.0.0", bytes: 0, flows: 0, hostnames: [], evidence: [] },
+      ];
+
+      const m1 = deriveMapViewModel(
+        { hosts: s1Rows, captureSessionId: "sess-fresh", snapshotSequence: 1 },
+        m0,
+        { origin, reducedMotion: false, zoomScale: 10.0, clusterRadiusPx: 1 }
+      );
+
+      const h1S1 = m1.hostsById.get("1.1.1.1")!;
+      const h8S1 = m1.hostsById.get("8.8.8.8")!;
+      expect(h1S1.freshness).toBe("active");
+      expect(h1S1.deltaBytes).toBe(5000);
+      expect(h8S1.freshness).toBe("recent");
+      expect(h8S1.deltaBytes).toBe(0);
+
+      const arc1S1 = m1.arcModels.find((a) => a.id.includes("1.1.1.1"))!;
+      const arc8S1 = m1.arcModels.find((a) => a.id.includes("8.8.8.8"))!;
+      expect(arc1S1.hasParticles).toBe(true);
+      expect(arc1S1.freshness).toBe("active");
+      expect(arc8S1.hasParticles).toBe(false);
+      expect(arc8S1.freshness).toBe("recent");
+
+      // S1 with reducedMotion: true -> hasParticles MUST be false even for active delta
+      const m1Reduced = deriveMapViewModel(
+        { hosts: s1Rows, captureSessionId: "sess-fresh", snapshotSequence: 1 },
+        m0,
+        { origin, reducedMotion: true, zoomScale: 10.0, clusterRadiusPx: 1 }
+      );
+      const arc1Reduced = m1Reduced.arcModels.find((a) => a.id.includes("1.1.1.1"))!;
+      expect(arc1Reduced.hasParticles).toBe(false);
+      expect(arc1Reduced.freshness).toBe("active");
+    });
+  });
 });

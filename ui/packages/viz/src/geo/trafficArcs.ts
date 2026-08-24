@@ -420,8 +420,6 @@ export function getArcOpacity(freshness: TelemetryFreshness): number {
       return 0.55;
     case "stale":
       return 0.25;
-    case "expired":
-      return 0.1;
   }
 }
 

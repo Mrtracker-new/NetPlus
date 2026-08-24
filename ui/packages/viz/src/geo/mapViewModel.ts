@@ -287,8 +287,7 @@ export function deriveClusteredMapModel(
         destLng: node.longitude,
       });
 
-      const hasParticles =
-        !reducedMotion && (node.freshness === "active" || node.deltaBytes > 0);
+      const hasParticles = !reducedMotion && node.deltaBytes > 0;
 
       const firstSeg = geometry.segments[0]!;
 

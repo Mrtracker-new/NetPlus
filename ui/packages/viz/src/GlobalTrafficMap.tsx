@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type Ke
 import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
+  isNodeSelected,
   makeHostEntityId,
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
@@ -64,48 +65,7 @@ function usePrefersReducedMotion(): boolean {
 const MIN_ZOOM = 1.0;
 const MAX_ZOOM = 8.0;
 
-/** Pure, authoritative node selection evaluation */
-export function isNodeSelected(
-  node: GeoAggregateNode | undefined,
-  activeSelection: SelectedEntity | null | undefined
-): boolean {
-  if (!node || !activeSelection) return false;
-  if (activeSelection.kind === "endpoint") {
-    return Boolean(node.endpointIps.includes(activeSelection.ip));
-  }
-  if (activeSelection.kind === "cluster") {
-    return (
-      node.entityId === activeSelection.entityId ||
-      node.id === activeSelection.clusterId ||
-      (Boolean(node.geoCellId) && node.geoCellId === activeSelection.geoCellId) ||
-      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId)
-    );
-  }
-  if (activeSelection.kind === "countryAggregate") {
-    return (
-      node.entityId === activeSelection.entityId ||
-      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
-      (Boolean(node.countryCode) && activeSelection.countryCode === node.countryCode)
-    );
-  }
-  if (activeSelection.kind === "cityAggregate") {
-    return (
-      node.entityId === activeSelection.entityId ||
-      (activeSelection.node !== undefined && node.entityId === activeSelection.node.entityId) ||
-      activeSelection.cityName === node.label.replace(/\s*\(\d+\)$/, "")
-    );
-  }
-  if (
-    activeSelection.kind === "otherResolvedAggregate" ||
-    activeSelection.kind === "otherResolvedGroup"
-  ) {
-    return (
-      node.nodeKind === "otherResolvedAggregate" ||
-      node.entityId === OTHER_RESOLVED_ENTITY_ID
-    );
-  }
-  return false;
-}
+export { isNodeSelected } from "./geo/geoTypes";
 
 export const GlobalTrafficMap = memo(function GlobalTrafficMap({
   hosts,

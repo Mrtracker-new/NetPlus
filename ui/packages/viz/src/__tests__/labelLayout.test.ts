@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeLabelLayout } from "../geo/labelLayout";
 import { makeHostEntityId, type GeoAggregateNode, type SelectedEntity } from "../geo/geoTypes";
+import { deriveClusteredMapModel } from "../geo/mapViewModel";
 
 describe("Deterministic Collision-Free Label Layout", () => {
   it("prevents overlapping labels by choosing alternative slots or suppressing excess labels", () => {
@@ -185,5 +186,128 @@ describe("Deterministic Collision-Free Label Layout", () => {
     const visibleLabels = Array.from(placements.values()).filter((p) => p.visible);
     expect(visibleLabels.length).toBeLessThanOrEqual(10);
     expect(visibleLabels.length).toBe(10);
+  });
+
+  it("prioritizes selected node label using selectedEntityId directly even with lowest traffic under tight maxLabels budget", () => {
+    // 10 nodes: first 9 have huge traffic (100MB+), last node has minimal traffic (100B)
+    const nodes: GeoAggregateNode[] = Array.from({ length: 10 }, (_, i) => ({
+      id: `node-${i}`,
+      entityId: `entity-host-10.0.0.${i}`,
+      geoCellId: `geocell-${i}`,
+      nodeKind: "endpoint",
+      label: `Node ${i}`,
+      countryCode: "US",
+      latitude: 20 + i * 3,
+      longitude: -120 + i * 5,
+      x: 50 + i * 50,
+      y: 50 + i * 25,
+      totalBytes: i === 9 ? 100 : (10 - i) * 10_000_000,
+      totalFlows: i === 9 ? 1 : 100,
+      sampleEndpointIps: [`10.0.0.${i}`],
+      endpointIps: [`10.0.0.${i}`],
+      asns: [13335],
+      freshness: i === 9 ? "stale" : "active",
+      deltaBytes: i === 9 ? 0 : 50_000,
+      memberCount: 1,
+    }));
+
+    // With maxLabels = 3, node-9 would normally be hidden without selection
+    const unselectedPlacements = computeLabelLayout(nodes, { maxLabels: 3 });
+    expect(unselectedPlacements.get("node-9")?.visible).toBe(false);
+
+    // With selectedEntityId = "entity-host-10.0.0.9", node-9 must receive top priority and be visible
+    const selectedPlacements = computeLabelLayout(nodes, {
+      maxLabels: 3,
+      selectedEntityId: "entity-host-10.0.0.9",
+    });
+    const selectedPlacement = selectedPlacements.get("node-9");
+    expect(selectedPlacement).toBeDefined();
+    expect(selectedPlacement!.visible).toBe(true);
+    expect(selectedPlacement!.priority).toBeGreaterThanOrEqual(100_000);
+  });
+
+  it("guarantees selected label priority through deriveClusteredMapModel pipeline", () => {
+    const enrichedHosts = Array.from({ length: 20 }, (_, i) => ({
+      ip: `198.51.100.${i + 1}`,
+      bytes: i === 19 ? 50 : (20 - i) * 1_000_000,
+      flows: 10,
+      deltaBytes: i === 19 ? 0 : 1000,
+      freshness: (i === 19 ? "stale" : "active") as "stale" | "active",
+      firstSeen: 1000,
+      lastSeen: 2000,
+      hostnames: [],
+      geo: {
+        status: "resolved" as const,
+        countryCode: "US",
+        country: "United States",
+        region: "CA",
+        city: `City-${i}`,
+        latitude: 25 + i * 2,
+        longitude: -120 + (i % 4) * 10,
+        accuracyRadiusKm: 10,
+        confidence: "high" as const,
+        locationMeaning: "physical_location" as const,
+        locationLevel: "city" as const,
+        precisionDescription: "City level",
+        source: "local_database" as const,
+        geoDatabaseVersion: "1.0",
+      },
+      asn: {
+        status: "resolved" as const,
+        asn: 13335,
+        asOrg: "Cloudflare",
+        asName: "CLOUDFLARENET",
+        source: "local_database" as const,
+        asnDatabaseVersion: "1.0",
+      },
+      classification: {
+        isPublic: true,
+        isLocalLan: false,
+        isLoopback: false,
+        isMulticast: false,
+        isLinkLocal: false,
+        isSpecial: false,
+        isAnycast: false,
+        category: "public" as const,
+      },
+      anycast: {
+        isAnycast: false,
+        provider: null,
+        service: null,
+        prefixCidr: null,
+        source: "none",
+      },
+    }));
+
+    const snapshot = {
+      captureSessionId: "sess-test",
+      snapshotSequence: 1,
+      snapshotTimestamp: 2000,
+      enrichedHosts,
+      hostsById: new Map(enrichedHosts.map((h) => [h.ip, h])),
+      coverageStats: {} as any,
+    };
+
+    // Low traffic host is 198.51.100.20
+    const targetIp = "198.51.100.20";
+    const targetEntityId = makeHostEntityId(targetIp);
+
+    const viewModel = deriveClusteredMapModel(snapshot, null, {
+      maxVisibleNodes: 120,
+      maxVisibleLabels: 3,
+      selectedEntityId: targetEntityId,
+    });
+
+    expect(viewModel.activeSelection).toBeDefined();
+    expect(viewModel.activeSelection?.entityId).toBe(targetEntityId);
+
+    // Find the node containing targetIp
+    const targetNode = viewModel.aggregateNodes.find((n) => n.endpointIps.includes(targetIp));
+    expect(targetNode).toBeDefined();
+
+    const targetLabelPlacement = viewModel.labelPlacements.get(targetNode!.id);
+    expect(targetLabelPlacement).toBeDefined();
+    expect(targetLabelPlacement!.visible).toBe(true);
+    expect(targetLabelPlacement!.priority).toBeGreaterThanOrEqual(100_000);
   });
 });

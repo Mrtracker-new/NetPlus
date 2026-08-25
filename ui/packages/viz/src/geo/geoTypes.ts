@@ -581,4 +581,77 @@ export interface TombstoneRecord {
   readonly selectedEntity: SelectedEntity;
 }
 
+/**
+ * Pure, authoritative node selection evaluation function.
+ * Determines whether a GeoAggregateNode represents or contains the selected entity or target entity ID.
+ */
+export function isNodeSelected(
+  node: GeoAggregateNode | undefined,
+  activeSelection: SelectedEntity | null | undefined,
+  selectedEntityId?: string | null
+): boolean {
+  if (!node) return false;
+
+  if (activeSelection) {
+    if (activeSelection.kind === "endpoint") {
+      if (node.endpointIps.includes(activeSelection.ip) || node.entityId === activeSelection.entityId) {
+        return true;
+      }
+    } else if (activeSelection.kind === "cluster") {
+      if (
+        node.entityId === activeSelection.entityId ||
+        node.id === activeSelection.clusterId ||
+        (Boolean(node.geoCellId) && node.geoCellId === activeSelection.geoCellId) ||
+        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId))
+      ) {
+        return true;
+      }
+    } else if (activeSelection.kind === "countryAggregate") {
+      if (
+        node.entityId === activeSelection.entityId ||
+        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+        (Boolean(node.countryCode) && activeSelection.countryCode.toUpperCase() === node.countryCode!.toUpperCase())
+      ) {
+        return true;
+      }
+    } else if (activeSelection.kind === "cityAggregate") {
+      if (
+        node.entityId === activeSelection.entityId ||
+        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+        activeSelection.cityName.toLowerCase() === node.label.replace(/\s*\(\d+\)$/, "").toLowerCase()
+      ) {
+        return true;
+      }
+    } else if (
+      activeSelection.kind === "otherResolvedAggregate" ||
+      activeSelection.kind === "otherResolvedGroup"
+    ) {
+      if (
+        node.nodeKind === "otherResolvedAggregate" ||
+        node.entityId === OTHER_RESOLVED_ENTITY_ID ||
+        (activeSelection.node !== undefined && node.id === activeSelection.node.id)
+      ) {
+        return true;
+      }
+    }
+  }
+
+  if (selectedEntityId) {
+    const rawId = selectedEntityId.trim();
+    if (
+      node.entityId === rawId ||
+      node.id === rawId ||
+      node.endpointIps.includes(rawId) ||
+      (rawId.startsWith("entity-host-") && node.endpointIps.includes(rawId.replace("entity-host-", ""))) ||
+      (rawId === OTHER_RESOLVED_ENTITY_ID && node.nodeKind === "otherResolvedAggregate") ||
+      (rawId.startsWith("entity-cluster-") && node.geoCellId === rawId.replace("entity-cluster-", "")) ||
+      (rawId.startsWith("cluster-") && node.geoCellId === rawId.replace("cluster-", ""))
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 

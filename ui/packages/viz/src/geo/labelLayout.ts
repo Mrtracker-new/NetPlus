@@ -1,4 +1,9 @@
-import type { GeoAggregateNode, LabelPlacement, SelectedEntity } from "./geoTypes";
+import {
+  isNodeSelected,
+  type GeoAggregateNode,
+  type LabelPlacement,
+  type SelectedEntity,
+} from "./geoTypes";
 
 export interface LabelLayoutOptions {
   /** Maximum number of labels to place (default: 20) */
@@ -7,6 +12,8 @@ export interface LabelLayoutOptions {
   zoomScale?: number;
   /** Currently selected entity */
   selectedEntity?: SelectedEntity | null;
+  /** Target entity identifier (fallback/alternative to selectedEntity) */
+  selectedEntityId?: string | null;
   /** Canvas viewport width in map units (default: 720) */
   viewportWidth?: number;
   /** Canvas viewport height in map units (default: 360) */
@@ -50,6 +57,7 @@ export function computeLabelLayout(
     maxLabels = 20,
     zoomScale = 1.0,
     selectedEntity = null,
+    selectedEntityId = null,
     viewportWidth = 720,
     viewportHeight = 360,
   } = options;
@@ -69,18 +77,7 @@ export function computeLabelLayout(
 
   const scoredNodes: ScoredNode[] = nodes.map((node) => {
     let score = 0;
-    const isSelected =
-      selectedEntity?.kind === "endpoint"
-        ? node.endpointIps.includes(selectedEntity.ip)
-        : selectedEntity?.kind === "cluster"
-        ? node.entityId === selectedEntity.entityId || (selectedEntity.node !== undefined && selectedEntity.node.id === node.id)
-        : selectedEntity?.kind === "countryAggregate"
-        ? selectedEntity.countryCode === node.countryCode || node.entityId === selectedEntity.entityId
-        : selectedEntity?.kind === "cityAggregate"
-        ? selectedEntity.cityName === node.label.replace(/\s*\(\d+\)$/, "") || node.entityId === selectedEntity.entityId
-        : selectedEntity?.kind === "otherResolvedAggregate" || selectedEntity?.kind === "otherResolvedGroup"
-        ? node.entityId === selectedEntity.entityId || (selectedEntity.node !== undefined && node.id === selectedEntity.node.id) || node.nodeKind === "otherResolvedAggregate"
-        : false;
+    const isSelected = isNodeSelected(node, selectedEntity, selectedEntityId);
 
     if (isSelected) {
       score += 100_000;
@@ -114,7 +111,7 @@ export function computeLabelLayout(
 
   for (const { node, score, isSelected } of scoredNodes) {
     // Truncate long text
-    const rawText = node.label;
+    const rawText = node.label || "";
     const text = rawText.length > 22 ? `${rawText.slice(0, 20)}…` : rawText;
 
     // Approximate character width in mono 9px font
@@ -163,7 +160,7 @@ export function computeLabelLayout(
     let placedSlot: (typeof candidateSlots)[0] | null = null;
 
     if (isSelected) {
-      // Selected entity is forced visible (try slots in order, fallback to Right)
+      // Selected entity is forced visible (try slots in order: non-overlapping inside viewport first)
       for (const slot of candidateSlots) {
         if (isInsideViewport(slot.box, viewportWidth, viewportHeight)) {
           let hasOverlap = false;
@@ -179,6 +176,16 @@ export function computeLabelLayout(
           }
         }
       }
+      // If all non-overlapping slots fail, pick the first slot that fits inside viewport
+      if (!placedSlot) {
+        for (const slot of candidateSlots) {
+          if (isInsideViewport(slot.box, viewportWidth, viewportHeight)) {
+            placedSlot = slot;
+            break;
+          }
+        }
+      }
+      // Fallback to default Right slot if screen boundaries prevent all candidate slots
       if (!placedSlot) {
         placedSlot = candidateSlots[0]!;
       }

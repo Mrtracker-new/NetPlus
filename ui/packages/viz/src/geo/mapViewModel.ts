@@ -322,17 +322,19 @@ export function deriveClusteredMapModel(
     }
   }
 
-  // Deterministic collision label layout
-  const labelPlacements = computeLabelLayout(aggregateNodes, {
-    maxLabels: maxVisibleLabels,
-    zoomScale,
-  });
-
   // Authoritative entity-keyed tombstone derivation (Invariant 3 & Invariant F: independent of activeSelection)
   const tombstones = deriveTombstonesSnapshot(snapshot, aggregateNodes, previousModel);
 
   // Authoritative semantic selection resolution
   const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones);
+
+  // Deterministic collision label layout with focal target selection priority
+  const labelPlacements = computeLabelLayout(aggregateNodes, {
+    maxLabels: maxVisibleLabels,
+    zoomScale,
+    selectedEntity: activeSelection ? activeSelection.selectedEntity : null,
+    selectedEntityId: targetEntityId,
+  });
 
   return {
     captureSessionId,

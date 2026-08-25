@@ -208,6 +208,107 @@ export function serializeArcGeometryToSvgD(segments: ArcSegment[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// Quadratic Bézier Seam Crossing Mathematics
+// ---------------------------------------------------------------------------
+
+/**
+ * Solves B_x(t) = seamX for a quadratic Bézier curve defined by x0, x1, x2 where t in [0, 1].
+ *
+ * B_x(t) = (1-t)^2 * x0 + 2*(1-t)*t * x1 + t^2 * x2
+ *        = t^2 * (x0 - 2*x1 + x2) + t * (2*(x1 - x0)) + x0
+ * Standard quadratic form: a*t^2 + b*t + c = 0 where c = x0 - seamX.
+ *
+ * Employs a numerically stable quadratic root formulation (Citardauq / Numerical Recipes)
+ * to prevent catastrophic cancellation, with comprehensive handling of linear degeneracies (a ≈ 0),
+ * near-tangential discriminants (D ≈ 0), exact endpoint crossings (t = 0, t = 1), and
+ * multi-root trajectory ordering (first crossing encountered along t from 0 to 1).
+ */
+export function solveQuadraticBezierSeamCrossing(
+  x0: number,
+  x1: number,
+  x2: number,
+  seamX: number
+): number {
+  const a = x0 - 2 * x1 + x2;
+  const b = 2 * (x1 - x0);
+  const c = x0 - seamX;
+
+  const EPS = 1e-12;
+
+  // Linear degenerate case (e.g. collinear in X or control point is arithmetic midpoint)
+  if (Math.abs(a) < EPS) {
+    if (Math.abs(b) > EPS) {
+      const t = -c / b;
+      return Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5;
+    }
+    // Entire curve is constant in X
+    return 0.5;
+  }
+
+  const discriminant = b * b - 4 * a * c;
+
+  // Handle negative discriminant (including near-tangent precision jitter)
+  if (discriminant < 0) {
+    if (discriminant >= -1e-9) {
+      // Near-tangential contact where D is slightly negative due to floating-point error
+      const t = -b / (2 * a);
+      return Number.isFinite(t) ? Math.max(0, Math.min(1, t)) : 0.5;
+    }
+    // No real crossing exists
+    return 0.5;
+  }
+
+  const sqrtD = Math.sqrt(Math.max(0, discriminant));
+
+  // Numerically stable quadratic root formulation (Citardauq / Numerical Recipes)
+  // q = -0.5 * (b + sign(b) * sqrt(D)) to prevent catastrophic cancellation
+  const signB = b >= 0 ? 1 : -1;
+  const q = -0.5 * (b + signB * sqrtD);
+
+  const roots: number[] = [];
+
+  if (Math.abs(q) > EPS) {
+    const t1 = q / a;
+    const t2 = c / q;
+    if (Number.isFinite(t1)) roots.push(t1);
+    if (Number.isFinite(t2)) roots.push(t2);
+  } else {
+    // Both b and D are near zero -> t = 0
+    roots.push(0);
+  }
+
+  // Filter roots to candidates within [0, 1] with numerical tolerance
+  const rootTolerance = 1e-7;
+  const validCandidates: number[] = [];
+
+  for (const r of roots) {
+    if (r >= -rootTolerance && r <= 1 + rootTolerance) {
+      validCandidates.push(Math.max(0, Math.min(1, r)));
+    }
+  }
+
+  if (validCandidates.length === 0) {
+    return 0.5;
+  }
+
+  if (validCandidates.length === 1) {
+    return validCandidates[0]!;
+  }
+
+  // Two valid candidate roots in [0, 1]:
+  // Select the root corresponding to the first actual seam crossing along the curve as t moves 0 -> 1.
+  validCandidates.sort((r1, r2) => r1 - r2);
+  const [firstRoot, secondRoot] = validCandidates as [number, number];
+
+  // If the first root is at t ≈ 0 (curve starts on the seam), check if there's a subsequent interior crossing
+  if (firstRoot <= rootTolerance && secondRoot > rootTolerance) {
+    return secondRoot;
+  }
+
+  return firstRoot;
+}
+
+// ---------------------------------------------------------------------------
 // Visual Policy Decoupled from Seam Mathematics
 // ---------------------------------------------------------------------------
 
@@ -292,31 +393,30 @@ export function calculateArcBezier(
 
   const p1 = calculateArcControlPoint(origin, p2Ext);
 
-  // Linear X de Casteljau split parameter (mathematically guaranteed 0 < splitT < 1 for crossing routes)
-  const splitT =
-    crossingDirection === "west"
-      ? origin.x / (origin.x - p2Ext.x)
-      : (720 - origin.x) / (p2Ext.x - origin.x);
+  // Exact Quadratic Bézier Seam Crossing: solve a*t^2 + b*t + c = seamX
+  const seamX = crossingDirection === "west" ? 0 : 720;
+  const splitT = solveQuadraticBezierSeamCrossing(origin.x, p1.x, p2Ext.x, seamX);
 
   // Guard against any numerical edge conditions while preserving valid split parameter
   const validSplitT = Number.isFinite(splitT) && splitT > 0 && splitT < 1 ? splitT : 0.5;
   const clampedSplitT = Math.max(0.0001, Math.min(0.9999, validSplitT));
 
+  // Genuine De Casteljau subdivision at exact seam crossing parameter
   const leftControl = lerpPoint(origin, p1, clampedSplitT);
   const rightControl = lerpPoint(p1, p2Ext, clampedSplitT);
   const rawSplit = lerpPoint(leftControl, rightControl, clampedSplitT);
 
   const splitPoint: Point = {
-    x: crossingDirection === "west" ? 0 : 720,
+    x: seamX,
     y: Math.max(0, Math.min(360, rawSplit.y)),
   };
 
-  // Segment 1 (Origin -> Antimeridian boundary)
+  // Segment 1 (Origin -> Antimeridian boundary at seamX)
   const seg1 = createArcSegment(origin, clampPoint(leftControl), splitPoint);
 
-  // Segment 2 (Wrapped Antimeridian boundary -> Destination)
+  // Segment 2 (Wrapped Antimeridian boundary -> Destination, wrapped by ±720)
   const seg2Start: Point = {
-    x: crossingDirection === "west" ? 720 : 0,
+    x: wrapX(seamX, crossingDirection),
     y: splitPoint.y,
   };
   const seg2Control: Point = clampPoint({

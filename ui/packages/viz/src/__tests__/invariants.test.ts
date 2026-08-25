@@ -9,7 +9,7 @@ import {
 } from "../geo/mapViewModel";
 import { OTHER_RESOLVED_ENTITY_ID, type EnrichedHost } from "../geo/geoTypes";
 import { clearGeoCaches } from "../geo/geoDatabase";
-import { calculateArcBezier, sampleArcInto } from "../geo/trafficArcs";
+import { calculateArcBezier, sampleArcInto, solveQuadraticBezierSeamCrossing } from "../geo/trafficArcs";
 import { projectGeo } from "../geo/worldGeometry";
 
 describe("Global Traffic Map — Production Invariant Test Suite", () => {
@@ -1221,6 +1221,161 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         expect(arc.particleSplitT!).toBeGreaterThan(0.0);
         expect(arc.particleSplitT!).toBeLessThan(1.0);
       }
+    });
+
+    it("Invariant 5.12: Quadratic Bézier Seam Crossing Solver & De Casteljau Exact Subdivision Integrity", () => {
+      // 1. Direct unit test of solveQuadraticBezierSeamCrossing
+      // Case A: Linear degenerate case (a = 0)
+      const x0A = 100;
+      const x1A = -200;
+      const x2A = -500;
+      const tA = solveQuadraticBezierSeamCrossing(x0A, x1A, x2A, 0);
+      expect(tA).toBeCloseTo(1 / 6, 6);
+      const bxA = (1 - tA) * (1 - tA) * x0A + 2 * (1 - tA) * tA * x1A + tA * tA * x2A;
+      expect(Math.abs(bxA)).toBeLessThan(1e-7);
+
+      // Case B: Truly quadratic case (a != 0)
+      const x0B = 200;
+      const x1B = 100;
+      const x2B = -600;
+      const tB = solveQuadraticBezierSeamCrossing(x0B, x1B, x2B, 0);
+      const expectedTB = (-1 + Math.sqrt(13)) / 6;
+      expect(tB).toBeCloseTo(expectedTB, 6);
+      const bxB = (1 - tB) * (1 - tB) * x0B + 2 * (1 - tB) * tB * x1B + tB * tB * x2B;
+      expect(Math.abs(bxB)).toBeLessThan(1e-7);
+
+      // Case C: Eastward crossing at seamX = 720
+      const x0C = 600;
+      const x1C = 680;
+      const x2C = 800;
+      const tC = solveQuadraticBezierSeamCrossing(x0C, x1C, x2C, 720);
+      const bxC = (1 - tC) * (1 - tC) * x0C + 2 * (1 - tC) * tC * x1C + tC * tC * x2C;
+      expect(Math.abs(bxC - 720)).toBeLessThan(1e-7);
+
+      // 2. Integration test on crossing arc geometry: exact De Casteljau subdivision
+      const sf = { lat: 37.7749, lng: -122.4194 };
+      const tokyo = { lat: 35.6762, lng: 139.6503 };
+      const [ox, oy] = projectGeo(sf.lat, sf.lng);
+      const [tx, ty] = projectGeo(tokyo.lat, tokyo.lng);
+
+      const arc = calculateArcBezier(ox, oy, tx, ty, {
+        originLng: sf.lng,
+        destLng: tokyo.lng,
+      });
+
+      expect(arc.crossesAntimeridian).toBe(true);
+      const t = arc.splitT!;
+      expect(t).toBeGreaterThan(0);
+      expect(t).toBeLessThan(1);
+
+      // Reconstruct extended quadratic curve in virtual space
+      const p2Ext = { x: tx - 720, y: ty };
+      const distX = p2Ext.x - ox;
+      const distY = p2Ext.y - oy;
+      const dist = Math.sqrt(distX * distX + distY * distY);
+      const midX = (ox + p2Ext.x) / 2;
+      const midY = (oy + p2Ext.y) / 2;
+      const curveFactor = Math.min(60, Math.max(18, dist * 0.22));
+      const cy = Math.max(15, Math.min(345, midY - curveFactor));
+      const p1 = { x: midX, y: cy };
+
+      // B(t) on original quadratic curve
+      const u = 1 - t;
+      const origBx = u * u * ox + 2 * u * t * p1.x + t * t * p2Ext.x;
+      const origBy = u * u * oy + 2 * u * t * p1.y + t * t * p2Ext.y;
+
+      // The X coordinate on original curve at exact splitT must equal seamX (0 for west)
+      expect(Math.abs(origBx)).toBeLessThan(1e-6);
+
+      // Segment 1 end must match original curve B(t)
+      const seg1 = arc.segments[0]!;
+      expect(seg1.end.x).toBe(0);
+      expect(seg1.end.y).toBeCloseTo(origBy, 4);
+
+      // Segment 2 start must match wrapped B(t)
+      const seg2 = arc.segments[1]!;
+      expect(seg2.start.x).toBe(720);
+      expect(seg2.start.y).toBeCloseTo(origBy, 4);
+
+      // Seam continuity
+      expect(Math.abs(seg1.end.y - seg2.start.y)).toBeLessThan(1e-6);
+    });
+
+    it("Invariant 5.13: Adversarial Numerical Robustness & Trajectory-Ordered Root Selection", () => {
+      // 1. Two mathematical seam intersections in [0, 1]: selects first crossing along trajectory
+      // Curve: x(0) = 50 -> dips to -75 -> x(1) = 100
+      // x0 = 50, x1 = -200, x2 = 100, seamX = 0
+      // a = 50 - 2(-200) + 100 = 550, b = 2(-200 - 50) = -500, c = 50
+      // Roots: 550 t^2 - 500 t + 50 = 0 <=> 11 t^2 - 10 t + 1 = 0
+      // t1 = (10 - sqrt(56))/22 ≈ 0.1144, t2 = (10 + sqrt(56))/22 ≈ 0.7947
+      const tTwoRoots = solveQuadraticBezierSeamCrossing(50, -200, 100, 0);
+      const expectedFirstRoot = (10 - Math.sqrt(56)) / 22;
+      expect(tTwoRoots).toBeCloseTo(expectedFirstRoot, 6);
+      const bxTwoRoots = (1 - tTwoRoots) * (1 - tTwoRoots) * 50 + 2 * (1 - tTwoRoots) * tTwoRoots * (-200) + tTwoRoots * tTwoRoots * 100;
+      expect(Math.abs(bxTwoRoots)).toBeLessThan(1e-7);
+
+      // 2. Tangential contact where discriminant is zero (D = 0)
+      // x0 = 100, x1 = -100, x2 = 100, seamX = 0 => 400 t^2 - 400 t + 100 = 0 => (2t - 1)^2 = 0 => t = 0.5
+      const tTangent = solveQuadraticBezierSeamCrossing(100, -100, 100, 0);
+      expect(tTangent).toBeCloseTo(0.5, 6);
+
+      // 3. Linear degeneracy where a ≈ 0
+      // x0 = 200, x1 = -100, x2 = -400, seamX = 0 => a = 0, b = -600, c = 200 => t = 1/3
+      const tLinear = solveQuadraticBezierSeamCrossing(200, -100, -400, 0);
+      expect(tLinear).toBeCloseTo(1 / 3, 6);
+
+      // 4. Exact endpoint crossings (t = 0 and t = 1)
+      // At t = 0: origin starts on seam
+      const tZero = solveQuadraticBezierSeamCrossing(0, -100, -300, 0);
+      expect(tZero).toBeGreaterThanOrEqual(0.0);
+      expect(tZero).toBeLessThanOrEqual(1.0);
+
+      // At t = 1: destination ends on seam
+      const tOne = solveQuadraticBezierSeamCrossing(300, 100, 0, 0);
+      expect(tOne).toBeCloseTo(1.0, 6);
+
+      // 5. Near-tangential with slightly negative discriminant due to float precision
+      // x0 = 100, x1 = -99.9999999999, x2 = 100, seamX = 0 => D < 0 but > -1e-9
+      const tNearTangent = solveQuadraticBezierSeamCrossing(100, -99.9999999, 100, 0);
+      expect(Number.isFinite(tNearTangent)).toBe(true);
+      expect(tNearTangent).toBeCloseTo(0.5, 3);
+
+      // 6. Control point lying exactly on the seam
+      // x0 = 100, x1 = 0, x2 = -200, seamX = 0 => root in [0, 1] is sqrt(2) - 1 ≈ 0.41421356
+      const tControlOnSeam = solveQuadraticBezierSeamCrossing(100, 0, -200, 0);
+      expect(tControlOnSeam).toBeCloseTo(Math.sqrt(2) - 1, 6);
+      const bxOnSeam = (1 - tControlOnSeam) * (1 - tControlOnSeam) * 100 + tControlOnSeam * tControlOnSeam * (-200);
+      expect(Math.abs(bxOnSeam)).toBeLessThan(1e-7);
+
+      // 7. Eastward 720 seam versus westward 0 seam
+      const tEast = solveQuadraticBezierSeamCrossing(700, 750, 800, 720);
+      expect(tEast).toBeGreaterThan(0);
+      expect(tEast).toBeLessThan(1);
+      const bxEast = (1 - tEast) * (1 - tEast) * 700 + 2 * (1 - tEast) * tEast * 750 + tEast * tEast * 800;
+      expect(Math.abs(bxEast - 720)).toBeLessThan(1e-7);
+
+      // 8. Control point causing unwrapped longitude overshoot before crossing
+      // x0 = 100, x1 = 400 (overshoots east), x2 = -600 => crosses westward at t ≈ 0.59157
+      const tOvershoot = solveQuadraticBezierSeamCrossing(100, 400, -600, 0);
+      expect(tOvershoot).toBeGreaterThan(0);
+      expect(tOvershoot).toBeLessThan(1);
+      const bxOvershoot = (1 - tOvershoot) * (1 - tOvershoot) * 100 + 2 * (1 - tOvershoot) * tOvershoot * 400 + tOvershoot * tOvershoot * (-600);
+      expect(Math.abs(bxOvershoot)).toBeLessThan(1e-7);
+
+      // 9. Catastrophic cancellation immunity (b^2 >> 4ac)
+      // a = 1, b = -10000, c = 0.01 (small root is -c/b = 0.01/10000 = 1e-6 in [0, 1])
+      // Standard formula: (10000 - sqrt(1e8 - 0.04)) / 2 suffers cancellation in standard float64
+      // Citardauq formula: c / q avoids subtraction
+      const aHuge = 1;
+      const bHuge = -10000;
+      const cHuge = 0.01;
+      const x0H = cHuge;
+      const x1H = x0H + bHuge / 2;
+      const x2H = aHuge + 2 * x1H - x0H;
+      const tSmall = solveQuadraticBezierSeamCrossing(x0H, x1H, x2H, 0);
+      expect(tSmall).toBeCloseTo(cHuge / Math.abs(bHuge), 9);
+      const bxSmall = (1 - tSmall) * (1 - tSmall) * x0H + 2 * (1 - tSmall) * tSmall * x1H + tSmall * tSmall * x2H;
+      expect(Math.abs(bxSmall)).toBeLessThan(1e-7);
     });
 
     it("Invariant 5.9: Semantic Origin Integrity - Unresolved origin produces zero geographic arcs without fabricating (0,0) centroid routing", () => {

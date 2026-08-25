@@ -724,10 +724,11 @@ export function resolveLiveHostSelection(
   targetEntityId: string,
   hostsById: Map<string, EnrichedHost>
 ): ResolvedSelection | null {
-  const ip = targetEntityId.startsWith("entity-host-")
-    ? targetEntityId.replace("entity-host-", "")
-    : hostsById.has(targetEntityId)
-    ? targetEntityId
+  const trimmed = targetEntityId.trim();
+  const ip = trimmed.startsWith("entity-host-")
+    ? trimmed.replace(/^entity-host-/, "")
+    : hostsById.has(trimmed)
+    ? trimmed
     : null;
 
   if (ip) {
@@ -757,10 +758,11 @@ export function resolveLiveAggregateSelection(
   hostsById: Map<string, EnrichedHost>,
   zoomTier = 10
 ): ResolvedSelection | null {
-  const targetGeoCellId = extractGeoCellId(targetEntityId);
+  const trimmed = targetEntityId.trim();
+  const targetGeoCellId = extractGeoCellId(trimmed);
 
   const matchingNode = aggregateNodes.find((n) => {
-    if (n.entityId === targetEntityId || n.id === targetEntityId) return true;
+    if (n.entityId === trimmed || n.id === trimmed) return true;
     if (
       targetGeoCellId !== null &&
       (n.geoCellId === targetGeoCellId ||
@@ -771,9 +773,9 @@ export function resolveLiveAggregateSelection(
       return true;
     }
     if (
-      (targetEntityId === OTHER_RESOLVED_ENTITY_ID ||
-        targetEntityId === OTHER_RESOLVED_NODE_ID ||
-        targetEntityId === OTHER_RESOLVED_GEOCELL_ID) &&
+      (trimmed === OTHER_RESOLVED_ENTITY_ID ||
+        trimmed === OTHER_RESOLVED_NODE_ID ||
+        trimmed === OTHER_RESOLVED_GEOCELL_ID) &&
       n.nodeKind === "otherResolvedAggregate"
     ) {
       return true;
@@ -849,7 +851,7 @@ export function resolveLiveAggregateSelection(
       };
     }
 
-    if (matchingNode.nodeKind === "otherResolvedAggregate" || targetEntityId === OTHER_RESOLVED_ENTITY_ID) {
+    if (matchingNode.nodeKind === "otherResolvedAggregate" || trimmed === OTHER_RESOLVED_ENTITY_ID) {
       return {
         entityId: matchingNode.entityId,
         status: "active",
@@ -900,8 +902,8 @@ export function resolveLiveAggregateSelection(
     h.geo.status === "resolved" ? h.geo.country : null;
 
   // 1. City Aggregate
-  if (targetEntityId.startsWith("entity-city-")) {
-    const raw = targetEntityId.replace("entity-city-", "");
+  if (trimmed.startsWith("entity-city-")) {
+    const raw = trimmed.replace("entity-city-", "");
     const dashIdx = raw.indexOf("-");
     if (dashIdx > 0) {
       const countryCode = raw.substring(0, dashIdx).toLowerCase();
@@ -920,12 +922,13 @@ export function resolveLiveAggregateSelection(
         const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
         const memberCount = memberHosts.length;
         const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+        const memberIpSet = new Set(memberHosts.map((h) => h.ip));
         const enclosingNode = aggregateNodes.find((n) =>
-          n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+          n.sampleEndpointIps.some((ip) => memberIpSet.has(ip))
         );
 
         return {
-          entityId: targetEntityId,
+          entityId: trimmed,
           status: "active",
           isSelected: true,
           label: `${cityName} (${memberCount})`,
@@ -934,7 +937,7 @@ export function resolveLiveAggregateSelection(
             kind: "cityAggregate",
             cityName,
             countryCode: countryCode.toUpperCase(),
-            entityId: targetEntityId as CityAggregateEntityId,
+            entityId: trimmed as CityAggregateEntityId,
             node: enclosingNode,
             memberHosts,
             memberCount,
@@ -947,8 +950,8 @@ export function resolveLiveAggregateSelection(
   }
 
   // 2. Country Aggregate
-  if (targetEntityId.startsWith("entity-country-")) {
-    const countryCode = targetEntityId.replace("entity-country-", "").toLowerCase();
+  if (trimmed.startsWith("entity-country-")) {
+    const countryCode = trimmed.replace("entity-country-", "").toLowerCase();
     const memberHosts = allHosts.filter(
       (h) => h.geo.status === "resolved" && h.geo.countryCode?.toLowerCase() === countryCode
     );
@@ -962,12 +965,13 @@ export function resolveLiveAggregateSelection(
       const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
       const memberCount = memberHosts.length;
       const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+      const memberIpSet = new Set(memberHosts.map((h) => h.ip));
       const enclosingNode = aggregateNodes.find((n) =>
-        n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+        n.sampleEndpointIps.some((ip) => memberIpSet.has(ip))
       );
 
       return {
-        entityId: targetEntityId,
+        entityId: trimmed,
         status: "active",
         isSelected: true,
         label: `${countryName} (${memberCount})`,
@@ -976,7 +980,7 @@ export function resolveLiveAggregateSelection(
           kind: "countryAggregate",
           countryCode: countryCode.toUpperCase(),
           countryName,
-          entityId: targetEntityId as CountryAggregateEntityId,
+          entityId: trimmed as CountryAggregateEntityId,
           node: enclosingNode,
           memberHosts,
           memberCount,
@@ -1001,8 +1005,9 @@ export function resolveLiveAggregateSelection(
       const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
       const memberCount = memberHosts.length;
       const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+      const memberIpSet = new Set(memberHosts.map((h) => h.ip));
       const enclosingNode = aggregateNodes.find((n) =>
-        n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+        n.sampleEndpointIps.some((ip) => memberIpSet.has(ip))
       );
       const firstCity = memberHosts.map(getResolvedCity).find((c): c is string => Boolean(c));
       const label = firstCity
@@ -1032,8 +1037,8 @@ export function resolveLiveAggregateSelection(
   }
 
   // 4. ASN Aggregate
-  if (targetEntityId.startsWith("entity-asn-") || targetEntityId.startsWith("asn-")) {
-    const rawAsn = targetEntityId.replace(/^entity-asn-|^asn-/, "");
+  if (trimmed.startsWith("entity-asn-") || trimmed.startsWith("asn-")) {
+    const rawAsn = trimmed.replace(/^entity-asn-|^asn-/, "");
     const asnNum = Number(rawAsn);
     if (Number.isFinite(asnNum) && asnNum > 0) {
       const memberHosts = allHosts.filter(
@@ -1066,9 +1071,9 @@ export function resolveLiveAggregateSelection(
 
   // 5. Unresolved Public Destinations Group
   if (
-    targetEntityId === UNRESOLVED_PUBLIC_ENTITY_ID ||
-    targetEntityId === "unresolved" ||
-    targetEntityId === "unresolvedGroup"
+    trimmed === UNRESOLVED_PUBLIC_ENTITY_ID ||
+    trimmed === "unresolved" ||
+    trimmed === "unresolvedGroup"
   ) {
     const memberHosts = allHosts.filter(
       (h) => h.classification.isPublic && h.geo.status === "unresolved"
@@ -1094,9 +1099,9 @@ export function resolveLiveAggregateSelection(
 
   // 6. Local Network Group (LAN / Multicast)
   if (
-    targetEntityId === LOCAL_LAN_ENTITY_ID ||
-    targetEntityId === "local-lan" ||
-    targetEntityId === "lan"
+    trimmed === LOCAL_LAN_ENTITY_ID ||
+    trimmed === "local-lan" ||
+    trimmed === "lan"
   ) {
     const memberHosts = allHosts.filter((h) => h.classification.isLocalLan);
     if (memberHosts.length > 0) {
@@ -1121,9 +1126,9 @@ export function resolveLiveAggregateSelection(
 
   // 7. Special Address Space Group
   if (
-    targetEntityId === SPECIAL_SPACE_ENTITY_ID ||
-    targetEntityId === "special" ||
-    targetEntityId === "shared"
+    trimmed === SPECIAL_SPACE_ENTITY_ID ||
+    trimmed === "special" ||
+    trimmed === "shared"
   ) {
     const memberHosts = allHosts.filter(
       (h) => !h.classification.isPublic && !h.classification.isLocalLan
@@ -1159,20 +1164,26 @@ export function resolveSelection(
   zoomTier = 10
 ): ResolvedSelection | null {
   if (!targetEntityId) return null;
+  const trimmed = targetEntityId.trim();
+  if (!trimmed) return null;
 
   const liveSelection =
-    resolveLiveHostSelection(targetEntityId, snapshot.hostsById) ??
-    resolveLiveAggregateSelection(targetEntityId, aggregateNodes, snapshot.hostsById, zoomTier);
+    resolveLiveHostSelection(trimmed, snapshot.hostsById) ??
+    resolveLiveAggregateSelection(trimmed, aggregateNodes, snapshot.hostsById, zoomTier);
 
   if (liveSelection) {
     return liveSelection;
   }
 
-  let tombstone = tombstones.get(targetEntityId);
-  if (!tombstone && !targetEntityId.startsWith("entity-host-")) {
-    tombstone = tombstones.get(`entity-host-${targetEntityId}`);
+  let tombstone = tombstones.get(trimmed);
+  if (!tombstone && !trimmed.startsWith("entity-host-")) {
+    tombstone = tombstones.get(`entity-host-${trimmed}`);
   }
-  const targetGeoCellId = extractGeoCellId(targetEntityId);
+  if (!tombstone && (trimmed.startsWith("asn-") || /^\d+$/.test(trimmed))) {
+    const asnClean = trimmed.replace(/^asn-/, "");
+    tombstone = tombstones.get(`entity-asn-${asnClean}`);
+  }
+  const targetGeoCellId = extractGeoCellId(trimmed);
   if (!tombstone && targetGeoCellId !== null) {
     tombstone =
       tombstones.get(makeClusterEntityId(targetGeoCellId)) ||

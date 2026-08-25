@@ -122,14 +122,29 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
 
   // 1. Snapshot-gated host enrichment & delta computation (Invariant 1 & 2)
   const hostEnrichmentRef = useRef<HostEnrichmentSnapshot | null>(null);
+  const implicitSequenceRef = useRef<number>(0);
 
   const snapshotModel = useMemo(() => {
-    const seq =
-      snapshotSequence !== undefined
-        ? snapshotSequence
-        : typeof snapshotIdentity === "number"
-        ? snapshotIdentity
-        : 0;
+    const isExplicit =
+      snapshotSequence !== undefined || typeof snapshotIdentity === "number";
+
+    let seq: number;
+    if (isExplicit) {
+      seq =
+        snapshotSequence !== undefined
+          ? snapshotSequence
+          : (snapshotIdentity as number);
+      // Synchronize implicit counter so future implicit mode transitions remain monotonically ahead
+      implicitSequenceRef.current = Math.max(implicitSequenceRef.current, seq);
+    } else {
+      // In implicit mode, increment internal sequence so that consecutive hosts prop updates
+      // are recognized as fresh logical snapshots rather than rejected duplicates.
+      implicitSequenceRef.current = Math.max(
+        implicitSequenceRef.current + 1,
+        (hostEnrichmentRef.current?.snapshotSequence ?? 0) + 1
+      );
+      seq = implicitSequenceRef.current;
+    }
 
     const session =
       captureSessionId ||

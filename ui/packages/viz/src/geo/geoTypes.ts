@@ -372,6 +372,12 @@ export interface GeoAggregateNode {
    * Never derive this from endpointIps; endpointIps is bounded inspection data.
    */
   memberCount: number;
+  /**
+   * Optional presentation-level selection metadata.
+   * Set when an endpoint belonging to this aggregate is selected, ensuring the containing visual node highlights
+   * even if the member is ranked outside the bounded sampleEndpointIps inspection sample.
+   */
+  selectedMemberEntityId?: string | null;
   locationLevel?: "country" | "city" | "unresolved" | "multiLocation" | "aggregate";
   precisionDescription?: string;
 }
@@ -637,7 +643,12 @@ export function isNodeSelected(
       if (
         node.sampleEndpointIps.includes(activeSelection.ip) ||
         node.endpointIps.includes(activeSelection.ip) ||
-        node.entityId === activeSelection.entityId
+        node.entityId === activeSelection.entityId ||
+        (Boolean(node.selectedMemberEntityId) && (
+          node.selectedMemberEntityId === activeSelection.entityId ||
+          node.selectedMemberEntityId === makeHostEntityId(activeSelection.ip) ||
+          node.selectedMemberEntityId === activeSelection.ip
+        ))
       ) {
         return true;
       }
@@ -646,41 +657,47 @@ export function isNodeSelected(
       const nodeCellId = node.geoCellId ? extractGeoCellId(node.geoCellId) : null;
 
       if (
-        node.entityId === activeSelection.entityId ||
-        node.id === activeSelection.clusterId ||
-        (activeCellId !== null && nodeCellId === activeCellId) ||
-        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
-        (activeCellId !== null && extractGeoCellId(node.entityId) === activeCellId) ||
-        (activeCellId !== null && extractGeoCellId(node.id) === activeCellId) ||
-        (activeSelection.sampleEndpointIps !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
-        (activeSelection.memberHosts !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        node.nodeKind !== "otherResolvedAggregate" && (
+          node.entityId === activeSelection.entityId ||
+          node.id === activeSelection.clusterId ||
+          (activeCellId !== null && nodeCellId === activeCellId) ||
+          (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+          (activeCellId !== null && extractGeoCellId(node.entityId) === activeCellId) ||
+          (activeCellId !== null && extractGeoCellId(node.id) === activeCellId) ||
+          (activeSelection.sampleEndpointIps !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+          (activeSelection.memberHosts !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        )
       ) {
         return true;
       }
     } else if (activeSelection.kind === "countryAggregate") {
       if (
-        node.entityId === activeSelection.entityId ||
-        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
-        (Boolean(node.countryCode) && activeSelection.countryCode.toUpperCase() === node.countryCode!.toUpperCase()) ||
-        (activeSelection.sampleEndpointIps !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
-        (activeSelection.memberHosts !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        node.nodeKind !== "otherResolvedAggregate" && (
+          node.entityId === activeSelection.entityId ||
+          (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+          (Boolean(node.countryCode) && activeSelection.countryCode.toUpperCase() === node.countryCode!.toUpperCase()) ||
+          (activeSelection.sampleEndpointIps !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+          (activeSelection.memberHosts !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        )
       ) {
         return true;
       }
     } else if (activeSelection.kind === "cityAggregate") {
       if (
-        node.entityId === activeSelection.entityId ||
-        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
-        (activeSelection.cityName.toLowerCase() === node.label.replace(/\s*\(\d+\)$/, "").toLowerCase() &&
-          (!activeSelection.countryCode || !node.countryCode || activeSelection.countryCode.toUpperCase() === node.countryCode.toUpperCase())) ||
-        (activeSelection.sampleEndpointIps !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
-        (activeSelection.memberHosts !== undefined &&
-          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        node.nodeKind !== "otherResolvedAggregate" && (
+          node.entityId === activeSelection.entityId ||
+          (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+          (activeSelection.cityName.toLowerCase() === node.label.replace(/\s*\(\d+\)$/, "").toLowerCase() &&
+            (!activeSelection.countryCode || !node.countryCode || activeSelection.countryCode.toUpperCase() === node.countryCode.toUpperCase())) ||
+          (activeSelection.sampleEndpointIps !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+          (activeSelection.memberHosts !== undefined &&
+            node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
+        )
       ) {
         return true;
       }
@@ -694,8 +711,10 @@ export function isNodeSelected(
       }
     } else if (activeSelection.kind === "asn") {
       if (
-        node.asns.includes(activeSelection.asn) ||
-        node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip))
+        node.nodeKind !== "otherResolvedAggregate" && (
+          node.asns.includes(activeSelection.asn) ||
+          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip))
+        )
       ) {
         return true;
       }
@@ -718,19 +737,26 @@ export function isNodeSelected(
     if (
       node.entityId === rawId ||
       node.id === rawId ||
+      node.selectedMemberEntityId === rawId ||
+      (node.selectedMemberEntityId != null && (
+        node.selectedMemberEntityId === rawId ||
+        node.selectedMemberEntityId.replace(/^entity-host-/, "") === rawId.replace(/^entity-host-/, "") ||
+        node.selectedMemberEntityId === makeHostEntityId(rawId)
+      )) ||
       node.sampleEndpointIps.includes(rawId) ||
       node.endpointIps.includes(rawId) ||
       (rawId.startsWith("entity-host-") && (
         node.sampleEndpointIps.includes(rawId.replace("entity-host-", "")) ||
-        node.endpointIps.includes(rawId.replace("entity-host-", ""))
+        node.endpointIps.includes(rawId.replace("entity-host-", "")) ||
+        node.selectedMemberEntityId === rawId.replace("entity-host-", "")
       )) ||
-      (rawId.startsWith("entity-asn-") && (
+      (node.nodeKind !== "otherResolvedAggregate" && rawId.startsWith("entity-asn-") && (
         node.asns.includes(Number(rawId.replace("entity-asn-", "")))
       )) ||
-      (rawId.startsWith("entity-country-") && Boolean(node.countryCode) && (
+      (node.nodeKind !== "otherResolvedAggregate" && rawId.startsWith("entity-country-") && Boolean(node.countryCode) && (
         node.countryCode!.toUpperCase() === rawId.replace("entity-country-", "").trim().toUpperCase()
       )) ||
-      (rawId.startsWith("entity-city-") && (() => {
+      (node.nodeKind !== "otherResolvedAggregate" && rawId.startsWith("entity-city-") && (() => {
         const rawCity = rawId.replace("entity-city-", "").trim();
         const dash = rawCity.indexOf("-");
         if (dash > 0) {
@@ -744,7 +770,7 @@ export function isNodeSelected(
         return false;
       })()) ||
       (rawId === OTHER_RESOLVED_ENTITY_ID && node.nodeKind === "otherResolvedAggregate") ||
-      (targetCellId !== null && (
+      (node.nodeKind !== "otherResolvedAggregate" && targetCellId !== null && (
         node.geoCellId === targetCellId ||
         extractGeoCellId(node.geoCellId) === targetCellId ||
         extractGeoCellId(node.entityId) === targetCellId ||

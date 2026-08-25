@@ -139,6 +139,7 @@ export interface ClusterAccumulator {
   totalFlows: number;
   deltaBytes: number;
   hasSelected: boolean;
+  selectedMemberEntityId?: string | null;
   anyActive: boolean;
   anyRecent: boolean;
   canonicalCityKeys: Set<string>;
@@ -416,6 +417,7 @@ function mapClusterToNode(
       freshness,
       deltaBytes: c.deltaBytes,
       memberCount: 1,
+      selectedMemberEntityId: c.selectedMemberEntityId || (c.hasSelected ? makeHostEntityId(first.ip) : null),
       locationLevel: first.geo.status === "resolved" ? first.geo.locationLevel : "unresolved",
       precisionDescription: first.geo.status === "resolved" ? first.geo.precisionDescription : "Unresolved",
     };
@@ -459,6 +461,7 @@ function mapClusterToNode(
       freshness,
       deltaBytes: c.deltaBytes,
       memberCount: count,
+      selectedMemberEntityId: c.selectedMemberEntityId || null,
       locationLevel: "city",
       precisionDescription: `${count} endpoints aggregated at ${cityName}, ${countryCode} estimate`,
     };
@@ -489,6 +492,7 @@ function mapClusterToNode(
       freshness,
       deltaBytes: c.deltaBytes,
       memberCount: count,
+      selectedMemberEntityId: c.selectedMemberEntityId || null,
       locationLevel: "country",
       precisionDescription: `${count} endpoints aggregated at country-level representation for ${countryName}`,
     };
@@ -522,6 +526,7 @@ function mapClusterToNode(
     freshness,
     deltaBytes: c.deltaBytes,
     memberCount: count,
+    selectedMemberEntityId: c.selectedMemberEntityId || null,
     locationLevel: "multiLocation",
     precisionDescription: `${count} endpoints aggregated at spatial grid centroid representation`,
   };
@@ -621,6 +626,10 @@ function createOtherResolvedAggregate(
   const label = `Other Resolved Traffic (${memberCount})`;
   const subLabel = `${memberCount} endpoints • ${humanBytes(totalBytes)}`;
 
+  // Selection metadata follows the rendered aggregate that contains the selected entity
+  const selectedMemberEntityId =
+    overflowClusters.find((c) => Boolean(c.selectedMemberEntityId))?.selectedMemberEntityId || null;
+
   return {
     id: makeOtherResolvedRenderNodeId(zoomTier),
     entityId: OTHER_RESOLVED_ENTITY_ID,
@@ -641,6 +650,7 @@ function createOtherResolvedAggregate(
     freshness,
     deltaBytes,
     memberCount,
+    selectedMemberEntityId: selectedMemberEntityId || undefined,
     locationLevel: "multiLocation",
     precisionDescription: `Aggregated representation of ${memberCount} endpoints across ${locationCount} spatial locations`,
   };
@@ -672,11 +682,30 @@ export function buildSpatialClusters(
     worldHeight = MAP_HEIGHT,
   } = options;
 
-  // Validate rendering budget contract (maxNodes must be a finite number >= 1)
-  if (!Number.isFinite(maxNodes) || maxNodes < 1) {
-    throw new RangeError(`maxNodes must be a finite number >= 1, received: ${maxNodes}`);
+  // Explicit Rendering Budget Contract:
+  // - undefined: default (120)
+  // - positive number: Math.floor(maxNodes)
+  // - 0: valid "render zero nodes" -> returns []
+  // - negative / NaN / Infinity: invalid -> normalize to default (120)
+  let effectiveMaxNodes = 120;
+  if (maxNodes === undefined) {
+    effectiveMaxNodes = 120;
+  } else if (typeof maxNodes === "number" && Number.isFinite(maxNodes)) {
+    if (maxNodes === 0) {
+      effectiveMaxNodes = 0;
+    } else if (maxNodes > 0) {
+      effectiveMaxNodes = Math.floor(maxNodes);
+    } else {
+      effectiveMaxNodes = 120;
+    }
+  } else {
+    effectiveMaxNodes = 120;
   }
-  const effectiveMaxNodes = Math.floor(maxNodes);
+
+  // If effectiveMaxNodes === 0, render zero visual nodes while preserving domain execution
+  if (effectiveMaxNodes === 0) {
+    return [];
+  }
 
   // Effective distance threshold in SVG map coordinate space
   const worldDistThreshold = Math.max(0.2, distanceThreshold / zoomScale);
@@ -731,6 +760,14 @@ export function buildSpatialClusters(
         selectedEntity.memberHosts.some((h) => h.ip === host.ip)) ||
       (targetGeoCellId !== null && hostGeoCellId === targetGeoCellId);
 
+    const isSelectedHostEndpoint =
+      isSelected &&
+      Boolean(
+        (canonicalSelectedHostIp != null && canonicalSelectedHostIp !== "" && host.ip === canonicalSelectedHostIp) ||
+        (selectedEntity?.kind === "endpoint" && selectedEntity.ip === host.ip) ||
+        (selectedEntityId != null && (selectedEntityId === makeHostEntityId(host.ip) || selectedEntityId === host.ip))
+      );
+
     const { targetCluster } = spatialGrid.findNearest(hx, hy, worldDistThreshold);
 
     const isHostCityLevel = host.geo.locationLevel === "city" && Boolean(host.geo.city);
@@ -779,7 +816,12 @@ export function buildSpatialClusters(
       }
       if (host.freshness === "active") targetCluster.anyActive = true;
       if (host.freshness === "recent") targetCluster.anyRecent = true;
-      if (isSelected) targetCluster.hasSelected = true;
+      if (isSelected) {
+        targetCluster.hasSelected = true;
+        if (isSelectedHostEndpoint) {
+          targetCluster.selectedMemberEntityId = makeHostEntityId(host.ip);
+        }
+      }
 
       // Accumulate resolution metadata
       if (hostCityKey) targetCluster.canonicalCityKeys.add(hostCityKey);
@@ -816,6 +858,7 @@ export function buildSpatialClusters(
         totalFlows: host.flows,
         deltaBytes: host.deltaBytes,
         hasSelected: isSelected,
+        selectedMemberEntityId: isSelectedHostEndpoint ? makeHostEntityId(host.ip) : null,
         anyActive: host.freshness === "active",
         anyRecent: host.freshness === "recent",
         canonicalCityKeys: initialCityKeys,
@@ -846,27 +889,25 @@ export function buildSpatialClusters(
           c.hasSelected = true;
         } else if (
           (selectedEntityId?.startsWith("entity-city-") || selectedEntity?.kind === "cityAggregate") &&
-          c.allCityLevel &&
           c.canonicalCityKeys.size === 1 &&
           c.normalizedCountryCodes.size === 1
         ) {
           const cc = Array.from(c.normalizedCountryCodes)[0]!;
           const ck = Array.from(c.canonicalCityKeys)[0]!;
           if (
-            (selectedEntityId && selectedEntityId === makeCityAggregateEntityId(cc, ck)) ||
-            (selectedEntity?.kind === "cityAggregate" && selectedEntity.entityId === makeCityAggregateEntityId(cc, ck))
+            (selectedEntityId && selectedEntityId.toLowerCase() === makeCityAggregateEntityId(cc, ck).toLowerCase()) ||
+            (selectedEntity?.kind === "cityAggregate" && selectedEntity.entityId.toLowerCase() === makeCityAggregateEntityId(cc, ck).toLowerCase())
           ) {
             c.hasSelected = true;
           }
         } else if (
           (selectedEntityId?.startsWith("entity-country-") || selectedEntity?.kind === "countryAggregate") &&
-          c.allCountryLevel &&
           c.normalizedCountryCodes.size === 1
         ) {
           const cc = Array.from(c.normalizedCountryCodes)[0]!;
           if (
-            (selectedEntityId && selectedEntityId === makeCountryAggregateEntityId(cc)) ||
-            (selectedEntity?.kind === "countryAggregate" && selectedEntity.countryCode.toLowerCase() === cc)
+            (selectedEntityId && selectedEntityId.toLowerCase() === makeCountryAggregateEntityId(cc).toLowerCase()) ||
+            (selectedEntity?.kind === "countryAggregate" && selectedEntity.countryCode.toLowerCase() === cc.toLowerCase())
           ) {
             c.hasSelected = true;
           }

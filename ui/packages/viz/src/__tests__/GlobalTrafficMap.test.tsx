@@ -217,4 +217,97 @@ describe("GlobalTrafficMap Component", () => {
       expect.stringContaining("Public IPv6 GeoIP resolution is intentionally deferred")
     );
   });
+
+  it("Regression Test: Standalone GlobalTrafficMap updates continuously without snapshotSequence prop (A -> B -> C -> D)", () => {
+    const hostA: BreakdownRow[] = [
+      { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "alpha.host", source: "dns" }], evidence: [] },
+    ];
+    const hostB: BreakdownRow[] = [
+      { label: "31.0.0.1", bytes: 2000, flows: 2, hostnames: [{ name: "beta.host", source: "dns" }], evidence: [] },
+    ];
+    const hostC: BreakdownRow[] = [
+      { label: "9.9.9.9", bytes: 3000, flows: 3, hostnames: [{ name: "gamma.host", source: "dns" }], evidence: [] },
+    ];
+    const hostD: BreakdownRow[] = [
+      { label: "142.250.30.1", bytes: 4000, flows: 4, hostnames: [{ name: "delta.host", source: "dns" }], evidence: [] },
+    ];
+
+    // Initial render: Host A
+    const { rerender } = render(<GlobalTrafficMap hosts={hostA} />);
+    expect(screen.getByText("alpha.host")).toBeInTheDocument();
+
+    // Prop update: Host B (sequence omitted)
+    rerender(<GlobalTrafficMap hosts={hostB} />);
+    expect(screen.getByText("beta.host")).toBeInTheDocument();
+
+    // Prop update: Host C (sequence omitted)
+    rerender(<GlobalTrafficMap hosts={hostC} />);
+    expect(screen.getByText("gamma.host")).toBeInTheDocument();
+
+    // Prop update: Host D (sequence omitted)
+    rerender(<GlobalTrafficMap hosts={hostD} />);
+    expect(screen.getByText("delta.host")).toBeInTheDocument();
+  });
+
+  it("Regression Test: Mode switching between implicit and explicit sequencing (implicit A -> B -> C -> explicit 100 -> 101 -> 99)", () => {
+    const hostA: BreakdownRow[] = [
+      { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "host-a.com", source: "dns" }], evidence: [] },
+    ];
+    const hostB: BreakdownRow[] = [
+      { label: "31.0.0.1", bytes: 2000, flows: 2, hostnames: [{ name: "host-b.com", source: "dns" }], evidence: [] },
+    ];
+    const hostC: BreakdownRow[] = [
+      { label: "9.9.9.9", bytes: 3000, flows: 3, hostnames: [{ name: "host-c.com", source: "dns" }], evidence: [] },
+    ];
+    const host100: BreakdownRow[] = [
+      { label: "142.250.30.1", bytes: 4000, flows: 4, hostnames: [{ name: "host-100.com", source: "dns" }], evidence: [] },
+    ];
+    const host101: BreakdownRow[] = [
+      { label: "1.1.1.1", bytes: 5000, flows: 5, hostnames: [{ name: "host-101.com", source: "dns" }], evidence: [] },
+    ];
+    const host99Stale: BreakdownRow[] = [
+      { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [{ name: "host-99-stale.com", source: "dns" }], evidence: [] },
+    ];
+
+    // 1. Implicit A
+    const { rerender } = render(<GlobalTrafficMap hosts={hostA} />);
+    expect(screen.getByText("host-a.com")).toBeInTheDocument();
+
+    // 2. Implicit B
+    rerender(<GlobalTrafficMap hosts={hostB} />);
+    expect(screen.getByText("host-b.com")).toBeInTheDocument();
+
+    // 3. Implicit C
+    rerender(<GlobalTrafficMap hosts={hostC} />);
+    expect(screen.getByText("host-c.com")).toBeInTheDocument();
+
+    // 4. Switch to Explicit Sequence 100 (accepted)
+    rerender(<GlobalTrafficMap hosts={host100} snapshotSequence={100} />);
+    expect(screen.getByText("host-100.com")).toBeInTheDocument();
+
+    // 5. Explicit Sequence 101 (accepted)
+    rerender(<GlobalTrafficMap hosts={host101} snapshotSequence={101} />);
+    expect(screen.getByText("host-101.com")).toBeInTheDocument();
+
+    // 6. Explicit Sequence 99 (stale -> ignored, retains host-101)
+    rerender(<GlobalTrafficMap hosts={host99Stale} snapshotSequence={99} />);
+    expect(screen.queryByText("host-99-stale.com")).not.toBeInTheDocument();
+    expect(screen.getByText("host-101.com")).toBeInTheDocument();
+  });
+
+  it("Regression Test: renderPolicy.maxVisibleNodes = 0 renders zero visual nodes safely while preserving HUD metrics", () => {
+    render(<GlobalTrafficMap hosts={mockHosts} renderPolicy={{ maxVisibleNodes: 0 }} />);
+
+    // SVG renders safely
+    const svg = screen.getByRole("img", { name: /Global Traffic Map:/i });
+    expect(svg).toBeInTheDocument();
+
+    // No visual endpoint or aggregate node buttons rendered
+    expect(screen.queryByRole("button", { name: /one.one.one.one/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Other Resolved Traffic/i })).not.toBeInTheDocument();
+
+    // Domain HUD metrics are preserved
+    expect(screen.getByText("RESOLVED COUNTRIES")).toBeInTheDocument();
+    expect(screen.getByText("RESOLVED ENDPOINTS")).toBeInTheDocument();
+  });
 });

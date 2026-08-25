@@ -25,8 +25,10 @@ import {
   makeAggregateRenderNodeId,
   makeOtherResolvedRenderNodeId,
   getCanonicalCountryName,
+  isNodeSelected,
   type EnrichedHost,
   type GeoResolution,
+  type SelectedEntity,
 } from "../geo/geoTypes";
 import { deriveMapViewModel, deriveClusteredMapModel } from "../geo/mapViewModel";
 import { enrichHost, clearGeoCaches } from "../geo/geoDatabase";
@@ -809,13 +811,22 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       expect(nodes1[1]!.id).toBe(nodes2[1]!.id);
     });
 
-    it("throws RangeError for invalid maxNodes (< 1 or non-finite)", () => {
+    it("enforces explicit maxNodes contract: 0 returns empty array, invalid values normalize to default 120", () => {
       const hosts = generateIsolatedHosts(5);
 
-      expect(() => buildSpatialClusters(hosts, { maxNodes: 0 })).toThrow(RangeError);
-      expect(() => buildSpatialClusters(hosts, { maxNodes: -10 })).toThrow(RangeError);
-      expect(() => buildSpatialClusters(hosts, { maxNodes: NaN })).toThrow(RangeError);
-      expect(() => buildSpatialClusters(hosts, { maxNodes: Infinity })).toThrow(RangeError);
+      // maxNodes = 0: Valid "render zero nodes"
+      const nodesZero = buildSpatialClusters(hosts, { maxNodes: 0 });
+      expect(nodesZero).toEqual([]);
+
+      // Invalid values: negative, NaN, Infinity normalize to default (120) and render safely without throwing
+      const nodesNegative = buildSpatialClusters(hosts, { maxNodes: -10, distanceThreshold: 1 });
+      expect(nodesNegative.length).toBe(5);
+
+      const nodesNaN = buildSpatialClusters(hosts, { maxNodes: NaN, distanceThreshold: 1 });
+      expect(nodesNaN.length).toBe(5);
+
+      const nodesInf = buildSpatialClusters(hosts, { maxNodes: Infinity, distanceThreshold: 1 });
+      expect(nodesInf.length).toBe(5);
     });
 
     it("handles boundary edge cases: maxNodes = 1, maxNodes = 2, maxNodes = exact count", () => {
@@ -2270,6 +2281,105 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
             expect(vmSel.activeSelection.selectedEntity.geoCellId).toBe(geoCell);
           }
         }
+      });
+
+      it("Regression Test: Selected endpoint ranked > 50 in dense cluster highlights via selectedMemberEntityId while preserving sample bounds", () => {
+        // Construct 60 hosts in Frankfurt with descending bytes (rank 1 to 60)
+        const hosts: EnrichedHost[] = [];
+        for (let i = 1; i <= 60; i++) {
+          const ip = `10.200.0.${i}`;
+          // Byte volume strictly descending: host 1 has highest bytes, host 60 has lowest bytes
+          const bytes = 100_000 - i * 100;
+          hosts.push(
+            createCustomHost(ip, 50.1109, 8.6821, bytes, 1, {
+              city: "Frankfurt",
+              countryCode: "DE",
+              locationLevel: "city",
+            })
+          );
+        }
+
+        const lowestRankHost = hosts[59]!; // 60th host (bytes = 94,000)
+        expect(lowestRankHost.ip).toBe("10.200.0.60");
+
+        // Build spatial clusters with the 60th host selected
+        const clusters = buildSpatialClusters(hosts, {
+          selectedIp: lowestRankHost.ip,
+          distanceThreshold: 50,
+        });
+
+        expect(clusters.length).toBe(1);
+        const clusterNode = clusters[0]!;
+
+        // Invariant 1: memberCount is exact (60)
+        expect(clusterNode.memberCount).toBe(60);
+
+        // Invariant 2: sampleEndpointIps is strictly bounded to 50
+        expect(clusterNode.sampleEndpointIps.length).toBe(50);
+        expect(clusterNode.sampleEndpointIps.length).toBeLessThanOrEqual(50);
+
+        // Invariant 3: 60th host is NOT in sampleEndpointIps (because it was ranked #60)
+        expect(clusterNode.sampleEndpointIps.includes(lowestRankHost.ip)).toBe(false);
+
+        // Invariant 4: clusterNode carries selectedMemberEntityId for the selected endpoint
+        expect(clusterNode.selectedMemberEntityId).toBe(`entity-host-${lowestRankHost.ip}`);
+
+        // Invariant 5: isNodeSelected evaluates to TRUE for the containing cluster
+        const selectedEntity: SelectedEntity = {
+          kind: "endpoint",
+          ip: lowestRankHost.ip,
+          entityId: `entity-host-${lowestRankHost.ip}`,
+          host: lowestRankHost,
+        };
+        expect(isNodeSelected(clusterNode, selectedEntity)).toBe(true);
+        expect(isNodeSelected(clusterNode, null, `entity-host-${lowestRankHost.ip}`)).toBe(true);
+        expect(isNodeSelected(clusterNode, null, lowestRankHost.ip)).toBe(true);
+
+        // Selecting a non-member host returns false
+        expect(isNodeSelected(clusterNode, { kind: "endpoint", ip: "192.168.1.99", entityId: "entity-host-192.168.1.99", host: lowestRankHost })).toBe(false);
+      });
+
+      it("Regression Test: Selection metadata follows the rendered aggregate (OtherResolved vs Visible Clusters)", () => {
+        // Create 5 distinct clusters in different cities
+        const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 50000, 5, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+        const h2 = createCustomHost("2.2.2.2", 48.85, 2.35, 40000, 4, { city: "Paris", countryCode: "FR", locationLevel: "city" });
+        const h3 = createCustomHost("3.3.3.3", 51.50, -0.12, 30000, 3, { city: "London", countryCode: "GB", locationLevel: "city" });
+        const h4 = createCustomHost("4.4.4.4", 40.71, -74.00, 20000, 2, { city: "New York", countryCode: "US", locationLevel: "city" });
+        const h5 = createCustomHost("5.5.5.5", 35.67, 139.65, 10000, 1, { city: "Tokyo", countryCode: "JP", locationLevel: "city" });
+
+        // Case A: Selected host is in a high-traffic VISIBLE cluster (Frankfurt) with maxVisibleNodes = 2
+        // Budget = 2 -> 1 visible slot for Frankfurt (highest bytes), 1 slot for Other Resolved (Paris, London, NY, Tokyo)
+        const clustersA = buildSpatialClusters([h1, h2, h3, h4, h5], {
+          maxNodes: 2,
+          selectedIp: "1.1.1.1",
+          distanceThreshold: 1,
+        });
+
+        expect(clustersA.length).toBe(2);
+        const visibleNodeA = clustersA.find((n) => n.nodeKind !== "otherResolvedAggregate")!;
+        const otherResolvedNodeA = clustersA.find((n) => n.nodeKind === "otherResolvedAggregate")!;
+
+        // Frankfurt (visible) has selectedMemberEntityId
+        expect(visibleNodeA.selectedMemberEntityId).toBe("entity-host-1.1.1.1");
+        expect(isNodeSelected(visibleNodeA, { kind: "endpoint", ip: "1.1.1.1", entityId: "entity-host-1.1.1.1", host: h1 })).toBe(true);
+
+        // OtherResolved does NOT inherit selectedMemberEntityId because 1.1.1.1 is in visibleNodeA
+        expect(otherResolvedNodeA.selectedMemberEntityId).toBeUndefined();
+        expect(isNodeSelected(otherResolvedNodeA, { kind: "endpoint", ip: "1.1.1.1", entityId: "entity-host-1.1.1.1", host: h1 })).toBe(false);
+
+        // Case B: Selected host is in an OVERFLOW cluster (Tokyo) with maxVisibleNodes = 2
+        // Budget = 2 (1 visible reserved for selected Tokyo, or if Tokyo overflows)
+        const clustersB = buildSpatialClusters([h1, h2, h3, h4, h5], {
+          maxNodes: 1, // maxNodes = 1: All clusters roll into Other Resolved
+          selectedIp: "5.5.5.5",
+          distanceThreshold: 1,
+        });
+
+        expect(clustersB.length).toBe(1);
+        const otherResolvedNodeB = clustersB[0]!;
+        expect(otherResolvedNodeB.nodeKind).toBe("otherResolvedAggregate");
+        expect(otherResolvedNodeB.selectedMemberEntityId).toBe("entity-host-5.5.5.5");
+        expect(isNodeSelected(otherResolvedNodeB, { kind: "endpoint", ip: "5.5.5.5", entityId: "entity-host-5.5.5.5", host: h5 })).toBe(true);
       });
     });
   });

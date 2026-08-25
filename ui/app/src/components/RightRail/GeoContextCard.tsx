@@ -18,6 +18,7 @@ export const GeoContextCard = memo(function GeoContextCard({
 }: GeoContextCardProps) {
   const navContext = useOptionalEvidenceNavigation();
   const navigateToEvidence = navContext?.navigateToEvidence ?? (() => {});
+  const sidebar = useOptionalSidebar();
 
   if (!entity) return null;
 
@@ -719,12 +720,14 @@ export const GeoContextCard = memo(function GeoContextCard({
                   type="button"
                   className="np-pill"
                   onClick={() => {
-                    onSelectEntity?.({
+                    const selected: SelectedEntity = {
                       kind: "endpoint",
                       entityId: makeHostEntityId(m.ip),
                       ip: m.ip,
                       host: m,
-                    });
+                    };
+                    onSelectEntity?.(selected);
+                    sidebar?.setSelectedEntity(selected);
                   }}
                   style={{
                     display: "flex",

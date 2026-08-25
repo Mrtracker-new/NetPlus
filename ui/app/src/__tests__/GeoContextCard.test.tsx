@@ -395,7 +395,7 @@ describe("GeoContextCard Polymorphic Inspector", () => {
     };
 
     render(<GeoContextCard entity={entity} />);
-    expect(screen.getByText("Unresolved (IPv6 GeoIP deferred)")).toBeInTheDocument();
+    expect(screen.getByText(/IPv6 geographic coordinate resolution unavailable/i)).toBeInTheDocument();
   });
 
   it("renders IPv6 deferred details when unresolvedGroup contains public IPv6 hosts", () => {
@@ -427,10 +427,9 @@ describe("GeoContextCard Polymorphic Inspector", () => {
     };
 
     render(<GeoContextCard entity={entity} />);
-    expect(screen.getByText(/Includes 1 public IPv6 endpoint where GeoIP resolution is intentionally deferred/i)).toBeInTheDocument();
     expect(screen.getByText("IPv6 Deferred")).toBeInTheDocument();
     expect(screen.getByText("1 hosts")).toBeInTheDocument();
-    expect(screen.getByText(/IPv6 deferred •/i)).toBeInTheDocument();
+    expect(screen.getByText(/IPv6 geographic coordinate resolution unavailable/i)).toBeInTheDocument();
   });
 
   it("renders SelectedAsn card with ASN number, organization, volume, flows, and handles member endpoint selection", () => {

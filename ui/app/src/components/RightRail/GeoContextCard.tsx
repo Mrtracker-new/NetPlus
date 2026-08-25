@@ -98,13 +98,10 @@ export const GeoContextCard = memo(function GeoContextCard({
               <li>
                 <span>Geographic Precision</span>
                 <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent-strong)" }}>
-                  {h.geo.precisionDescription ||
-                    ((h.geo as any).locationLevel === "city"
-                      ? "City estimate"
-                      : "Country representation (centroid)")}
+                  {(h.geo as any).precisionDescription || `${String((h.geo as any).precision || "CITY").toUpperCase()} estimate`}
                 </span>
               </li>
-              {h.anycast.isAnycast && (
+              {h.geo.distribution === "anycast" && (
                 <li>
                   <span>Routing Type</span>
                   <span
@@ -114,21 +111,37 @@ export const GeoContextCard = memo(function GeoContextCard({
                       color: "var(--np-accent)",
                     }}
                   >
-                    Anycast PoP ({h.anycast.provider})
+                    Anycast PoP ({h.anycast.provider || h.geo.organization || "Distributed"})
                   </span>
                 </li>
               )}
             </>
           )}
           {h?.geo.status === "unresolved" && (
-            <li>
-              <span>Location</span>
-              <span className="np-rail-list__val" style={{ color: "var(--np-text-mute)" }}>
-                {h.geo.reason === "ipv6_deferred"
-                  ? "Unresolved (IPv6 GeoIP deferred)"
-                  : `Unresolved (${h.geo.reason})`}
-              </span>
-            </li>
+            <>
+              {h.geo.country && (
+                <li>
+                  <span>Location</span>
+                  <span className="np-rail-list__val">
+                    {h.geo.country} ({h.geo.countryCode})
+                  </span>
+                </li>
+              )}
+              <li>
+                <span>Geographic Precision</span>
+                <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-warning, #f2b64d)" }}>
+                  {h.geo.precision.toUpperCase()}
+                </span>
+              </li>
+              <li>
+                <span>Resolution Status</span>
+                <span className="np-rail-list__val" style={{ color: "var(--np-text-mute)", fontSize: "0.72rem" }}>
+                  {h.geo.explanation || (h.geo.reason === "ipv6_deferred"
+                    ? "Unresolved (IPv6 GeoIP deferred)"
+                    : `Unresolved (${h.geo.reason})`)}
+                </span>
+              </li>
+            </>
           )}
           {(() => {
             const asRes = h?.asn;
@@ -515,72 +528,12 @@ export const GeoContextCard = memo(function GeoContextCard({
   }
 
   if (entity.kind === "unresolvedGroup") {
-    const isIpv6Deferred = (h: EnrichedHost) => h.geo.status === "unresolved" && h.geo.reason === "ipv6_deferred";
-    const ipv6DeferredCount = entity.memberHosts.filter(isIpv6Deferred).length;
     return (
-      <section className="np-rail-card np-geo-context-card" aria-label="Unresolved Public Destinations">
-        <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <span className="np-badge np-badge--neutral">Unresolved Geography</span>
-            <h2 className="np-rail-card__title" style={{ marginTop: "4px" }}>
-              {entity.title}
-            </h2>
-          </div>
-          {onClearSelection && (
-            <button
-              type="button"
-              className="np-iconbtn"
-              onClick={onClearSelection}
-              aria-label="Clear selection"
-              title="Clear selection"
-            >
-              <Icon name="close" />
-            </button>
-          )}
-        </div>
-
-        <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
-          Observed public destinations without coordinate matches in the local offline GeoIP database.
-          {ipv6DeferredCount > 0
-            ? ` Includes ${ipv6DeferredCount} public IPv6 endpoint${ipv6DeferredCount > 1 ? "s" : ""} where GeoIP resolution is intentionally deferred.`
-            : " Physical locations are omitted to maintain accuracy."}
-        </p>
-
-        <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
-          <li>
-            <span>Unresolved Endpoints</span>
-            <span className="np-rail-list__val">{entity.memberHosts.length} hosts</span>
-          </li>
-          {ipv6DeferredCount > 0 && (
-            <li>
-              <span>IPv6 Deferred</span>
-              <span className="np-rail-list__val">{ipv6DeferredCount} hosts</span>
-            </li>
-          )}
-          <li>
-            <span>Total Volume</span>
-            <span className="np-rail-list__val">
-              {humanBytes(entity.memberHosts.reduce((s: number, h: EnrichedHost) => s + h.bytes, 0))}
-            </span>
-          </li>
-        </ul>
-
-        <div style={{ marginTop: "0.75rem" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" }}>
-            {entity.memberHosts.map((m: EnrichedHost) => {
-              const isDeferred = isIpv6Deferred(m);
-              return (
-                <div key={m.ip} className="np-pill" style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
-                  <span>{m.hostnames[0]?.name || m.ip}</span>
-                  <span style={{ color: isDeferred ? "var(--np-text-dim)" : undefined }}>
-                    {isDeferred ? "IPv6 deferred • " : ""}{humanBytes(m.bytes)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
+      <UnresolvedGroupCard
+        entity={entity}
+        onClearSelection={onClearSelection}
+        onSelectEntity={onSelectEntity}
+      />
     );
   }
 
@@ -717,6 +670,277 @@ export const GeoContextCard = memo(function GeoContextCard({
 
   return null;
 });
+
+interface UnresolvedGroupCardProps {
+  entity: Extract<SelectedEntity, { kind: "unresolvedGroup" }>;
+  onClearSelection?: () => void;
+  onSelectEntity?: (entity: SelectedEntity | null) => void;
+}
+
+function UnresolvedGroupCard({
+  entity,
+  onClearSelection,
+  onSelectEntity,
+}: UnresolvedGroupCardProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [precisionFilter, setPrecisionFilter] = useState<"ALL" | "COUNTRY" | "NETWORK" | "UNKNOWN">("ALL");
+  const sidebar = useOptionalSidebar();
+
+  const totalHosts = entity.memberHosts.length;
+  const totalBytes = useMemo(
+    () => entity.memberHosts.reduce((sum, h) => sum + h.bytes, 0),
+    [entity.memberHosts]
+  );
+
+  const countryCount = useMemo(
+    () => entity.memberHosts.filter((h) => h.geo.precision === "country").length,
+    [entity.memberHosts]
+  );
+  const networkCount = useMemo(
+    () => entity.memberHosts.filter((h) => h.geo.precision === "network").length,
+    [entity.memberHosts]
+  );
+  const unknownCount = useMemo(
+    () => entity.memberHosts.filter((h) => h.geo.precision === "unknown").length,
+    [entity.memberHosts]
+  );
+  const ipv6DeferredCount = useMemo(
+    () => entity.memberHosts.filter((h) => h.geo.limitation === "ipv6_database_unavailable" || h.geo.reason === "ipv6_deferred").length,
+    [entity.memberHosts]
+  );
+
+  const filteredHosts = useMemo(() => {
+    return entity.memberHosts.filter((h) => {
+      if (precisionFilter !== "ALL") {
+        if (precisionFilter === "COUNTRY" && h.geo.precision !== "country") return false;
+        if (precisionFilter === "NETWORK" && h.geo.precision !== "network") return false;
+        if (precisionFilter === "UNKNOWN" && h.geo.precision !== "unknown") return false;
+      }
+      if (searchTerm.trim()) {
+        const query = searchTerm.trim().toLowerCase();
+        const matchesIp = h.ip.toLowerCase().includes(query);
+        const matchesHostname = h.hostnames.some((hn) => hn.name.toLowerCase().includes(query));
+        const matchesAsn = h.asn.status === "resolved" && (
+          String(h.asn.asn).includes(query) || h.asn.asOrg.toLowerCase().includes(query)
+        );
+        const matchesCountry = Boolean(h.geo.countryCode?.toLowerCase().includes(query) || (h.geo as any).country?.toLowerCase().includes(query));
+        const matchesExplanation = h.geo.explanation.toLowerCase().includes(query);
+        return matchesIp || matchesHostname || matchesAsn || matchesCountry || matchesExplanation;
+      }
+      return true;
+    });
+  }, [entity.memberHosts, precisionFilter, searchTerm]);
+
+  return (
+    <section className="np-rail-card np-geo-context-card" aria-label="Unresolved Public Destinations">
+      <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <span className="np-badge np-badge--neutral">Geographic Visibility Gap</span>
+          <h2 className="np-rail-card__title" style={{ marginTop: "4px" }}>
+            {entity.title}
+          </h2>
+        </div>
+        {onClearSelection && (
+          <button
+            type="button"
+            className="np-iconbtn"
+            onClick={onClearSelection}
+            aria-label="Clear selection"
+            title="Clear selection"
+          >
+            <Icon name="close" />
+          </button>
+        )}
+      </div>
+
+      <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
+        Observed public destinations without coordinate matches in the local offline GeoIP database. Physical locations are omitted to maintain accuracy.
+      </p>
+
+      {/* Progressive Visibility Breakdown Grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginTop: "0.5rem" }}>
+        <div style={{ padding: "6px 8px", background: "var(--np-bg-subtle, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", border: "1px solid var(--np-border-subtle, rgba(255,255,255,0.06))" }}>
+          <div style={{ fontSize: "0.68rem", color: "var(--np-text-mute)" }}>GROUP PHYSICAL COORDS</div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--np-text-dim)" }}>0 / {totalHosts} (0%)</div>
+        </div>
+        <div style={{ padding: "6px 8px", background: "var(--np-bg-subtle, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", border: "1px solid var(--np-border-subtle, rgba(255,255,255,0.06))" }}>
+          <div style={{ fontSize: "0.68rem", color: "var(--np-text-mute)" }}>TOTAL TRAFFIC</div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 600 }}>{humanBytes(totalBytes)}</div>
+        </div>
+        <div style={{ padding: "6px 8px", background: "var(--np-bg-subtle, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", border: "1px solid var(--np-border-subtle, rgba(255,255,255,0.06))" }}>
+          <div style={{ fontSize: "0.68rem", color: "var(--np-text-mute)" }}>COUNTRY IDENTITY</div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--np-accent, #2fe0d6)" }}>{countryCount} / {totalHosts}</div>
+        </div>
+        <div style={{ padding: "6px 8px", background: "var(--np-bg-subtle, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", border: "1px solid var(--np-border-subtle, rgba(255,255,255,0.06))" }}>
+          <div style={{ fontSize: "0.68rem", color: "var(--np-text-mute)" }}>NETWORK IDENTITY</div>
+          <div style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--np-warning, #f2b64d)" }}>{networkCount} / {totalHosts}</div>
+        </div>
+      </div>
+
+      <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
+        <li>
+          <span>Unresolved Endpoints</span>
+          <span className="np-rail-list__val">{totalHosts} hosts</span>
+        </li>
+        <li>
+          <span>Completely Unknown</span>
+          <span className="np-rail-list__val" style={{ color: "var(--np-text-mute)" }}>{unknownCount} hosts</span>
+        </li>
+        {ipv6DeferredCount > 0 && (
+          <li>
+            <span>IPv6 Deferred</span>
+            <span className="np-rail-list__val">{ipv6DeferredCount} hosts</span>
+          </li>
+        )}
+        <li>
+          <span>Total Volume</span>
+          <span className="np-rail-list__val">{humanBytes(totalBytes)}</span>
+        </li>
+      </ul>
+
+      {/* Search & Filter Controls */}
+      <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "6px" }}>
+        <input
+          type="text"
+          className="np-input"
+          placeholder="Filter unresolved hosts..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{ width: "100%", fontSize: "0.72rem", padding: "4px 8px" }}
+          aria-label="Filter unresolved hosts"
+        />
+
+        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+          {(["ALL", "COUNTRY", "NETWORK", "UNKNOWN"] as const).map((p) => {
+            const count =
+              p === "ALL"
+                ? totalHosts
+                : p === "COUNTRY"
+                ? countryCount
+                : p === "NETWORK"
+                ? networkCount
+                : unknownCount;
+            const isSelected = precisionFilter === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                className={`np-pill ${isSelected ? "np-pill--active" : ""}`}
+                onClick={() => setPrecisionFilter(p)}
+                style={{
+                  fontSize: "0.68rem",
+                  cursor: "pointer",
+                  background: isSelected ? "var(--np-accent, #2fe0d6)" : undefined,
+                  color: isSelected ? "#000" : undefined,
+                  border: "none",
+                }}
+              >
+                {p} ({count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Filtered Endpoint List */}
+      <div style={{ marginTop: "0.5rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "240px", overflowY: "auto" }}>
+          {filteredHosts.length === 0 ? (
+            <div style={{ fontSize: "0.72rem", color: "var(--np-text-dim)", textAlign: "center", padding: "12px 0" }}>
+              No endpoints matching filter
+            </div>
+          ) : (
+            filteredHosts.map((m: EnrichedHost) => {
+              const isDeferred = m.geo.limitation === "ipv6_database_unavailable" || m.geo.reason === "ipv6_deferred";
+              return (
+                <div
+                  key={m.ip}
+                  className="np-geo-context-card__endpoint-item"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "2px",
+                    padding: "6px 8px",
+                    background: "rgba(255, 255, 255, 0.03)",
+                    borderRadius: "4px",
+                    border: "1px solid rgba(255, 255, 255, 0.05)",
+                    cursor: onSelectEntity ? "pointer" : "default",
+                  }}
+                  onClick={() => {
+                    const sel = {
+                      kind: "endpoint" as const,
+                      entityId: makeHostEntityId(m.ip),
+                      ip: m.ip,
+                      host: m,
+                    };
+                    onSelectEntity?.(sel);
+                    sidebar?.setSelectedEntity(sel);
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontWeight: 600, fontSize: "0.75rem" }}>
+                      {m.hostnames[0]?.name || m.ip}
+                    </span>
+                    <span style={{ fontSize: "0.72rem", color: isDeferred ? "var(--np-text-dim)" : undefined }}>
+                      {humanBytes(m.bytes)}
+                    </span>
+                  </div>
+
+                  {m.hostnames[0]?.name && (
+                    <div style={{ fontSize: "0.68rem", color: "var(--np-text-dim)" }}>
+                      {m.ip} • {m.flows} flows
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap", marginTop: "2px" }}>
+                    <span
+                      style={{
+                        fontSize: "0.65rem",
+                        padding: "1px 4px",
+                        borderRadius: "3px",
+                        fontWeight: 600,
+                        background:
+                          m.geo.precision === "country"
+                            ? "rgba(47, 224, 214, 0.15)"
+                            : m.geo.precision === "network"
+                            ? "rgba(242, 182, 77, 0.15)"
+                            : "rgba(255, 255, 255, 0.08)",
+                        color:
+                          m.geo.precision === "country"
+                            ? "var(--np-accent, #2fe0d6)"
+                            : m.geo.precision === "network"
+                            ? "var(--np-warning, #f2b64d)"
+                            : "var(--np-text-dim)",
+                      }}
+                    >
+                      {m.geo.precision.toUpperCase()}
+                    </span>
+
+                    {m.asn.status === "resolved" && (
+                      <span style={{ fontSize: "0.68rem", color: "var(--np-text-dim)" }}>
+                        AS{m.asn.asn} ({m.asn.asOrg})
+                      </span>
+                    )}
+
+                    {m.geo.countryCode && (
+                      <span style={{ fontSize: "0.68rem", color: "var(--np-accent)" }}>
+                        {m.geo.countryCode}
+                      </span>
+                    )}
+                  </div>
+
+                  <div style={{ fontSize: "0.65rem", color: "var(--np-text-mute)", marginTop: "1px" }}>
+                    {m.geo.explanation}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 interface OtherResolvedCardProps {
   entity: Extract<SelectedEntity, { kind: "otherResolvedAggregate" }>;

@@ -35,6 +35,8 @@ describe("GeoContextCard Polymorphic Inspector", () => {
     expect(screen.getByText("AS13335")).toBeInTheDocument();
     expect(screen.getByText("Cloudflare, Inc.")).toBeInTheDocument();
     expect(screen.getByText("1.0 MB")).toBeInTheDocument();
+    expect(screen.getByText("anycast reference location")).toBeInTheDocument();
+    expect(screen.getByText(`Anycast PoP (${host.anycast.provider})`)).toBeInTheDocument();
   });
 
   it("renders country cluster details with member endpoints count and total volume", () => {

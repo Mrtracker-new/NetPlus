@@ -61,6 +61,5 @@ export function generateGraticulePaths(width = MAP_WIDTH, height = MAP_HEIGHT): 
 /**
  * Export Natural Earth 1:110m Sovereign Country Features
  */
-export const CONTINENT_PATHS = GEO_COUNTRY_FEATURES;
 export const COUNTRY_FEATURES = GEO_COUNTRY_FEATURES;
 export { type GeoCountryFeature };

@@ -169,7 +169,13 @@ export function ScreenContextCard() {
   const { selectedEntity, setSelectedEntity } = useSidebar();
 
   if (selectedEntity) {
-    return <GeoContextCard entity={selectedEntity} onClearSelection={() => setSelectedEntity(null)} />;
+    return (
+      <GeoContextCard
+        entity={selectedEntity}
+        onClearSelection={() => setSelectedEntity(null)}
+        onSelectEntity={setSelectedEntity}
+      />
+    );
   }
 
   const descriptor = SCREEN_CONTEXTS[screen] ?? FALLBACK_DESCRIPTOR;

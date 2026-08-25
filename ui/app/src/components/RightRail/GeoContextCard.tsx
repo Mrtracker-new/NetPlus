@@ -98,9 +98,26 @@ export const GeoContextCard = memo(function GeoContextCard({
               <li>
                 <span>Geographic Precision</span>
                 <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent-strong)" }}>
-                  {h.geo.locationLevel === "city" ? "City estimate" : "Country representation (centroid)"}
+                  {h.geo.precisionDescription ||
+                    ((h.geo as any).locationLevel === "city"
+                      ? "City estimate"
+                      : "Country representation (centroid)")}
                 </span>
               </li>
+              {h.anycast.isAnycast && (
+                <li>
+                  <span>Routing Type</span>
+                  <span
+                    className="np-rail-list__val"
+                    style={{
+                      fontSize: "0.72rem",
+                      color: "var(--np-accent)",
+                    }}
+                  >
+                    Anycast PoP ({h.anycast.provider})
+                  </span>
+                </li>
+              )}
             </>
           )}
           {h?.geo.status === "unresolved" && (

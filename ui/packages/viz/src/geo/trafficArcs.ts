@@ -51,9 +51,6 @@ export interface ArcPathModel {
   oy: number;
   dx: number;
   dy: number;
-  midX: number;
-  midY: number;
-  effectiveDx?: number;
 }
 
 export interface ArcBezierOptions {
@@ -523,25 +520,3 @@ export function getArcOpacity(freshness: TelemetryFreshness): number {
   }
 }
 
-/** Legacy quadratic bezier sample helper */
-export function sampleQuadraticBezier(
-  ox: number,
-  oy: number,
-  cx: number,
-  cy: number,
-  dx: number,
-  dy: number,
-  t: number
-): [number, number] {
-  const u = 1 - t;
-  const tt = t * t;
-  const uu = u * u;
-  const ut2 = 2 * u * t;
-
-  let x = uu * ox + ut2 * cx + tt * dx;
-  let y = uu * oy + ut2 * cy + tt * dy;
-
-  // Viewport clamp for legacy callers
-  x = ((x % 720) + 720) % 720;
-  return [x, y];
-}

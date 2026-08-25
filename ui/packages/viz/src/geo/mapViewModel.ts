@@ -356,13 +356,6 @@ export function deriveClusteredMapModel(
         oy: geometry.origin.y,
         dx: geometry.destination.x,
         dy: geometry.destination.y,
-        midX: firstSeg ? firstSeg.control.x : (ox + node.x) / 2,
-        midY: firstSeg ? firstSeg.control.y : (oy + node.y) / 2,
-        effectiveDx: geometry.crossesAntimeridian
-          ? geometry.crossingDirection === "west"
-            ? geometry.destination.x - 720
-            : geometry.destination.x + 720
-          : geometry.destination.x,
       });
     }
   }

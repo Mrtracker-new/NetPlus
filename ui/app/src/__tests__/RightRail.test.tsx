@@ -4,7 +4,10 @@ import "../i18n";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { App } from "../App";
 import { setMonitor, __resetForTest } from "../state/store";
-import { SCREEN_CONTEXTS } from "../components/RightRail/ScreenContextCard";
+import { SCREEN_CONTEXTS, ScreenContextCard } from "../components/RightRail/ScreenContextCard";
+import { SidebarProvider, useSidebar } from "../components/RightRail/RightRailContext";
+import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { enrichHost, makeHostEntityId } from "@netpulse/viz";
 
 afterEach(() => {
   cleanup();
@@ -175,5 +178,70 @@ describe("RightRail Context Sidebar", () => {
       expect(SCREEN_CONTEXTS[screenName].defaultTitle).toBeTruthy();
       expect(SCREEN_CONTEXTS[screenName].defaultSummary).toBeTruthy();
     }
+  });
+
+  it("allows drilling from selected endpoint to ASN context through ScreenContextCard wiring", () => {
+    const host = enrichHost(
+      {
+        label: "1.1.1.1",
+        bytes: 1048576,
+        flows: 14,
+        hostnames: [{ name: "one.one.one.one", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+
+    function TestHarness() {
+      const { setSelectedEntity } = useSidebar();
+      return (
+        <div>
+          <button
+            type="button"
+            data-testid="select-endpoint-btn"
+            onClick={() =>
+              setSelectedEntity({
+                kind: "endpoint",
+                entityId: makeHostEntityId("1.1.1.1"),
+                ip: "1.1.1.1",
+                host,
+              })
+            }
+          >
+            Select Endpoint
+          </button>
+          <ScreenContextCard />
+        </div>
+      );
+    }
+
+    render(
+      <EvidenceNavigationProvider>
+        <SidebarProvider>
+          <TestHarness />
+        </SidebarProvider>
+      </EvidenceNavigationProvider>
+    );
+
+    // Initial state: default descriptor
+    expect(
+      screen.getByText("Real-time observation of active network traffic, hosts, and protocol feeds.")
+    ).toBeInTheDocument();
+
+    // Select endpoint
+    fireEvent.click(screen.getByTestId("select-endpoint-btn"));
+
+    // Endpoint context rendered with ASN button
+    expect(screen.getByText("one.one.one.one")).toBeInTheDocument();
+    const asnButton = screen.getByTitle("Inspect Autonomous System AS13335");
+    expect(asnButton).toBeInTheDocument();
+
+    // Click ASN button inside ScreenContextCard
+    fireEvent.click(asnButton);
+
+    // Parent selectedEntity state is updated to ASN, and AsnCard is rendered
+    expect(screen.getByText("Autonomous System (ASN)")).toBeInTheDocument();
+    expect(screen.getByText("AS13335 (Cloudflare, Inc.)")).toBeInTheDocument();
+    expect(screen.getByText("Traffic routed through Autonomous System AS13335 (Cloudflare, Inc.).")).toBeInTheDocument();
   });
 });

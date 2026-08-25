@@ -7,6 +7,7 @@ import {
   angularDistanceLng,
   toroidalDistanceX,
   type EnrichedHost,
+  type GeoResolution,
 } from "@netpulse/viz";
 import { deriveMapViewModel, type MapViewModelInput, type MapViewModel } from "@netpulse/viz";
 import type { BreakdownRow } from "@netpulse/contract";
@@ -173,7 +174,7 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
           },
           geo: {
             status: "resolved",
-            precision: "country" as any,
+            precision: "country",
             distribution: "unicast",
             mapEligible: true,
             latitude: -16.0,
@@ -184,12 +185,12 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
             accuracyRadiusKm: null,
             confidence: "medium",
             locationMeaning: "countryOnly",
-            locationLevel: "country" as any,
+            locationLevel: "country",
             precisionDescription: "country-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
             explanation: "Benchmark test host",
-          },
+          } as unknown as GeoResolution,
           asn: {
             status: "resolved",
             asn: 13335,
@@ -233,7 +234,7 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
           },
           geo: {
             status: "resolved",
-            precision: "country" as any,
+            precision: "country",
             distribution: "unicast",
             mapEligible: true,
             latitude: -16.0,
@@ -244,12 +245,12 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
             accuracyRadiusKm: null,
             confidence: "medium",
             locationMeaning: "countryOnly",
-            locationLevel: "country" as any,
+            locationLevel: "country",
             precisionDescription: "country-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
             explanation: "Benchmark test host",
-          },
+          } as unknown as GeoResolution,
           asn: {
             status: "resolved",
             asn: 13335,

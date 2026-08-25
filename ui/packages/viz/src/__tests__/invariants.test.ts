@@ -16,6 +16,7 @@ import {
   makeHostEntityId,
   isNodeSelected,
   type EnrichedHost,
+  type GeoResolution,
 } from "../geo/geoTypes";
 import { clearGeoCaches } from "../geo/geoDatabase";
 import { calculateArcBezier, sampleArcInto, solveQuadraticBezierSeamCrossing } from "../geo/trafficArcs";
@@ -961,7 +962,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const targetHost = enrichedHosts[199]!;
       const targetEntityId = `entity-host-${targetHost.ip}`;
 
-      const snapshot: HostEnrichmentSnapshot = {
+      const snapshot = {
         captureSessionId: "s",
         snapshotSequence: 1,
         enrichedHosts,
@@ -979,7 +980,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           coveragePercent: 100,
           resolvedBytesPercent: 100,
         },
-      };
+      } as unknown as HostEnrichmentSnapshot;
 
       const model = deriveClusteredMapModel(
         snapshot,

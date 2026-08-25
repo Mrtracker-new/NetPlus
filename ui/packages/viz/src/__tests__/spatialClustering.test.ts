@@ -30,10 +30,12 @@ import {
   type GeoResolution,
   type SelectedEntity,
 } from "../geo/geoTypes";
-import { deriveMapViewModel, deriveClusteredMapModel } from "../geo/mapViewModel";
+import { deriveMapViewModel, deriveClusteredMapModel, type HostEnrichmentSnapshot } from "../geo/mapViewModel";
 import { enrichHost, clearGeoCaches } from "../geo/geoDatabase";
 import { projectGeo, MAP_WIDTH } from "../geo/worldGeometry";
 import type { BreakdownRow } from "@netpulse/contract";
+
+const asSnapshot = (snap: unknown): HostEnrichmentSnapshot => snap as HostEnrichmentSnapshot;
 
 describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
   describe("Toroidal Geometry & Normalization Helpers", () => {
@@ -123,6 +125,9 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
         geo: {
           status: "resolved",
+          precision: "city",
+          distribution: "unicast",
+          mapEligible: true,
           latitude: lat,
           longitude: lng,
           country: "Test",
@@ -135,6 +140,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           precisionDescription: "city-level estimate",
           source: "local_database",
           geoDatabaseVersion: "test-v1",
+          explanation: "Resolved test host",
         },
         asn: {
           status: "unresolved",
@@ -408,7 +414,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
         geo: {
           status: "resolved",
-          precision: "city",
+          precision: "country",
           distribution: "unicast",
           mapEligible: true,
           latitude: lat,
@@ -424,7 +430,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           source: "local_database",
           geoDatabaseVersion: "test-v1",
           explanation: "Test mock host",
-        },
+        } as unknown as GeoResolution,
         asn: {
           status: "resolved",
           asn: 13335,
@@ -784,7 +790,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           ip: "10.0.0.1",
           row: { label: "10.0.0.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
           classification: { ip: "10.0.0.1", normalizedIp: "10.0.0.1", version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public", description: "" },
-          geo: { status: "resolved", latitude: 50.0, longitude: 10.0, country: "DE", countryCode: "DE", city: "Frankfurt", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1" },
+          geo: { status: "resolved", precision: "city", distribution: "unicast", mapEligible: true, latitude: 50.0, longitude: 10.0, country: "DE", countryCode: "DE", city: "Frankfurt", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1", explanation: "Test" },
           asn: { status: "unresolved", reason: "no_match", source: "none", asnDatabaseVersion: "v1" },
           anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
           bytes: 1000, flows: 1, deltaBytes: 0, hostnames: [], evidence: [], freshness: "active", lastSeenTs: 1_700_000_000_000,
@@ -1048,7 +1054,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       lng: number,
       bytes = 1000,
       flows = 1,
-      geoProps: Partial<EnrichedHost["geo"]> = {}
+      geoProps: Record<string, any> = {}
     ): EnrichedHost {
       return {
         ip,
@@ -1335,7 +1341,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       };
 
       // Derive initial view with active cityAggregate selection
-      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshot1), null, {
         selectedEntityId: "entity-city-de-frankfurt",
       });
 
@@ -1363,7 +1369,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm2 = deriveClusteredMapModel(snapshot2, vm1, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshot2), vm1, {
         selectedEntityId: "entity-city-de-frankfurt",
       });
 
@@ -1402,7 +1408,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshot1), null, {
         selectedEntityId: "entity-city-de-frankfurt",
       });
       expect(vm1.activeSelection?.status).toBe("active");
@@ -1430,7 +1436,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       };
 
       // Select Frankfurt tombstone
-      const vm2 = deriveClusteredMapModel(snapshot2, vm1, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshot2), vm1, {
         selectedEntityId: "entity-city-de-frankfurt",
       });
       expect(vm2.activeSelection?.status).toBe("tombstone");
@@ -1438,7 +1444,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       expect(vm2.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(9000);
 
       // Select Tokyo host 2.2.2.1 tombstone
-      const vm3 = deriveClusteredMapModel(snapshot2, vm2, {
+      const vm3 = deriveClusteredMapModel(asSnapshot(snapshot2), vm2, {
         selectedEntityId: "entity-host-2.2.2.1",
       });
       expect(vm3.activeSelection?.status).toBe("tombstone");
@@ -1446,7 +1452,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       expect(vm3.activeSelection?.tombstoneDetails?.lastObservedBytes).toBe(7000);
 
       // Select Frankfurt tombstone again
-      const vm4 = deriveClusteredMapModel(snapshot2, vm3, {
+      const vm4 = deriveClusteredMapModel(asSnapshot(snapshot2), vm3, {
         selectedEntityId: "entity-city-de-frankfurt",
       });
       expect(vm4.activeSelection?.status).toBe("tombstone");
@@ -1481,13 +1487,13 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm1 = deriveClusteredMapModel(snapshot1, null);
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshot1), null);
       const clusterNode = vm1.aggregateNodes[0]!;
       expect(clusterNode.nodeKind).toBe("cluster");
       const clusterEntityId = clusterNode.entityId;
 
       // Select cluster while live
-      const vm1Sel = deriveClusteredMapModel(snapshot1, null, {
+      const vm1Sel = deriveClusteredMapModel(asSnapshot(snapshot1), null, {
         selectedEntityId: clusterEntityId,
       });
       expect(vm1Sel.activeSelection?.status).toBe("active");
@@ -1515,7 +1521,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm2 = deriveClusteredMapModel(snapshot2, vm1Sel, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshot2), vm1Sel, {
         selectedEntityId: clusterEntityId,
       });
       expect(vm2.activeSelection?.status).toBe("tombstone");
@@ -1554,13 +1560,13 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       };
 
       // Small cluster radius: 2 discrete nodes
-      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshot1), null, {
         clusterRadiusPx: 2,
       });
       expect(vm1.aggregateNodes.length).toBe(2);
 
       // Large cluster radius: merged into 1 cluster
-      const vm2 = deriveClusteredMapModel(snapshot1, vm1, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshot1), vm1, {
         clusterRadiusPx: 100,
       });
       expect(vm2.aggregateNodes.length).toBe(1);
@@ -1595,14 +1601,14 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       };
 
       // Frame 1: London rendered as cityAggregate
-      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshot1), null, {
         selectedEntityId: "entity-city-gb-london",
       });
       expect(vm1.activeSelection?.status).toBe("active");
       expect(vm1.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
 
       // Frame 2: Budget restricted to 1 node -> rolled into Other Resolved
-      const vm2 = deriveClusteredMapModel(snapshot1, vm1, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshot1), vm1, {
         maxVisibleNodes: 1,
         selectedEntityId: "entity-city-gb-london",
       });
@@ -1643,7 +1649,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm1 = deriveClusteredMapModel(snapshotLive, null, {
+      const vm1 = deriveClusteredMapModel(asSnapshot(snapshotLive), null, {
         selectedEntityId: "entity-city-gb-london",
       });
       expect(vm1.activeSelection?.status).toBe("active");
@@ -1671,7 +1677,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm2 = deriveClusteredMapModel(snapshotDead, vm1, {
+      const vm2 = deriveClusteredMapModel(asSnapshot(snapshotDead), vm1, {
         selectedEntityId: "entity-city-gb-london",
       });
       expect(vm2.activeSelection?.status).toBe("tombstone");
@@ -1701,7 +1707,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm3 = deriveClusteredMapModel(snapshotResurrected, vm2, {
+      const vm3 = deriveClusteredMapModel(asSnapshot(snapshotResurrected), vm2, {
         selectedEntityId: "entity-city-gb-london",
       });
       expect(vm3.activeSelection?.status).toBe("active");
@@ -1805,7 +1811,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
 
       for (const node of nodes) {
         if (node.nodeKind !== "endpoint") {
-          const vm = deriveClusteredMapModel(snapshot, null, {
+          const vm = deriveClusteredMapModel(asSnapshot(snapshot), null, {
             selectedEntityId: node.entityId,
             maxVisibleNodes: 8,
           });
@@ -1936,7 +1942,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
       };
 
-      const vm = deriveClusteredMapModel(snapshot, null, {
+      const vm = deriveClusteredMapModel(asSnapshot(snapshot), null, {
         selectedEntityId: node.entityId,
       });
 

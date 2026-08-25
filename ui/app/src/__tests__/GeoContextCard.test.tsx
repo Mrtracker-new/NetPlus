@@ -56,18 +56,225 @@ describe("GeoContextCard Polymorphic Inspector", () => {
         y: 75.26,
         totalBytes: 5242880,
         totalFlows: 22,
-        endpointIps: ["193.0.0.1", "193.0.0.2"],
+        sampleEndpointIps: ["193.0.0.1", "193.0.0.2", "193.0.0.3"],
+        endpointIps: ["193.0.0.1", "193.0.0.2", "193.0.0.3"],
         asns: [3333],
         freshness: "active",
         deltaBytes: 5242880,
+        memberCount: 3,
       },
       memberHosts: [],
     };
 
     render(<GeoContextCard entity={entity} />);
     expect(screen.getByText(/Netherlands \(NL\)/i)).toBeInTheDocument();
+    expect(screen.getByText("3 hosts")).toBeInTheDocument();
     expect(screen.getByText("5.0 MB")).toBeInTheDocument();
     expect(screen.getByText("AS3333")).toBeInTheDocument();
+  });
+
+  it("renders sampled cluster inspector with exact 127 endpoints and bounded 50 member sample note", () => {
+    const sampleHosts: EnrichedHost[] = [];
+    for (let i = 0; i < 50; i++) {
+      sampleHosts.push(
+        enrichHost(
+          {
+            label: `198.51.100.${i + 1}`,
+            bytes: (50 - i) * 1000,
+            flows: 1,
+            hostnames: [{ name: `sampled-host-${i}.net`, source: "dns" }],
+            evidence: [],
+          },
+          0
+        )
+      );
+    }
+
+    const sampleIps = sampleHosts.map((h) => h.ip);
+
+    const entity: SelectedEntity = {
+      kind: "cluster",
+      entityId: "entity-cluster-geocell-100_200",
+      clusterId: "cluster-node-1",
+      geoCellId: "geocell-100_200",
+      label: "Spatial Cluster (127)",
+      node: {
+        id: "cluster-node-1",
+        entityId: "entity-cluster-geocell-100_200",
+        geoCellId: "geocell-100_200",
+        nodeKind: "cluster",
+        label: "Spatial Cluster (127)",
+        countryCode: null,
+        latitude: 10.0,
+        longitude: 20.0,
+        x: 200,
+        y: 150,
+        totalBytes: 500_000,
+        totalFlows: 127,
+        sampleEndpointIps: sampleIps,
+        endpointIps: sampleIps,
+        asns: [13335],
+        freshness: "active",
+        deltaBytes: 50_000,
+        memberCount: 127,
+      },
+      memberHosts: sampleHosts,
+      memberCount: 127,
+      sampleEndpointIps: sampleIps,
+      isSampled: true,
+    };
+
+    render(<GeoContextCard entity={entity} />);
+    expect(screen.getByText("127 hosts")).toBeInTheDocument();
+    expect(screen.getByText("SAMPLE ENDPOINTS (50 OF 127):")).toBeInTheDocument();
+    expect(screen.getByText("Showing a sample of 50 endpoints")).toBeInTheDocument();
+    expect(
+      screen.getByText("Displaying a representative sample of 50 out of 127 total endpoints.")
+    ).toBeInTheDocument();
+  });
+
+  it("renders sampled cluster inspector with 127 total endpoints when memberHosts is missing records (48 of 127)", () => {
+    const sampleHosts: EnrichedHost[] = [];
+    for (let i = 0; i < 48; i++) {
+      sampleHosts.push(
+        enrichHost(
+          {
+            label: `198.51.100.${i + 1}`,
+            bytes: (48 - i) * 1000,
+            flows: 1,
+            hostnames: [{ name: `sampled-host-${i}.net`, source: "dns" }],
+            evidence: [],
+          },
+          0
+        )
+      );
+    }
+
+    const sampleIps = Array.from({ length: 50 }, (_, i) => `198.51.100.${i + 1}`);
+
+    const entity: SelectedEntity = {
+      kind: "cluster",
+      entityId: "entity-cluster-geocell-100_200",
+      clusterId: "cluster-node-1",
+      geoCellId: "geocell-100_200",
+      label: "Spatial Cluster (127)",
+      node: {
+        id: "cluster-node-1",
+        entityId: "entity-cluster-geocell-100_200",
+        geoCellId: "geocell-100_200",
+        nodeKind: "cluster",
+        label: "Spatial Cluster (127)",
+        countryCode: null,
+        latitude: 10.0,
+        longitude: 20.0,
+        x: 200,
+        y: 150,
+        totalBytes: 500_000,
+        totalFlows: 127,
+        sampleEndpointIps: sampleIps,
+        endpointIps: sampleIps,
+        asns: [13335],
+        freshness: "active",
+        deltaBytes: 50_000,
+        memberCount: 127,
+      },
+      memberHosts: sampleHosts, // 48 enriched records
+      memberCount: 127,
+      sampleEndpointIps: sampleIps, // 50 sample IPs
+      isSampled: true,
+    };
+
+    render(<GeoContextCard entity={entity} />);
+    expect(screen.getByText("127 hosts")).toBeInTheDocument();
+    expect(screen.getByText("SAMPLE ENDPOINTS (48 OF 127):")).toBeInTheDocument();
+    expect(screen.getByText("Showing a sample of 48 endpoints")).toBeInTheDocument();
+    expect(
+      screen.getByText("Displaying a representative sample of 48 out of 127 total endpoints.")
+    ).toBeInTheDocument();
+  });
+
+  it("verifies count authority fallback hierarchy (node.memberCount -> entity.memberCount -> memberHosts.length)", () => {
+    const sampleHosts: EnrichedHost[] = [];
+    for (let i = 0; i < 50; i++) {
+      sampleHosts.push(
+        enrichHost(
+          {
+            label: `198.51.100.${i + 1}`,
+            bytes: 1000,
+            flows: 1,
+            hostnames: [],
+            evidence: [],
+          },
+          0
+        )
+      );
+    }
+
+    // 1. node.memberCount = 127 takes precedence
+    const { unmount: unmount1 } = render(
+      <GeoContextCard
+        entity={{
+          kind: "cluster",
+          entityId: "entity-cluster-1",
+          clusterId: "c-1",
+          label: "Cluster A",
+          node: {
+            id: "c-1",
+            entityId: "entity-cluster-1",
+            geoCellId: "geo-1",
+            nodeKind: "cluster",
+            label: "Cluster A",
+            countryCode: null,
+            latitude: 0,
+            longitude: 0,
+            x: 0,
+            y: 0,
+            totalBytes: 1000,
+            totalFlows: 1,
+            sampleEndpointIps: sampleHosts.map((h) => h.ip),
+            endpointIps: sampleHosts.map((h) => h.ip),
+            asns: [],
+            freshness: "active",
+            deltaBytes: 0,
+            memberCount: 127,
+          },
+          memberHosts: sampleHosts,
+        }}
+      />
+    );
+    expect(screen.getByText("127 hosts")).toBeInTheDocument();
+    unmount1();
+
+    // 2. entity.memberCount = 127 when node is undefined
+    const { unmount: unmount2 } = render(
+      <GeoContextCard
+        entity={{
+          kind: "cluster",
+          entityId: "entity-cluster-2",
+          clusterId: "c-2",
+          label: "Cluster B",
+          memberCount: 127,
+          memberHosts: sampleHosts,
+        }}
+      />
+    );
+    expect(screen.getByText("127 hosts")).toBeInTheDocument();
+    unmount2();
+
+    // 3. Fallback to memberHosts.length = 50 when both memberCounts are undefined
+    render(
+      <GeoContextCard
+        entity={{
+          kind: "cluster",
+          entityId: "entity-cluster-3",
+          clusterId: "c-3",
+          label: "Cluster C",
+          memberHosts: sampleHosts,
+        }}
+      />
+    );
+    expect(screen.getByText("50 hosts")).toBeInTheDocument();
+    expect(screen.getByText("CLUSTER ENDPOINTS (50):")).toBeInTheDocument();
   });
 
   it("renders unresolved public group information with honesty notice", () => {

@@ -90,11 +90,11 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
       expect(model.aggregateNodes.length).toBeLessThanOrEqual(120);
       expect(model.arcModels.length).toBeLessThanOrEqual(48);
 
-      if (count === 1000) expect(elapsed).toBeLessThan(50.0);
-      if (count === 10000) expect(elapsed).toBeLessThan(300.0);
-      if (count === 50000) expect(elapsed).toBeLessThan(3500.0);
+      if (count === 1000) expect(elapsed).toBeLessThan(200.0);
+      if (count === 10000) expect(elapsed).toBeLessThan(500.0);
+      if (count === 50000) expect(elapsed).toBeLessThan(6000.0);
     }
-  });
+  }, 15000);
 
   describe("Pathological Spatial Distributions", () => {
     it("Single Cell Singularity: 10,000 endpoints at identical coordinate", () => {

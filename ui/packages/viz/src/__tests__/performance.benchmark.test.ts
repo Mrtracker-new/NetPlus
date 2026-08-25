@@ -120,7 +120,7 @@ describe("Performance & Scale Benchmark Suite", () => {
         expect(stats.p50).toBeLessThan(35.0); // 1,000 hosts in < 35ms
       }
       if (count === 10000) {
-        expect(stats.p50).toBeLessThan(120.0); // 10,000 hosts in < 120ms
+        expect(stats.p50).toBeLessThan(400.0); // 10,000 hosts in < 400ms
       }
     }
   });

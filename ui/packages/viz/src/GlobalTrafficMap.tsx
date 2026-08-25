@@ -406,8 +406,10 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
   // Node selection handler
   const handleNodeClick = useCallback(
     (node: GeoAggregateNode) => {
+      const sampleIps = node.sampleEndpointIps;
+
       if (node.nodeKind === "endpoint") {
-        const host = hostsById.get(node.endpointIps[0] || "");
+        const host = hostsById.get(sampleIps[0] || "");
         if (host) {
           handleSetSelection({
             kind: "endpoint",
@@ -419,8 +421,13 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         }
       }
 
+      const members = sampleIps
+        .map((ip) => hostsById.get(ip))
+        .filter((h): h is EnrichedHost => Boolean(h));
+      const memberCount = node.memberCount;
+      const isSampled = members.length < memberCount;
+
       if (node.nodeKind === "cityAggregate") {
-        const members = node.endpointIps.map((ip) => hostsById.get(ip)!).filter(Boolean);
         handleSetSelection({
           kind: "cityAggregate",
           cityName: node.label.replace(/\s*\(\d+\)$/, ""),
@@ -428,12 +435,14 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           entityId: node.entityId as CityAggregateEntityId,
           node,
           memberHosts: members,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
         });
         return;
       }
 
       if (node.nodeKind === "countryAggregate") {
-        const members = node.endpointIps.map((ip) => hostsById.get(ip)!).filter(Boolean);
         handleSetSelection({
           kind: "countryAggregate",
           countryCode: node.countryCode || "XX",
@@ -441,12 +450,14 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           entityId: node.entityId as CountryAggregateEntityId,
           node,
           memberHosts: members,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
         });
         return;
       }
 
       if (node.nodeKind === "cluster") {
-        const members = node.endpointIps.map((ip) => hostsById.get(ip)!).filter(Boolean);
         handleSetSelection({
           kind: "cluster",
           clusterId: node.id,
@@ -455,18 +466,23 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           label: node.label,
           node,
           memberHosts: members,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
         });
         return;
       }
 
       if (node.nodeKind === "otherResolvedAggregate") {
-        const members = node.endpointIps.map((ip) => hostsById.get(ip)!).filter(Boolean);
         handleSetSelection({
           kind: "otherResolvedAggregate",
           title: node.label,
           entityId: OTHER_RESOLVED_ENTITY_ID,
           node,
           memberHosts: members,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
         });
         return;
       }

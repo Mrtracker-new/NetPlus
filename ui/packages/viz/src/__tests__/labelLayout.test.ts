@@ -19,10 +19,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
         y: 104,
         totalBytes: 5_000_000,
         totalFlows: 20,
+        sampleEndpointIps: ["1.1.1.1"],
         endpointIps: ["1.1.1.1"],
         asns: [13335],
         freshness: "active",
         deltaBytes: 50_000,
+        memberCount: 1,
       },
       {
         id: "node-2",
@@ -37,10 +39,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
         y: 105,
         totalBytes: 3_000_000,
         totalFlows: 15,
+        sampleEndpointIps: ["8.8.8.8"],
         endpointIps: ["8.8.8.8"],
         asns: [15169],
         freshness: "active",
         deltaBytes: 30_000,
+        memberCount: 1,
       },
       {
         id: "node-3",
@@ -55,10 +59,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
         y: 106,
         totalBytes: 1_000_000,
         totalFlows: 5,
+        sampleEndpointIps: ["9.9.9.9"],
         endpointIps: ["9.9.9.9"],
         asns: [19281],
         freshness: "recent",
         deltaBytes: 0,
+        memberCount: 1,
       },
     ];
 
@@ -98,10 +104,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
         y: 100,
         totalBytes: 1_000_000,
         totalFlows: 10,
+        sampleEndpointIps: ["1.1.1.1"],
         endpointIps: ["1.1.1.1"],
         asns: [13335],
         freshness: "recent",
         deltaBytes: 0,
+        memberCount: 1,
       },
       {
         id: "node-selected",
@@ -116,10 +124,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
         y: 105,
         totalBytes: 100,
         totalFlows: 1,
+        sampleEndpointIps: ["8.8.8.8"],
         endpointIps: ["8.8.8.8"],
         asns: [15169],
         freshness: "stale",
         deltaBytes: 0,
+        memberCount: 1,
       },
     ];
 
@@ -156,10 +166,12 @@ describe("Deterministic Collision-Free Label Layout", () => {
       y: 30 + Math.floor(i / 5) * 50,
       totalBytes: (30 - i) * 10_000,
       totalFlows: 5,
+      sampleEndpointIps: [`10.0.0.${i}`],
       endpointIps: [`10.0.0.${i}`],
       asns: [13335],
       freshness: "active",
       deltaBytes: 1000,
+      memberCount: 1,
     }));
 
     // With maxLabels = 10 and high zoom scale (e.g. 8.0)

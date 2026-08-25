@@ -310,11 +310,24 @@ export interface GeoAggregateNode {
   y: number;
   totalBytes: number;
   totalFlows: number;
+  /**
+   * Bounded representative endpoint sample (at most MAX_CLUSTER_SAMPLE_IPS = 50 items).
+   * Never interpreted as complete membership when memberCount > sampleEndpointIps.length.
+   */
+  sampleEndpointIps: string[];
+  /**
+   * @deprecated Use sampleEndpointIps.
+   * Retained for backward compatibility; contains the same bounded sample array.
+   */
   endpointIps: string[];
   asns: number[];
   freshness: TelemetryFreshness;
   deltaBytes: number;
-  memberCount?: number;
+  /**
+   * Authoritative total count of endpoints represented by this node.
+   * Never derive this from endpointIps; endpointIps is bounded inspection data.
+   */
+  memberCount: number;
   locationLevel?: "country" | "city" | "unresolved" | "multiLocation" | "aggregate";
   precisionDescription?: string;
 }
@@ -408,6 +421,19 @@ export type SelectedCityAggregate = {
   countryCode?: string;
   node?: GeoAggregateNode;
   memberHosts: EnrichedHost[];
+  /**
+   * Exact endpoint cardinality represented by the selected node.
+   * Never inferred from memberHosts.length when authoritative node data exists.
+   */
+  memberCount?: number;
+  /**
+   * Bounded endpoint inspection sample associated with the selection.
+   */
+  sampleEndpointIps?: string[];
+  /**
+   * Derived presentation state: memberHosts.length < memberCount.
+   */
+  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 
@@ -418,6 +444,19 @@ export type SelectedCountryAggregate = {
   countryName: string;
   node?: GeoAggregateNode;
   memberHosts: EnrichedHost[];
+  /**
+   * Exact endpoint cardinality represented by the selected node.
+   * Never inferred from memberHosts.length when authoritative node data exists.
+   */
+  memberCount?: number;
+  /**
+   * Bounded endpoint inspection sample associated with the selection.
+   */
+  sampleEndpointIps?: string[];
+  /**
+   * Derived presentation state: memberHosts.length < memberCount.
+   */
+  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 
@@ -429,6 +468,19 @@ export type SelectedCluster = {
   label: string;
   node?: GeoAggregateNode;
   memberHosts: EnrichedHost[];
+  /**
+   * Exact endpoint cardinality represented by the selected node.
+   * Never inferred from memberHosts.length when authoritative node data exists.
+   */
+  memberCount?: number;
+  /**
+   * Bounded endpoint inspection sample associated with the selection.
+   */
+  sampleEndpointIps?: string[];
+  /**
+   * Derived presentation state: memberHosts.length < memberCount.
+   */
+  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 
@@ -438,6 +490,19 @@ export type SelectedOtherResolvedAggregate = {
   title: string;
   node?: GeoAggregateNode;
   memberHosts: EnrichedHost[];
+  /**
+   * Exact endpoint cardinality represented by the selected node.
+   * Never inferred from memberHosts.length when authoritative node data exists.
+   */
+  memberCount?: number;
+  /**
+   * Bounded endpoint inspection sample associated with the selection.
+   */
+  sampleEndpointIps?: string[];
+  /**
+   * Derived presentation state: memberHosts.length < memberCount.
+   */
+  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 
@@ -474,6 +539,19 @@ export type SelectedOtherResolvedGroup = {
   entityId?: string;
   node?: GeoAggregateNode;
   memberHosts: EnrichedHost[];
+  /**
+   * Exact endpoint cardinality represented by the selected node.
+   * Never inferred from memberHosts.length when authoritative node data exists.
+   */
+  memberCount?: number;
+  /**
+   * Bounded endpoint inspection sample associated with the selection.
+   */
+  sampleEndpointIps?: string[];
+  /**
+   * Derived presentation state: memberHosts.length < memberCount.
+   */
+  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 

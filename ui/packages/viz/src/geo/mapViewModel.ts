@@ -395,6 +395,7 @@ export function createAggregateTombstone(
     lastObservedFlows: node.totalFlows,
   };
   const baseLabel = node.label.replace(/\s*\(\d+\)$/, "");
+  const sampleIps = node.sampleEndpointIps;
   let tombstoneEntity: SelectedEntity;
 
   if (node.nodeKind === "cityAggregate") {
@@ -404,6 +405,10 @@ export function createAggregateTombstone(
       cityName: baseLabel,
       countryCode: node.countryCode || undefined,
       memberHosts: [],
+      memberCount: node.memberCount,
+      sampleEndpointIps: sampleIps,
+      isSampled: node.memberCount > 0,
+      node,
       tombstone,
     };
   } else if (node.nodeKind === "countryAggregate") {
@@ -413,6 +418,10 @@ export function createAggregateTombstone(
       countryCode: node.countryCode || "XX",
       countryName: baseLabel,
       memberHosts: [],
+      memberCount: node.memberCount,
+      sampleEndpointIps: sampleIps,
+      isSampled: node.memberCount > 0,
+      node,
       tombstone,
     };
   } else if (node.nodeKind === "otherResolvedAggregate") {
@@ -421,6 +430,10 @@ export function createAggregateTombstone(
       entityId: OTHER_RESOLVED_ENTITY_ID,
       title: node.label,
       memberHosts: [],
+      memberCount: node.memberCount,
+      sampleEndpointIps: sampleIps,
+      isSampled: node.memberCount > 0,
+      node,
       tombstone,
     };
   } else if (node.nodeKind === "cluster") {
@@ -431,11 +444,15 @@ export function createAggregateTombstone(
       clusterId: node.id,
       label: node.label,
       memberHosts: [],
+      memberCount: node.memberCount,
+      sampleEndpointIps: sampleIps,
+      isSampled: node.memberCount > 0,
+      node,
       tombstone,
     };
   } else {
     // endpoint nodeKind
-    const ip = node.endpointIps[0] || "";
+    const ip = sampleIps[0] || node.endpointIps[0] || "";
     tombstoneEntity = {
       kind: "endpoint",
       entityId: makeHostEntityId(ip),
@@ -614,12 +631,15 @@ export function resolveLiveAggregateSelection(
 
   if (!matchingNode) return null;
 
-  const memberHosts = matchingNode.endpointIps
+  const sampleIps = matchingNode.sampleEndpointIps;
+  const memberHosts = sampleIps
     .map((ip) => hostsById.get(ip))
     .filter((h): h is EnrichedHost => Boolean(h));
+  const memberCount = matchingNode.memberCount;
+  const isSampled = memberHosts.length < memberCount;
 
   if (matchingNode.nodeKind === "endpoint") {
-    const ip = matchingNode.endpointIps[0] || "";
+    const ip = sampleIps[0] || "";
     const host = hostsById.get(ip);
     return {
       entityId: matchingNode.entityId,
@@ -650,6 +670,9 @@ export function resolveLiveAggregateSelection(
         entityId: matchingNode.entityId as CityAggregateEntityId,
         node: matchingNode,
         memberHosts,
+        memberCount,
+        sampleEndpointIps: sampleIps,
+        isSampled,
       },
     };
   }
@@ -668,6 +691,9 @@ export function resolveLiveAggregateSelection(
         entityId: matchingNode.entityId as CountryAggregateEntityId,
         node: matchingNode,
         memberHosts,
+        memberCount,
+        sampleEndpointIps: sampleIps,
+        isSampled,
       },
     };
   }
@@ -685,6 +711,9 @@ export function resolveLiveAggregateSelection(
         entityId: OTHER_RESOLVED_ENTITY_ID,
         node: matchingNode,
         memberHosts,
+        memberCount,
+        sampleEndpointIps: sampleIps,
+        isSampled,
       },
     };
   }
@@ -703,6 +732,9 @@ export function resolveLiveAggregateSelection(
       label: matchingNode.label,
       node: matchingNode,
       memberHosts,
+      memberCount,
+      sampleEndpointIps: sampleIps,
+      isSampled,
     },
   };
 }

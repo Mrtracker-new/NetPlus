@@ -116,6 +116,9 @@ export function computeGeoCellId(lat: number, lng: number): string {
   return `geocell-${qLat}_${qLng}`;
 }
 
+/** Maximum number of sample endpoint IPs stored per aggregate node for inspection */
+export const MAX_CLUSTER_SAMPLE_IPS = 50;
+
 export interface ClusterAccumulator {
   geoCellId: string;
   count: number;
@@ -272,6 +275,7 @@ function mapClusterToNode(
           : first.geo.country
         : "";
     const subLabel = primaryName ? `${first.ip} • ${locationPart}` : locationPart;
+    const sampleEndpointIps = [first.ip];
 
     return {
       id: makeEndpointRenderNodeId(first.ip),
@@ -287,7 +291,8 @@ function mapClusterToNode(
       y,
       totalBytes: c.totalBytes,
       totalFlows: c.totalFlows,
-      endpointIps: [first.ip],
+      sampleEndpointIps,
+      endpointIps: sampleEndpointIps,
       asns,
       freshness,
       deltaBytes: c.deltaBytes,
@@ -301,6 +306,7 @@ function mapClusterToNode(
   const hasCountry = c.normalizedCountryCodes.size === 1 && Array.from(c.normalizedCountryCodes)[0] !== "";
   const countryCode = hasCountry ? Array.from(c.normalizedCountryCodes)[0]!.toUpperCase() : null;
   const countryName = countryCode ? getCanonicalCountryName(countryCode, c.firstResolvedCountryName || "Country") : "Region";
+  const sampleEndpointIps = [...c.endpointIps];
 
   // 1. City Aggregate
   if (
@@ -328,7 +334,8 @@ function mapClusterToNode(
       y,
       totalBytes: c.totalBytes,
       totalFlows: c.totalFlows,
-      endpointIps: [...c.endpointIps],
+      sampleEndpointIps,
+      endpointIps: sampleEndpointIps,
       asns,
       freshness,
       deltaBytes: c.deltaBytes,
@@ -357,7 +364,8 @@ function mapClusterToNode(
       y,
       totalBytes: c.totalBytes,
       totalFlows: c.totalFlows,
-      endpointIps: [...c.endpointIps],
+      sampleEndpointIps,
+      endpointIps: sampleEndpointIps,
       asns,
       freshness,
       deltaBytes: c.deltaBytes,
@@ -389,7 +397,8 @@ function mapClusterToNode(
     y,
     totalBytes: c.totalBytes,
     totalFlows: c.totalFlows,
-    endpointIps: [...c.endpointIps],
+    sampleEndpointIps,
+    endpointIps: sampleEndpointIps,
     asns,
     freshness,
     deltaBytes: c.deltaBytes,
@@ -412,7 +421,8 @@ function createOtherResolvedAggregate(
   let anyActive = false;
   let anyRecent = false;
 
-  const endpointIpSet = new Set<string>();
+  const sampleEndpointIps: string[] = [];
+  const sampleIpSet = new Set<string>();
   const asnSet = new Set<number>();
   const geoCellSet = new Set<string>();
   const countryCodeSet = new Set<string>();
@@ -431,7 +441,10 @@ function createOtherResolvedAggregate(
     if (c.anyRecent) anyRecent = true;
 
     for (const ip of c.endpointIps) {
-      endpointIpSet.add(ip);
+      if (sampleIpSet.size < MAX_CLUSTER_SAMPLE_IPS && !sampleIpSet.has(ip)) {
+        sampleIpSet.add(ip);
+        sampleEndpointIps.push(ip);
+      }
     }
     for (const asn of c.asns) {
       asnSet.add(asn);
@@ -480,7 +493,6 @@ function createOtherResolvedAggregate(
   const x = normalizeWorldX(projX, worldWidth);
   const y = projY;
 
-  const endpointIps = Array.from(endpointIpSet);
   const asns = Array.from(asnSet).sort((a, b) => a - b);
   const locationCount = geoCellSet.size;
   const countryCode = countryCodeSet.size === 1 ? Array.from(countryCodeSet)[0]! : null;
@@ -504,7 +516,8 @@ function createOtherResolvedAggregate(
     y,
     totalBytes,
     totalFlows,
-    endpointIps,
+    sampleEndpointIps,
+    endpointIps: sampleEndpointIps,
     asns,
     freshness,
     deltaBytes,
@@ -607,8 +620,10 @@ export function buildSpatialClusters(
       targetCluster.totalBytes += host.bytes;
       targetCluster.totalFlows += host.flows;
       targetCluster.deltaBytes += host.deltaBytes;
-      if (!targetCluster.endpointIps.includes(host.ip)) {
-        targetCluster.endpointIps.push(host.ip);
+      if (targetCluster.endpointIps.length < MAX_CLUSTER_SAMPLE_IPS) {
+        if (!targetCluster.endpointIps.includes(host.ip)) {
+          targetCluster.endpointIps.push(host.ip);
+        }
       }
       if (host.asn.status === "resolved") {
         targetCluster.asns.add(host.asn.asn);

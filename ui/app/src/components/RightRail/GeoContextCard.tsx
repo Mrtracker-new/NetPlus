@@ -159,7 +159,8 @@ export const GeoContextCard = memo(function GeoContextCard({
     const isTombstone = Boolean(entity.tombstone?.isInactive);
     const totalBytes = entity.node?.totalBytes ?? entity.tombstone?.lastObservedBytes ?? 0;
     const totalFlows = entity.node?.totalFlows ?? entity.tombstone?.lastObservedFlows ?? 0;
-    const endpointCount = entity.node?.endpointIps.length ?? entity.memberHosts.length;
+    const endpointCount = entity.node?.memberCount ?? entity.memberCount ?? entity.memberHosts.length;
+    const isSampled = entity.memberHosts.length < endpointCount;
 
     return (
       <section className="np-rail-card np-geo-context-card" aria-label="Country Aggregate Summary">
@@ -228,9 +229,23 @@ export const GeoContextCard = memo(function GeoContextCard({
 
         {entity.memberHosts.length > 0 && (
           <div style={{ marginTop: "0.75rem" }}>
-            <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block", marginBottom: "4px" }}>
-              MEMBER ENDPOINTS ({entity.memberHosts.length}):
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block" }}>
+                {isSampled
+                  ? `SAMPLE ENDPOINTS (${entity.memberHosts.length} OF ${endpointCount}):`
+                  : `MEMBER ENDPOINTS (${entity.memberHosts.length}):`}
+              </span>
+              {isSampled && (
+                <span style={{ fontSize: "0.65rem", color: "var(--np-accent, #2fe0d6)" }}>
+                  Showing a sample of {entity.memberHosts.length} endpoints
+                </span>
+              )}
+            </div>
+            {isSampled && (
+              <p style={{ margin: "0 0 6px", fontSize: "0.7rem", color: "var(--np-text-dim, #94a3b8)" }}>
+                Displaying a representative sample of {entity.memberHosts.length} out of {endpointCount} total endpoints.
+              </p>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", maxHeight: "120px", overflowY: "auto" }}>
               {entity.memberHosts.map((m: EnrichedHost) => (
                 <span key={m.ip} className="np-pill" style={{ fontSize: "0.68rem" }}>
@@ -248,7 +263,8 @@ export const GeoContextCard = memo(function GeoContextCard({
     const isTombstone = Boolean(entity.tombstone?.isInactive);
     const totalBytes = entity.node?.totalBytes ?? entity.tombstone?.lastObservedBytes ?? 0;
     const totalFlows = entity.node?.totalFlows ?? entity.tombstone?.lastObservedFlows ?? 0;
-    const endpointCount = entity.node?.endpointIps.length ?? entity.memberHosts.length;
+    const endpointCount = entity.node?.memberCount ?? entity.memberCount ?? entity.memberHosts.length;
+    const isSampled = entity.memberHosts.length < endpointCount;
 
     return (
       <section className="np-rail-card np-geo-context-card" aria-label="Spatial Cluster Summary">
@@ -317,9 +333,23 @@ export const GeoContextCard = memo(function GeoContextCard({
 
         {entity.memberHosts.length > 0 && (
           <div style={{ marginTop: "0.75rem" }}>
-            <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block", marginBottom: "4px" }}>
-              MEMBER ENDPOINTS ({entity.memberHosts.length}):
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block" }}>
+                {isSampled
+                  ? `SAMPLE ENDPOINTS (${entity.memberHosts.length} OF ${endpointCount}):`
+                  : `CLUSTER ENDPOINTS (${entity.memberHosts.length}):`}
+              </span>
+              {isSampled && (
+                <span style={{ fontSize: "0.65rem", color: "var(--np-accent, #2fe0d6)" }}>
+                  Showing a sample of {entity.memberHosts.length} endpoints
+                </span>
+              )}
+            </div>
+            {isSampled && (
+              <p style={{ margin: "0 0 6px", fontSize: "0.7rem", color: "var(--np-text-dim, #94a3b8)" }}>
+                Displaying a representative sample of {entity.memberHosts.length} out of {endpointCount} total endpoints.
+              </p>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", maxHeight: "140px", overflowY: "auto" }}>
               {entity.memberHosts.map((m: EnrichedHost) => (
                 <span key={m.ip} className="np-pill" style={{ fontSize: "0.68rem" }}>
@@ -337,7 +367,8 @@ export const GeoContextCard = memo(function GeoContextCard({
     const isTombstone = Boolean(entity.tombstone?.isInactive);
     const totalBytes = entity.node?.totalBytes ?? entity.tombstone?.lastObservedBytes ?? 0;
     const totalFlows = entity.node?.totalFlows ?? entity.tombstone?.lastObservedFlows ?? 0;
-    const endpointCount = entity.node?.endpointIps.length ?? entity.memberHosts.length;
+    const endpointCount = entity.node?.memberCount ?? entity.memberCount ?? entity.memberHosts.length;
+    const isSampled = entity.memberHosts.length < endpointCount;
 
     return (
       <section className="np-rail-card np-geo-context-card" aria-label="City Cluster Summary">
@@ -398,9 +429,23 @@ export const GeoContextCard = memo(function GeoContextCard({
 
         {entity.memberHosts.length > 0 && (
           <div style={{ marginTop: "0.75rem" }}>
-            <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block", marginBottom: "4px" }}>
-              CLUSTER ENDPOINTS ({entity.memberHosts.length}):
-            </span>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+              <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block" }}>
+                {isSampled
+                  ? `SAMPLE ENDPOINTS (${entity.memberHosts.length} OF ${endpointCount}):`
+                  : `CLUSTER ENDPOINTS (${entity.memberHosts.length}):`}
+              </span>
+              {isSampled && (
+                <span style={{ fontSize: "0.65rem", color: "var(--np-accent, #2fe0d6)" }}>
+                  Showing a sample of {entity.memberHosts.length} endpoints
+                </span>
+              )}
+            </div>
+            {isSampled && (
+              <p style={{ margin: "0 0 6px", fontSize: "0.7rem", color: "var(--np-text-dim, #94a3b8)" }}>
+                Displaying a representative sample of {entity.memberHosts.length} out of {endpointCount} total endpoints.
+              </p>
+            )}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", maxHeight: "120px", overflowY: "auto" }}>
               {entity.memberHosts.map((m: EnrichedHost) => (
                 <span key={m.ip} className="np-pill" style={{ fontSize: "0.68rem" }}>
@@ -602,6 +647,10 @@ function OtherResolvedCard({
   // Windowed display (first 100 items) to prevent DOM strain
   const displayedMembers = sortedMembers.slice(0, 100);
 
+  const totalMemberCount =
+    entity.node?.memberCount ?? entity.memberCount ?? entity.memberHosts.length;
+  const isSampled = entity.memberHosts.length < totalMemberCount;
+
   return (
     <section className="np-rail-card np-geo-context-card" aria-label="Other Resolved Traffic Summary">
       <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -631,7 +680,7 @@ function OtherResolvedCard({
       <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
         <li>
           <span>Aggregated Endpoints</span>
-          <span className="np-rail-list__val">{entity.memberHosts.length} hosts</span>
+          <span className="np-rail-list__val">{totalMemberCount} hosts</span>
         </li>
         <li>
           <span>Total Volume</span>
@@ -652,15 +701,25 @@ function OtherResolvedCard({
       <div style={{ marginTop: "0.75rem" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
           <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)" }}>
-            MEMBER ENDPOINTS ({sortedMembers.length}
-            {sortedMembers.length !== entity.memberHosts.length ? ` of ${entity.memberHosts.length}` : ""}):
+            {isSampled
+              ? `SAMPLE ENDPOINTS (${sortedMembers.length} OF ${totalMemberCount}):`
+              : `MEMBER ENDPOINTS (${sortedMembers.length}${sortedMembers.length !== entity.memberHosts.length ? ` of ${entity.memberHosts.length}` : ""}):`}
           </span>
-          {sortedMembers.length > 100 && (
+          {isSampled ? (
+            <span style={{ fontSize: "0.65rem", color: "var(--np-accent)" }}>
+              Showing a sample of {sortedMembers.length} endpoints
+            </span>
+          ) : sortedMembers.length > 100 ? (
             <span style={{ fontSize: "0.65rem", color: "var(--np-accent)" }}>
               Showing top 100
             </span>
-          )}
+          ) : null}
         </div>
+        {isSampled && (
+          <p style={{ margin: "0 0 6px", fontSize: "0.7rem", color: "var(--np-text-dim, #94a3b8)" }}>
+            Displaying a representative sample of {entity.memberHosts.length} out of {totalMemberCount} total endpoints.
+          </p>
+        )}
 
         <input
           type="search"

@@ -596,59 +596,11 @@ export const GeoContextCard = memo(function GeoContextCard({
 
   if (entity.kind === "localNetworkGroup") {
     return (
-      <section className="np-rail-card np-geo-context-card" aria-label="Local Network Group">
-        <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
-            <span className="np-badge np-badge--accent">
-              {entity.category === "lan" ? "Local Network (LAN)" : "Shared / Special"}
-            </span>
-            <h2 className="np-rail-card__title" style={{ marginTop: "4px" }}>
-              {entity.title}
-            </h2>
-          </div>
-          {onClearSelection && (
-            <button
-              type="button"
-              className="np-iconbtn"
-              onClick={onClearSelection}
-              aria-label="Clear selection"
-              title="Clear selection"
-            >
-              <Icon name="close" />
-            </button>
-          )}
-        </div>
-
-        <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
-          {entity.category === "lan"
-            ? "Private, link-local, loopback, and multicast traffic contained within the local broadcast domain."
-            : "CGNAT (RFC 6598), documentation, benchmarking, or special-use address space."}
-        </p>
-
-        <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
-          <li>
-            <span>Active Endpoints</span>
-            <span className="np-rail-list__val">{entity.memberHosts.length} hosts</span>
-          </li>
-          <li>
-            <span>Total Volume</span>
-            <span className="np-rail-list__val">
-              {humanBytes(entity.memberHosts.reduce((s: number, h: EnrichedHost) => s + h.bytes, 0))}
-            </span>
-          </li>
-        </ul>
-
-        <div style={{ marginTop: "0.75rem" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" }}>
-            {entity.memberHosts.map((m: EnrichedHost) => (
-              <div key={m.ip} className="np-pill" style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
-                <span>{m.ip} ({m.classification.categoryLabel})</span>
-                <span>{humanBytes(m.bytes)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <LocalNetworkGroupCard
+        entity={entity}
+        onClearSelection={onClearSelection}
+        onSelectEntity={onSelectEntity}
+      />
     );
   }
 
@@ -951,6 +903,157 @@ function OtherResolvedCard({
             </button>
           ))}
           {displayedMembers.length === 0 && (
+            <div style={{ fontSize: "0.72rem", color: "var(--np-text-mute)", textAlign: "center", padding: "8px" }}>
+              No endpoints matching &quot;{searchTerm}&quot;
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface LocalNetworkGroupCardProps {
+  entity: Extract<SelectedEntity, { kind: "localNetworkGroup" }>;
+  onClearSelection?: () => void;
+  onSelectEntity?: (entity: SelectedEntity | null) => void;
+}
+
+function LocalNetworkGroupCard({
+  entity,
+  onClearSelection,
+  onSelectEntity,
+}: LocalNetworkGroupCardProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const sidebar = useOptionalSidebar();
+
+  const handleSelectEndpoint = (m: EnrichedHost) => {
+    const selected: SelectedEntity = {
+      kind: "endpoint",
+      entityId: makeHostEntityId(m.ip),
+      ip: m.ip,
+      host: m,
+    };
+    onSelectEntity?.(selected);
+    sidebar?.setSelectedEntity(selected);
+  };
+
+  const totalBytes = entity.memberHosts.reduce((s, h) => s + h.bytes, 0);
+  const totalFlows = entity.memberHosts.reduce((s, h) => s + h.flows, 0);
+
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredMembers = useMemo(() => {
+    if (!normalizedSearch) return entity.memberHosts;
+    return entity.memberHosts.filter((m) => {
+      if (m.ip.toLowerCase().includes(normalizedSearch)) return true;
+      if (m.hostnames.some((h) => h.name.toLowerCase().includes(normalizedSearch))) return true;
+      if (m.classification.categoryLabel.toLowerCase().includes(normalizedSearch)) return true;
+      return false;
+    });
+  }, [entity.memberHosts, normalizedSearch]);
+
+  const sortedMembers = useMemo(() => {
+    return [...filteredMembers].sort((a, b) => {
+      if (b.bytes !== a.bytes) return b.bytes - a.bytes;
+      return a.ip.localeCompare(b.ip);
+    });
+  }, [filteredMembers]);
+
+  return (
+    <section className="np-rail-card np-geo-context-card" aria-label="Local Network Group Summary">
+      <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div>
+          <span className="np-badge np-badge--accent">
+            {entity.category === "lan" ? "Local Network (LAN)" : "Shared / Special"}
+          </span>
+          <h2 className="np-rail-card__title" style={{ marginTop: "4px" }}>
+            {entity.title}
+          </h2>
+        </div>
+        {onClearSelection && (
+          <button
+            type="button"
+            className="np-iconbtn"
+            onClick={onClearSelection}
+            aria-label="Clear selection"
+            title="Clear selection"
+          >
+            <Icon name="close" />
+          </button>
+        )}
+      </div>
+
+      <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
+        {entity.category === "lan"
+          ? "Private, link-local, loopback, and multicast traffic contained within the local broadcast domain."
+          : "CGNAT (RFC 6598), documentation, benchmarking, or special-use address space."}
+      </p>
+
+      <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
+        <li>
+          <span>Active Endpoints</span>
+          <span className="np-rail-list__val">{entity.memberHosts.length} hosts</span>
+        </li>
+        <li>
+          <span>Total Volume</span>
+          <span className="np-rail-list__val">{humanBytes(totalBytes)}</span>
+        </li>
+        <li>
+          <span>Total Flows</span>
+          <span className="np-rail-list__val">{totalFlows}</span>
+        </li>
+      </ul>
+
+      <div style={{ marginTop: "0.75rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+          <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)" }}>
+            LOCAL ENDPOINTS ({sortedMembers.length}{sortedMembers.length !== entity.memberHosts.length ? ` of ${entity.memberHosts.length}` : ""}):
+          </span>
+        </div>
+
+        <input
+          type="search"
+          className="np-input"
+          placeholder="Filter by IP, host, or type..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          aria-label="Filter local member endpoints"
+          style={{ width: "100%", marginBottom: "6px", fontSize: "0.72rem", padding: "4px 8px" }}
+        />
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "180px", overflowY: "auto" }}>
+          {sortedMembers.map((m) => (
+            <button
+              key={m.ip}
+              type="button"
+              className="np-pill"
+              onClick={() => handleSelectEndpoint(m)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
+                cursor: "pointer",
+                textAlign: "left",
+                background: "var(--np-surface-2, #131d2e)",
+                border: "1px solid var(--np-accent-line, rgba(47, 224, 214, 0.15))",
+              }}
+              title={`Inspect ${m.ip} (${m.classification.categoryLabel})`}
+            >
+              <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                <span style={{ fontWeight: 600, color: "var(--np-text, #e7ebf3)" }}>
+                  {m.hostnames[0]?.name || m.ip}
+                </span>
+                <span style={{ fontSize: "0.65rem", color: "var(--np-text-dim, #9aa3b8)" }}>
+                  {m.classification.categoryLabel}
+                </span>
+              </div>
+              <span style={{ fontSize: "0.68rem", color: "var(--np-accent)", marginLeft: "6px", flexShrink: 0 }}>
+                {humanBytes(m.bytes)}
+              </span>
+            </button>
+          ))}
+          {sortedMembers.length === 0 && (
             <div style={{ fontSize: "0.72rem", color: "var(--np-text-mute)", textAlign: "center", padding: "8px" }}>
               No endpoints matching &quot;{searchTerm}&quot;
             </div>

@@ -71,6 +71,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     setSelectedEntityState(entity);
     if (entity) {
       setActiveTabState("context");
+      setIsCollapsedState(false);
     }
   }, []);
 

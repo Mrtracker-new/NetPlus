@@ -14,6 +14,7 @@ import {
   type EnrichedHost,
   type GeoAggregateNode,
   type NodeKind,
+  type SelectedEntity,
   type TelemetryFreshness,
 } from "./geoTypes";
 import { projectGeo, MAP_WIDTH, MAP_HEIGHT } from "./worldGeometry";
@@ -26,6 +27,8 @@ export interface ClusterOptions {
   zoomScale?: number;
   /** Maximum number of aggregated visual nodes to emit (default: 120, must be >= 1) */
   maxNodes?: number;
+  /** Specific selected entity instance (pinned from merging if possible) */
+  selectedEntity?: SelectedEntity | null;
   /** Specific IP or entity ID that is currently selected (pinned from merging if possible) */
   selectedIp?: string | null;
   selectedEntityId?: string | null;
@@ -662,6 +665,7 @@ export function buildSpatialClusters(
     distanceThreshold = 26,
     zoomScale = 1.0,
     maxNodes = 120,
+    selectedEntity = null,
     selectedIp = null,
     selectedEntityId = null,
     worldWidth = MAP_WIDTH,
@@ -677,12 +681,18 @@ export function buildSpatialClusters(
   // Effective distance threshold in SVG map coordinate space
   const worldDistThreshold = Math.max(0.2, distanceThreshold / zoomScale);
 
-  // Derive canonical target host IP if selectedEntityId is a host
-  const canonicalSelectedHostIp = selectedEntityId?.startsWith("entity-host-")
-    ? selectedEntityId.replace("entity-host-", "")
-    : selectedIp || null;
+  // Derive canonical target host IP if selectedEntity/selectedEntityId is a host
+  const canonicalSelectedHostIp =
+    selectedEntity?.kind === "endpoint"
+      ? selectedEntity.ip
+      : selectedEntityId?.startsWith("entity-host-")
+      ? selectedEntityId.replace("entity-host-", "")
+      : selectedIp || null;
 
-  const targetGeoCellId = extractGeoCellId(selectedEntityId);
+  const targetGeoCellId =
+    (selectedEntity && "geoCellId" in selectedEntity && selectedEntity.geoCellId
+      ? extractGeoCellId(selectedEntity.geoCellId)
+      : null) || extractGeoCellId(selectedEntityId);
 
   // Sort hosts by total bytes descending for deterministic cluster seed placement
   const sorted = [...resolvedHosts].sort((a, b) => {
@@ -706,6 +716,11 @@ export function buildSpatialClusters(
       (selectedEntityId != null &&
         selectedEntityId !== "" &&
         (selectedEntityId === makeHostEntityId(host.ip) || selectedEntityId === host.ip)) ||
+      (selectedEntity?.kind === "endpoint" && selectedEntity.ip === host.ip) ||
+      (selectedEntity &&
+        "memberHosts" in selectedEntity &&
+        Array.isArray(selectedEntity.memberHosts) &&
+        selectedEntity.memberHosts.some((h) => h.ip === host.ip)) ||
       (targetGeoCellId !== null && hostGeoCellId === targetGeoCellId);
 
     const { targetCluster } = spatialGrid.findNearest(hx, hy, worldDistThreshold);
@@ -770,31 +785,14 @@ export function buildSpatialClusters(
         targetCluster.firstResolvedCountryName = host.geo.country;
       }
     } else {
-      const geoCellId = hostGeoCellId;
-      const asns = new Set<number>();
-      if (host.asn.status === "resolved") {
-        asns.add(host.asn.asn);
-      }
+      const initialCityKeys = new Set<string>();
+      if (hostCityKey) initialCityKeys.add(hostCityKey);
 
-      const isClusterSelected =
-        isSelected ||
-        Boolean(
-          selectedEntityId &&
-            ((targetGeoCellId !== null && (geoCellId === targetGeoCellId || extractGeoCellId(geoCellId) === targetGeoCellId)) ||
-              selectedEntityId === makeClusterEntityId(geoCellId) ||
-              selectedEntityId === geoCellId ||
-              selectedEntityId.startsWith(`cluster-${geoCellId}`) ||
-              selectedEntityId.startsWith(`aggregate-${geoCellId}`))
-        );
-
-      const canonicalCityKeys = new Set<string>();
-      if (hostCityKey) canonicalCityKeys.add(hostCityKey);
-
-      const normalizedCountryCodes = new Set<string>();
-      if (hostCountryCode) normalizedCountryCodes.add(hostCountryCode);
+      const initialCountryCodes = new Set<string>();
+      if (hostCountryCode) initialCountryCodes.add(hostCountryCode);
 
       const newCluster: ClusterAccumulator = {
-        geoCellId,
+        geoCellId: hostGeoCellId,
         count: 1,
         latSum: norm.lat,
         unwrappedLngSum: norm.lng,
@@ -805,15 +803,15 @@ export function buildSpatialClusters(
         avgY: hy,
         firstHost: host,
         endpointIps: [host.ip],
-        asns,
+        asns: new Set(host.asn.status === "resolved" ? [host.asn.asn] : []),
         totalBytes: host.bytes,
         totalFlows: host.flows,
         deltaBytes: host.deltaBytes,
-        hasSelected: isClusterSelected,
+        hasSelected: isSelected,
         anyActive: host.freshness === "active",
         anyRecent: host.freshness === "recent",
-        canonicalCityKeys,
-        normalizedCountryCodes,
+        canonicalCityKeys: initialCityKeys,
+        normalizedCountryCodes: initialCountryCodes,
         allCityLevel: isHostCityLevel,
         allCountryLevel: isHostCountryLevel,
         firstResolvedCityName: isHostCityLevel && host.geo.city ? host.geo.city : null,
@@ -824,36 +822,60 @@ export function buildSpatialClusters(
     }
   }
 
-  // Verify aggregate selection if selectedEntityId matches city/country/cluster entity IDs
-  if (selectedEntityId) {
+  // Verify aggregate selection if selectedEntity or selectedEntityId matches city/country/cluster entity IDs
+  if (selectedEntity || selectedEntityId) {
     for (const c of clusters) {
       if (!c.hasSelected) {
         if (
           (targetGeoCellId !== null && (c.geoCellId === targetGeoCellId || extractGeoCellId(c.geoCellId) === targetGeoCellId)) ||
-          selectedEntityId === makeClusterEntityId(c.geoCellId) ||
-          selectedEntityId === c.geoCellId ||
-          selectedEntityId.startsWith(`cluster-${c.geoCellId}`) ||
-          selectedEntityId.startsWith(`aggregate-${c.geoCellId}`)
+          (selectedEntityId && (
+            selectedEntityId === makeClusterEntityId(c.geoCellId) ||
+            selectedEntityId === c.geoCellId ||
+            selectedEntityId.startsWith(`cluster-${c.geoCellId}`) ||
+            selectedEntityId.startsWith(`aggregate-${c.geoCellId}`)
+          ))
         ) {
           c.hasSelected = true;
         } else if (
-          selectedEntityId.startsWith("entity-city-") &&
+          (selectedEntityId?.startsWith("entity-city-") || selectedEntity?.kind === "cityAggregate") &&
           c.allCityLevel &&
           c.canonicalCityKeys.size === 1 &&
           c.normalizedCountryCodes.size === 1
         ) {
           const cc = Array.from(c.normalizedCountryCodes)[0]!;
           const ck = Array.from(c.canonicalCityKeys)[0]!;
-          if (selectedEntityId === makeCityAggregateEntityId(cc, ck)) {
+          if (
+            (selectedEntityId && selectedEntityId === makeCityAggregateEntityId(cc, ck)) ||
+            (selectedEntity?.kind === "cityAggregate" && selectedEntity.entityId === makeCityAggregateEntityId(cc, ck))
+          ) {
             c.hasSelected = true;
           }
         } else if (
-          selectedEntityId.startsWith("entity-country-") &&
+          (selectedEntityId?.startsWith("entity-country-") || selectedEntity?.kind === "countryAggregate") &&
           c.allCountryLevel &&
           c.normalizedCountryCodes.size === 1
         ) {
           const cc = Array.from(c.normalizedCountryCodes)[0]!;
-          if (selectedEntityId === makeCountryAggregateEntityId(cc)) {
+          if (
+            (selectedEntityId && selectedEntityId === makeCountryAggregateEntityId(cc)) ||
+            (selectedEntity?.kind === "countryAggregate" && selectedEntity.countryCode.toLowerCase() === cc)
+          ) {
+            c.hasSelected = true;
+          }
+        } else if (selectedEntity) {
+          if (selectedEntity.kind === "endpoint" && c.endpointIps.includes(selectedEntity.ip)) {
+            c.hasSelected = true;
+          } else if (
+            "sampleEndpointIps" in selectedEntity &&
+            Array.isArray(selectedEntity.sampleEndpointIps) &&
+            selectedEntity.sampleEndpointIps.some((ip) => c.endpointIps.includes(ip))
+          ) {
+            c.hasSelected = true;
+          } else if (
+            "memberHosts" in selectedEntity &&
+            Array.isArray(selectedEntity.memberHosts) &&
+            selectedEntity.memberHosts.some((h) => c.endpointIps.includes(h.ip))
+          ) {
             c.hasSelected = true;
           }
         }

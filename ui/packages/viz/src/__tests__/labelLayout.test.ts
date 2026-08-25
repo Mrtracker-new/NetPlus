@@ -3,7 +3,7 @@ import { computeLabelLayout } from "../geo/labelLayout";
 import { makeHostEntityId, type GeoAggregateNode, type SelectedEntity } from "../geo/geoTypes";
 import { deriveClusteredMapModel } from "../geo/mapViewModel";
 
-describe("Deterministic Collision-Free Label Layout", () => {
+describe("Deterministic Greedy Collision-Avoidance Label Layout", () => {
   it("prevents overlapping labels by choosing alternative slots or suppressing excess labels", () => {
     // 3 nodes situated right next to each other
     const nodes: GeoAggregateNode[] = [
@@ -318,5 +318,156 @@ describe("Deterministic Collision-Free Label Layout", () => {
     expect(targetLabelPlacement).toBeDefined();
     expect(targetLabelPlacement!.visible).toBe(true);
     expect(targetLabelPlacement!.priority).toBeGreaterThanOrEqual(100_000);
+  });
+
+  it("passes selectedEntity directly through deriveClusteredMapModel to prioritize label layout", () => {
+    const enrichedHosts = Array.from({ length: 15 }, (_, i) => ({
+      ip: `198.51.100.${i + 1}`,
+      bytes: (15 - i) * 1_000_000,
+      flows: 10,
+      deltaBytes: 500,
+      freshness: "active" as const,
+      firstSeen: 1000,
+      lastSeen: 2000,
+      lastSeenTs: 2000,
+      hostnames: [],
+      evidence: [],
+      row: {
+        label: `198.51.100.${i + 1}`,
+        bytes: (15 - i) * 1_000_000,
+        flows: 10,
+        hostnames: [],
+        evidence: [],
+      },
+      geo: {
+        status: "resolved" as const,
+        countryCode: "DE",
+        country: "Germany",
+        region: "HE",
+        city: i === 14 ? "Frankfurt" : `City-${i}`,
+        latitude: 50.1109 + i * 0.5,
+        longitude: 8.6821 + i * 0.5,
+        accuracyRadiusKm: 10,
+        confidence: "high" as const,
+        locationMeaning: "geoIpLocation" as const,
+        locationLevel: "city" as const,
+        precisionDescription: "city-level estimate" as const,
+        source: "local_database" as const,
+        geoDatabaseVersion: "1.0",
+      },
+      asn: {
+        status: "resolved" as const,
+        asn: 3320,
+        asOrg: "Deutsche Telekom AG",
+        asName: "DTAG",
+        source: "local_database" as const,
+        asnDatabaseVersion: "1.0",
+      },
+      classification: {
+        ip: `198.51.100.${i + 1}`,
+        normalizedIp: `198.51.100.${i + 1}`,
+        version: 4 as const,
+        isPublic: true,
+        isLocalLan: false,
+        category: "public" as const,
+        categoryLabel: "Public Internet",
+        description: "Public IPv4",
+      },
+      anycast: {
+        isAnycast: false,
+        provider: null,
+        service: null,
+        prefixCidr: null,
+        source: "none",
+      },
+    }));
+
+    const snapshot = {
+      captureSessionId: "sess-entity-test",
+      snapshotSequence: 1,
+      snapshotTimestamp: 2000,
+      enrichedHosts,
+      hostsById: new Map(enrichedHosts.map((h) => [h.ip, h])),
+      coverageStats: {} as any,
+    };
+
+    const targetHost = enrichedHosts[14]!; // lowest traffic host
+    const selectedEntity: SelectedEntity = {
+      kind: "endpoint",
+      ip: targetHost.ip,
+      entityId: makeHostEntityId(targetHost.ip),
+      host: targetHost,
+    };
+
+    // Low maxLabels budget = 2
+    const viewModel = deriveClusteredMapModel(snapshot, null, {
+      maxVisibleNodes: 120,
+      maxVisibleLabels: 2,
+      selectedEntity,
+    });
+
+    const targetNode = viewModel.aggregateNodes.find((n) => n.endpointIps.includes(targetHost.ip));
+    expect(targetNode).toBeDefined();
+
+    const placement = viewModel.labelPlacements.get(targetNode!.id);
+    expect(placement).toBeDefined();
+    expect(placement!.visible).toBe(true);
+    expect(placement!.priority).toBeGreaterThanOrEqual(100_000);
+  });
+
+  it("demonstrates greedy collision avoidance fallback for selected entity when all slots collide", () => {
+    // Single point with multiple conflicting nodes placed identically
+    const nodes: GeoAggregateNode[] = [
+      {
+        id: "node-obstacle-1",
+        entityId: "entity-host-1.1.1.1",
+        geoCellId: "geocell-377_-1224",
+        nodeKind: "endpoint",
+        label: "Obstacle Node Huge Alpha",
+        countryCode: "US",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        x: 360,
+        y: 180,
+        totalBytes: 90_000_000,
+        totalFlows: 100,
+        sampleEndpointIps: ["1.1.1.1"],
+        endpointIps: ["1.1.1.1"],
+        asns: [13335],
+        freshness: "active",
+        deltaBytes: 50_000,
+        memberCount: 1,
+      },
+      {
+        id: "node-selected",
+        entityId: "entity-host-2.2.2.2",
+        geoCellId: "geocell-377_-1224",
+        nodeKind: "endpoint",
+        label: "Selected Forced Node",
+        countryCode: "US",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        x: 360,
+        y: 180,
+        totalBytes: 100,
+        totalFlows: 1,
+        sampleEndpointIps: ["2.2.2.2"],
+        endpointIps: ["2.2.2.2"],
+        asns: [13335],
+        freshness: "stale",
+        deltaBytes: 0,
+        memberCount: 1,
+      },
+    ];
+
+    const placements = computeLabelLayout(nodes, {
+      maxLabels: 10,
+      selectedEntityId: "entity-host-2.2.2.2",
+    });
+
+    const selectedPlacement = placements.get("node-selected");
+    expect(selectedPlacement).toBeDefined();
+    // In greedy collision avoidance, selected entity is forced visible (even if placed slot overlaps obstacle)
+    expect(selectedPlacement!.visible).toBe(true);
   });
 });

@@ -47,7 +47,11 @@ function isInsideViewport(box: BoundingBox, width: number, height: number, margi
 
 /**
  * Deterministic greedy collision-avoidance label layout engine.
- * Computes optimal non-overlapping anchor positions for geographic nodes.
+ * Computes greedy collision-avoiding anchor positions for geographic nodes.
+ *
+ * Evaluates candidate slots around nodes to avoid bounding-box intersections.
+ * Selected entities are guaranteed visibility; if all candidate slots conflict or collide,
+ * a fallback candidate slot is placed which may overlap.
  */
 export function computeLabelLayout(
   nodes: GeoAggregateNode[],

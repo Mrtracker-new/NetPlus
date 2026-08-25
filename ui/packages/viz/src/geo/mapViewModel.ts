@@ -11,6 +11,7 @@ import {
   makeCanonicalCityKey,
   getCanonicalCountryName,
   extractGeoCellId,
+  isNodeSelected,
   type HostEntityId,
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
@@ -51,6 +52,7 @@ export interface MapViewModelOptions {
   maxVisibleNodes?: number;
   maxVisibleArcs?: number;
   maxVisibleLabels?: number;
+  selectedEntity?: SelectedEntity | null;
   selectedEntityId?: string | null;
   selectedIp?: string | null;
   origin?: OriginResolution;
@@ -256,6 +258,7 @@ export function deriveClusteredMapModel(
     maxVisibleNodes = 120,
     maxVisibleArcs = 48,
     maxVisibleLabels = 24,
+    selectedEntity = null,
     selectedEntityId = null,
     selectedIp = null,
     origin = getLocalOrigin(),
@@ -276,13 +279,28 @@ export function deriveClusteredMapModel(
     distanceThreshold: clusterRadiusPx,
     zoomScale,
     maxNodes: maxVisibleNodes,
+    selectedEntity,
     selectedIp,
     selectedEntityId,
   });
 
   // Selection identifier for focal target prioritization
   const targetEntityId =
-    selectedEntityId || (selectedIp ? `entity-host-${selectedIp}` : null);
+    selectedEntityId ||
+    (selectedEntity && "entityId" in selectedEntity && selectedEntity.entityId ? selectedEntity.entityId : null) ||
+    (selectedEntity && selectedEntity.kind === "endpoint" ? makeHostEntityId(selectedEntity.ip) : null) ||
+    (selectedIp ? `entity-host-${selectedIp}` : null);
+
+  // Authoritative entity-keyed tombstone derivation (Invariant 3 & Invariant F: independent of activeSelection)
+  const tombstones = deriveTombstonesSnapshot(snapshot, aggregateNodes, previousModel);
+
+  // Authoritative semantic selection resolution
+  const zoomTier = Math.round(zoomScale * 10);
+  const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones, zoomTier);
+
+  // Authoritative effective selection for arcs, labels, and visual highlights
+  const effectiveSelectedEntity =
+    selectedEntity ?? (activeSelection ? activeSelection.selectedEntity : null);
 
   // Generate traffic arcs with focal target preservation (Invariant 5: Pacific antimeridian shortest-path routing)
   // Semantic Integrity: If origin is unresolved, do not fabricate synthetic geographic arcs from (0°,0°) / map centroid
@@ -291,17 +309,10 @@ export function deriveClusteredMapModel(
   if (origin.status === "resolved") {
     const arcCandidateNodes = (() => {
       if (aggregateNodes.length <= maxVisibleArcs) return aggregateNodes;
-      if (!targetEntityId) return aggregateNodes.slice(0, maxVisibleArcs);
+      if (!targetEntityId && !effectiveSelectedEntity) return aggregateNodes.slice(0, maxVisibleArcs);
 
-      const targetGeoCell = extractGeoCellId(targetEntityId);
       const isTargetNode = (n: GeoAggregateNode) =>
-        n.entityId === targetEntityId ||
-        n.id === targetEntityId ||
-        (selectedIp != null && selectedIp !== "" && (n.sampleEndpointIps.includes(selectedIp) || n.endpointIps.includes(selectedIp))) ||
-        (targetEntityId.startsWith("entity-host-") &&
-          (n.sampleEndpointIps.includes(targetEntityId.replace("entity-host-", "")) ||
-           n.endpointIps.includes(targetEntityId.replace("entity-host-", "")))) ||
-        (targetGeoCell !== null && (n.geoCellId === targetGeoCell || extractGeoCellId(n.geoCellId) === targetGeoCell));
+        isNodeSelected(n, effectiveSelectedEntity, targetEntityId);
 
       const selectedArcNodes = aggregateNodes.filter(isTargetNode);
       const unselectedArcNodes = aggregateNodes.filter((n) => !isTargetNode(n));
@@ -351,18 +362,11 @@ export function deriveClusteredMapModel(
     }
   }
 
-  // Authoritative entity-keyed tombstone derivation (Invariant 3 & Invariant F: independent of activeSelection)
-  const tombstones = deriveTombstonesSnapshot(snapshot, aggregateNodes, previousModel);
-
-  // Authoritative semantic selection resolution
-  const zoomTier = Math.round(zoomScale * 10);
-  const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones, zoomTier);
-
-  // Deterministic collision label layout with focal target selection priority
+  // Deterministic greedy collision-avoidance label layout with focal target selection priority
   const labelPlacements = computeLabelLayout(aggregateNodes, {
     maxLabels: maxVisibleLabels,
     zoomScale,
-    selectedEntity: activeSelection ? activeSelection.selectedEntity : null,
+    selectedEntity: effectiveSelectedEntity,
     selectedEntityId: targetEntityId,
   });
 

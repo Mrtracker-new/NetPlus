@@ -88,7 +88,7 @@ describe("Performance & Scale Benchmark Suite", () => {
           maxNodes: 120,
         });
 
-        // 3. Deterministic collision-free label layout
+        // 3. Deterministic greedy collision-avoidance label layout
         const labelPlacements = computeLabelLayout(clusters, {
           maxLabels: 24,
           viewportWidth: 720,

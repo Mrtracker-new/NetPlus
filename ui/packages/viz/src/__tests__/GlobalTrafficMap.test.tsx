@@ -144,8 +144,8 @@ describe("GlobalTrafficMap Component", () => {
     expect(screen.getByText("Location unavailable")).toBeInTheDocument();
   });
 
-  it("maintains selection and active highlighting across zoom scale changes", () => {
-    const { rerender } = render(
+  it("maintains selection, active highlighting, and places label for selectedEntity", () => {
+    render(
       <GlobalTrafficMap
         hosts={mockHosts}
         selectedEntity={{
@@ -159,6 +159,11 @@ describe("GlobalTrafficMap Component", () => {
 
     const selectedGroup = document.querySelector(".np-geomap__node-group--selected");
     expect(selectedGroup).toBeInTheDocument();
+
+    // Verify label text inside selected group is rendered visible
+    const labelText = selectedGroup?.querySelector("text");
+    expect(labelText).toBeInTheDocument();
+    expect(labelText?.textContent).toBe("one.one.one.one");
   });
 
   it("renders Other Resolved Traffic aggregate node when clusters exceed budget and dispatches otherResolvedGroup on click", () => {

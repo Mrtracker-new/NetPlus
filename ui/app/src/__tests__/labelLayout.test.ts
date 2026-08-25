@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeLabelLayout, type GeoAggregateNode } from "@netpulse/viz";
 
-describe("Deterministic Collision-Free Label Layout in @netpulse/app", () => {
+describe("Deterministic Greedy Collision-Avoidance Label Layout in @netpulse/app", () => {
   it("prevents overlapping labels by choosing alternative slots or suppressing excess labels", () => {
     const nodes: GeoAggregateNode[] = [
       {

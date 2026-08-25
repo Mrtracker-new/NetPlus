@@ -168,6 +168,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
       maxVisibleNodes,
       maxVisibleArcs,
       maxVisibleLabels,
+      selectedEntity: activeSelection,
       selectedEntityId,
       selectedIp,
       origin,
@@ -183,6 +184,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     maxVisibleNodes,
     maxVisibleArcs,
     maxVisibleLabels,
+    activeSelection,
     selectedEntityId,
     selectedIp,
     origin,
@@ -940,7 +942,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                       </text>
                     )}
 
-                    {/* Collision-Free Text Label (if placed) */}
+                    {/* Greedy Collision-Avoidance Text Label (if placed) */}
                     {labelPlacement && labelPlacement.visible && (
                       <text
                         x={labelPlacement.x - node.x}

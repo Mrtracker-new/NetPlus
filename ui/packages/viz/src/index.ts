@@ -48,6 +48,7 @@ export * from "./geo/trafficArcs";
 export * from "./geo/spatialClustering";
 export * from "./geo/labelLayout";
 export * from "./geo/mapViewModel";
+export * from "./geo/tooltipPlacement";
 
 export {
   hostSourceRank,

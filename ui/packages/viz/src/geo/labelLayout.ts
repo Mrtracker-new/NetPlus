@@ -46,6 +46,56 @@ function isInsideViewport(box: BoundingBox, width: number, height: number, margi
 }
 
 /**
+ * Deterministically truncates a string with ASCII ellipsis '...'
+ * to avoid Unicode font-fallback glyph errors on Windows/Tauri renderers.
+ */
+export function truncateLabel(label: string, maxLength = 22): string {
+  if (!label) return "";
+  if (label.length <= maxLength) return label;
+  const truncateAt = Math.max(0, maxLength - 3);
+  return `${label.slice(0, truncateAt)}...`;
+}
+
+export interface FormatClusterLabelOptions {
+  label: string;
+  memberCount?: number;
+  countRenderedInGlyph?: boolean;
+  maxLength?: number;
+}
+
+/**
+ * Semantically formats an aggregate cluster/node label.
+ * Invariant: If the cluster glyph renders the cardinality badge, the textual label must not duplicate it.
+ */
+export function formatClusterLabel(options: FormatClusterLabelOptions): string {
+  const { label, memberCount = 1, countRenderedInGlyph = true, maxLength = 22 } = options;
+  if (!label) return "";
+  let cleanLabel = label;
+  if (countRenderedInGlyph && memberCount > 1) {
+    cleanLabel = cleanLabel.replace(/\s*\(\d+\)$/, "");
+  }
+  return truncateLabel(cleanLabel, maxLength);
+}
+
+/**
+ * Normalizes an aggregate node's display label for map text rendering.
+ */
+export function formatNodeMapLabel(node: GeoAggregateNode, maxLength = 22): string {
+  const isAggregate =
+    node.nodeKind === "cluster" ||
+    node.nodeKind === "cityAggregate" ||
+    node.nodeKind === "countryAggregate" ||
+    node.nodeKind === "otherResolvedAggregate";
+
+  return formatClusterLabel({
+    label: node.label || "",
+    memberCount: node.memberCount,
+    countRenderedInGlyph: isAggregate,
+    maxLength,
+  });
+}
+
+/**
  * Deterministic greedy collision-avoidance label layout engine.
  * Computes greedy collision-avoiding anchor positions for geographic nodes.
  *
@@ -114,9 +164,8 @@ export function computeLabelLayout(
   let visibleCount = 0;
 
   for (const { node, score, isSelected } of scoredNodes) {
-    // Truncate long text
-    const rawText = node.label || "";
-    const text = rawText.length > 22 ? `${rawText.slice(0, 20)}…` : rawText;
+    // Truncate long text deterministically without unicode glyph errors
+    const text = formatNodeMapLabel(node);
 
     // Approximate character width in mono 9px font
     const charWidth = 6.2;

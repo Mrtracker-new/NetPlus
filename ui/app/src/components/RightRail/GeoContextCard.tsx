@@ -687,7 +687,7 @@ export const GeoContextCard = memo(function GeoContextCard({
                 <button
                   key={m.ip}
                   type="button"
-                  className="np-pill"
+                  className="np-geo-context-card__endpoint-item"
                   onClick={() => {
                     const selected: SelectedEntity = {
                       kind: "endpoint",
@@ -698,22 +698,12 @@ export const GeoContextCard = memo(function GeoContextCard({
                     onSelectEntity?.(selected);
                     sidebar?.setSelectedEntity(selected);
                   }}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    width: "100%",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    background: "var(--np-surface-2, #131d2e)",
-                    border: "1px solid var(--np-accent-line, rgba(47, 224, 214, 0.15))",
-                  }}
                   title={`Select ${m.ip}`}
                 >
                   <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {m.hostnames[0]?.name || m.ip}
                   </span>
-                  <span style={{ fontSize: "0.68rem", color: "var(--np-accent)", marginLeft: "6px", flexShrink: 0 }}>
+                  <span style={{ fontSize: "0.68rem", color: "var(--np-accent-strong)", marginLeft: "6px", flexShrink: 0, fontFamily: "var(--np-font-mono)" }}>
                     {humanBytes(m.bytes)}
                   </span>
                 </button>
@@ -880,24 +870,14 @@ function OtherResolvedCard({
             <button
               key={m.ip}
               type="button"
-              className="np-pill"
+              className="np-geo-context-card__endpoint-item"
               onClick={() => handleSelectEndpoint(m)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                width: "100%",
-                cursor: "pointer",
-                textAlign: "left",
-                background: "var(--np-surface-2, #131d2e)",
-                border: "1px solid var(--np-accent-line, rgba(47, 224, 214, 0.15))",
-              }}
               title={`Select ${m.ip}`}
             >
               <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {m.hostnames[0]?.name || m.ip}
               </span>
-              <span style={{ fontSize: "0.68rem", color: "var(--np-accent)", marginLeft: "6px", flexShrink: 0 }}>
+              <span style={{ fontSize: "0.68rem", color: "var(--np-accent-strong)", marginLeft: "6px", flexShrink: 0, fontFamily: "var(--np-font-mono)" }}>
                 {humanBytes(m.bytes)}
               </span>
             </button>
@@ -1026,29 +1006,19 @@ function LocalNetworkGroupCard({
             <button
               key={m.ip}
               type="button"
-              className="np-pill"
+              className="np-geo-context-card__endpoint-item"
               onClick={() => handleSelectEndpoint(m)}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                width: "100%",
-                cursor: "pointer",
-                textAlign: "left",
-                background: "var(--np-surface-2, #131d2e)",
-                border: "1px solid var(--np-accent-line, rgba(47, 224, 214, 0.15))",
-              }}
               title={`Inspect ${m.ip} (${m.classification.categoryLabel})`}
             >
               <div style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                <span style={{ fontWeight: 600, color: "var(--np-text, #e7ebf3)" }}>
+                <span style={{ fontWeight: 600, color: "var(--np-text)" }}>
                   {m.hostnames[0]?.name || m.ip}
                 </span>
-                <span style={{ fontSize: "0.65rem", color: "var(--np-text-dim, #9aa3b8)" }}>
+                <span style={{ fontSize: "0.65rem", color: "var(--np-text-dim)" }}>
                   {m.classification.categoryLabel}
                 </span>
               </div>
-              <span style={{ fontSize: "0.68rem", color: "var(--np-accent)", marginLeft: "6px", flexShrink: 0 }}>
+              <span style={{ fontSize: "0.68rem", color: "var(--np-accent-strong)", marginLeft: "6px", flexShrink: 0, fontFamily: "var(--np-font-mono)" }}>
                 {humanBytes(m.bytes)}
               </span>
             </button>

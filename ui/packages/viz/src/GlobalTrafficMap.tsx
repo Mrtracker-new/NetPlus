@@ -1299,15 +1299,24 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
       <footer className="np-geomap-footer">
         {/* Local Network Activity Tray */}
         {localLanHosts.length > 0 && (
-          <div className="np-geomap-tray np-geomap-tray--local">
+          <div className="np-geomap-tray np-geomap-tray--local" role="region" aria-label="Local Network Activity">
             <div className="np-geomap-tray__header">
               <span className="np-geomap-tray__badge np-geomap-tray__badge--accent">
-                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--accent" />
+                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--accent" aria-hidden="true" />
                 Local Network ({localLanHosts.length} LAN / Multicast)
               </span>
               <button
                 type="button"
-                className="np-geomap-tray__inspect-btn"
+                className={`np-geomap-tray__inspect-btn${
+                  activeSelection?.kind === "localNetworkGroup" && activeSelection.entityId === LOCAL_LAN_ENTITY_ID
+                    ? " np-geomap-tray__inspect-btn--selected"
+                    : ""
+                }`}
+                aria-current={
+                  activeSelection?.kind === "localNetworkGroup" && activeSelection.entityId === LOCAL_LAN_ENTITY_ID
+                    ? "true"
+                    : undefined
+                }
                 onClick={() =>
                   handleSetSelection({
                     kind: "localNetworkGroup",
@@ -1322,41 +1331,54 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
               </button>
             </div>
             <div className="np-geomap-tray__chips">
-              {localLanHosts.slice(0, 8).map((h) => (
-                <button
-                  key={h.ip}
-                  type="button"
-                  className="np-geomap-tray__chip"
-                  onClick={() =>
-                    handleSetSelection({
-                      kind: "endpoint",
-                      entityId: makeHostEntityId(h.ip),
-                      ip: h.ip,
-                      host: h,
-                    })
-                  }
-                  title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
-                >
-                  <span className="np-geomap-tray__chip-text">
-                    {h.ip} • {h.classification.categoryLabel}
-                  </span>
-                </button>
-              ))}
+              {localLanHosts.slice(0, 8).map((h) => {
+                const isSelected = activeSelection?.kind === "endpoint" && activeSelection.ip === h.ip;
+                return (
+                  <button
+                    key={h.ip}
+                    type="button"
+                    className={`np-geomap-tray__chip${isSelected ? " np-geomap-tray__chip--selected" : ""}`}
+                    aria-current={isSelected ? "true" : undefined}
+                    onClick={() =>
+                      handleSetSelection({
+                        kind: "endpoint",
+                        entityId: makeHostEntityId(h.ip),
+                        ip: h.ip,
+                        host: h,
+                      })
+                    }
+                    title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
+                  >
+                    <span className="np-geomap-tray__chip-text">
+                      {h.ip} • {h.classification.categoryLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
 
         {/* Shared Space / Special Addresses Tray */}
         {specialHosts.length > 0 && (
-          <div className="np-geomap-tray np-geomap-tray--special">
+          <div className="np-geomap-tray np-geomap-tray--special" role="region" aria-label="Special Address Space Activity">
             <div className="np-geomap-tray__header">
               <span className="np-geomap-tray__badge np-geomap-tray__badge--neutral">
-                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--neutral" />
+                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--neutral" aria-hidden="true" />
                 Shared Space / Special ({specialHosts.length})
               </span>
               <button
                 type="button"
-                className="np-geomap-tray__inspect-btn"
+                className={`np-geomap-tray__inspect-btn${
+                  activeSelection?.kind === "localNetworkGroup" && activeSelection.entityId === SPECIAL_SPACE_ENTITY_ID
+                    ? " np-geomap-tray__inspect-btn--selected"
+                    : ""
+                }`}
+                aria-current={
+                  activeSelection?.kind === "localNetworkGroup" && activeSelection.entityId === SPECIAL_SPACE_ENTITY_ID
+                    ? "true"
+                    : undefined
+                }
                 onClick={() =>
                   handleSetSelection({
                     kind: "localNetworkGroup",
@@ -1371,26 +1393,30 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
               </button>
             </div>
             <div className="np-geomap-tray__chips">
-              {specialHosts.slice(0, 8).map((h) => (
-                <button
-                  key={h.ip}
-                  type="button"
-                  className="np-geomap-tray__chip"
-                  onClick={() =>
-                    handleSetSelection({
-                      kind: "endpoint",
-                      entityId: makeHostEntityId(h.ip),
-                      ip: h.ip,
-                      host: h,
-                    })
-                  }
-                  title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
-                >
-                  <span className="np-geomap-tray__chip-text">
-                    {h.ip} • {h.classification.categoryLabel}
-                  </span>
-                </button>
-              ))}
+              {specialHosts.slice(0, 8).map((h) => {
+                const isSelected = activeSelection?.kind === "endpoint" && activeSelection.ip === h.ip;
+                return (
+                  <button
+                    key={h.ip}
+                    type="button"
+                    className={`np-geomap-tray__chip${isSelected ? " np-geomap-tray__chip--selected" : ""}`}
+                    aria-current={isSelected ? "true" : undefined}
+                    onClick={() =>
+                      handleSetSelection({
+                        kind: "endpoint",
+                        entityId: makeHostEntityId(h.ip),
+                        ip: h.ip,
+                        host: h,
+                      })
+                    }
+                    title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
+                  >
+                    <span className="np-geomap-tray__chip-text">
+                      {h.ip} • {h.classification.categoryLabel}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

@@ -92,11 +92,14 @@
   /* ---- Neumorphic elevation: the signature dual light/dark soft shadow ----
    * Raised plates catch light top-left, cast shadow bottom-right. Inset = pressed.
    * Tuned against the --np-surface-1 plate; components apply these on that family. */
-  --np-neu: -7px -7px 16px rgba(255, 255, 255, 0.92), 8px 8px 20px rgba(28, 40, 66, 0.12);
-  --np-neu-sm: -4px -4px 9px rgba(255, 255, 255, 0.85), 4px 4px 11px rgba(28, 40, 66, 0.1);
+  --np-neu-highlight: rgba(255, 255, 255, 0.92);
+  --np-neu-shadow: rgba(28, 40, 66, 0.12);
+  --np-neu: -7px -7px 16px var(--np-neu-highlight), 8px 8px 20px var(--np-neu-shadow);
+  --np-neu-sm: -4px -4px 9px var(--np-neu-highlight), 4px 4px 11px var(--np-neu-shadow);
+  --np-neu-hover: -5px -5px 12px var(--np-neu-highlight), 6px 6px 14px var(--np-neu-shadow);
   --np-neu-inset: inset 3px 3px 7px rgba(28, 40, 66, 0.13),
-    inset -3px -3px 7px rgba(255, 255, 255, 0.9);
-  --np-neu-lg: -12px -12px 28px rgba(255, 255, 255, 0.9), 14px 14px 36px rgba(28, 40, 66, 0.16);
+    inset -3px -3px 7px var(--np-neu-highlight);
+  --np-neu-lg: -12px -12px 28px var(--np-neu-highlight), 14px 14px 36px rgba(28, 40, 66, 0.16);
 
   /* Legacy elevation aliases kept so any lingering usage still resolves. */
   --np-shadow: var(--np-neu-sm);
@@ -181,12 +184,15 @@
   --np-finding: #ef6167;
   --np-finding-soft: rgba(239, 97, 103, 0.13);
 
-  /* In dark, "neumorphism" reads as layered glass rather than soft plaster:
-     a top highlight hairline + deep drop shadow. */
-  --np-neu: 0 1px 0 rgba(255, 255, 255, 0.05) inset, 0 1px 2px rgba(0, 0, 0, 0.5),
+  /* In dark, "neumorphism" reads as layered tactile dark plate:
+     a top highlight hairline + directional soft drop shadow. */
+  --np-neu-highlight: rgba(255, 255, 255, 0.05);
+  --np-neu-shadow: rgba(0, 0, 0, 0.5);
+  --np-neu: 0 1px 0 var(--np-neu-highlight) inset, 0 1px 2px var(--np-neu-shadow),
     0 12px 30px rgba(0, 0, 0, 0.4);
-  --np-neu-sm: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 2px 8px rgba(0, 0, 0, 0.4);
-  --np-neu-inset: inset 0 2px 6px rgba(0, 0, 0, 0.55), inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --np-neu-sm: 0 1px 0 var(--np-neu-highlight) inset, 0 2px 8px var(--np-neu-shadow);
+  --np-neu-hover: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 4px 14px rgba(0, 0, 0, 0.6);
+  --np-neu-inset: inset 0 2px 6px rgba(0, 0, 0, 0.55), inset 0 -1px 0 var(--np-neu-highlight);
   --np-neu-lg: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 20px 50px rgba(0, 0, 0, 0.55);
 
   --np-glass-bg: rgba(19, 26, 38, 0.6);

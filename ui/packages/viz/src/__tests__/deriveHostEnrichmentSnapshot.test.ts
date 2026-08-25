@@ -312,7 +312,7 @@ describe("deriveHostEnrichmentSnapshot — Authoritative Delta Engine Test Suite
   it("9. Coverage telemetry: correctly calculates endpoint-count coverage and resolvedBytesPercent exclusively from public traffic", () => {
     // 19 resolved public endpoints carrying 100 bytes each (1,900 bytes total)
     const resolvedRows: BreakdownRow[] = Array.from({ length: 19 }, (_, i) => ({
-      label: `1.1.1.${i + 1}`,
+      label: `17.0.0.${i + 1}`,
       bytes: 100,
       flows: 1,
       hostnames: [],
@@ -385,7 +385,7 @@ describe("deriveHostEnrichmentSnapshot — Authoritative Delta Engine Test Suite
 
   it("10. IPv6 GeoIP intentional deferral: public IPv6 is classified as public, receives ipv6_deferred geo reason, and is tracked in coverageStats", () => {
     const ipv4Resolved: BreakdownRow = {
-      label: "1.1.1.1",
+      label: "17.0.0.1",
       bytes: 1000,
       flows: 5,
       hostnames: [],
@@ -445,4 +445,65 @@ describe("deriveHostEnrichmentSnapshot — Authoritative Delta Engine Test Suite
     // Byte-weighted coverage: 1000 / (1000 + 2000) = 33.33%
     expect(Math.round(stats.resolvedBytesPercent)).toBe(33);
   });
+
+  it("11. Anycast Byte Accounting: Anycast city references never inflate cityResolvedBytes or resolvedBytes", () => {
+    // 17.0.0.1 is Cupertino (unicast, mapEligible=true)
+    const unicastRow: BreakdownRow = {
+      label: "17.0.0.1",
+      bytes: 5_000_000,
+      flows: 10,
+      hostnames: [],
+      evidence: [],
+    };
+    // 1.1.1.1 is Anycast Cloudflare (anycast reference location, mapEligible=false)
+    const anycastRow: BreakdownRow = {
+      label: "1.1.1.1",
+      bytes: 20_000_000,
+      flows: 50,
+      hostnames: [],
+      evidence: [],
+    };
+    // 93.184.216.34 is unknown public (mapEligible=false)
+    const unknownRow: BreakdownRow = {
+      label: "93.184.216.34",
+      bytes: 1_000_000,
+      flows: 2,
+      hostnames: [],
+      evidence: [],
+    };
+
+    const snapshot = deriveHostEnrichmentSnapshot(
+      {
+        hosts: [unicastRow, anycastRow, unknownRow],
+        captureSessionId: "anycast-byte-accounting",
+        snapshotSequence: 1,
+      },
+      null
+    );
+
+    const stats = snapshot.coverageStats;
+
+    // Total public volume: 5MB + 20MB + 1MB = 26MB
+    expect(stats.totalBytes).toBe(26_000_000);
+    expect(stats.publicHostsCount).toBe(3);
+
+    // Only unicast 17.0.0.1 is mapEligible
+    expect(stats.resolvedHostsCount).toBe(1);
+    expect(stats.unresolvedHostsCount).toBe(2);
+
+    // cityResolvedBytes MUST strictly equal map-eligible physical traffic (5MB), not inflated by 1.1.1.1 (20MB)
+    expect(stats.cityResolvedBytes).toBe(5_000_000);
+    expect(stats.resolvedBytes).toBe(5_000_000);
+    expect(stats.unresolvedBytes).toBe(21_000_000);
+
+    // Physical coverage: 1 / 3 = 33.33%
+    expect(Math.round(stats.physicalCoveragePercent)).toBe(33);
+
+    // Resolved bytes coverage: 5MB / 26MB = 19.23% (NOT 25MB / 26MB = 96%)
+    expect(Math.round(stats.resolvedBytesPercent)).toBe(19);
+
+    // Network identity includes unicast (city), anycast (network), but not completely unknown
+    expect(stats.networkIdentityCoveragePercent).toBeGreaterThan(0);
+  });
 });
+

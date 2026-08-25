@@ -153,6 +153,18 @@ export function deriveHostEnrichmentSnapshot(
   let unresolvedBytes = 0;
   let ipv6DeferredBytes = 0;
 
+  let cityResolvedHostsCount = 0;
+  let regionResolvedHostsCount = 0;
+  let countryResolvedHostsCount = 0;
+  let networkResolvedHostsCount = 0;
+  let unknownHostsCount = 0;
+
+  let cityResolvedBytes = 0;
+  let regionResolvedBytes = 0;
+  let countryResolvedBytes = 0;
+  let networkResolvedBytes = 0;
+  let unknownBytes = 0;
+
   const effectiveTimestamp =
     snapshotTimestamp !== undefined
       ? snapshotTimestamp
@@ -192,16 +204,53 @@ export function deriveHostEnrichmentSnapshot(
     enrichedHosts.push(enriched);
     hostsById.set(ip, enriched);
 
+    // Progressive resolution accounting
+    switch (enriched.geo.precision) {
+      case "city":
+        if (enriched.geo.mapEligible) {
+          cityResolvedHostsCount++;
+          cityResolvedBytes += currentBytes;
+        } else {
+          // Anycast reference location -> network-level identity
+          networkResolvedHostsCount++;
+          networkResolvedBytes += currentBytes;
+        }
+        break;
+      case "region":
+        if (enriched.geo.mapEligible) {
+          regionResolvedHostsCount++;
+          regionResolvedBytes += currentBytes;
+        } else {
+          // Anycast reference location -> network-level identity
+          networkResolvedHostsCount++;
+          networkResolvedBytes += currentBytes;
+        }
+        break;
+      case "country":
+        countryResolvedHostsCount++;
+        countryResolvedBytes += currentBytes;
+        break;
+      case "network":
+        networkResolvedHostsCount++;
+        networkResolvedBytes += currentBytes;
+        break;
+      case "unknown":
+      default:
+        unknownHostsCount++;
+        unknownBytes += currentBytes;
+        break;
+    }
+
     // Coverage telemetry accounting
     if (enriched.classification.isPublic) {
       publicHostsCount++;
-      if (enriched.geo.status === "resolved") {
+      if (enriched.geo.mapEligible) {
         resolvedHostsCount++;
         resolvedBytes += currentBytes;
       } else {
         unresolvedHostsCount++;
         unresolvedBytes += currentBytes;
-        if (enriched.geo.reason === "ipv6_deferred") {
+        if (enriched.geo.reason === "ipv6_deferred" || enriched.geo.limitation === "ipv6_database_unavailable") {
           ipv6DeferredHostsCount++;
           ipv6DeferredBytes += currentBytes;
         }
@@ -213,27 +262,62 @@ export function deriveHostEnrichmentSnapshot(
     }
   }
 
-  const coveragePercent =
+  const physicalCoveragePercent =
     publicHostsCount > 0 ? (resolvedHostsCount / publicHostsCount) * 100 : 0;
+  const coveragePercent = physicalCoveragePercent;
 
   const totalPublicBytes = resolvedBytes + unresolvedBytes;
   const resolvedBytesPercent =
     totalPublicBytes > 0 ? (resolvedBytes / totalPublicBytes) * 100 : 0;
+
+  const knownNetworkHosts =
+    cityResolvedHostsCount +
+    regionResolvedHostsCount +
+    countryResolvedHostsCount +
+    networkResolvedHostsCount;
+  const networkIdentityCoveragePercent =
+    publicHostsCount > 0 ? (knownNetworkHosts / publicHostsCount) * 100 : 0;
 
   const coverageStats: CoverageStats = {
     totalObservedHosts: hosts.length,
     publicHostsCount,
     resolvedHostsCount,
     unresolvedHostsCount,
-    ipv6DeferredHostsCount,
     localLanHostsCount,
     specialHostsCount,
     totalBytes,
     resolvedBytes,
     unresolvedBytes,
+    ipv6DeferredHostsCount,
     ipv6DeferredBytes,
+    physicalCoveragePercent,
     coveragePercent,
     resolvedBytesPercent,
+    networkIdentityCoveragePercent,
+    cityResolvedHostsCount,
+    regionResolvedHostsCount,
+    countryResolvedHostsCount,
+    networkResolvedHostsCount,
+    unknownHostsCount,
+    cityResolvedBytes,
+    regionResolvedBytes,
+    countryResolvedBytes,
+    networkResolvedBytes,
+    unknownBytes,
+    precisionBreakdown: {
+      city: cityResolvedHostsCount,
+      region: regionResolvedHostsCount,
+      country: countryResolvedHostsCount,
+      network: networkResolvedHostsCount,
+      unknown: unknownHostsCount,
+    },
+    bytesBreakdown: {
+      city: cityResolvedBytes,
+      region: regionResolvedBytes,
+      country: countryResolvedBytes,
+      network: networkResolvedBytes,
+      unknown: unknownBytes,
+    },
   };
 
   return {
@@ -278,8 +362,8 @@ export function deriveClusteredMapModel(
     coverageStats,
   } = snapshot;
 
-  // Build spatial clusters (Invariant 3 & 4: bounded O(N+C) grid indexing, deltaBytes sum)
-  const resolvedHosts = enrichedHosts.filter((h) => h.geo.status === "resolved");
+  // Build spatial clusters (Invariant: ONLY mapEligible hosts with valid coordinates participate in map clustering)
+  const resolvedHosts = enrichedHosts.filter((h) => h.geo.mapEligible);
   const aggregateNodes = buildSpatialClusters(resolvedHosts, {
     distanceThreshold: clusterRadiusPx,
     zoomScale,
@@ -523,7 +607,7 @@ export function deriveLiveSemanticEntityIds(
     }
 
     // 3. Address classification groups
-    if (host.classification.isPublic && host.geo.status === "unresolved") {
+    if (host.classification.isPublic && !host.geo.mapEligible) {
       liveEntityIds.add(UNRESOLVED_PUBLIC_ENTITY_ID);
     } else if (host.classification.isLocalLan) {
       liveEntityIds.add(LOCAL_LAN_ENTITY_ID);
@@ -531,22 +615,21 @@ export function deriveLiveSemanticEntityIds(
       liveEntityIds.add(SPECIAL_SPACE_ENTITY_ID);
     }
 
-    if (host.geo.status === "resolved") {
-
-      // 4. City aggregate entity identity: derived from current resolved hosts
-      if (host.geo.countryCode && host.geo.city) {
-        const canonicalCityKey = makeCanonicalCityKey(host.geo.city);
-        if (canonicalCityKey) {
-          liveEntityIds.add(makeCityAggregateEntityId(host.geo.countryCode, canonicalCityKey));
-        }
+    // 4. City aggregate entity identity: derived from hosts with valid city & country
+    if (host.geo.countryCode && host.geo.city) {
+      const canonicalCityKey = makeCanonicalCityKey(host.geo.city);
+      if (canonicalCityKey) {
+        liveEntityIds.add(makeCityAggregateEntityId(host.geo.countryCode, canonicalCityKey));
       }
+    }
 
-      // 5. Country aggregate entity identity: derived from current resolved hosts
-      if (host.geo.countryCode) {
-        liveEntityIds.add(makeCountryAggregateEntityId(host.geo.countryCode));
-      }
+    // 5. Country aggregate entity identity: derived from hosts with country info
+    if (host.geo.countryCode) {
+      liveEntityIds.add(makeCountryAggregateEntityId(host.geo.countryCode));
+    }
 
-      // 6. Cluster entity identity: derived according to stable geoCell semantics
+    // 6. Cluster entity identity: derived from mapEligible physical coordinates
+    if (host.geo.mapEligible) {
       const norm = normalizeCoordinates(host.geo.latitude, host.geo.longitude);
       if (norm) {
         const geoCellId = computeGeoCellId(norm.lat, norm.lng);

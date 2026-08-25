@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
 import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
@@ -36,6 +36,7 @@ import {
   type MapViewModelInput,
 } from "./geo/mapViewModel";
 import { humanBytes } from "./utils";
+import { calculateTooltipPlacement, type TooltipPlacement } from "./geo/tooltipPlacement";
 
 export interface GlobalTrafficMapProps {
   hosts: BreakdownRow[];
@@ -116,9 +117,87 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
   const dragStartRef = useRef<{ x: number; y: number; tx: number; ty: number }>({ x: 0, y: 0, tx: 0, ty: 0 });
   const svgRef = useRef<SVGSVGElement | null>(null);
 
+  const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
+
+  // Canvas wrapper bounding dimensions state
+  const [wrapperSize, setWrapperSize] = useState<{ width: number; height: number }>({
+    width: MAP_WIDTH,
+    height: MAP_HEIGHT,
+  });
+
+  // Track canvas wrapper resize events (window resize, sidebar toggle, responsive shifts)
+  useEffect(() => {
+    const el = canvasWrapperRef.current;
+    if (!el) return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setWrapperSize({ width: Math.round(rect.width), height: Math.round(rect.height) });
+    }
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setWrapperSize((prev) => {
+            if (Math.abs(prev.width - width) >= 1 || Math.abs(prev.height - height) >= 1) {
+              return { width: Math.round(width), height: Math.round(height) };
+            }
+            return prev;
+          });
+        }
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   // Hover and tooltip state
   const [hoveredNode, setHoveredNode] = useState<GeoAggregateNode | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
+  const [tooltipScreenPos, setTooltipScreenPos] = useState<{ x: number; y: number; radius: number } | null>(null);
+  const [measuredTooltipSize, setMeasuredTooltipSize] = useState<{ width: number; height: number }>({
+    width: 220,
+    height: 140,
+  });
+
+  // Dynamically measure actual tooltip dimensions upon render/content change with ResizeObserver
+  useLayoutEffect(() => {
+    const el = tooltipRef.current;
+    if (!hoveredNode || !el) return;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      setMeasuredTooltipSize((prev) => {
+        if (Math.abs(prev.width - rect.width) >= 1 || Math.abs(prev.height - rect.height) >= 1) {
+          return { width: Math.round(rect.width), height: Math.round(rect.height) };
+        }
+        return prev;
+      });
+    }
+
+    if (typeof ResizeObserver === "undefined") return;
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        if (width > 0 && height > 0) {
+          setMeasuredTooltipSize((prev) => {
+            if (Math.abs(prev.width - width) >= 1 || Math.abs(prev.height - height) >= 1) {
+              return { width: Math.round(width), height: Math.round(height) };
+            }
+            return prev;
+          });
+        }
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hoveredNode]);
 
   // 1. Snapshot-gated host enrichment & delta computation (Invariant 1 & 2)
   const hostEnrichmentRef = useRef<HostEnrichmentSnapshot | null>(null);
@@ -600,9 +679,76 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     setTransform({ scale: 1.0, x: 0, y: 0 });
   }, []);
 
+  // Hover & Tooltip Handlers with screen-space coordinates
+  const handleNodeHover = useCallback(
+    (node: GeoAggregateNode, radius: number, el?: SVGElement | null) => {
+      setHoveredNode(node);
+      if (el && canvasWrapperRef.current) {
+        const nodeRect = el.getBoundingClientRect();
+        const wrapperRect = canvasWrapperRef.current.getBoundingClientRect();
+        setTooltipScreenPos({
+          x: nodeRect.left + nodeRect.width / 2 - wrapperRect.left,
+          y: nodeRect.top + nodeRect.height / 2 - wrapperRect.top,
+          radius: Math.max(nodeRect.width, nodeRect.height) / 2 || radius,
+        });
+      } else {
+        const wrapperRect = canvasWrapperRef.current?.getBoundingClientRect();
+        const scaleX = (wrapperRect?.width || MAP_WIDTH) / MAP_WIDTH;
+        const scaleY = (wrapperRect?.height || MAP_HEIGHT) / MAP_HEIGHT;
+        setTooltipScreenPos({
+          x: (node.x * transform.scale + transform.x) * scaleX,
+          y: (node.y * transform.scale + transform.y) * scaleY,
+          radius: radius * scaleX,
+        });
+      }
+    },
+    [transform.scale, transform.x, transform.y]
+  );
+
+  const handleNodeLeave = useCallback(() => {
+    setHoveredNode(null);
+    setTooltipScreenPos(null);
+  }, []);
+
+  // Synchronize tooltip screen position during zoom / pan transformations
+  useEffect(() => {
+    if (!hoveredNode) return;
+    const wrapperRect = canvasWrapperRef.current?.getBoundingClientRect();
+    const scaleX = (wrapperRect?.width || MAP_WIDTH) / MAP_WIDTH;
+    const scaleY = (wrapperRect?.height || MAP_HEIGHT) / MAP_HEIGHT;
+    const baseRadius = hoveredNode.nodeKind === "endpoint" ? 4.5 : 7;
+    const radius = baseRadius + Math.sqrt(hoveredNode.totalBytes / maxNodeBytes) * 5.5;
+    setTooltipScreenPos({
+      x: (hoveredNode.x * transform.scale + transform.x) * scaleX,
+      y: (hoveredNode.y * transform.scale + transform.y) * scaleY,
+      radius: radius * scaleX,
+    });
+  }, [transform.scale, transform.x, transform.y, hoveredNode, maxNodeBytes]);
+
+  // Compute collision-aware pixel-space tooltip placement
+  const tooltipPlacement = useMemo((): TooltipPlacement | null => {
+    if (!hoveredNode || !tooltipScreenPos) return null;
+    return calculateTooltipPlacement({
+      nodeX: tooltipScreenPos.x,
+      nodeY: tooltipScreenPos.y,
+      nodeRadius: tooltipScreenPos.radius,
+      wrapperWidth: wrapperSize.width,
+      wrapperHeight: wrapperSize.height,
+      tooltipWidth: measuredTooltipSize.width,
+      tooltipHeight: measuredTooltipSize.height,
+      gap: 10,
+      padding: 8,
+      preferredY: "top",
+      pointerInsetLeft: 16,
+      pointerInsetRight: 16,
+    });
+  }, [hoveredNode, tooltipScreenPos, wrapperSize, measuredTooltipSize]);
+
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<SVGSVGElement>) => {
       if (e.key === "Escape") {
+        setHoveredNode(null);
+        setTooltipScreenPos(null);
         handleSetSelection(null);
         return;
       }
@@ -726,7 +872,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
       </div>
 
       {/* 3. Main SVG World Map Visualization Layer with Vector Pan & Zoom */}
-      <div className="np-geomap-canvas-wrapper" style={{ position: "relative", width: "100%", height: "auto" }}>
+      <div ref={canvasWrapperRef} className="np-geomap-canvas-wrapper" style={{ position: "relative", width: "100%", height: "auto" }}>
         <svg
           ref={svgRef}
           className="np-geomap-svg"
@@ -779,12 +925,12 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           {/* Root Pan/Zoom Transformed Group */}
           <g transform={`translate(${transform.x.toFixed(2)}, ${transform.y.toFixed(2)}) scale(${transform.scale.toFixed(4)})`}>
             {/* Layer 1: Graticule Grid & Equator / Prime Meridian */}
-            <line x1="0" y1="180" x2={MAP_WIDTH} y2="180" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="0.75" strokeDasharray="3 3" />
-            <line x1="360" y1="0" x2="360" y2={MAP_HEIGHT} stroke="rgba(255, 255, 255, 0.05)" strokeWidth="0.75" strokeDasharray="3 3" />
+            <line x1="0" y1="180" x2={MAP_WIDTH} y2="180" stroke="rgba(255, 255, 255, 0.05)" strokeWidth="0.75" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
+            <line x1="360" y1="0" x2="360" y2={MAP_HEIGHT} stroke="rgba(255, 255, 255, 0.05)" strokeWidth="0.75" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" />
 
             <g className="np-geomap__graticule" stroke="rgba(255, 255, 255, 0.03)" strokeWidth="0.5" strokeDasharray="2 4">
               {graticulePaths.map((p, idx) => (
-                <path key={idx} d={p} fill="none" />
+                <path key={idx} d={p} fill="none" vectorEffect="non-scaling-stroke" />
               ))}
             </g>
 
@@ -804,6 +950,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                     strokeWidth={isCountrySelected ? 1.2 : 0.65}
                     strokeLinejoin="round"
                     strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
                   >
                     <title>{country.name}</title>
                   </path>
@@ -823,6 +970,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                     strokeWidth={arc.strokeWidth}
                     opacity={arc.opacity}
                     strokeLinecap="round"
+                    vectorEffect="non-scaling-stroke"
                   />
                 ))}
               </g>
@@ -837,7 +985,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                     ref={(el) => {
                       particleRefs.current[i] = el;
                     }}
-                    r={arc.isSelected ? "3" : "2.2"}
+                    r={(arc.isSelected ? 3 : 2.2) / transform.scale}
                     fill="var(--np-accent, #2fe0d6)"
                     opacity="0"
                   />
@@ -861,33 +1009,31 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                 const radius = baseRadius + Math.sqrt(node.totalBytes / maxNodeBytes) * 5.5;
 
                 const labelPlacement = labelPlacements.get(node.id);
+                const invScale = 1 / transform.scale;
 
                 return (
                   <g
                     key={node.id}
                     className={`np-geomap__node-group ${isSelected ? "np-geomap__node-group--selected" : ""}`}
-                    transform={`translate(${node.x}, ${node.y})`}
+                    transform={`translate(${node.x}, ${node.y}) scale(${invScale.toFixed(4)})`}
                     opacity={nodeOpacity}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleNodeClick(node);
                     }}
-                    onMouseEnter={() => {
-                      setHoveredNode(node);
-                      setTooltipPos({ x: node.x, y: node.y });
+                    onMouseEnter={(e) => {
+                      handleNodeHover(node, radius, e.currentTarget);
                     }}
                     onMouseLeave={() => {
-                      setHoveredNode(null);
-                      setTooltipPos(null);
+                      handleNodeLeave();
                     }}
-                    onFocus={() => {
-                      setHoveredNode(node);
-                      setTooltipPos({ x: node.x, y: node.y });
+                    onFocus={(e) => {
+                      handleNodeHover(node, radius, e.currentTarget);
                     }}
                     onBlur={() => {
-                      setHoveredNode(null);
-                      setTooltipPos(null);
+                      handleNodeLeave();
                     }}
+                    aria-describedby={hoveredNode?.id === node.id ? `np-geomap-tooltip-${baseId}` : undefined}
                     role="button"
                     tabIndex={0}
                     aria-label={
@@ -983,7 +1129,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
 
             {/* Layer 6: Resolved Local Origin Node (Honest representation) */}
             {origin.status === "resolved" && (
-              <g transform={`translate(${projectGeo(origin.latitude, origin.longitude).join(",")})`}>
+              <g transform={`translate(${projectGeo(origin.latitude, origin.longitude).join(",")}) scale(${(1 / transform.scale).toFixed(4)})`}>
                 <circle r="7" fill="var(--np-good, #46c48d)" stroke="#fff" strokeWidth="1.5" />
                 <text x="10" y="3" fill="var(--np-good, #46c48d)" fontSize="9px" fontWeight="bold">
                   YOU ({origin.label})
@@ -1041,61 +1187,100 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           </span>
         </div>
 
-        {/* Floating Hover Tooltip */}
-        {hoveredNode && tooltipPos && (
+        {/* Floating Hover Tooltip with Collision-Aware Positioning and Dynamic Pointer Tracking */}
+        {hoveredNode && tooltipPlacement && (
           <div
-            className="np-geomap-tooltip"
+            ref={tooltipRef}
+            className={`np-geomap-tooltip np-geomap-tooltip--${tooltipPlacement.placementY}`}
             role="tooltip"
+            id={`np-geomap-tooltip-${baseId}`}
             aria-hidden="true"
             style={{
-              position: "absolute",
-              left: `${((tooltipPos.x * transform.scale + transform.x) / MAP_WIDTH) * 100}%`,
-              top: `${((tooltipPos.y * transform.scale + transform.y) / MAP_HEIGHT) * 100}%`,
-              transform: "translate(-50%, -125%)",
-              pointerEvents: "none",
-              zIndex: 10,
+              left: `${tooltipPlacement.left}px`,
+              top: `${tooltipPlacement.top}px`,
+              ["--pointer-x" as any]: `${tooltipPlacement.pointerX}px`,
             }}
           >
-            <div
-              className="np-card"
-              style={{
-                padding: "0.5rem 0.75rem",
-                minWidth: "170px",
-                background: "var(--np-surface-1, #0b111c)",
-                border: "1px solid var(--np-accent-line, #2fe0d6)",
-                boxShadow: "0 4px 16px rgba(0,0,0,0.6)",
-              }}
-            >
-              <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--np-accent)" }}>
-                {hoveredNode.label}
-              </div>
-              {hoveredNode.subLabel && (
-                <div style={{ fontSize: "0.72rem", color: "var(--np-text-dim)", marginBottom: "4px" }}>
-                  {hoveredNode.subLabel}
-                </div>
+            <div className="np-geomap-tooltip__arrow" />
+            <div className="np-geomap-tooltip__header">
+              <span
+                className={`np-geomap-tooltip__badge ${
+                  hoveredNode.nodeKind === "cluster" ? "np-geomap-tooltip__badge--cluster" : ""
+                }`}
+              >
+                {hoveredNode.nodeKind === "cluster"
+                  ? `CLUSTER (${hoveredNode.memberCount || 1})`
+                  : hoveredNode.nodeKind === "cityAggregate"
+                  ? `CITY (${hoveredNode.memberCount || 1})`
+                  : hoveredNode.nodeKind === "countryAggregate"
+                  ? `COUNTRY (${hoveredNode.memberCount || 1})`
+                  : hoveredNode.nodeKind === "otherResolvedAggregate"
+                  ? `AGGREGATE (${hoveredNode.memberCount || 1})`
+                  : "PUBLIC ENDPOINT"}
+              </span>
+              {hoveredNode.freshness === "active" && (
+                <span
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    fontSize: "0.62rem",
+                    color: "var(--np-accent, #2fe0d6)",
+                    fontFamily: "var(--np-font-mono, monospace)",
+                    fontWeight: 700,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: "5px",
+                      height: "5px",
+                      borderRadius: "50%",
+                      background: "var(--np-accent, #2fe0d6)",
+                      boxShadow: "0 0 6px var(--np-accent, #2fe0d6)",
+                    }}
+                  />
+                  ACTIVE
+                </span>
               )}
-              <div style={{ fontSize: "0.72rem", display: "grid", gridTemplateColumns: "auto 1fr", gap: "2px 8px" }}>
-                <span style={{ color: "var(--np-text-mute)" }}>Traffic:</span>
-                <span style={{ fontWeight: 500 }}>{humanBytes(hoveredNode.totalBytes)}</span>
-                <span style={{ color: "var(--np-text-mute)" }}>Flows:</span>
-                <span style={{ fontWeight: 500 }}>{hoveredNode.totalFlows}</span>
-                <span style={{ color: "var(--np-text-mute)" }}>ASNs:</span>
-                <span style={{ fontWeight: 500 }}>
-                  {hoveredNode.asns.length > 0 ? hoveredNode.asns.map((a) => `AS${a}`).join(", ") : "None"}
-                </span>
-                <span style={{ color: "var(--np-text-mute)" }}>Kind:</span>
-                <span style={{ fontWeight: 500 }}>
-                  {hoveredNode.nodeKind === "otherResolvedAggregate" ? "Aggregate Rollup" : hoveredNode.nodeKind}
-                </span>
-                {hoveredNode.precisionDescription && (
-                  <>
-                    <span style={{ color: "var(--np-text-mute)" }}>Precision:</span>
-                    <span style={{ fontWeight: 500, fontSize: "0.68rem", color: "var(--np-accent)" }}>
-                      {hoveredNode.precisionDescription}
-                    </span>
-                  </>
-                )}
+            </div>
+
+            <div className="np-geomap-tooltip__title" title={hoveredNode.label}>
+              {hoveredNode.label}
+            </div>
+            {hoveredNode.subLabel && (
+              <div className="np-geomap-tooltip__sub" title={hoveredNode.subLabel}>
+                {hoveredNode.subLabel}
               </div>
+            )}
+
+            <div className="np-geomap-tooltip__grid">
+              <span className="np-geomap-tooltip__key">Traffic:</span>
+              <span className="np-geomap-tooltip__val">{humanBytes(hoveredNode.totalBytes)}</span>
+
+              <span className="np-geomap-tooltip__key">Flows:</span>
+              <span className="np-geomap-tooltip__val">{hoveredNode.totalFlows}</span>
+
+              <span className="np-geomap-tooltip__key">ASNs:</span>
+              <span className="np-geomap-tooltip__val">
+                {hoveredNode.asns.length > 0 ? hoveredNode.asns.map((a) => `AS${a}`).join(", ") : "None"}
+              </span>
+
+              {hoveredNode.countryCode && (
+                <>
+                  <span className="np-geomap-tooltip__key">Country:</span>
+                  <span className="np-geomap-tooltip__val">{hoveredNode.countryCode}</span>
+                </>
+              )}
+            </div>
+
+            {hoveredNode.precisionDescription && (
+              <div className="np-geomap-tooltip__precision">
+                {hoveredNode.precisionDescription}
+              </div>
+            )}
+
+            <div className="np-geomap-tooltip__hint">
+              <span>Click or press Enter to inspect in Right Rail</span>
             </div>
           </div>
         )}
@@ -1116,12 +1301,13 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         {localLanHosts.length > 0 && (
           <div className="np-geomap-tray np-geomap-tray--local">
             <div className="np-geomap-tray__header">
-              <span className="np-badge np-badge--accent">
+              <span className="np-geomap-tray__badge np-geomap-tray__badge--accent">
+                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--accent" />
                 Local Network ({localLanHosts.length} LAN / Multicast)
               </span>
               <button
                 type="button"
-                className="np-btn np-btn--ghost np-btn--sm"
+                className="np-geomap-tray__inspect-btn"
                 onClick={() =>
                   handleSetSelection({
                     kind: "localNetworkGroup",
@@ -1140,7 +1326,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                 <button
                   key={h.ip}
                   type="button"
-                  className="np-pill"
+                  className="np-geomap-tray__chip"
                   onClick={() =>
                     handleSetSelection({
                       kind: "endpoint",
@@ -1149,8 +1335,11 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                       host: h,
                     })
                   }
+                  title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
                 >
-                  {h.ip} • {h.classification.categoryLabel}
+                  <span className="np-geomap-tray__chip-text">
+                    {h.ip} • {h.classification.categoryLabel}
+                  </span>
                 </button>
               ))}
             </div>
@@ -1161,12 +1350,13 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         {specialHosts.length > 0 && (
           <div className="np-geomap-tray np-geomap-tray--special">
             <div className="np-geomap-tray__header">
-              <span className="np-badge np-badge--neutral">
+              <span className="np-geomap-tray__badge np-geomap-tray__badge--neutral">
+                <span className="np-geomap-tray__badge-dot np-geomap-tray__badge-dot--neutral" />
                 Shared Space / Special ({specialHosts.length})
               </span>
               <button
                 type="button"
-                className="np-btn np-btn--ghost np-btn--sm"
+                className="np-geomap-tray__inspect-btn"
                 onClick={() =>
                   handleSetSelection({
                     kind: "localNetworkGroup",
@@ -1185,7 +1375,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                 <button
                   key={h.ip}
                   type="button"
-                  className="np-pill"
+                  className="np-geomap-tray__chip"
                   onClick={() =>
                     handleSetSelection({
                       kind: "endpoint",
@@ -1194,8 +1384,11 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                       host: h,
                     })
                   }
+                  title={`Inspect ${h.ip} (${h.classification.categoryLabel})`}
                 >
-                  {h.ip} • {h.classification.categoryLabel}
+                  <span className="np-geomap-tray__chip-text">
+                    {h.ip} • {h.classification.categoryLabel}
+                  </span>
                 </button>
               ))}
             </div>

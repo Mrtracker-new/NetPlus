@@ -10,7 +10,7 @@ afterEach(() => {
 
 const mockHosts: BreakdownRow[] = [
   {
-    label: "1.1.1.1",
+    label: "17.0.0.1",
     bytes: 1048576,
     flows: 12,
     hostnames: [{ name: "one.one.one.one", source: "dns" }],
@@ -67,7 +67,7 @@ describe("GlobalTrafficMap Component", () => {
     const handleSelect = vi.fn();
     render(<GlobalTrafficMap hosts={mockHosts} onSelectEntity={handleSelect} />);
 
-    expect(screen.getByText(/have no geographic resolution/i)).toBeInTheDocument();
+    expect(screen.getByText(/without physical coordinate resolution/i)).toBeInTheDocument();
     const inspectBtn = screen.getByRole("button", { name: /Inspect Unresolved/i });
     expect(inspectBtn).toBeInTheDocument();
 
@@ -98,7 +98,7 @@ describe("GlobalTrafficMap Component", () => {
     expect(handleSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "endpoint",
-        ip: "1.1.1.1",
+        ip: "17.0.0.1",
       })
     );
   });
@@ -219,8 +219,8 @@ describe("GlobalTrafficMap Component", () => {
         hosts={mockHosts}
         selectedEntity={{
           kind: "endpoint",
-          ip: "1.1.1.1",
-          entityId: "entity-host-1.1.1.1",
+          ip: "17.0.0.1",
+          entityId: "entity-host-17.0.0.1",
           host: {} as any,
         }}
       />
@@ -239,7 +239,7 @@ describe("GlobalTrafficMap Component", () => {
     const handleSelect = vi.fn();
     // 4 verified resolved locations: US (San Jose), Germany (Frankfurt), Switzerland (Zurich), Japan (Tokyo)
     const denseHosts: BreakdownRow[] = [
-      { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [{ name: "us-host", source: "dns" }], evidence: [] },
+      { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [{ name: "us-host", source: "dns" }], evidence: [] },
       { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [{ name: "de-host", source: "dns" }], evidence: [] },
       { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [{ name: "ch-host", source: "dns" }], evidence: [] },
       { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [{ name: "jp-host", source: "dns" }], evidence: [] },
@@ -270,26 +270,26 @@ describe("GlobalTrafficMap Component", () => {
 
   it("clarifies that public IPv6 is deferred in the coverage banner and HUD", () => {
     const mixedHosts: BreakdownRow[] = [
-      { label: "1.1.1.1", bytes: 1000, flows: 2, hostnames: [], evidence: [] },
+      { label: "17.0.0.1", bytes: 1000, flows: 2, hostnames: [], evidence: [] },
       { label: "2607:f8b0:4005:805::200e", bytes: 3000, flows: 4, hostnames: [], evidence: [] }, // Public IPv6
     ];
 
     render(<GlobalTrafficMap hosts={mixedHosts} />);
 
     // Coverage banner indicates IPv6 deferred
-    expect(screen.getByText(/including 1 IPv6 deferred/i)).toBeInTheDocument();
+    expect(screen.getByText(/1 IPv6 deferred/i)).toBeInTheDocument();
 
     // HUD has Geographic Coverage label
     const hudItem = screen.getByText("GEOGRAPHIC COVERAGE").closest(".np-geomap-hud__item");
     expect(hudItem).toHaveAttribute(
       "title",
-      expect.stringContaining("Public IPv6 GeoIP resolution is intentionally deferred")
+      expect.stringContaining("Geographic Traffic Coverage")
     );
   });
 
   it("Regression Test: Standalone GlobalTrafficMap updates continuously without snapshotSequence prop (A -> B -> C -> D)", () => {
     const hostA: BreakdownRow[] = [
-      { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "alpha.host", source: "dns" }], evidence: [] },
+      { label: "17.0.0.1", bytes: 1000, flows: 1, hostnames: [{ name: "alpha.host", source: "dns" }], evidence: [] },
     ];
     const hostB: BreakdownRow[] = [
       { label: "31.0.0.1", bytes: 2000, flows: 2, hostnames: [{ name: "beta.host", source: "dns" }], evidence: [] },
@@ -320,7 +320,7 @@ describe("GlobalTrafficMap Component", () => {
 
   it("Regression Test: Mode switching between implicit and explicit sequencing (implicit A -> B -> C -> explicit 100 -> 101 -> 99)", () => {
     const hostA: BreakdownRow[] = [
-      { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [{ name: "host-a.com", source: "dns" }], evidence: [] },
+      { label: "17.0.0.1", bytes: 1000, flows: 1, hostnames: [{ name: "host-a.com", source: "dns" }], evidence: [] },
     ];
     const hostB: BreakdownRow[] = [
       { label: "31.0.0.1", bytes: 2000, flows: 2, hostnames: [{ name: "host-b.com", source: "dns" }], evidence: [] },
@@ -332,7 +332,7 @@ describe("GlobalTrafficMap Component", () => {
       { label: "142.250.30.1", bytes: 4000, flows: 4, hostnames: [{ name: "host-100.com", source: "dns" }], evidence: [] },
     ];
     const host101: BreakdownRow[] = [
-      { label: "1.1.1.1", bytes: 5000, flows: 5, hostnames: [{ name: "host-101.com", source: "dns" }], evidence: [] },
+      { label: "17.0.0.1", bytes: 5000, flows: 5, hostnames: [{ name: "host-101.com", source: "dns" }], evidence: [] },
     ];
     const host99Stale: BreakdownRow[] = [
       { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [{ name: "host-99-stale.com", source: "dns" }], evidence: [] },

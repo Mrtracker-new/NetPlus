@@ -49,6 +49,8 @@ export * from "./geo/spatialClustering";
 export * from "./geo/labelLayout";
 export * from "./geo/mapViewModel";
 export * from "./geo/tooltipPlacement";
+export * from "./geo/observedHostnameClassifier";
+export * from "./geo/secondaryGeoProvider";
 
 export {
   hostSourceRank,

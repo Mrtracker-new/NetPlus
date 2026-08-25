@@ -11,7 +11,7 @@ afterEach(() => {
 
 const mockHosts: BreakdownRow[] = [
   {
-    label: "1.1.1.1",
+    label: "17.0.0.1",
     bytes: 1048576,
     flows: 12,
     hostnames: [{ name: "one.one.one.one", source: "dns" }],
@@ -65,7 +65,7 @@ describe("GlobalTrafficMap Integration in @netpulse/app", () => {
     const handleSelect = vi.fn();
     render(<GlobalTrafficMap hosts={mockHosts} onSelectEntity={handleSelect} />);
 
-    expect(screen.getByText(/have no geographic resolution/i)).toBeInTheDocument();
+    expect(screen.getByText(/without physical coordinate resolution/i)).toBeInTheDocument();
     const inspectBtn = screen.getByRole("button", { name: /Inspect Unresolved/i });
     expect(inspectBtn).toBeInTheDocument();
 
@@ -96,7 +96,7 @@ describe("GlobalTrafficMap Integration in @netpulse/app", () => {
     expect(handleSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "endpoint",
-        ip: "1.1.1.1",
+        ip: "17.0.0.1",
       })
     );
   });

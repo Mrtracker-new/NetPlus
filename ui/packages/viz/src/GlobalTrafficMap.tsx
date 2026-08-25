@@ -298,11 +298,11 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
   } = viewModel;
 
   const publicResolvedHosts = useMemo(
-    () => snapshotModel.enrichedHosts.filter((h) => h.geo.status === "resolved"),
+    () => snapshotModel.enrichedHosts.filter((h) => h.geo.mapEligible),
     [snapshotModel.enrichedHosts]
   );
   const unresolvedPublicHosts = useMemo(
-    () => snapshotModel.enrichedHosts.filter((h) => h.classification.isPublic && h.geo.status === "unresolved"),
+    () => snapshotModel.enrichedHosts.filter((h) => h.classification.isPublic && !h.geo.mapEligible),
     [snapshotModel.enrichedHosts]
   );
   const localLanHosts = useMemo(
@@ -319,11 +319,11 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     const countrySet = new Set<string>();
     const asnSet = new Set<number>();
     for (const h of publicResolvedHosts) {
-      if (h.geo.status === "resolved") {
+      if (h.geo.countryCode) {
         countrySet.add(h.geo.countryCode);
-        if (h.asn.status === "resolved") {
-          asnSet.add(h.asn.asn);
-        }
+      }
+      if (h.asn.status === "resolved") {
+        asnSet.add(h.asn.asn);
       }
     }
     return {
@@ -830,10 +830,16 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           <span className="np-geomap-hud__label">RESOLVED COUNTRIES</span>
           <span className="np-geomap-hud__val">{distinctCountries.length}</span>
         </div>
-        <div className="np-geomap-hud__item" title="Geographically resolved public endpoints out of all observed public destinations">
+        <div
+          className="np-geomap-hud__item"
+          title={`Geographically resolved public destinations (${coverageStats.resolvedHostsCount}/${coverageStats.publicHostsCount} endpoints, ${coverageStats.physicalCoveragePercent.toFixed(0)}% physical coverage)`}
+        >
           <span className="np-geomap-hud__label">RESOLVED ENDPOINTS</span>
           <span className="np-geomap-hud__val">
-            {coverageStats.resolvedHostsCount} <span className="np-geomap-hud__sub">/ {coverageStats.publicHostsCount}</span>
+            {coverageStats.resolvedHostsCount}{" "}
+            <span className="np-geomap-hud__sub">
+              / {coverageStats.publicHostsCount} ({coverageStats.physicalCoveragePercent.toFixed(0)}%)
+            </span>
           </span>
         </div>
         <div className="np-geomap-hud__item" title="Unique Autonomous System Numbers (ASNs) from resolved public endpoints">
@@ -846,21 +852,21 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         </div>
         <div
           className="np-geomap-hud__item"
-          title={`Percentage of observed public destinations with geographic coordinate resolution (${coverageStats.resolvedHostsCount}/${coverageStats.publicHostsCount} endpoints, ${coverageStats.resolvedBytesPercent.toFixed(0)}% bytes). Public IPv6 GeoIP resolution is intentionally deferred.`}
+          title={`Geographic Traffic Coverage: ${coverageStats.resolvedBytesPercent.toFixed(0)}% volume (${humanBytes(coverageStats.resolvedBytes)} / ${humanBytes(coverageStats.totalBytes)}). Progressive Breakdown: City: ${coverageStats.cityResolvedHostsCount} · Region: ${coverageStats.regionResolvedHostsCount} · Country: ${coverageStats.countryResolvedHostsCount} · Network: ${coverageStats.networkResolvedHostsCount} · Unknown: ${coverageStats.unknownHostsCount}`}
         >
           <span className="np-geomap-hud__label">GEOGRAPHIC COVERAGE</span>
           <span
             className="np-geomap-hud__val"
             style={{
               color:
-                coverageStats.coveragePercent > 80
+                coverageStats.physicalCoveragePercent > 80
                   ? "var(--np-good, #46c48d)"
-                  : coverageStats.coveragePercent > 40
+                  : coverageStats.physicalCoveragePercent > 40
                   ? "var(--np-warning, #f2b64d)"
                   : "var(--np-accent, #2fe0d6)",
             }}
           >
-            {Math.round(coverageStats.coveragePercent)}%
+            {Math.round(coverageStats.physicalCoveragePercent)}%
             <span className="np-geomap-hud__sub"> ({coverageStats.resolvedBytesPercent.toFixed(0)}% bytes)</span>
           </span>
         </div>
@@ -890,7 +896,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
               ⚠
             </span>
             <span>
-              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> have no geographic resolution ({humanBytes(coverageStats.unresolvedBytes)} observed{coverageStats.ipv6DeferredHostsCount && coverageStats.ipv6DeferredHostsCount > 0 ? `, including ${coverageStats.ipv6DeferredHostsCount} IPv6 deferred` : ""})
+              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> without physical coordinate resolution ({humanBytes(coverageStats.unresolvedBytes)} · {(100 - coverageStats.resolvedBytesPercent).toFixed(0)}% of observed traffic{coverageStats.countryResolvedHostsCount + coverageStats.networkResolvedHostsCount > 0 ? `, ${coverageStats.countryResolvedHostsCount + coverageStats.networkResolvedHostsCount} enriched with country/network identity` : ""}{coverageStats.unknownHostsCount > 0 ? `, ${coverageStats.unknownHostsCount} unknown` : ""}{coverageStats.ipv6DeferredHostsCount && coverageStats.ipv6DeferredHostsCount > 0 ? `, ${coverageStats.ipv6DeferredHostsCount} IPv6 deferred` : ""}). Physical locations omitted to preserve semantic accuracy.
             </span>
           </div>
           <button

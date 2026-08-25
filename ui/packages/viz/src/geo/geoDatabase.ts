@@ -5,14 +5,16 @@ import type {
   EnrichedHost,
   GeoConfidence,
   GeoResolution,
+  GeoResolutionTrace,
   IPv4Int,
   OriginResolution,
   TelemetryFreshness,
   NetworkDistribution,
   ResolutionLimitation,
+  ProviderHint,
 } from "./geoTypes";
 import { classifyIpAddress, parseIpv4ToUint32, clearClassifierCache } from "./ipClassifier";
-import { extractLocationFromHostname, type GeoHint } from "./observedHostnameClassifier";
+import { extractLocationFromHostname, extractProviderFromHostname, type GeoHint } from "./observedHostnameClassifier";
 import { BoundedCache } from "./boundedCache";
 import { IPV4_GEO_INTERVALS } from "./generatedGeoIntervals";
 import { IPV4_ASN_INTERVALS } from "./generatedAsnIntervals";
@@ -164,7 +166,16 @@ function classifyDistribution(isAnycast: boolean, asOrg?: string): NetworkDistri
       orgLower.includes("linode") ||
       orgLower.includes("fastly") ||
       orgLower.includes("akamai") ||
-      orgLower.includes("cloudflare")
+      orgLower.includes("cloudflare") ||
+      orgLower.includes("hostinger") ||
+      orgLower.includes("vultr") ||
+      orgLower.includes("leaseweb") ||
+      orgLower.includes("alibaba") ||
+      orgLower.includes("tencent") ||
+      orgLower.includes("scaleway") ||
+      orgLower.includes("gcore") ||
+      orgLower.includes("equinix") ||
+      orgLower.includes("contabo")
     ) {
       return "cloud";
     }
@@ -179,16 +190,17 @@ function classifyDistribution(isAnycast: boolean, asOrg?: string): NetworkDistri
  * Strictly offline.
  */
 export function resolveAnycast(ip: string): AnycastClassification {
-  const cached = anycastCache.get(ip);
+  const normalizedIp = ip.trim();
+  const cached = anycastCache.get(normalizedIp);
   if (cached) return cached;
 
-  const v4Num = parseIpv4ToUint32(ip);
+  const v4Num = parseIpv4ToUint32(normalizedIp);
   if (v4Num === null) {
     const result: AnycastClassification = {
       isAnycast: false, provider: null, service: null, prefixCidr: null,
       source: "generated-anycast-v1",
     };
-    anycastCache.set(ip, result);
+    anycastCache.set(normalizedIp, result);
     return result;
   }
 
@@ -209,8 +221,457 @@ export function resolveAnycast(ip: string): AnycastClassification {
         source: "generated-anycast-v1",
       };
 
-  anycastCache.set(ip, result);
+  anycastCache.set(normalizedIp, result);
   return result;
+}
+
+/**
+ * Core unified geographic resolution & trace derivation engine.
+ * Single source of truth for both production resolution and diagnostic tracing.
+ */
+export function resolveGeoCore(
+  ip: string,
+  observedHostnames?: string[]
+): { resolution: GeoResolution; trace: GeoResolutionTrace } {
+  const normalizedIp = ip.trim();
+
+  // Stage 1: Special-use classification -- always first.
+  const classification = classifyIpAddress(normalizedIp);
+
+  if (classification.category === "invalid") {
+    const resolution: GeoResolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: "unknown",
+      mapEligible: false,
+      source: "none",
+      geoDatabaseVersion: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      limitation: "invalid_address_syntax",
+      reason: "invalid_address",
+      explanation: "Invalid IP address syntax",
+    };
+    const trace: GeoResolutionTrace = {
+      ip: normalizedIp,
+      addressClassification: "invalid",
+      geoIp: { status: "miss" },
+      asn: { status: "miss" },
+      anycast: { status: "miss" },
+      cloud: { status: "miss" },
+      hostname: { status: "miss" },
+      finalPrecision: "unknown",
+      finalReason: "invalid_address_syntax",
+      explanation: resolution.explanation,
+      mapEligible: false,
+    };
+    return { resolution, trace };
+  }
+
+  if (classification.version === 6 && classification.isPublic) {
+    const resolution: GeoResolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: "unicast",
+      mapEligible: false,
+      source: "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      limitation: "ipv6_database_unavailable",
+      reason: "ipv6_deferred",
+      explanation: "IPv6 geographic coordinate resolution unavailable in local database",
+    };
+    const trace: GeoResolutionTrace = {
+      ip: normalizedIp,
+      addressClassification: classification.category,
+      geoIp: { status: "miss" },
+      asn: { status: "miss" },
+      anycast: { status: "miss" },
+      cloud: { status: "miss" },
+      hostname: { status: "miss" },
+      finalPrecision: "unknown",
+      finalReason: "ipv6_database_unavailable",
+      explanation: resolution.explanation,
+      mapEligible: false,
+    };
+    return { resolution, trace };
+  }
+
+  if (!classification.isPublic || classification.version !== 4) {
+    const distribution = classification.category === "multicast" ? "multicast" : "unknown";
+    const resolution: GeoResolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution,
+      mapEligible: false,
+      source: "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      limitation: "private_or_special_address",
+      reason: "no_match",
+      explanation: `${classification.categoryLabel} address space (physical location omitted)`,
+    };
+    const trace: GeoResolutionTrace = {
+      ip: normalizedIp,
+      addressClassification: classification.category,
+      geoIp: { status: "miss" },
+      asn: { status: "miss" },
+      anycast: { status: "miss" },
+      cloud: { status: "miss" },
+      hostname: { status: "miss" },
+      finalPrecision: "unknown",
+      finalReason: "private_or_special_address",
+      explanation: resolution.explanation,
+      mapEligible: false,
+    };
+    return { resolution, trace };
+  }
+
+  // Stage 2: IPv4 conversion
+  const v4Num = parseIpv4ToUint32(normalizedIp);
+  if (v4Num === null) {
+    const resolution: GeoResolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: "unknown",
+      mapEligible: false,
+      source: "none",
+      geoDatabaseVersion: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      limitation: "invalid_address_syntax",
+      reason: "invalid_address",
+      explanation: "Invalid IPv4 address format",
+    };
+    const trace: GeoResolutionTrace = {
+      ip: normalizedIp,
+      addressClassification: classification.category,
+      geoIp: { status: "miss" },
+      asn: { status: "miss" },
+      anycast: { status: "miss" },
+      cloud: { status: "miss" },
+      hostname: { status: "miss" },
+      finalPrecision: "unknown",
+      finalReason: "invalid_address_syntax",
+      explanation: resolution.explanation,
+      mapEligible: false,
+    };
+    return { resolution, trace };
+  }
+
+  // Stage 3: GeoIP lookup
+  const geoRecord = findIpv4GeoInterval(v4Num);
+
+  // Stage 4: Anycast lookup
+  const anycastPrefix = findAnycastInterval(v4Num);
+  const isAnycast = anycastPrefix !== null;
+
+  // Stage 5: ASN lookup
+  const asnRecord = findIpv4AsnInterval(v4Num);
+
+  // Stage 6: Observed Hostname analysis (conservative token matching & provider domain hint)
+  let geoHint: GeoHint | null = null;
+  let providerHint: ProviderHint | null = null;
+  let matchedGeoHostname: string | undefined;
+  let matchedProviderHostname: string | undefined;
+
+  if (observedHostnames && observedHostnames.length > 0) {
+    for (const rawH of observedHostnames) {
+      if (!rawH || typeof rawH !== "string") continue;
+      const h = rawH.trim();
+      if (!h) continue;
+
+      if (!geoHint) {
+        const gh = extractLocationFromHostname(h);
+        if (gh) {
+          geoHint = gh;
+          matchedGeoHostname = h;
+        }
+      }
+      if (!providerHint) {
+        const ph = extractProviderFromHostname(h);
+        if (ph) {
+          providerHint = ph;
+          matchedProviderHostname = h;
+        }
+      }
+    }
+  }
+
+  const primaryMatchedHostname = matchedGeoHostname || matchedProviderHostname;
+
+  // Stage 7: Progressive resolution synthesis & conflict handling
+  const distribution = classifyDistribution(isAnycast, asnRecord?.asOrg || providerHint?.provider);
+
+  const hasGeoConflict = Boolean(
+    geoRecord && geoHint && geoHint.countryCode && geoRecord.countryCode.toUpperCase() !== geoHint.countryCode.toUpperCase()
+  );
+
+  let resolution: GeoResolution;
+
+  if (geoRecord && geoRecord.city !== null && geoRecord.city.length > 0) {
+    // City-level record in GeoIP database
+    if (isAnycast) {
+      resolution = {
+        status: "resolved",
+        precision: "city",
+        distribution: "anycast",
+        mapEligible: false, // Invariant: Anycast reference coordinates must never be rendered as a physical endpoint
+        country: geoRecord.country,
+        countryCode: geoRecord.countryCode,
+        city: geoRecord.city,
+        latitude: geoRecord.latitude,
+        longitude: geoRecord.longitude,
+        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
+        confidence: null,
+        locationMeaning: "anyCastPoP",
+        locationLevel: "city",
+        precisionDescription: "anycast reference location",
+        source: "local_database",
+        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+        asn: asnRecord?.asn,
+        organization: asnRecord?.asOrg || anycastPrefix.provider,
+        observedHostname: primaryMatchedHostname,
+        limitation: "anycast_distributed_routing",
+        reason: "anycast",
+        explanation: "Anycast distributed network; coordinates represent prefix reference, not physical endpoint",
+      };
+    } else {
+      // Unicast City resolution
+      const isCompositeAgreement =
+        geoHint &&
+        geoHint.countryCode === geoRecord.countryCode &&
+        (geoHint.locationName.toLowerCase() === geoRecord.city.toLowerCase() ||
+          geoHint.iataCode.toLowerCase() === geoRecord.city.substring(0, 3).toLowerCase());
+
+      const confidence = hasGeoConflict
+        ? "low"
+        : isCompositeAgreement
+        ? "high"
+        : deriveConfidence("geoIpLocation", geoRecord.accuracyRadiusKm);
+
+      const limitation: ResolutionLimitation | undefined = hasGeoConflict
+        ? "geo_sources_disagree"
+        : undefined;
+
+      resolution = {
+        status: "resolved",
+        precision: "city",
+        distribution: "unicast",
+        mapEligible: true,
+        country: geoRecord.country,
+        countryCode: geoRecord.countryCode,
+        city: geoRecord.city,
+        latitude: geoRecord.latitude,
+        longitude: geoRecord.longitude,
+        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
+        confidence,
+        locationMeaning: "geoIpLocation",
+        locationLevel: "city",
+        precisionDescription: "city-level estimate",
+        source: isCompositeAgreement ? "composite" : "local_database",
+        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+        asn: asnRecord?.asn,
+        organization: asnRecord?.asOrg || providerHint?.provider,
+        observedHostname: primaryMatchedHostname,
+        limitation,
+        explanation: hasGeoConflict
+          ? `Geographic city-level resolution for ${geoRecord.city}, ${geoRecord.countryCode} (hostname location hint disagrees)`
+          : `Geographic city-level resolution for ${geoRecord.city}, ${geoRecord.countryCode}`,
+      };
+    }
+  } else if (geoRecord) {
+    // Country-only record in GeoIP database (no city / coordinates)
+    const isCompositeAgreement = Boolean(
+      geoHint && geoHint.countryCode.toUpperCase() === geoRecord.countryCode.toUpperCase()
+    );
+    const limitation: ResolutionLimitation = isAnycast
+      ? "anycast_distributed_routing"
+      : distribution === "cloud"
+      ? "cloud_or_hosting_network"
+      : hasGeoConflict
+      ? "geo_sources_disagree"
+      : "country_level_only";
+
+    resolution = {
+      status: "unresolved",
+      precision: "country",
+      distribution,
+      mapEligible: false,
+      country: geoRecord.country,
+      countryCode: geoRecord.countryCode,
+      city: null,
+      confidence: hasGeoConflict ? "low" : (isCompositeAgreement || Boolean(asnRecord) ? "medium" : "low"),
+      locationMeaning: "countryOnly",
+      locationLevel: "country",
+      precisionDescription: "country-level estimate",
+      source: isCompositeAgreement || Boolean(asnRecord) ? "composite" : "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      asn: asnRecord?.asn,
+      organization: asnRecord?.asOrg || providerHint?.provider,
+      observedHostname: primaryMatchedHostname,
+      limitation,
+      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : (hasGeoConflict ? "sources_disagree" : "country_only"),
+      explanation: isAnycast
+        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); distributed Anycast network`
+        : distribution === "cloud"
+        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); cloud / hosting infrastructure`
+        : `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); city-level coordinates unavailable`,
+    };
+  } else if (asnRecord) {
+    // No GeoIP record, but ASN matches -> NETWORK resolution
+    const hasHostnameCountry = Boolean(geoHint && geoHint.countryCode);
+    const countryCode = geoHint?.countryCode;
+    const limitation: ResolutionLimitation = isAnycast
+      ? "anycast_distributed_routing"
+      : distribution === "cloud"
+      ? "cloud_or_hosting_network"
+      : "physical_location_unavailable";
+
+    const isGoogle = asnRecord.asOrg.toLowerCase().includes("google");
+    const explanation = isAnycast
+      ? (hasHostnameCountry
+          ? `Network identified as distributed anycast infrastructure (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName}; a single physical endpoint location cannot be established`
+          : `Network identified as distributed anycast infrastructure (${asnRecord.asOrg}); a single physical endpoint location cannot be established`)
+      : distribution === "cloud"
+      ? (isGoogle
+          ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (cloud / hosting provider)`
+          : (hasHostnameCountry
+              ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName} (cloud / hosting provider)`
+              : `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (cloud / hosting provider)`))
+      : (hasHostnameCountry
+          ? `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName}`
+          : `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg})`);
+
+    resolution = {
+      status: "unresolved",
+      precision: "network",
+      distribution,
+      mapEligible: false,
+      country: countryCode,
+      countryCode,
+      city: null,
+      confidence: hasHostnameCountry ? "medium" : "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "network-level estimate",
+      source: hasHostnameCountry ? "composite" : "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      asn: asnRecord.asn,
+      organization: asnRecord.asOrg,
+      observedHostname: primaryMatchedHostname,
+      limitation,
+      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : "asn_only",
+      explanation,
+    };
+  } else if (providerHint) {
+    // No GeoIP or ASN record, but observed hostname has a verified provider domain match
+    resolution = {
+      status: "unresolved",
+      precision: "network",
+      distribution: providerHint.distribution || "cloud",
+      mapEligible: false,
+      organization: providerHint.provider,
+      city: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "network-level estimate",
+      source: "observed_hostname",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      observedHostname: matchedProviderHostname,
+      limitation: "cloud_or_hosting_network",
+      reason: "cloud",
+      explanation: `Network/provider identity inferred from observed hostname (${matchedProviderHostname}); IP-level ASN ownership was not established.`,
+    };
+  } else if (geoHint) {
+    // No GeoIP, ASN, or Provider record, but observed hostname has a verified IATA/location hint
+    resolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: isAnycast ? "anycast" : "unknown",
+      mapEligible: false,
+      country: geoHint.locationName,
+      countryCode: geoHint.countryCode,
+      city: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      source: "observed_hostname",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      observedHostname: matchedGeoHostname,
+      limitation: "unmapped_public_address",
+      reason: "no_match",
+      explanation: `Unmapped public address; observed hostname suggests ${geoHint.locationName} (${geoHint.countryCode})`,
+    };
+  } else {
+    // Completely unmapped
+    resolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: isAnycast ? "anycast" : "unknown",
+      mapEligible: false,
+      city: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      source: "none",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      limitation: "unmapped_public_address",
+      reason: "no_match",
+      explanation: "No local geographic, country, ASN, or network evidence was found.",
+    };
+  }
+
+  // Diagnostic trace object built from the exact same evaluation
+  const trace: GeoResolutionTrace = {
+    ip: normalizedIp,
+    addressClassification: classification.category,
+    geoIp: {
+      status: geoRecord ? "match" : "miss",
+      precision: geoRecord ? (geoRecord.city ? "city" : "country") : undefined,
+      country: geoRecord?.country,
+      countryCode: geoRecord?.countryCode,
+      city: geoRecord?.city,
+    },
+    asn: {
+      status: asnRecord ? "match" : "miss",
+      asn: asnRecord?.asn,
+      organization: asnRecord?.asOrg,
+    },
+    anycast: {
+      status: isAnycast ? "match" : "miss",
+      provider: anycastPrefix?.provider ?? null,
+    },
+    cloud: {
+      status: distribution === "cloud" ? "match" : "miss",
+      provider: distribution === "cloud" ? (asnRecord?.asOrg || providerHint?.provider) : undefined,
+    },
+    hostname: {
+      status: (geoHint || providerHint) ? "match" : "miss",
+      hint: geoHint ? { locationName: geoHint.locationName, countryCode: geoHint.countryCode, iataCode: geoHint.iataCode } : undefined,
+      providerHint: providerHint ?? undefined,
+      matchedHostname: primaryMatchedHostname,
+    },
+    finalPrecision: resolution.precision,
+    finalReason: resolution.limitation || resolution.reason,
+    explanation: resolution.explanation,
+    mapEligible: resolution.mapEligible,
+  };
+
+  return { resolution, trace };
 }
 
 /**
@@ -235,303 +696,18 @@ export function resolveGeo(ip: string, observedHostnames?: string[]): GeoResolut
   const cached = geoCache.get(cacheKey);
   if (cached) return cached;
 
-  // Stage 1: Special-use classification -- always first.
-  const classification = classifyIpAddress(normalizedIp);
+  const { resolution } = resolveGeoCore(ip, observedHostnames);
+  geoCache.set(cacheKey, resolution);
+  return resolution;
+}
 
-  if (classification.category === "invalid") {
-    const result: GeoResolution = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: "unknown",
-      mapEligible: false,
-      source: "none",
-      geoDatabaseVersion: null,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      limitation: "invalid_address_syntax",
-      reason: "invalid_address",
-      explanation: "Invalid IP address syntax",
-    };
-    geoCache.set(cacheKey, result);
-    return result;
-  }
-
-  if (classification.version === 6 && classification.isPublic) {
-    // Explicit IPv6 handling: currently local IPv6 intervals are unavailable
-    const result: GeoResolution = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: "unicast",
-      mapEligible: false,
-      source: "local_database",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      limitation: "ipv6_database_unavailable",
-      reason: "ipv6_deferred",
-      explanation: "IPv6 geographic coordinate resolution unavailable in local database",
-    };
-    geoCache.set(cacheKey, result);
-    return result;
-  }
-
-  if (!classification.isPublic || classification.version !== 4) {
-    // Special-use, private, loopback, multicast, etc.
-    const result: GeoResolution = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: classification.category === "multicast" ? "multicast" : "unknown",
-      mapEligible: false,
-      source: "local_database",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      limitation: "private_or_special_address",
-      reason: "no_match",
-      explanation: `${classification.categoryLabel} address space (physical location omitted)`,
-    };
-    geoCache.set(cacheKey, result);
-    return result;
-  }
-
-  // Stage 2: IPv4 conversion
-  const v4Num = parseIpv4ToUint32(normalizedIp);
-  if (v4Num === null) {
-    const result: GeoResolution = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: "unknown",
-      mapEligible: false,
-      source: "none",
-      geoDatabaseVersion: null,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      limitation: "invalid_address_syntax",
-      reason: "invalid_address",
-      explanation: "Invalid IPv4 address format",
-    };
-    geoCache.set(cacheKey, result);
-    return result;
-  }
-
-  // Stage 3: GeoIP lookup
-  const geoRecord = findIpv4GeoInterval(v4Num);
-
-  // Stage 4: Anycast lookup
-  const anycastPrefix = findAnycastInterval(v4Num);
-  const isAnycast = anycastPrefix !== null;
-
-  // Stage 5: ASN lookup
-  const asnRecord = findIpv4AsnInterval(v4Num);
-
-  // Stage 6: Observed Hostname analysis (conservative token-boundary matching)
-  let geoHint: GeoHint | null = null;
-  let matchedHostnameStr: string | undefined;
-  if (observedHostnames && observedHostnames.length > 0) {
-    for (const h of observedHostnames) {
-      const hint = extractLocationFromHostname(h);
-      if (hint) {
-        geoHint = hint;
-        matchedHostnameStr = h;
-        break;
-      }
-    }
-  }
-
-  // Stage 7: Progressive resolution synthesis
-  let result: GeoResolution;
-  const distribution = classifyDistribution(isAnycast, asnRecord?.asOrg);
-
-  if (geoRecord && geoRecord.city !== null && geoRecord.city.length > 0) {
-    // City-level record in GeoIP database
-    if (isAnycast) {
-      result = {
-        status: "resolved",
-        precision: "city",
-        distribution: "anycast",
-        mapEligible: false, // Invariant: Anycast reference coordinates must never be rendered as a single physical endpoint
-        country: geoRecord.country,
-        countryCode: geoRecord.countryCode,
-        city: geoRecord.city,
-        latitude: geoRecord.latitude,
-        longitude: geoRecord.longitude,
-        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
-        confidence: null,
-        locationMeaning: "anyCastPoP",
-        locationLevel: "city",
-        precisionDescription: "anycast reference location",
-        source: "local_database",
-        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-        asn: asnRecord?.asn,
-        organization: asnRecord?.asOrg || anycastPrefix.provider,
-        observedHostname: matchedHostnameStr,
-        limitation: "anycast_distributed_routing",
-        reason: "anycast",
-        explanation: "Anycast distributed network; coordinates represent prefix reference, not physical endpoint",
-      };
-    } else {
-      // Unicast City resolution
-      const isCompositeAgreement =
-        geoHint &&
-        geoHint.countryCode === geoRecord.countryCode &&
-        (geoHint.locationName.toLowerCase() === geoRecord.city.toLowerCase() ||
-          geoHint.iataCode.toLowerCase() === geoRecord.city.substring(0, 3).toLowerCase());
-
-      const confidence = isCompositeAgreement
-        ? "high"
-        : deriveConfidence("geoIpLocation", geoRecord.accuracyRadiusKm);
-
-      result = {
-        status: "resolved",
-        precision: "city",
-        distribution: "unicast",
-        mapEligible: true,
-        country: geoRecord.country,
-        countryCode: geoRecord.countryCode,
-        city: geoRecord.city,
-        latitude: geoRecord.latitude,
-        longitude: geoRecord.longitude,
-        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
-        confidence,
-        locationMeaning: "geoIpLocation",
-        locationLevel: "city",
-        precisionDescription: "city-level estimate",
-        source: isCompositeAgreement ? "composite" : "local_database",
-        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-        asn: asnRecord?.asn,
-        organization: asnRecord?.asOrg,
-        observedHostname: matchedHostnameStr,
-        explanation: `Geographic city-level resolution for ${geoRecord.city}, ${geoRecord.countryCode}`,
-      };
-    }
-  } else if (geoRecord) {
-    // Country-only record in GeoIP database (no city / coordinates)
-    const isCompositeAgreement = Boolean(
-      geoHint && geoHint.countryCode.toUpperCase() === geoRecord.countryCode.toUpperCase()
-    );
-    const limitation: ResolutionLimitation = isAnycast
-      ? "anycast_distributed_routing"
-      : distribution === "cloud"
-      ? "cloud_or_hosting_network"
-      : "country_level_only";
-
-    result = {
-      status: "unresolved",
-      precision: "country",
-      distribution,
-      mapEligible: false,
-      country: geoRecord.country,
-      countryCode: geoRecord.countryCode,
-      city: null,
-      confidence: isCompositeAgreement || Boolean(asnRecord) ? "medium" : "low",
-      locationMeaning: "countryOnly",
-      locationLevel: "country",
-      precisionDescription: "country-level estimate",
-      source: isCompositeAgreement || Boolean(asnRecord) ? "composite" : "local_database",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      asn: asnRecord?.asn,
-      organization: asnRecord?.asOrg,
-      observedHostname: matchedHostnameStr,
-      limitation,
-      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : "country_only",
-      explanation: isAnycast
-        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); distributed Anycast network`
-        : distribution === "cloud"
-        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); cloud / hosting infrastructure`
-        : `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); city-level coordinates unavailable`,
-    };
-  } else if (asnRecord) {
-    // No GeoIP record, but ASN matches -> NETWORK resolution
-    const hasHostnameCountry = Boolean(geoHint && geoHint.countryCode);
-    const countryCode = geoHint?.countryCode;
-    const limitation: ResolutionLimitation = isAnycast
-      ? "anycast_distributed_routing"
-      : distribution === "cloud"
-      ? "cloud_or_hosting_network"
-      : "physical_location_unavailable";
-
-    result = {
-      status: "unresolved",
-      precision: "network",
-      distribution,
-      mapEligible: false,
-      country: countryCode,
-      countryCode,
-      city: null,
-      confidence: hasHostnameCountry ? "medium" : "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "network-level estimate",
-      source: hasHostnameCountry ? "composite" : "asn",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      asn: asnRecord.asn,
-      organization: asnRecord.asOrg,
-      observedHostname: matchedHostnameStr,
-      limitation,
-      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : "asn_only",
-      explanation: isAnycast
-        ? (hasHostnameCountry
-            ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName} (distributed anycast)`
-            : `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (distributed anycast)`)
-        : distribution === "cloud"
-        ? (hasHostnameCountry
-            ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName} (cloud / hosting provider)`
-            : `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (cloud / hosting provider)`)
-        : (hasHostnameCountry
-            ? `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName}`
-            : `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg})`),
-    };
-  } else if (geoHint) {
-    // No GeoIP or ASN record, but observed hostname has a verified token hint
-    result = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: isAnycast ? "anycast" : "unknown",
-      mapEligible: false,
-      country: geoHint.locationName,
-      countryCode: geoHint.countryCode,
-      city: null,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      source: "observed_hostname",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      observedHostname: matchedHostnameStr,
-      limitation: "unmapped_public_address",
-      reason: "no_match",
-      explanation: `Unmapped public address; observed hostname suggests ${geoHint.locationName} (${geoHint.countryCode})`,
-    };
-  } else {
-    // Completely unmapped
-    result = {
-      status: "unresolved",
-      precision: "unknown",
-      distribution: isAnycast ? "anycast" : "unknown",
-      mapEligible: false,
-      city: null,
-      confidence: "low",
-      locationMeaning: "unresolved",
-      locationLevel: "unresolved",
-      precisionDescription: "unresolved",
-      source: "none",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-      limitation: "unmapped_public_address",
-      reason: "no_match",
-      explanation: "No geographic coordinates or network match in local database",
-    };
-  }
-
-  geoCache.set(cacheKey, result);
-  return result;
+/**
+ * Diagnostic trace of IP resolution evaluation.
+ * Returns the exact decision breakdown generated by resolveGeoCore.
+ */
+export function traceGeoResolution(ip: string, observedHostnames?: string[]): GeoResolutionTrace {
+  const { trace } = resolveGeoCore(ip, observedHostnames);
+  return trace;
 }
 
 /**
@@ -539,10 +715,11 @@ export function resolveGeo(ip: string, observedHostnames?: string[]): GeoResolut
  * Strictly independent of geographic resolution.
  */
 export function resolveAsn(ip: string): AsnResolution {
-  const cached = asnCache.get(ip);
+  const normalizedIp = ip.trim();
+  const cached = asnCache.get(normalizedIp);
   if (cached) return cached;
 
-  const classification = classifyIpAddress(ip);
+  const classification = classifyIpAddress(normalizedIp);
   if (!classification.isPublic || classification.version !== 4) {
     const result: AsnResolution = {
       status: "unresolved",
@@ -550,11 +727,11 @@ export function resolveAsn(ip: string): AsnResolution {
       source: "local_database",
       asnDatabaseVersion: LOCAL_ASN_DB_VERSION,
     };
-    asnCache.set(ip, result);
+    asnCache.set(normalizedIp, result);
     return result;
   }
 
-  const v4Num = parseIpv4ToUint32(ip);
+  const v4Num = parseIpv4ToUint32(normalizedIp);
   if (v4Num === null) {
     const result: AsnResolution = {
       status: "unresolved",
@@ -562,7 +739,7 @@ export function resolveAsn(ip: string): AsnResolution {
       source: "none",
       asnDatabaseVersion: null,
     };
-    asnCache.set(ip, result);
+    asnCache.set(normalizedIp, result);
     return result;
   }
 
@@ -576,7 +753,7 @@ export function resolveAsn(ip: string): AsnResolution {
       source: "local_database",
       asnDatabaseVersion: LOCAL_ASN_DB_VERSION,
     };
-    asnCache.set(ip, result);
+    asnCache.set(normalizedIp, result);
     return result;
   }
 
@@ -586,7 +763,7 @@ export function resolveAsn(ip: string): AsnResolution {
     source: "local_database",
     asnDatabaseVersion: LOCAL_ASN_DB_VERSION,
   };
-  asnCache.set(ip, result);
+  asnCache.set(normalizedIp, result);
   return result;
 }
 
@@ -597,7 +774,11 @@ export function resolveAsn(ip: string): AsnResolution {
  */
 export function enrichHost(row: BreakdownRow, deltaBytes = 0, timestamp = 0): EnrichedHost {
   const ip = (row.label || "").trim();
-  const hostnamesList = Array.isArray(row.hostnames) ? row.hostnames.map((h) => h.name) : [];
+  const hostnamesList = Array.isArray(row.hostnames)
+    ? row.hostnames
+        .map((h) => (typeof h?.name === "string" ? h.name.trim() : ""))
+        .filter(Boolean)
+    : [];
   const classification = classifyIpAddress(ip);
   const geo = resolveGeo(ip, hostnamesList);
   const asn = resolveAsn(ip);

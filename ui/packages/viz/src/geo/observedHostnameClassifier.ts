@@ -9,6 +9,8 @@
  *   - It NEVER manufactures latitude or longitude coordinates.
  */
 
+import type { NetworkDistribution, ProviderHint } from "./geoTypes";
+
 export interface GeoHint {
   locationName: string;
   city?: string;
@@ -19,6 +21,140 @@ export interface GeoHint {
   source: "observed_hostname";
   matchedToken: string;
   matchKind: "edge_token" | "hostname_label" | "known_suffix";
+}
+
+export type { ProviderHint };
+
+interface ProviderDomainRule {
+  domain: string;
+  provider: string;
+  distribution: NetworkDistribution;
+}
+
+/**
+ * Curated dictionary of major global cloud, CDN, and infrastructure domain suffixes.
+ */
+const KNOWN_PROVIDER_DOMAINS: ProviderDomainRule[] = [
+  // Google
+  { domain: "googleapis.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "googlevideo.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "youtube.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "google.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "1e100.net", provider: "Google LLC", distribution: "cloud" },
+  { domain: "gstatic.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "googleusercontent.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "ggpht.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "gvt1.com", provider: "Google LLC", distribution: "cloud" },
+  { domain: "gvt2.com", provider: "Google LLC", distribution: "cloud" },
+
+  // Amazon / AWS
+  { domain: "amazonaws.com", provider: "Amazon.com, Inc.", distribution: "cloud" },
+  { domain: "cloudfront.net", provider: "Amazon.com, Inc.", distribution: "cloud" },
+  { domain: "aws.amazon.com", provider: "Amazon.com, Inc.", distribution: "cloud" },
+  { domain: "amazon.com", provider: "Amazon.com, Inc.", distribution: "cloud" },
+
+  // Microsoft / Azure
+  { domain: "azure.com", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "azurewebsites.net", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "trafficmanager.net", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "microsoft.com", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "office.com", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "live.com", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "msn.com", provider: "Microsoft Corporation", distribution: "cloud" },
+  { domain: "azureedge.net", provider: "Microsoft Corporation", distribution: "cloud" },
+
+  // Cloudflare
+  { domain: "cloudflare.com", provider: "Cloudflare, Inc.", distribution: "cloud" },
+  { domain: "cloudflare.net", provider: "Cloudflare, Inc.", distribution: "cloud" },
+  { domain: "workers.dev", provider: "Cloudflare, Inc.", distribution: "cloud" },
+  { domain: "pages.dev", provider: "Cloudflare, Inc.", distribution: "cloud" },
+
+  // Fastly
+  { domain: "fastly.net", provider: "Fastly, Inc.", distribution: "cloud" },
+  { domain: "fastlylb.net", provider: "Fastly, Inc.", distribution: "cloud" },
+
+  // Akamai
+  { domain: "akamai.net", provider: "Akamai Technologies, Inc.", distribution: "cloud" },
+  { domain: "akamaitechnologies.com", provider: "Akamai Technologies, Inc.", distribution: "cloud" },
+  { domain: "akamaiedge.net", provider: "Akamai Technologies, Inc.", distribution: "cloud" },
+  { domain: "edgesuite.net", provider: "Akamai Technologies, Inc.", distribution: "cloud" },
+  { domain: "edgekey.net", provider: "Akamai Technologies, Inc.", distribution: "cloud" },
+
+  // GitHub
+  { domain: "github.com", provider: "GitHub, Inc.", distribution: "cloud" },
+  { domain: "github.io", provider: "GitHub, Inc.", distribution: "cloud" },
+  { domain: "githubusercontent.com", provider: "GitHub, Inc.", distribution: "cloud" },
+
+  // Apple
+  { domain: "apple.com", provider: "Apple Inc.", distribution: "cloud" },
+  { domain: "icloud.com", provider: "Apple Inc.", distribution: "cloud" },
+  { domain: "mzstatic.com", provider: "Apple Inc.", distribution: "cloud" },
+  { domain: "apple-dns.net", provider: "Apple Inc.", distribution: "cloud" },
+
+  // Meta
+  { domain: "facebook.com", provider: "Meta Platforms, Inc.", distribution: "cloud" },
+  { domain: "fbcdn.net", provider: "Meta Platforms, Inc.", distribution: "cloud" },
+  { domain: "instagram.com", provider: "Meta Platforms, Inc.", distribution: "cloud" },
+  { domain: "whatsapp.net", provider: "Meta Platforms, Inc.", distribution: "cloud" },
+
+  // Hostinger
+  { domain: "hostinger.com", provider: "Hostinger Operations, UAB", distribution: "cloud" },
+  { domain: "hostinger.io", provider: "Hostinger Operations, UAB", distribution: "cloud" },
+  { domain: "hostingermail.com", provider: "Hostinger Operations, UAB", distribution: "cloud" },
+
+  // DigitalOcean
+  { domain: "digitalocean.com", provider: "DigitalOcean, LLC", distribution: "cloud" },
+
+  // Hetzner
+  { domain: "hetzner.com", provider: "Hetzner Online GmbH", distribution: "cloud" },
+  { domain: "your-server.de", provider: "Hetzner Online GmbH", distribution: "cloud" },
+
+  // Vultr / Choopa
+  { domain: "vultr.com", provider: "The Constant Company, LLC (Vultr)", distribution: "cloud" },
+  { domain: "choopa.net", provider: "The Constant Company, LLC (Vultr)", distribution: "cloud" },
+
+  // Leaseweb
+  { domain: "leaseweb.com", provider: "Leaseweb Global B.V.", distribution: "cloud" },
+  { domain: "leaseweb.net", provider: "Leaseweb Global B.V.", distribution: "cloud" },
+
+  // Oracle Cloud
+  { domain: "oraclecloud.com", provider: "Oracle Corporation", distribution: "cloud" },
+
+  // Alibaba Cloud
+  { domain: "alibabacloud.com", provider: "Alibaba Group", distribution: "cloud" },
+  { domain: "aliyun.com", provider: "Alibaba Group", distribution: "cloud" },
+];
+
+/**
+ * Extracts a non-authoritative provider hint from an observed hostname.
+ * Requires exact domain match or subdomain boundary (e.g. "ajax.googleapis.com" matches "googleapis.com",
+ * but "fakegoogleapis.com" is strictly rejected).
+ * Handles trailing FQDN dots (RFC 1035 root dot notation).
+ *
+ * Invariant: Confidence is always "low" because hostname observation is evidence,
+ * not authoritative IP ownership.
+ */
+export function extractProviderFromHostname(
+  hostname: string | null | undefined
+): ProviderHint | null {
+  if (!hostname || typeof hostname !== "string") return null;
+  const raw = hostname.trim().toLowerCase();
+  const clean = raw.endsWith(".") ? raw.slice(0, -1) : raw;
+  if (!clean || clean.length < 3) return null;
+
+  for (const entry of KNOWN_PROVIDER_DOMAINS) {
+    if (clean === entry.domain || clean.endsWith("." + entry.domain)) {
+      return {
+        provider: entry.provider,
+        distribution: entry.distribution,
+        source: "observed_hostname",
+        confidence: "low",
+        matchedDomain: entry.domain,
+      };
+    }
+  }
+
+  return null;
 }
 
 interface MetroHubInfo {
@@ -138,10 +274,11 @@ function matchIataToken(token: string): { code: string; matchKind: "edge_token" 
 export function extractLocationFromHostname(hostname: string | null | undefined): GeoHint | null {
   if (!hostname || typeof hostname !== "string") return null;
   const raw = hostname.trim().toLowerCase();
-  if (!raw || raw.length < 3) return null;
+  const clean = raw.endsWith(".") ? raw.slice(0, -1) : raw;
+  if (!clean || clean.length < 3) return null;
 
   // Split into domain labels
-  const labels = raw.split(".");
+  const labels = clean.split(".");
 
   for (let labelIndex = 0; labelIndex < labels.length; labelIndex++) {
     const label = labels[labelIndex];

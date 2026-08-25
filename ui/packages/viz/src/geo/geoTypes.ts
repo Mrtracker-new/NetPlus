@@ -259,7 +259,7 @@ export interface NetworkResolution {
   precisionDescription: "network-level estimate";
   source: GeoResolutionSource;
   geoDatabaseVersion: string | null;
-  asn: number;
+  asn?: number;
   organization: string;
   observedHostname?: string;
   limitation: ResolutionLimitation;
@@ -339,6 +339,63 @@ export interface AnycastClassification {
   service: string | null;
   prefixCidr: string | null;
   source: string;            // e.g. "generated-anycast-v1"
+}
+
+/**
+ * Non-authoritative provider hint extracted from observed hostname patterns.
+ * Constrained strictly to "low" confidence to avoid elevating hostname patterns
+ * to authoritative network ownership.
+ */
+export interface ProviderHint {
+  provider: string;
+  distribution?: NetworkDistribution;
+  source: "observed_hostname";
+  confidence: "low";
+  matchedDomain: string;
+}
+
+/**
+ * Diagnostic trace representing stage-by-stage evaluation of an IP resolution.
+ * Derived from resolveGeoCore to guarantee zero logic divergence between
+ * production resolution and diagnostic inspection.
+ */
+export interface GeoResolutionTrace {
+  ip: string;
+  addressClassification: IpCategory;
+  geoIp: {
+    status: "match" | "miss";
+    precision?: GeoPrecision;
+    country?: string;
+    countryCode?: string;
+    city?: string | null;
+  };
+  asn: {
+    status: "match" | "miss";
+    asn?: number;
+    organization?: string;
+  };
+  anycast: {
+    status: "match" | "miss";
+    provider?: string | null;
+  };
+  cloud: {
+    status: "match" | "miss";
+    provider?: string;
+  };
+  hostname: {
+    status: "match" | "miss";
+    hint?: {
+      locationName: string;
+      countryCode: string;
+      iataCode?: string;
+    };
+    providerHint?: ProviderHint;
+    matchedHostname?: string;
+  };
+  finalPrecision: GeoPrecision;
+  finalReason?: ResolutionLimitation | string;
+  explanation: string;
+  mapEligible: boolean;
 }
 
 /**

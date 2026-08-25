@@ -7,8 +7,10 @@ import {
   makeCityAggregateEntityId,
   makeCountryAggregateEntityId,
   makeClusterEntityId,
+  makeAggregateRenderNodeId,
   makeCanonicalCityKey,
   getCanonicalCountryName,
+  extractGeoCellId,
   type HostEntityId,
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
@@ -280,12 +282,15 @@ export function deriveClusteredMapModel(
       if (aggregateNodes.length <= maxVisibleArcs) return aggregateNodes;
       if (!targetEntityId) return aggregateNodes.slice(0, maxVisibleArcs);
 
+      const targetGeoCell = extractGeoCellId(targetEntityId);
       const isTargetNode = (n: GeoAggregateNode) =>
         n.entityId === targetEntityId ||
         n.id === targetEntityId ||
-        (selectedIp != null && selectedIp !== "" && n.endpointIps.includes(selectedIp)) ||
+        (selectedIp != null && selectedIp !== "" && (n.sampleEndpointIps.includes(selectedIp) || n.endpointIps.includes(selectedIp))) ||
         (targetEntityId.startsWith("entity-host-") &&
-          n.endpointIps.includes(targetEntityId.replace("entity-host-", "")));
+          (n.sampleEndpointIps.includes(targetEntityId.replace("entity-host-", "")) ||
+           n.endpointIps.includes(targetEntityId.replace("entity-host-", "")))) ||
+        (targetGeoCell !== null && (n.geoCellId === targetGeoCell || extractGeoCellId(n.geoCellId) === targetGeoCell));
 
       const selectedArcNodes = aggregateNodes.filter(isTargetNode);
       const unselectedArcNodes = aggregateNodes.filter((n) => !isTargetNode(n));
@@ -339,7 +344,8 @@ export function deriveClusteredMapModel(
   const tombstones = deriveTombstonesSnapshot(snapshot, aggregateNodes, previousModel);
 
   // Authoritative semantic selection resolution
-  const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones);
+  const zoomTier = Math.round(zoomScale * 10);
+  const activeSelection = resolveSelection(targetEntityId, snapshot, aggregateNodes, tombstones, zoomTier);
 
   // Deterministic collision label layout with focal target selection priority
   const labelPlacements = computeLabelLayout(aggregateNodes, {
@@ -532,6 +538,7 @@ export function deriveLiveSemanticEntityIds(
         liveEntityIds.add(makeClusterEntityId(geoCellId));
         liveEntityIds.add(geoCellId);
         liveEntityIds.add(`cluster-${geoCellId}`);
+        liveEntityIds.add(`aggregate-${geoCellId}`);
       }
     }
   }
@@ -543,6 +550,7 @@ export function deriveLiveSemanticEntityIds(
       liveEntityIds.add(makeClusterEntityId(node.geoCellId));
       liveEntityIds.add(node.geoCellId);
       liveEntityIds.add(`cluster-${node.geoCellId}`);
+      liveEntityIds.add(`aggregate-${node.geoCellId}`);
     }
     if (node.id) {
       liveEntityIds.add(node.id);
@@ -620,7 +628,25 @@ export function deriveTombstonesSnapshot(
     const lastTs = previousModel.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0;
     for (const prevNode of previousModel.aggregateNodes) {
       const aggregateEntityId = prevNode.entityId;
-      if (!liveEntityIds.has(aggregateEntityId) && !nextTombstones.has(aggregateEntityId)) {
+
+      // Invariant: Render disappearance must not automatically imply tombstone.
+      // An aggregate is deceased ONLY if its semantic entityId is not live,
+      // its underlying geoCell has no live telemetry, AND none of its constituent member hosts exist in the active snapshot.
+      const hasLiveConstituentHost =
+        (prevNode.sampleEndpointIps && prevNode.sampleEndpointIps.some((ip) => snapshot.hostsById.has(ip))) ||
+        (prevNode.endpointIps && prevNode.endpointIps.some((ip) => snapshot.hostsById.has(ip)));
+
+      const prevGeoCellId = prevNode.geoCellId ? extractGeoCellId(prevNode.geoCellId) : null;
+      const isGeoCellLive = prevGeoCellId
+        ? liveEntityIds.has(makeClusterEntityId(prevGeoCellId)) || liveEntityIds.has(prevGeoCellId)
+        : false;
+
+      const isSemanticEntityLive =
+        liveEntityIds.has(aggregateEntityId) ||
+        isGeoCellLive ||
+        hasLiveConstituentHost;
+
+      if (!isSemanticEntityLive && !nextTombstones.has(aggregateEntityId)) {
         nextTombstones.set(aggregateEntityId, createAggregateTombstone(prevNode, lastTs));
       }
     }
@@ -702,15 +728,32 @@ export function resolveLiveHostSelection(
 export function resolveLiveAggregateSelection(
   targetEntityId: string,
   aggregateNodes: GeoAggregateNode[],
-  hostsById: Map<string, EnrichedHost>
+  hostsById: Map<string, EnrichedHost>,
+  zoomTier = 10
 ): ResolvedSelection | null {
-  const matchingNode = aggregateNodes.find(
-    (n) =>
-      n.entityId === targetEntityId ||
-      n.id === targetEntityId ||
-      n.geoCellId === targetEntityId.replace("entity-cluster-", "") ||
-      (targetEntityId === OTHER_RESOLVED_ENTITY_ID && n.nodeKind === "otherResolvedAggregate")
-  );
+  const targetGeoCellId = extractGeoCellId(targetEntityId);
+
+  const matchingNode = aggregateNodes.find((n) => {
+    if (n.entityId === targetEntityId || n.id === targetEntityId) return true;
+    if (
+      targetGeoCellId !== null &&
+      (n.geoCellId === targetGeoCellId ||
+        extractGeoCellId(n.geoCellId) === targetGeoCellId ||
+        extractGeoCellId(n.entityId) === targetGeoCellId ||
+        extractGeoCellId(n.id) === targetGeoCellId)
+    ) {
+      return true;
+    }
+    if (
+      (targetEntityId === OTHER_RESOLVED_ENTITY_ID ||
+        targetEntityId === OTHER_RESOLVED_NODE_ID ||
+        targetEntityId === OTHER_RESOLVED_GEOCELL_ID) &&
+      n.nodeKind === "otherResolvedAggregate"
+    ) {
+      return true;
+    }
+    return false;
+  });
 
   if (matchingNode) {
     const sampleIps = matchingNode.sampleEndpointIps;
@@ -919,14 +962,8 @@ export function resolveLiveAggregateSelection(
   }
 
   // 3. Cluster Aggregate
-  if (
-    targetEntityId.startsWith("entity-cluster-") ||
-    targetEntityId.startsWith("geocell-") ||
-    targetEntityId.startsWith("cluster-geocell-")
-  ) {
-    const geoCellId = targetEntityId
-      .replace(/^entity-cluster-/, "")
-      .replace(/^cluster-/, "");
+  if (targetGeoCellId !== null) {
+    const geoCellId = targetGeoCellId;
 
     const memberHosts = allHosts.filter((h) => {
       if (h.geo.status !== "resolved") return false;
@@ -954,7 +991,7 @@ export function resolveLiveAggregateSelection(
         subLabel: `${memberCount} endpoints • ${humanBytes(totalBytes)}`,
         selectedEntity: {
           kind: "cluster",
-          clusterId: enclosingNode?.id || `cluster-${geoCellId}`,
+          clusterId: enclosingNode?.id || makeAggregateRenderNodeId(geoCellId, Math.round(zoomTier)),
           entityId: makeClusterEntityId(geoCellId),
           geoCellId,
           label,
@@ -1010,13 +1047,14 @@ export function resolveSelection(
   targetEntityId: string | null,
   snapshot: HostEnrichmentSnapshot,
   aggregateNodes: GeoAggregateNode[],
-  tombstones: Map<string, TombstoneRecord>
+  tombstones: Map<string, TombstoneRecord>,
+  zoomTier = 10
 ): ResolvedSelection | null {
   if (!targetEntityId) return null;
 
   const liveSelection =
     resolveLiveHostSelection(targetEntityId, snapshot.hostsById) ??
-    resolveLiveAggregateSelection(targetEntityId, aggregateNodes, snapshot.hostsById);
+    resolveLiveAggregateSelection(targetEntityId, aggregateNodes, snapshot.hostsById, zoomTier);
 
   if (liveSelection) {
     return liveSelection;
@@ -1026,27 +1064,22 @@ export function resolveSelection(
   if (!tombstone && !targetEntityId.startsWith("entity-host-")) {
     tombstone = tombstones.get(`entity-host-${targetEntityId}`);
   }
-  if (
-    !tombstone &&
-    (targetEntityId.startsWith("entity-cluster-") ||
-      targetEntityId.startsWith("geocell-") ||
-      targetEntityId.startsWith("cluster-geocell-"))
-  ) {
-    const cellId = targetEntityId
-      .replace(/^entity-cluster-/, "")
-      .replace(/^cluster-/, "");
-
+  const targetGeoCellId = extractGeoCellId(targetEntityId);
+  if (!tombstone && targetGeoCellId !== null) {
     tombstone =
-      tombstones.get(makeClusterEntityId(cellId)) ||
-      tombstones.get(cellId) ||
-      tombstones.get(`cluster-${cellId}`);
+      tombstones.get(makeClusterEntityId(targetGeoCellId)) ||
+      tombstones.get(targetGeoCellId) ||
+      tombstones.get(`cluster-${targetGeoCellId}`) ||
+      tombstones.get(`aggregate-${targetGeoCellId}`);
 
     if (!tombstone) {
       for (const record of tombstones.values()) {
         if (
           record.kind === "cluster" &&
           "geoCellId" in record.selectedEntity &&
-          record.selectedEntity.geoCellId === cellId
+          record.selectedEntity.geoCellId &&
+          (record.selectedEntity.geoCellId === targetGeoCellId ||
+            extractGeoCellId(record.selectedEntity.geoCellId) === targetGeoCellId)
         ) {
           tombstone = record;
           break;

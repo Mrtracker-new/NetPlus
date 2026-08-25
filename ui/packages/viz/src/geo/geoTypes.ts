@@ -244,6 +244,30 @@ export function makeClusterEntityId(geoCellId: string): ClusterEntityId {
 }
 
 /**
+ * Authoritative extractor for canonical geoCellId from various entity, node, or cell identifier strings.
+ * Handles entity-cluster-*, cluster-*, aggregate-*, and bare geocell-* identifiers, with or without zoom tier suffixes.
+ *
+ * Examples:
+ *   "entity-cluster-geocell-501_86" -> "geocell-501_86"
+ *   "cluster-geocell-501_86-z10"    -> "geocell-501_86"
+ *   "aggregate-geocell-501_86-10"   -> "geocell-501_86"
+ *   "aggregate-geocell-501_86-z10"  -> "geocell-501_86"
+ *   "geocell-501_86"                -> "geocell-501_86"
+ *   "geocell-501_86-z20"            -> "geocell-501_86"
+ */
+export function extractGeoCellId(id: string | null | undefined): string | null {
+  if (!id) return null;
+  const trimmed = id.trim();
+  const raw = trimmed
+    .replace(/^entity-cluster-/, "")
+    .replace(/^cluster-/, "")
+    .replace(/^aggregate-/, "")
+    .replace(/-z?\d+$/, "");
+
+  return raw.startsWith("geocell-") ? raw : null;
+}
+
+/**
  * Look up canonical country name from ISO-2 country code with fallback.
  */
 const COUNTRY_NAME_BY_ISO2 = new Map<string, string>();
@@ -594,15 +618,28 @@ export function isNodeSelected(
 
   if (activeSelection) {
     if (activeSelection.kind === "endpoint") {
-      if (node.endpointIps.includes(activeSelection.ip) || node.entityId === activeSelection.entityId) {
+      if (
+        node.sampleEndpointIps.includes(activeSelection.ip) ||
+        node.endpointIps.includes(activeSelection.ip) ||
+        node.entityId === activeSelection.entityId
+      ) {
         return true;
       }
     } else if (activeSelection.kind === "cluster") {
+      const activeCellId = activeSelection.geoCellId ? extractGeoCellId(activeSelection.geoCellId) : null;
+      const nodeCellId = node.geoCellId ? extractGeoCellId(node.geoCellId) : null;
+
       if (
         node.entityId === activeSelection.entityId ||
         node.id === activeSelection.clusterId ||
-        (Boolean(node.geoCellId) && node.geoCellId === activeSelection.geoCellId) ||
-        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId))
+        (activeCellId !== null && nodeCellId === activeCellId) ||
+        (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
+        (activeCellId !== null && extractGeoCellId(node.entityId) === activeCellId) ||
+        (activeCellId !== null && extractGeoCellId(node.id) === activeCellId) ||
+        (activeSelection.sampleEndpointIps !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+        (activeSelection.memberHosts !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
       ) {
         return true;
       }
@@ -610,7 +647,11 @@ export function isNodeSelected(
       if (
         node.entityId === activeSelection.entityId ||
         (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
-        (Boolean(node.countryCode) && activeSelection.countryCode.toUpperCase() === node.countryCode!.toUpperCase())
+        (Boolean(node.countryCode) && activeSelection.countryCode.toUpperCase() === node.countryCode!.toUpperCase()) ||
+        (activeSelection.sampleEndpointIps !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+        (activeSelection.memberHosts !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
       ) {
         return true;
       }
@@ -618,7 +659,12 @@ export function isNodeSelected(
       if (
         node.entityId === activeSelection.entityId ||
         (activeSelection.node !== undefined && (node.id === activeSelection.node.id || node.entityId === activeSelection.node.entityId)) ||
-        activeSelection.cityName.toLowerCase() === node.label.replace(/\s*\(\d+\)$/, "").toLowerCase()
+        (activeSelection.cityName.toLowerCase() === node.label.replace(/\s*\(\d+\)$/, "").toLowerCase() &&
+          (!activeSelection.countryCode || !node.countryCode || activeSelection.countryCode.toUpperCase() === node.countryCode.toUpperCase())) ||
+        (activeSelection.sampleEndpointIps !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.sampleEndpointIps!.includes(ip))) ||
+        (activeSelection.memberHosts !== undefined &&
+          node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip)))
       ) {
         return true;
       }
@@ -654,15 +700,24 @@ export function isNodeSelected(
 
   if (selectedEntityId) {
     const rawId = selectedEntityId.trim();
+    const targetCellId = extractGeoCellId(rawId);
+
     if (
       node.entityId === rawId ||
       node.id === rawId ||
+      node.sampleEndpointIps.includes(rawId) ||
       node.endpointIps.includes(rawId) ||
-      (rawId.startsWith("entity-host-") && node.endpointIps.includes(rawId.replace("entity-host-", ""))) ||
+      (rawId.startsWith("entity-host-") && (
+        node.sampleEndpointIps.includes(rawId.replace("entity-host-", "")) ||
+        node.endpointIps.includes(rawId.replace("entity-host-", ""))
+      )) ||
       (rawId === OTHER_RESOLVED_ENTITY_ID && node.nodeKind === "otherResolvedAggregate") ||
-      (rawId.startsWith("entity-cluster-") && node.geoCellId === rawId.replace("entity-cluster-", "")) ||
-      (rawId.startsWith("cluster-") && node.geoCellId === rawId.replace("cluster-", "")) ||
-      (rawId.startsWith("geocell-") && node.geoCellId === rawId)
+      (targetCellId !== null && (
+        node.geoCellId === targetCellId ||
+        extractGeoCellId(node.geoCellId) === targetCellId ||
+        extractGeoCellId(node.entityId) === targetCellId ||
+        extractGeoCellId(node.id) === targetCellId
+      ))
     ) {
       return true;
     }

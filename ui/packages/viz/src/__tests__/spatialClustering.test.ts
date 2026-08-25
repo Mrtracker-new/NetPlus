@@ -2077,6 +2077,201 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       expect(otherResolved.endpointIps.length).toBe(50);
       expect(new Set(otherResolved.sampleEndpointIps).size).toBe(50);
     });
+
+    describe("Cluster Tombstones Decoupling & Semantic Hierarchy Audit Suite", () => {
+      it("Zoom tier changes change render ID (e.g. cluster-geocell-z10 vs z50) without producing tombstones", () => {
+        const h1 = createCustomHost("1.1.1.1", 37.77, -122.41, 10000, 10, { city: "San Francisco", countryCode: "US", locationLevel: "city" });
+        const h2 = createCustomHost("1.1.1.2", 37.78, -122.42, 5000, 5, { city: "San Francisco", countryCode: "US", locationLevel: "city" });
+        const snapshot = {
+          captureSessionId: "s-zoom-audit",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [h1, h2],
+          hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+          coverageStats: {} as any,
+        };
+
+        const vm1 = deriveClusteredMapModel(snapshot, null, { zoomScale: 1.0 });
+        expect(vm1.aggregateNodes.length).toBe(1);
+        const node1 = vm1.aggregateNodes[0]!;
+        expect(node1.id).toBe(`cluster-${node1.geoCellId}-z10`);
+
+        const vm2 = deriveClusteredMapModel(snapshot, vm1, { zoomScale: 5.0 });
+        expect(vm2.aggregateNodes.length).toBe(1);
+        const node2 = vm2.aggregateNodes[0]!;
+        expect(node2.id).toBe(`cluster-${node2.geoCellId}-z50`);
+
+        // No tombstones produced
+        expect(vm2.tombstones.size).toBe(0);
+
+        // Selection by previous render ID recovers active live selection
+        const vmSelected = deriveClusteredMapModel(snapshot, vm2, {
+          zoomScale: 5.0,
+          selectedEntityId: node1.id,
+        });
+        expect(vmSelected.activeSelection?.status).toBe("active");
+      });
+
+      it("Threshold/radius changes merging or splitting clusters do not produce tombstones", () => {
+        // Frankfurt (50.11, 8.68) and Munich (48.13, 11.58)
+        const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 10000, 10, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+        const h2 = createCustomHost("1.1.1.2", 48.13, 11.58, 8000, 8, { city: "Munich", countryCode: "DE", locationLevel: "city" });
+        const snapshot = {
+          captureSessionId: "s-thresh-audit",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [h1, h2],
+          hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+          coverageStats: {} as any,
+        };
+
+        const vmSplit = deriveClusteredMapModel(snapshot, null, { clusterRadiusPx: 2 });
+        expect(vmSplit.aggregateNodes.length).toBe(2);
+
+        const vmMerged = deriveClusteredMapModel(snapshot, vmSplit, { clusterRadiusPx: 100 });
+        expect(vmMerged.aggregateNodes.length).toBe(1);
+        expect(vmMerged.tombstones.size).toBe(0);
+
+        const vmSplitAgain = deriveClusteredMapModel(snapshot, vmMerged, { clusterRadiusPx: 2 });
+        expect(vmSplitAgain.aggregateNodes.length).toBe(2);
+        expect(vmSplitAgain.tombstones.size).toBe(0);
+      });
+
+      it("Budget changes pushing nodes into Other Resolved aggregate do not produce tombstones and allow active selection recovery", () => {
+        const h1 = createCustomHost("1.1.1.1", 37.77, -122.41, 10000, 10, { city: "SF", countryCode: "US", locationLevel: "city" });
+        const h2 = createCustomHost("1.1.1.2", 51.50, -0.12, 8000, 8, { city: "London", countryCode: "GB", locationLevel: "city" });
+        const h3 = createCustomHost("1.1.1.3", 51.51, -0.11, 7000, 7, { city: "London", countryCode: "GB", locationLevel: "city" });
+        const snapshot = {
+          captureSessionId: "s-budget-audit",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [h1, h2, h3],
+          hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2], ["1.1.1.3", h3]]),
+          coverageStats: {} as any,
+        };
+
+        const vmOpen = deriveClusteredMapModel(snapshot, null, { maxVisibleNodes: 10 });
+        expect(vmOpen.aggregateNodes.length).toBe(2);
+
+        const londonNode = vmOpen.aggregateNodes.find((n) => n.nodeKind === "cityAggregate")!;
+        expect(londonNode).toBeDefined();
+
+        const vmConstrained = deriveClusteredMapModel(snapshot, vmOpen, {
+          maxVisibleNodes: 1,
+          selectedEntityId: londonNode.entityId,
+        });
+        expect(vmConstrained.tombstones.size).toBe(0);
+        expect(vmConstrained.activeSelection?.status).toBe("active");
+        expect(vmConstrained.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+      });
+
+      it("Neighboring membership and cluster seed shift does not produce tombstones for previous seed geoCellId", () => {
+        const hA = createCustomHost("1.1.1.1", 37.77, -122.41, 5000, 5, { city: "SF", countryCode: "US", locationLevel: "city" });
+        const hB = createCustomHost("1.1.1.2", 37.78, -122.42, 3000, 3, { city: "SF", countryCode: "US", locationLevel: "city" });
+
+        // Frame 1: hA has more bytes -> seed
+        const snap1 = {
+          captureSessionId: "s-seed-audit",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [hA, hB],
+          hostsById: new Map([["1.1.1.1", hA], ["1.1.1.2", hB]]),
+          coverageStats: {} as any,
+        };
+        const vm1 = deriveClusteredMapModel(snap1, null);
+        const geoCellA = vm1.aggregateNodes[0]!.geoCellId;
+
+        // Frame 2: hB traffic spikes to 20000 -> hB becomes seed
+        const hBSpike = { ...hB, bytes: 20000 };
+        const snap2 = {
+          captureSessionId: "s-seed-audit",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+          enrichedHosts: [hA, hBSpike],
+          hostsById: new Map([["1.1.1.1", hA], ["1.1.1.2", hBSpike]]),
+          coverageStats: {} as any,
+        };
+        const vm2 = deriveClusteredMapModel(snap2, vm1);
+        expect(vm2.tombstones.has(`entity-cluster-${geoCellA}`)).toBe(false);
+        expect(vm2.tombstones.size).toBe(0);
+      });
+
+      it("Authoritative liveness: True cessation of all member hosts creates tombstone, and resurrection removes it", () => {
+        const h1 = createCustomHost("10.0.0.1", 20.0, 30.0, 4000, 4);
+        const snapLive = {
+          captureSessionId: "s-cessation",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [h1],
+          hostsById: new Map([["10.0.0.1", h1]]),
+          coverageStats: {} as any,
+        };
+
+        const vmLive = deriveClusteredMapModel(snapLive, null);
+        const clusterId = vmLive.aggregateNodes[0]!.entityId;
+
+        // Telemetry stops
+        const snapDead = {
+          captureSessionId: "s-cessation",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+          enrichedHosts: [],
+          hostsById: new Map(),
+          coverageStats: {} as any,
+        };
+        const vmDead = deriveClusteredMapModel(snapDead, vmLive, { selectedEntityId: clusterId });
+        expect(vmDead.tombstones.has(clusterId)).toBe(true);
+        expect(vmDead.activeSelection?.status).toBe("tombstone");
+
+        // Telemetry resumes
+        const snapResurrected = {
+          captureSessionId: "s-cessation",
+          snapshotSequence: 3,
+          snapshotTimestamp: 3000,
+          enrichedHosts: [h1],
+          hostsById: new Map([["10.0.0.1", h1]]),
+          coverageStats: {} as any,
+        };
+        const vmRes = deriveClusteredMapModel(snapResurrected, vmDead, { selectedEntityId: clusterId });
+        expect(vmRes.tombstones.has(clusterId)).toBe(false);
+        expect(vmRes.activeSelection?.status).toBe("active");
+      });
+
+      it("Entity-ID completeness: resolves selection via entity-cluster-*, geocell-*, cluster-*, and aggregate-* aliases", () => {
+        const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 5000, 5, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+        const h2 = createCustomHost("1.1.1.2", 50.10, 8.76, 3000, 3, { city: "Offenbach", countryCode: "DE", locationLevel: "city" });
+        const snap = {
+          captureSessionId: "s-aliases",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+          enrichedHosts: [h1, h2],
+          hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+          coverageStats: {} as any,
+        };
+        const vm = deriveClusteredMapModel(snap, null);
+        const node = vm.aggregateNodes[0]!;
+        expect(node.nodeKind).toBe("cluster");
+        const geoCell = node.geoCellId;
+
+        const aliases = [
+          `entity-cluster-${geoCell}`,
+          geoCell,
+          `cluster-${geoCell}`,
+          `cluster-${geoCell}-z10`,
+          `aggregate-${geoCell}-10`,
+          node.id,
+        ];
+
+        for (const alias of aliases) {
+          const vmSel = deriveClusteredMapModel(snap, null, { selectedEntityId: alias });
+          expect(vmSel.activeSelection?.status).toBe("active");
+          expect(vmSel.activeSelection?.selectedEntity.kind).toBe("cluster");
+          if (vmSel.activeSelection?.selectedEntity.kind === "cluster") {
+            expect(vmSel.activeSelection.selectedEntity.geoCellId).toBe(geoCell);
+          }
+        }
+      });
+    });
   });
 });
 

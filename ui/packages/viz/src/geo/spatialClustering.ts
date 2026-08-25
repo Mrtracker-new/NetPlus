@@ -10,6 +10,7 @@ import {
   makeEndpointRenderNodeId,
   makeAggregateRenderNodeId,
   makeOtherResolvedRenderNodeId,
+  extractGeoCellId,
   type EnrichedHost,
   type GeoAggregateNode,
   type NodeKind,
@@ -681,6 +682,8 @@ export function buildSpatialClusters(
     ? selectedEntityId.replace("entity-host-", "")
     : selectedIp || null;
 
+  const targetGeoCellId = extractGeoCellId(selectedEntityId);
+
   // Sort hosts by total bytes descending for deterministic cluster seed placement
   const sorted = [...resolvedHosts].sort((a, b) => {
     if (b.bytes !== a.bytes) return b.bytes - a.bytes;
@@ -697,15 +700,17 @@ export function buildSpatialClusters(
     if (!norm) continue;
 
     const [hx, hy] = projectGeo(norm.lat, norm.lng, worldWidth, worldHeight);
+    const hostGeoCellId = computeGeoCellId(norm.lat, norm.lng);
     const isSelected =
       (canonicalSelectedHostIp != null && canonicalSelectedHostIp !== "" && host.ip === canonicalSelectedHostIp) ||
       (selectedEntityId != null &&
         selectedEntityId !== "" &&
-        (selectedEntityId === makeHostEntityId(host.ip) || selectedEntityId === host.ip));
+        (selectedEntityId === makeHostEntityId(host.ip) || selectedEntityId === host.ip)) ||
+      (targetGeoCellId !== null && hostGeoCellId === targetGeoCellId);
 
     const { targetCluster } = spatialGrid.findNearest(hx, hy, worldDistThreshold);
 
-    const isHostCityLevel = host.geo.locationLevel === "city";
+    const isHostCityLevel = host.geo.locationLevel === "city" && Boolean(host.geo.city);
     const isHostCountryLevel = host.geo.locationLevel === "country";
     const hostCountryCode = host.geo.countryCode ? host.geo.countryCode.trim().toLowerCase() : "";
     const hostCityKey = isHostCityLevel && host.geo.city ? makeCanonicalCityKey(host.geo.city) : "";
@@ -765,7 +770,7 @@ export function buildSpatialClusters(
         targetCluster.firstResolvedCountryName = host.geo.country;
       }
     } else {
-      const geoCellId = computeGeoCellId(norm.lat, norm.lng);
+      const geoCellId = hostGeoCellId;
       const asns = new Set<number>();
       if (host.asn.status === "resolved") {
         asns.add(host.asn.asn);
@@ -775,9 +780,11 @@ export function buildSpatialClusters(
         isSelected ||
         Boolean(
           selectedEntityId &&
-            (selectedEntityId === makeClusterEntityId(geoCellId) ||
+            ((targetGeoCellId !== null && (geoCellId === targetGeoCellId || extractGeoCellId(geoCellId) === targetGeoCellId)) ||
+              selectedEntityId === makeClusterEntityId(geoCellId) ||
               selectedEntityId === geoCellId ||
-              selectedEntityId.startsWith(`cluster-${geoCellId}`))
+              selectedEntityId.startsWith(`cluster-${geoCellId}`) ||
+              selectedEntityId.startsWith(`aggregate-${geoCellId}`))
         );
 
       const canonicalCityKeys = new Set<string>();
@@ -822,9 +829,11 @@ export function buildSpatialClusters(
     for (const c of clusters) {
       if (!c.hasSelected) {
         if (
+          (targetGeoCellId !== null && (c.geoCellId === targetGeoCellId || extractGeoCellId(c.geoCellId) === targetGeoCellId)) ||
           selectedEntityId === makeClusterEntityId(c.geoCellId) ||
           selectedEntityId === c.geoCellId ||
-          selectedEntityId.startsWith(`cluster-${c.geoCellId}`)
+          selectedEntityId.startsWith(`cluster-${c.geoCellId}`) ||
+          selectedEntityId.startsWith(`aggregate-${c.geoCellId}`)
         ) {
           c.hasSelected = true;
         } else if (

@@ -106,7 +106,9 @@ export const GeoContextCard = memo(function GeoContextCard({
             <li>
               <span>Location</span>
               <span className="np-rail-list__val" style={{ color: "var(--np-text-mute)" }}>
-                Unresolved ({h.geo.reason})
+                {h.geo.reason === "ipv6_deferred"
+                  ? "Unresolved (IPv6 GeoIP deferred)"
+                  : `Unresolved (${h.geo.reason})`}
               </span>
             </li>
           )}
@@ -460,6 +462,8 @@ export const GeoContextCard = memo(function GeoContextCard({
   }
 
   if (entity.kind === "unresolvedGroup") {
+    const isIpv6Deferred = (h: EnrichedHost) => h.geo.status === "unresolved" && h.geo.reason === "ipv6_deferred";
+    const ipv6DeferredCount = entity.memberHosts.filter(isIpv6Deferred).length;
     return (
       <section className="np-rail-card np-geo-context-card" aria-label="Unresolved Public Destinations">
         <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -483,7 +487,10 @@ export const GeoContextCard = memo(function GeoContextCard({
         </div>
 
         <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
-          Observed public destinations without coordinate matches in the local offline GeoIP database. Physical locations are omitted to maintain accuracy.
+          Observed public destinations without coordinate matches in the local offline GeoIP database.
+          {ipv6DeferredCount > 0
+            ? ` Includes ${ipv6DeferredCount} public IPv6 endpoint${ipv6DeferredCount > 1 ? "s" : ""} where GeoIP resolution is intentionally deferred.`
+            : " Physical locations are omitted to maintain accuracy."}
         </p>
 
         <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
@@ -491,6 +498,12 @@ export const GeoContextCard = memo(function GeoContextCard({
             <span>Unresolved Endpoints</span>
             <span className="np-rail-list__val">{entity.memberHosts.length} hosts</span>
           </li>
+          {ipv6DeferredCount > 0 && (
+            <li>
+              <span>IPv6 Deferred</span>
+              <span className="np-rail-list__val">{ipv6DeferredCount} hosts</span>
+            </li>
+          )}
           <li>
             <span>Total Volume</span>
             <span className="np-rail-list__val">
@@ -501,12 +514,17 @@ export const GeoContextCard = memo(function GeoContextCard({
 
         <div style={{ marginTop: "0.75rem" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" }}>
-            {entity.memberHosts.map((m: EnrichedHost) => (
-              <div key={m.ip} className="np-pill" style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
-                <span>{m.hostnames[0]?.name || m.ip}</span>
-                <span>{humanBytes(m.bytes)}</span>
-              </div>
-            ))}
+            {entity.memberHosts.map((m: EnrichedHost) => {
+              const isDeferred = isIpv6Deferred(m);
+              return (
+                <div key={m.ip} className="np-pill" style={{ display: "flex", justifyContent: "space-between", fontSize: "0.72rem" }}>
+                  <span>{m.hostnames[0]?.name || m.ip}</span>
+                  <span style={{ color: isDeferred ? "var(--np-text-dim)" : undefined }}>
+                    {isDeferred ? "IPv6 deferred • " : ""}{humanBytes(m.bytes)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

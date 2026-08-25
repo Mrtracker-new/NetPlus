@@ -383,6 +383,20 @@ export interface LabelPlacement {
 
 /**
  * Geographic coverage and resolution metrics.
+ *
+ * Tracks the proportion of observed public Internet destinations that are successfully
+ * resolved to geographic coordinates in the local offline database.
+ *
+ * Geographic Coverage Accounting:
+ *   Geographic Coverage = IPv4 GeoIP Resolution / Total Observed Public Endpoints (IPv4 + IPv6)
+ *
+ * NOTE ON IPv6 DEFERRAL:
+ *   Public IPv6 addresses are successfully classified by protocol and address scope,
+ *   but geographic coordinate resolution is intentionally deferred in v1 (reason: "ipv6_deferred").
+ *   Consequently, public IPv6 traffic appears under `publicHostsCount` and `unresolvedHostsCount`,
+ *   and is tracked in `ipv6DeferredHostsCount` and `ipv6DeferredBytes`.
+ *   Overall geographic coverage represents resolved physical coordinates and must not be
+ *   referred to as unqualified "Internet coverage" without clarifying that public IPv6 is deferred.
  */
 export interface CoverageStats {
   totalObservedHosts: number;
@@ -396,6 +410,8 @@ export interface CoverageStats {
   unresolvedBytes: number;
   coveragePercent: number;
   resolvedBytesPercent: number;
+  ipv6DeferredHostsCount?: number;
+  ipv6DeferredBytes?: number;
 }
 
 /**
@@ -531,6 +547,7 @@ export type SelectedOtherResolvedAggregate = {
    * Derived presentation state: memberHosts.length < memberCount.
    */
   isSampled?: boolean;
+  tombstone?: TombstoneDetails;
 };
 
 export type SelectedAsn = {
@@ -579,6 +596,7 @@ export type SelectedOtherResolvedGroup = {
    * Derived presentation state: memberHosts.length < memberCount.
    */
   isSampled?: boolean;
+  tombstone?: TombstoneDetails;
 };
 
 /**

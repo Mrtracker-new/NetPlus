@@ -138,11 +138,13 @@ export function deriveHostEnrichmentSnapshot(
   let publicHostsCount = 0;
   let resolvedHostsCount = 0;
   let unresolvedHostsCount = 0;
+  let ipv6DeferredHostsCount = 0;
   let localLanHostsCount = 0;
   let specialHostsCount = 0;
   let totalBytes = 0;
   let resolvedBytes = 0;
   let unresolvedBytes = 0;
+  let ipv6DeferredBytes = 0;
 
   const effectiveTimestamp =
     snapshotTimestamp !== undefined
@@ -154,7 +156,10 @@ export function deriveHostEnrichmentSnapshot(
     const ip = rawIp.trim();
     if (!ip) continue;
 
-    const currentBytes = row.bytes || 0;
+    const currentBytes =
+      typeof row.bytes === "number" && Number.isFinite(row.bytes)
+        ? Math.max(0, row.bytes)
+        : 0;
     totalBytes += currentBytes;
 
     let deltaBytes = 0;
@@ -189,6 +194,10 @@ export function deriveHostEnrichmentSnapshot(
       } else {
         unresolvedHostsCount++;
         unresolvedBytes += currentBytes;
+        if (enriched.geo.reason === "ipv6_deferred") {
+          ipv6DeferredHostsCount++;
+          ipv6DeferredBytes += currentBytes;
+        }
       }
     } else if (enriched.classification.isLocalLan) {
       localLanHostsCount++;
@@ -209,11 +218,13 @@ export function deriveHostEnrichmentSnapshot(
     publicHostsCount,
     resolvedHostsCount,
     unresolvedHostsCount,
+    ipv6DeferredHostsCount,
     localLanHostsCount,
     specialHostsCount,
     totalBytes,
     resolvedBytes,
     unresolvedBytes,
+    ipv6DeferredBytes,
     coveragePercent,
     resolvedBytesPercent,
   };

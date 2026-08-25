@@ -636,7 +636,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         </div>
         <div
           className="np-geomap-hud__item"
-          title={`Percentage of observed public destinations with geographic coordinate resolution (${coverageStats.resolvedHostsCount}/${coverageStats.publicHostsCount} endpoints, ${coverageStats.resolvedBytesPercent.toFixed(0)}% bytes)`}
+          title={`Percentage of observed public destinations with geographic coordinate resolution (${coverageStats.resolvedHostsCount}/${coverageStats.publicHostsCount} endpoints, ${coverageStats.resolvedBytesPercent.toFixed(0)}% bytes). Public IPv6 GeoIP resolution is intentionally deferred.`}
         >
           <span className="np-geomap-hud__label">GEOGRAPHIC COVERAGE</span>
           <span
@@ -650,7 +650,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                   : "var(--np-accent, #2fe0d6)",
             }}
           >
-            {coverageStats.coveragePercent}%
+            {Math.round(coverageStats.coveragePercent)}%
             <span className="np-geomap-hud__sub"> ({coverageStats.resolvedBytesPercent.toFixed(0)}% bytes)</span>
           </span>
         </div>
@@ -680,7 +680,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
               ⚠
             </span>
             <span>
-              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> have no geographic resolution ({humanBytes(coverageStats.unresolvedBytes)} observed)
+              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> have no geographic resolution ({humanBytes(coverageStats.unresolvedBytes)} observed{coverageStats.ipv6DeferredHostsCount && coverageStats.ipv6DeferredHostsCount > 0 ? `, including ${coverageStats.ipv6DeferredHostsCount} IPv6 deferred` : ""})
             </span>
           </div>
           <button

@@ -382,4 +382,67 @@ describe("deriveHostEnrichmentSnapshot — Authoritative Delta Engine Test Suite
     // Operationally highlighting that 90% of public traffic is unmapped despite 95% endpoint coverage
     expect(stats.resolvedBytesPercent).toBe(10);
   });
+
+  it("10. IPv6 GeoIP intentional deferral: public IPv6 is classified as public, receives ipv6_deferred geo reason, and is tracked in coverageStats", () => {
+    const ipv4Resolved: BreakdownRow = {
+      label: "1.1.1.1",
+      bytes: 1000,
+      flows: 5,
+      hostnames: [],
+      evidence: [],
+    };
+    const ipv6PublicDeferred: BreakdownRow = {
+      label: "2001:4860:4860::8888", // Google Public DNS IPv6 (2000::/3 global unicast)
+      bytes: 2000,
+      flows: 10,
+      hostnames: [],
+      evidence: [],
+    };
+    const ipv6LinkLocal: BreakdownRow = {
+      label: "fe80::1", // Link-local (non-public)
+      bytes: 500,
+      flows: 2,
+      hostnames: [],
+      evidence: [],
+    };
+
+    const snapshot = deriveHostEnrichmentSnapshot(
+      {
+        hosts: [ipv4Resolved, ipv6PublicDeferred, ipv6LinkLocal],
+        captureSessionId: "ipv6-deferral-test",
+        snapshotSequence: 1,
+      },
+      null
+    );
+
+    const hostIpv6 = snapshot.hostsById.get("2001:4860:4860::8888");
+    expect(hostIpv6).toBeDefined();
+    // Protocol classification succeeds as public Internet
+    expect(hostIpv6?.classification.isPublic).toBe(true);
+    expect(hostIpv6?.classification.version).toBe(6);
+    // GeoIP resolution is intentionally deferred
+    expect(hostIpv6?.geo.status).toBe("unresolved");
+    if (hostIpv6 && hostIpv6.geo.status === "unresolved") {
+      expect(hostIpv6.geo.reason).toBe("ipv6_deferred");
+    }
+
+    const hostLinkLocal = snapshot.hostsById.get("fe80::1");
+    expect(hostLinkLocal?.classification.isLocalLan).toBe(true);
+    expect(hostLinkLocal?.classification.isPublic).toBe(false);
+
+    const stats = snapshot.coverageStats;
+    expect(stats.totalObservedHosts).toBe(3);
+    // Public hosts count includes IPv4 resolved and public IPv6
+    expect(stats.publicHostsCount).toBe(2);
+    expect(stats.resolvedHostsCount).toBe(1);
+    expect(stats.unresolvedHostsCount).toBe(1);
+    expect(stats.ipv6DeferredHostsCount).toBe(1);
+    expect(stats.ipv6DeferredBytes).toBe(2000);
+    expect(stats.localLanHostsCount).toBe(1);
+
+    // Geographic coverage is 1 / 2 = 50%
+    expect(stats.coveragePercent).toBe(50);
+    // Byte-weighted coverage: 1000 / (1000 + 2000) = 33.33%
+    expect(Math.round(stats.resolvedBytesPercent)).toBe(33);
+  });
 });

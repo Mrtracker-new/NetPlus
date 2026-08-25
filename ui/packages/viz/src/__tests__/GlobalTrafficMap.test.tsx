@@ -193,4 +193,23 @@ describe("GlobalTrafficMap Component", () => {
       })
     );
   });
+
+  it("clarifies that public IPv6 is deferred in the coverage banner and HUD", () => {
+    const mixedHosts: BreakdownRow[] = [
+      { label: "1.1.1.1", bytes: 1000, flows: 2, hostnames: [], evidence: [] },
+      { label: "2607:f8b0:4005:805::200e", bytes: 3000, flows: 4, hostnames: [], evidence: [] }, // Public IPv6
+    ];
+
+    render(<GlobalTrafficMap hosts={mixedHosts} />);
+
+    // Coverage banner indicates IPv6 deferred
+    expect(screen.getByText(/including 1 IPv6 deferred/i)).toBeInTheDocument();
+
+    // HUD has Geographic Coverage label
+    const hudItem = screen.getByText("GEOGRAPHIC COVERAGE").closest(".np-geomap-hud__item");
+    expect(hudItem).toHaveAttribute(
+      "title",
+      expect.stringContaining("Public IPv6 GeoIP resolution is intentionally deferred")
+    );
+  });
 });

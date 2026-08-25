@@ -371,4 +371,62 @@ describe("GeoContextCard Polymorphic Inspector", () => {
       })
     );
   });
+
+  it("renders IPv6 deferred status clearly on endpoint card", () => {
+    const host = enrichHost(
+      {
+        label: "2001:4860:4860::8888",
+        bytes: 4096,
+        flows: 2,
+        hostnames: [{ name: "dns.google", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+
+    const entity: SelectedEntity = {
+      kind: "endpoint",
+      ip: host.ip,
+      entityId: makeHostEntityId(host.ip),
+      host,
+    };
+
+    render(<GeoContextCard entity={entity} />);
+    expect(screen.getByText("Unresolved (IPv6 GeoIP deferred)")).toBeInTheDocument();
+  });
+
+  it("renders IPv6 deferred details when unresolvedGroup contains public IPv6 hosts", () => {
+    const ipv4Unresolved = enrichHost(
+      {
+        label: "93.184.216.34",
+        bytes: 1000,
+        flows: 1,
+        hostnames: [{ name: "unresolved.example.com", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+    const ipv6Deferred = enrichHost(
+      {
+        label: "2607:f8b0:4005:805::200e",
+        bytes: 2000,
+        flows: 2,
+        hostnames: [{ name: "ipv6.google.com", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+
+    const entity: SelectedEntity = {
+      kind: "unresolvedGroup",
+      title: "Unresolved Public Destinations",
+      memberHosts: [ipv4Unresolved, ipv6Deferred],
+    };
+
+    render(<GeoContextCard entity={entity} />);
+    expect(screen.getByText(/Includes 1 public IPv6 endpoint where GeoIP resolution is intentionally deferred/i)).toBeInTheDocument();
+    expect(screen.getByText("IPv6 Deferred")).toBeInTheDocument();
+    expect(screen.getByText("1 hosts")).toBeInTheDocument();
+    expect(screen.getByText(/IPv6 deferred •/i)).toBeInTheDocument();
+  });
 });

@@ -24,8 +24,8 @@ describe("GeoIP & ASN Resolution -- @netpulse/app consumer contract", () => {
     for (const ip of ["192.168.1.1", "10.0.0.1", "172.16.0.1", "127.0.0.1"]) {
       const res = resolveGeo(ip);
       expect(res.status, `${ip} must not resolve`).toBe("unresolved");
-      expect((res as Record<string, unknown>)["latitude"]).toBeUndefined();
-      expect((res as Record<string, unknown>)["longitude"]).toBeUndefined();
+      expect((res as unknown as Record<string, unknown>)["latitude"]).toBeUndefined();
+      expect((res as unknown as Record<string, unknown>)["longitude"]).toBeUndefined();
     }
   });
 

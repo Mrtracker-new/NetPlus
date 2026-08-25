@@ -8,13 +8,17 @@ import type {
   IPv4Int,
   OriginResolution,
   TelemetryFreshness,
+  NetworkDistribution,
+  ResolutionLimitation,
 } from "./geoTypes";
 import { classifyIpAddress, parseIpv4ToUint32, clearClassifierCache } from "./ipClassifier";
+import { extractLocationFromHostname, type GeoHint } from "./observedHostnameClassifier";
 import { BoundedCache } from "./boundedCache";
 import { IPV4_GEO_INTERVALS } from "./generatedGeoIntervals";
 import { IPV4_ASN_INTERVALS } from "./generatedAsnIntervals";
 import { ANYCAST_PREFIXES } from "./generatedAnycastPrefixes";
 import { GEO_DATABASE_METADATA } from "./generatedDatabaseMetadata";
+import { defaultSecondaryGeoService } from "./secondaryGeoProvider";
 
 /**
  * GeoIP Dataset Metadata & Governance
@@ -38,8 +42,6 @@ import { GEO_DATABASE_METADATA } from "./generatedDatabaseMetadata";
 // Primary validation authority is `pnpm geoip:verify` (build time).
 // This guard catches the case where a generated file is absent or was committed
 // without passing verification.
-// A length > 0 check does not validate structure or payload correctness --
-// that is the responsibility of verify-geoip-db.ts.
 if (ANYCAST_PREFIXES.length === 0) {
   throw new Error(
     "[geoDatabase] ANYCAST_PREFIXES is empty. " +
@@ -145,11 +147,35 @@ function deriveConfidence(
   return "low";
 }
 
+function classifyDistribution(isAnycast: boolean, asOrg?: string): NetworkDistribution {
+  if (isAnycast) return "anycast";
+  if (asOrg) {
+    const orgLower = asOrg.toLowerCase();
+    if (
+      orgLower.includes("amazon") ||
+      orgLower.includes("aws") ||
+      orgLower.includes("google") ||
+      orgLower.includes("microsoft") ||
+      orgLower.includes("azure") ||
+      orgLower.includes("digitalocean") ||
+      orgLower.includes("oracle") ||
+      orgLower.includes("hetzner") ||
+      orgLower.includes("ovh") ||
+      orgLower.includes("linode") ||
+      orgLower.includes("fastly") ||
+      orgLower.includes("akamai") ||
+      orgLower.includes("cloudflare")
+    ) {
+      return "cloud";
+    }
+  }
+  return "unicast";
+}
+
 // --- Public API ----------------------------------------------------------------
 
 /**
  * Resolves anycast classification for an IP address.
- * Stage 4 of the resolution pipeline -- always called for public IPv4.
  * Strictly offline.
  */
 export function resolveAnycast(ip: string): AnycastClassification {
@@ -188,81 +214,111 @@ export function resolveAnycast(ip: string): AnycastClassification {
 }
 
 /**
- * Resolves geographic location for an IP address.
+ * Resolves geographic location, network metadata, and progressive precision for an IP address.
  *
- * Five-stage pipeline (strictly ordered):
+ * Progressive Precision Hierarchy:
+ *   CITY (validated coordinates) -> REGION -> COUNTRY -> NETWORK (ASN) -> UNKNOWN
  *
- *   Stage 1: Special-use classification via classifyIpAddress().
- *            Invariant: SPECIAL_USE_IP_MUST_NEVER_REACH_GEOIP_LOOKUP
- *            classifyIpAddress() runs first. If not (IPv4 AND public),
- *            returns unresolved immediately. No IPv4 conversion yet.
- *
- *   Stage 2: parseIpv4ToUint32() -- called ONLY after Stage 1 establishes
- *            protocol=IPv4 AND scope=public.
- *
- *   Stage 3: GeoIP lookup (binary search over IPV4_GEO_INTERVALS)
- *
- *   Stage 4: Anycast lookup (binary search over ANYCAST_PREFIXES)
- *
- *   Stage 5: Semantic classification -> final GeoResolution
- *            Anycast is an INPUT here. GeoResolution is not constructed
- *            until this point -- no intermediate object is mutated.
- *
- * Strictly offline. Zero external network egress.
+ * Structurally Discriminated Invariants:
+ *   - `mapEligible: true` ONLY for Unicast with verified physical coordinates (CITY or REGION).
+ *   - `mapEligible: false` for Anycast reference locations, COUNTRY, NETWORK, and UNKNOWN.
+ *   - Coordinates (`latitude`/`longitude`) are strictly forbidden on COUNTRY, NETWORK, UNKNOWN.
+ *   - ASN information enriches COUNTRY results without downgrading precision.
+ *   - 100% offline; zero network egress.
  */
-export function resolveGeo(ip: string): GeoResolution {
-  const cached = geoCache.get(ip);
+export function resolveGeo(ip: string, observedHostnames?: string[]): GeoResolution {
+  const normalizedIp = ip.trim();
+  const cacheKey = observedHostnames && observedHostnames.length > 0
+    ? `${normalizedIp}|${observedHostnames.join(",")}`
+    : normalizedIp;
+
+  const cached = geoCache.get(cacheKey);
   if (cached) return cached;
 
   // Stage 1: Special-use classification -- always first.
-  // No IPv4 parsing has occurred yet at this point.
-  const classification = classifyIpAddress(ip);
+  const classification = classifyIpAddress(normalizedIp);
 
-  if (classification.version === 6 && classification.isPublic) {
-    // Explicit v1 deferral -- public IPv6 is never assigned coordinates.
-    // No IPv6 address is assigned coordinates derived from an IPv4 lookup.
+  if (classification.category === "invalid") {
     const result: GeoResolution = {
       status: "unresolved",
-      reason: "ipv6_deferred",
+      precision: "unknown",
+      distribution: "unknown",
+      mapEligible: false,
+      source: "none",
+      geoDatabaseVersion: null,
+      confidence: "low",
       locationMeaning: "unresolved",
       locationLevel: "unresolved",
       precisionDescription: "unresolved",
+      limitation: "invalid_address_syntax",
+      reason: "invalid_address",
+      explanation: "Invalid IP address syntax",
+    };
+    geoCache.set(cacheKey, result);
+    return result;
+  }
+
+  if (classification.version === 6 && classification.isPublic) {
+    // Explicit IPv6 handling: currently local IPv6 intervals are unavailable
+    const result: GeoResolution = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: "unicast",
+      mapEligible: false,
       source: "local_database",
       geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      limitation: "ipv6_database_unavailable",
+      reason: "ipv6_deferred",
+      explanation: "IPv6 geographic coordinate resolution unavailable in local database",
     };
-    geoCache.set(ip, result);
+    geoCache.set(cacheKey, result);
     return result;
   }
 
   if (!classification.isPublic || classification.version !== 4) {
-    // Special-use, private, loopback, multicast, etc. -- never reach GeoIP lookup.
+    // Special-use, private, loopback, multicast, etc.
     const result: GeoResolution = {
       status: "unresolved",
-      reason: classification.category === "invalid" ? "invalid_address" : "no_match",
+      precision: "unknown",
+      distribution: classification.category === "multicast" ? "multicast" : "unknown",
+      mapEligible: false,
+      source: "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      confidence: "low",
       locationMeaning: "unresolved",
       locationLevel: "unresolved",
       precisionDescription: "unresolved",
-      source: "local_database",
-      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      limitation: "private_or_special_address",
+      reason: "no_match",
+      explanation: `${classification.categoryLabel} address space (physical location omitted)`,
     };
-    geoCache.set(ip, result);
+    geoCache.set(cacheKey, result);
     return result;
   }
 
-  // Stage 2: IPv4 conversion -- only reachable for public IPv4.
-  // This is the single IPv4 conversion entry point in the geo layer.
-  const v4Num = parseIpv4ToUint32(ip);
+  // Stage 2: IPv4 conversion
+  const v4Num = parseIpv4ToUint32(normalizedIp);
   if (v4Num === null) {
     const result: GeoResolution = {
       status: "unresolved",
-      reason: "invalid_address",
+      precision: "unknown",
+      distribution: "unknown",
+      mapEligible: false,
+      source: "none",
+      geoDatabaseVersion: null,
+      confidence: "low",
       locationMeaning: "unresolved",
       locationLevel: "unresolved",
       precisionDescription: "unresolved",
-      source: "none",
-      geoDatabaseVersion: null,
+      limitation: "invalid_address_syntax",
+      reason: "invalid_address",
+      explanation: "Invalid IPv4 address format",
     };
-    geoCache.set(ip, result);
+    geoCache.set(cacheKey, result);
     return result;
   }
 
@@ -273,66 +329,208 @@ export function resolveGeo(ip: string): GeoResolution {
   const anycastPrefix = findAnycastInterval(v4Num);
   const isAnycast = anycastPrefix !== null;
 
-  if (!geoRecord) {
-    const result: GeoResolution = {
+  // Stage 5: ASN lookup
+  const asnRecord = findIpv4AsnInterval(v4Num);
+
+  // Stage 6: Observed Hostname analysis (conservative token-boundary matching)
+  let geoHint: GeoHint | null = null;
+  let matchedHostnameStr: string | undefined;
+  if (observedHostnames && observedHostnames.length > 0) {
+    for (const h of observedHostnames) {
+      const hint = extractLocationFromHostname(h);
+      if (hint) {
+        geoHint = hint;
+        matchedHostnameStr = h;
+        break;
+      }
+    }
+  }
+
+  // Stage 7: Progressive resolution synthesis
+  let result: GeoResolution;
+  const distribution = classifyDistribution(isAnycast, asnRecord?.asOrg);
+
+  if (geoRecord && geoRecord.city !== null && geoRecord.city.length > 0) {
+    // City-level record in GeoIP database
+    if (isAnycast) {
+      result = {
+        status: "resolved",
+        precision: "city",
+        distribution: "anycast",
+        mapEligible: false, // Invariant: Anycast reference coordinates must never be rendered as a single physical endpoint
+        country: geoRecord.country,
+        countryCode: geoRecord.countryCode,
+        city: geoRecord.city,
+        latitude: geoRecord.latitude,
+        longitude: geoRecord.longitude,
+        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
+        confidence: null,
+        locationMeaning: "anyCastPoP",
+        locationLevel: "city",
+        precisionDescription: "anycast reference location",
+        source: "local_database",
+        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+        asn: asnRecord?.asn,
+        organization: asnRecord?.asOrg || anycastPrefix.provider,
+        observedHostname: matchedHostnameStr,
+        limitation: "anycast_distributed_routing",
+        reason: "anycast",
+        explanation: "Anycast distributed network; coordinates represent prefix reference, not physical endpoint",
+      };
+    } else {
+      // Unicast City resolution
+      const isCompositeAgreement =
+        geoHint &&
+        geoHint.countryCode === geoRecord.countryCode &&
+        (geoHint.locationName.toLowerCase() === geoRecord.city.toLowerCase() ||
+          geoHint.iataCode.toLowerCase() === geoRecord.city.substring(0, 3).toLowerCase());
+
+      const confidence = isCompositeAgreement
+        ? "high"
+        : deriveConfidence("geoIpLocation", geoRecord.accuracyRadiusKm);
+
+      result = {
+        status: "resolved",
+        precision: "city",
+        distribution: "unicast",
+        mapEligible: true,
+        country: geoRecord.country,
+        countryCode: geoRecord.countryCode,
+        city: geoRecord.city,
+        latitude: geoRecord.latitude,
+        longitude: geoRecord.longitude,
+        accuracyRadiusKm: geoRecord.accuracyRadiusKm,
+        confidence,
+        locationMeaning: "geoIpLocation",
+        locationLevel: "city",
+        precisionDescription: "city-level estimate",
+        source: isCompositeAgreement ? "composite" : "local_database",
+        geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+        asn: asnRecord?.asn,
+        organization: asnRecord?.asOrg,
+        observedHostname: matchedHostnameStr,
+        explanation: `Geographic city-level resolution for ${geoRecord.city}, ${geoRecord.countryCode}`,
+      };
+    }
+  } else if (geoRecord) {
+    // Country-only record in GeoIP database (no city / coordinates)
+    const isCompositeAgreement = Boolean(
+      geoHint && geoHint.countryCode.toUpperCase() === geoRecord.countryCode.toUpperCase()
+    );
+    const limitation: ResolutionLimitation = isAnycast
+      ? "anycast_distributed_routing"
+      : distribution === "cloud"
+      ? "cloud_or_hosting_network"
+      : "country_level_only";
+
+    result = {
       status: "unresolved",
-      reason: "no_match",
+      precision: "country",
+      distribution,
+      mapEligible: false,
+      country: geoRecord.country,
+      countryCode: geoRecord.countryCode,
+      city: null,
+      confidence: isCompositeAgreement || Boolean(asnRecord) ? "medium" : "low",
+      locationMeaning: "countryOnly",
+      locationLevel: "country",
+      precisionDescription: "country-level estimate",
+      source: isCompositeAgreement || Boolean(asnRecord) ? "composite" : "local_database",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      asn: asnRecord?.asn,
+      organization: asnRecord?.asOrg,
+      observedHostname: matchedHostnameStr,
+      limitation,
+      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : "country_only",
+      explanation: isAnycast
+        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); distributed Anycast network`
+        : distribution === "cloud"
+        ? `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); cloud / hosting infrastructure`
+        : `Resolved to country ${geoRecord.country} (${geoRecord.countryCode}); city-level coordinates unavailable`,
+    };
+  } else if (asnRecord) {
+    // No GeoIP record, but ASN matches -> NETWORK resolution
+    const hasHostnameCountry = Boolean(geoHint && geoHint.countryCode);
+    const countryCode = geoHint?.countryCode;
+    const limitation: ResolutionLimitation = isAnycast
+      ? "anycast_distributed_routing"
+      : distribution === "cloud"
+      ? "cloud_or_hosting_network"
+      : "physical_location_unavailable";
+
+    result = {
+      status: "unresolved",
+      precision: "network",
+      distribution,
+      mapEligible: false,
+      country: countryCode,
+      countryCode,
+      city: null,
+      confidence: hasHostnameCountry ? "medium" : "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "network-level estimate",
+      source: hasHostnameCountry ? "composite" : "asn",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      asn: asnRecord.asn,
+      organization: asnRecord.asOrg,
+      observedHostname: matchedHostnameStr,
+      limitation,
+      reason: isAnycast ? "anycast" : distribution === "cloud" ? "cloud" : "asn_only",
+      explanation: isAnycast
+        ? (hasHostnameCountry
+            ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName} (distributed anycast)`
+            : `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (distributed anycast)`)
+        : distribution === "cloud"
+        ? (hasHostnameCountry
+            ? `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName} (cloud / hosting provider)`
+            : `Physical location unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) (cloud / hosting provider)`)
+        : (hasHostnameCountry
+            ? `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg}) with hostname hint in ${geoHint!.locationName}`
+            : `Physical coordinates unavailable; identified as AS${asnRecord.asn} (${asnRecord.asOrg})`),
+    };
+  } else if (geoHint) {
+    // No GeoIP or ASN record, but observed hostname has a verified token hint
+    result = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: isAnycast ? "anycast" : "unknown",
+      mapEligible: false,
+      country: geoHint.locationName,
+      countryCode: geoHint.countryCode,
+      city: null,
+      confidence: "low",
       locationMeaning: "unresolved",
       locationLevel: "unresolved",
       precisionDescription: "unresolved",
-      source: "local_database",
+      source: "observed_hostname",
       geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      observedHostname: matchedHostnameStr,
+      limitation: "unmapped_public_address",
+      reason: "no_match",
+      explanation: `Unmapped public address; observed hostname suggests ${geoHint.locationName} (${geoHint.countryCode})`,
     };
-    geoCache.set(ip, result);
-    return result;
-  }
-
-  // Stage 5: Semantic classification.
-  // Anycast is an input -- GeoResolution is not constructed until this point.
-  const hasCity = geoRecord.city !== null && geoRecord.city.length > 0;
-
-  let locationMeaning: "geoIpLocation" | "anyCastPoP" | "countryOnly";
-  let locationLevel: "city" | "country";
-  let precisionDescription: "city-level estimate" | "country-level estimate" | "anycast reference location";
-
-  if (isAnycast) {
-    // When isAnycast === true, GeoIP coordinates are retained as the
-    // dataset-associated reference location for the anycast prefix.
-    // They are NOT the nearest responding PoP.
-    // They are NOT a physical endpoint location.
-    // The UI must communicate this distinction explicitly.
-    locationMeaning = "anyCastPoP";
-    locationLevel = hasCity ? "city" : "country";
-    precisionDescription = "anycast reference location";
-  } else if (hasCity) {
-    locationMeaning = "geoIpLocation";
-    locationLevel = "city";
-    precisionDescription = "city-level estimate";
   } else {
-    locationMeaning = "countryOnly";
-    locationLevel = "country";
-    precisionDescription = "country-level estimate";
+    // Completely unmapped
+    result = {
+      status: "unresolved",
+      precision: "unknown",
+      distribution: isAnycast ? "anycast" : "unknown",
+      mapEligible: false,
+      city: null,
+      confidence: "low",
+      locationMeaning: "unresolved",
+      locationLevel: "unresolved",
+      precisionDescription: "unresolved",
+      source: "none",
+      geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
+      limitation: "unmapped_public_address",
+      reason: "no_match",
+      explanation: "No geographic coordinates or network match in local database",
+    };
   }
 
-  // Stage 5b: Confidence derivation
-  const confidence = deriveConfidence(locationMeaning, geoRecord.accuracyRadiusKm);
-
-  const result: GeoResolution = {
-    status: "resolved",
-    country: geoRecord.country,
-    countryCode: geoRecord.countryCode,
-    city: hasCity ? geoRecord.city : null,
-    latitude: geoRecord.latitude,
-    longitude: geoRecord.longitude,
-    accuracyRadiusKm: geoRecord.accuracyRadiusKm,
-    confidence,
-    locationMeaning,
-    locationLevel,
-    precisionDescription,
-    source: "local_database",
-    geoDatabaseVersion: LOCAL_GEOIP_DB_VERSION,
-  };
-  geoCache.set(ip, result);
+  geoCache.set(cacheKey, result);
   return result;
 }
 
@@ -399,8 +597,9 @@ export function resolveAsn(ip: string): AsnResolution {
  */
 export function enrichHost(row: BreakdownRow, deltaBytes = 0, timestamp = 0): EnrichedHost {
   const ip = (row.label || "").trim();
+  const hostnamesList = Array.isArray(row.hostnames) ? row.hostnames.map((h) => h.name) : [];
   const classification = classifyIpAddress(ip);
-  const geo = resolveGeo(ip);
+  const geo = resolveGeo(ip, hostnamesList);
   const asn = resolveAsn(ip);
   const anycast = resolveAnycast(ip);
 
@@ -448,5 +647,6 @@ export function clearGeoCaches(): void {
   geoCache.clear();
   asnCache.clear();
   anycastCache.clear();
+  defaultSecondaryGeoService.clearCache();
   clearClassifierCache();
 }

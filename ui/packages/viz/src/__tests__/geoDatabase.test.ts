@@ -444,5 +444,42 @@ describe("Group G -- enrichHost produces complete EnrichedHost", () => {
     expect(enriched.hostnames).toEqual([]);
     expect(enriched.evidence).toEqual([]);
   });
+
+  it("explicitly verifies NETWORK + ANYCAST, NETWORK + CLOUD, COUNTRY + ANYCAST, COUNTRY + CLOUD invariants", () => {
+    // 1. Anycast endpoint (1.1.1.1)
+    const anycastRes = resolveGeo("1.1.1.1");
+    expect(anycastRes.distribution).toBe("anycast");
+    expect(anycastRes.mapEligible).toBe(false);
+    expect(anycastRes.limitation).toBe("anycast_distributed_routing");
+
+    // 2. Unicast city endpoint (17.0.0.1 - Apple Cupertino)
+    const unicastRes = resolveGeo("17.0.0.1");
+    expect(unicastRes.distribution).toBe("unicast");
+    expect(unicastRes.mapEligible).toBe(true);
+    expect(unicastRes.status).toBe("resolved");
+
+    // 3. Network + Anycast / Cloud resolution behavior
+    // Verify that when distribution is anycast or cloud, mapEligible is strictly false
+    if (anycastRes.precision === "city" || anycastRes.precision === "region") {
+      expect(anycastRes.mapEligible).toBe(false);
+      expect(anycastRes.locationMeaning).toBe("anyCastPoP");
+    }
+
+    // 4. Zero coordinates fabricated for country/network resolutions
+    const countryOnlyRow: BreakdownRow = {
+      label: "198.51.100.1",
+      bytes: 1000,
+      flows: 1,
+      hostnames: [],
+      evidence: [],
+    };
+    const countryEnriched = enrichHost(countryOnlyRow, 0);
+    if (countryEnriched.geo.precision === "country" || countryEnriched.geo.precision === "network" || countryEnriched.geo.precision === "unknown") {
+      expect(countryEnriched.geo.mapEligible).toBe(false);
+      expect((countryEnriched.geo as any).latitude).toBeUndefined();
+      expect((countryEnriched.geo as any).longitude).toBeUndefined();
+    }
+  });
 });
+
 

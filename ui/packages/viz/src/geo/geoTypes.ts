@@ -55,48 +55,258 @@ export type LocationMeaning =
   | "countryOnly"    // Producer: DB-IP record where city is absent or empty.
   | "unresolved";    // Producer: any code path with no match.
 
+export type GeoPrecision =
+  | "city"
+  | "region"
+  | "country"
+  | "network"
+  | "unknown";
+
+export type GeoResolutionSource =
+  | "local_database"
+  | "secondary_database"
+  | "asn"
+  | "rdap"
+  | "observed_hostname"
+  | "composite"
+  | "none";
+
+export type NetworkDistribution =
+  | "unicast"
+  | "anycast"
+  | "cloud"
+  | "multicast"
+  | "unknown";
+
+export type ResolutionLimitation =
+  | "city_coordinates_unavailable"
+  | "country_level_only"
+  | "physical_location_unavailable"
+  | "anycast_distributed_routing"
+  | "cloud_or_hosting_network"
+  | "ipv6_database_unavailable"
+  | "private_or_special_address"
+  | "unmapped_public_address"
+  | "geo_sources_disagree"
+  | "invalid_address_syntax";
+
 export type PrecisionDescription =
   | "city-level estimate"
+  | "region-level estimate"
   | "country-level estimate"
+  | "network-level estimate"
   | "anycast reference location"
   | "unresolved";
 
 /**
  * Application-derived confidence heuristic.
- * NOT supplied by the database. Derived from DB-IP data and locationMeaning.
+ * NOT supplied by the database. Derived from DB-IP data, ASN, hostname, and locationMeaning.
  * See CONFIDENCE_DERIVATION_RULES in geoDatabase.ts.
  */
 export type GeoConfidence = "high" | "medium" | "low" | null;
 
+export interface UnicastCityResolution {
+  status: "resolved";
+  precision: "city";
+  distribution: "unicast";
+  mapEligible: true;
+  country: string;
+  countryCode: string;             // ISO 3166-1 alpha-2
+  regionCode?: string;
+  regionName?: string;
+  city: string;
+  latitude: number;                // in [-90, 90]
+  longitude: number;               // in [-180, 180]
+  accuracyRadiusKm: number | null; // From database if available; null otherwise
+  confidence: GeoConfidence;       // App-derived -- see CONFIDENCE_DERIVATION_RULES
+  locationMeaning: Exclude<LocationMeaning, "unresolved" | "anyCastPoP">;
+  locationLevel: "city";
+  precisionDescription: "city-level estimate";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation?: ResolutionLimitation;
+  reason?: string;
+  explanation: string;
+}
+
+export interface AnycastCityReference {
+  status: "resolved";
+  precision: "city";
+  distribution: "anycast";
+  mapEligible: false;
+  country: string;
+  countryCode: string;             // ISO 3166-1 alpha-2
+  regionCode?: string;
+  regionName?: string;
+  city: string;
+  latitude: number;                // in [-90, 90]
+  longitude: number;               // in [-180, 180]
+  accuracyRadiusKm: number | null;
+  confidence: null;
+  locationMeaning: "anyCastPoP";
+  locationLevel: "city";
+  precisionDescription: "anycast reference location";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation: "anycast_distributed_routing";
+  reason?: string;
+  explanation: string;
+}
+
+export interface UnicastRegionResolution {
+  status: "resolved";
+  precision: "region";
+  distribution: "unicast";
+  mapEligible: true;
+  country: string;
+  countryCode: string;
+  regionCode: string;
+  regionName: string;
+  city: string | null;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number | null;
+  confidence: GeoConfidence;
+  locationMeaning: Exclude<LocationMeaning, "unresolved" | "anyCastPoP">;
+  locationLevel: "region";
+  precisionDescription: "region-level estimate";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation?: ResolutionLimitation;
+  reason?: string;
+  explanation: string;
+}
+
+export interface AnycastRegionReference {
+  status: "resolved";
+  precision: "region";
+  distribution: "anycast";
+  mapEligible: false;
+  country: string;
+  countryCode: string;
+  regionCode: string;
+  regionName: string;
+  city: string | null;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number | null;
+  confidence: null;
+  locationMeaning: "anyCastPoP";
+  locationLevel: "region";
+  precisionDescription: "anycast reference location";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation: "anycast_distributed_routing";
+  reason?: string;
+  explanation: string;
+}
+
+export interface CountryResolution {
+  status: "unresolved"; // Non-coordinate level (unmapped on physical SVG map)
+  precision: "country";
+  distribution: NetworkDistribution;
+  mapEligible: false;
+  country: string;
+  countryCode: string;
+  regionCode?: string;
+  regionName?: string;
+  city?: null;
+  latitude?: never;
+  longitude?: never;
+  accuracyRadiusKm?: null;
+  confidence: GeoConfidence;
+  locationMeaning: "countryOnly";
+  locationLevel: "country";
+  precisionDescription: "country-level estimate";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string | null;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation: ResolutionLimitation;
+  reason?: string;
+  explanation: string;
+}
+
+export interface NetworkResolution {
+  status: "unresolved"; // Non-coordinate level (unmapped on physical SVG map)
+  precision: "network";
+  distribution: NetworkDistribution;
+  mapEligible: false;
+  country?: string;
+  countryCode?: string;
+  regionCode?: string;
+  regionName?: string;
+  city?: null;
+  latitude?: never;
+  longitude?: never;
+  accuracyRadiusKm?: null;
+  confidence: GeoConfidence;
+  locationMeaning: "unresolved";
+  locationLevel: "unresolved";
+  precisionDescription: "network-level estimate";
+  source: GeoResolutionSource;
+  geoDatabaseVersion: string | null;
+  asn: number;
+  organization: string;
+  observedHostname?: string;
+  limitation: ResolutionLimitation;
+  reason?: string;
+  explanation: string;
+}
+
+export interface UnknownResolution {
+  status: "unresolved"; // Non-coordinate level (unmapped on physical SVG map)
+  precision: "unknown";
+  distribution: NetworkDistribution;
+  mapEligible: false;
+  country?: string;
+  countryCode?: string;
+  regionCode?: string;
+  regionName?: string;
+  city?: null;
+  latitude?: never;
+  longitude?: never;
+  accuracyRadiusKm?: null;
+  confidence: GeoConfidence;
+  locationMeaning: "unresolved";
+  locationLevel: "unresolved";
+  precisionDescription: "unresolved";
+  source: "none" | "local_database" | GeoResolutionSource;
+  geoDatabaseVersion: string | null;
+  asn?: number;
+  organization?: string;
+  observedHostname?: string;
+  limitation: ResolutionLimitation;
+  reason?: string;
+  explanation: string;
+}
+
 /**
- * Discriminated GeoResolution model.
- * Strict invariant: No coordinates or city are populated when status is "unresolved".
+ * Structurally Discriminated GeoResolution model.
+ * Strict invariant: No coordinates are populated when precision is not "city" or "region",
+ * and mapEligible is true ONLY for unicast city/region resolutions with verified coordinates.
  */
 export type GeoResolution =
-  | {
-      status: "resolved";
-      country: string;
-      countryCode: string;             // ISO 3166-1 alpha-2
-      city: string | null;
-      latitude: number;                // in [-90, 90]
-      longitude: number;               // in [-180, 180]
-      accuracyRadiusKm: number | null; // From database if available; null otherwise
-      confidence: GeoConfidence;       // App-derived -- see CONFIDENCE_DERIVATION_RULES
-      locationMeaning: Exclude<LocationMeaning, "unresolved">;
-      locationLevel: "city" | "country";
-      precisionDescription: Exclude<PrecisionDescription, "unresolved">;
-      source: "local_database";
-      geoDatabaseVersion: string;
-    }
-  | {
-      status: "unresolved";
-      reason: "no_database" | "no_match" | "invalid_address" | "ipv6_deferred";
-      locationMeaning: "unresolved";
-      locationLevel: "unresolved";
-      precisionDescription: "unresolved";
-      source: "none" | "local_database";
-      geoDatabaseVersion: string | null;
-    };
+  | UnicastCityResolution
+  | AnycastCityReference
+  | UnicastRegionResolution
+  | AnycastRegionReference
+  | CountryResolution
+  | NetworkResolution
+  | UnknownResolution;
 
 /**
  * Discriminated AsnResolution model.
@@ -427,17 +637,56 @@ export interface LabelPlacement {
 export interface CoverageStats {
   totalObservedHosts: number;
   publicHostsCount: number;
+  /** Count of endpoints with mapEligible === true (legitimate physical coordinates) */
   resolvedHostsCount: number;
+  /** Count of endpoints with mapEligible === false (unmapped on physical SVG map) */
   unresolvedHostsCount: number;
   localLanHostsCount: number;
   specialHostsCount: number;
   totalBytes: number;
+  /** Bytes from mapEligible endpoints */
   resolvedBytes: number;
+  /** Bytes from non-mapEligible endpoints */
   unresolvedBytes: number;
+  /** Percentage of public endpoints physically resolved with map coordinates: (resolvedHostsCount / publicHostsCount) * 100 */
+  physicalCoveragePercent: number;
+  /** @deprecated Retained for backward compatibility; equals physicalCoveragePercent */
   coveragePercent: number;
+  /** Percentage of observed public traffic volume with physical coordinates: (resolvedBytes / totalPublicBytes) * 100 */
   resolvedBytesPercent: number;
+  /** Percentage of public endpoints with known network identity: (city + region + country + network) / publicHosts * 100 */
+  networkIdentityCoveragePercent: number;
   ipv6DeferredHostsCount?: number;
   ipv6DeferredBytes?: number;
+
+  // Progressive resolution breakdown counts
+  cityResolvedHostsCount: number;
+  regionResolvedHostsCount: number;
+  countryResolvedHostsCount: number;
+  networkResolvedHostsCount: number;
+  unknownHostsCount: number;
+
+  // Progressive resolution breakdown bytes
+  cityResolvedBytes: number;
+  regionResolvedBytes: number;
+  countryResolvedBytes: number;
+  networkResolvedBytes: number;
+  unknownBytes: number;
+
+  precisionBreakdown: {
+    city: number;
+    region: number;
+    country: number;
+    network: number;
+    unknown: number;
+  };
+  bytesBreakdown: {
+    city: number;
+    region: number;
+    country: number;
+    network: number;
+    unknown: number;
+  };
 }
 
 /**

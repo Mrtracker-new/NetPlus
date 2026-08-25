@@ -3,10 +3,14 @@ import {
   OTHER_RESOLVED_ENTITY_ID,
   OTHER_RESOLVED_NODE_ID,
   OTHER_RESOLVED_GEOCELL_ID,
+  UNRESOLVED_PUBLIC_ENTITY_ID,
+  LOCAL_LAN_ENTITY_ID,
+  SPECIAL_SPACE_ENTITY_ID,
   makeHostEntityId,
   makeCityAggregateEntityId,
   makeCountryAggregateEntityId,
   makeClusterEntityId,
+  makeAsnEntityId,
   makeAggregateRenderNodeId,
   makeCanonicalCityKey,
   getCanonicalCountryName,
@@ -16,6 +20,7 @@ import {
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
   type ClusterEntityId,
+  type AsnEntityId,
   type OtherResolvedEntityId,
   type CoverageStats,
   type EnrichedHost,
@@ -331,7 +336,7 @@ export function deriveClusteredMapModel(
 
       const hasParticles = !reducedMotion && node.deltaBytes > 0;
 
-      const firstSeg = geometry.segments[0]!;
+      const firstSeg = geometry.segments[0];
 
       arcModels.push({
         id: `arc-${node.id}`,
@@ -351,8 +356,8 @@ export function deriveClusteredMapModel(
         oy: geometry.origin.y,
         dx: geometry.destination.x,
         dy: geometry.destination.y,
-        midX: firstSeg.control.x,
-        midY: firstSeg.control.y,
+        midX: firstSeg ? firstSeg.control.x : (ox + node.x) / 2,
+        midY: firstSeg ? firstSeg.control.y : (oy + node.y) / 2,
         effectiveDx: geometry.crossesAntimeridian
           ? geometry.crossingDirection === "west"
             ? geometry.destination.x - 720
@@ -518,9 +523,24 @@ export function deriveLiveSemanticEntityIds(
     liveEntityIds.add(makeHostEntityId(host.ip));
     liveEntityIds.add(host.ip);
 
+    // 2. ASN entity identity
+    if (host.asn.status === "resolved") {
+      liveEntityIds.add(makeAsnEntityId(host.asn.asn));
+      liveEntityIds.add(`asn-${host.asn.asn}`);
+    }
+
+    // 3. Address classification groups
+    if (host.classification.isPublic && host.geo.status === "unresolved") {
+      liveEntityIds.add(UNRESOLVED_PUBLIC_ENTITY_ID);
+    } else if (host.classification.isLocalLan) {
+      liveEntityIds.add(LOCAL_LAN_ENTITY_ID);
+    } else if (!host.classification.isPublic) {
+      liveEntityIds.add(SPECIAL_SPACE_ENTITY_ID);
+    }
+
     if (host.geo.status === "resolved") {
 
-      // 2. City aggregate entity identity: derived from current resolved hosts
+      // 4. City aggregate entity identity: derived from current resolved hosts
       if (host.geo.countryCode && host.geo.city) {
         const canonicalCityKey = makeCanonicalCityKey(host.geo.city);
         if (canonicalCityKey) {
@@ -528,12 +548,12 @@ export function deriveLiveSemanticEntityIds(
         }
       }
 
-      // 3. Country aggregate entity identity: derived from current resolved hosts
+      // 5. Country aggregate entity identity: derived from current resolved hosts
       if (host.geo.countryCode) {
         liveEntityIds.add(makeCountryAggregateEntityId(host.geo.countryCode));
       }
 
-      // 4. Cluster entity identity: derived according to stable geoCell semantics
+      // 6. Cluster entity identity: derived according to stable geoCell semantics
       const norm = normalizeCoordinates(host.geo.latitude, host.geo.longitude);
       if (norm) {
         const geoCellId = computeGeoCellId(norm.lat, norm.lng);
@@ -658,8 +678,7 @@ export function deriveTombstonesSnapshot(
     const prevSel = previousModel.activeSelection;
     if (
       prevSel.entityId === OTHER_RESOLVED_ENTITY_ID ||
-      prevSel.selectedEntity?.kind === "otherResolvedAggregate" ||
-      prevSel.selectedEntity?.kind === "otherResolvedGroup"
+      prevSel.selectedEntity?.kind === "otherResolvedAggregate"
     ) {
       // Presentation aggregates cannot be tombstones
     } else if (!nextTombstones.has(prevSel.entityId) && !liveEntityIds.has(prevSel.entityId)) {
@@ -1007,6 +1026,123 @@ export function resolveLiveAggregateSelection(
           memberCount,
           sampleEndpointIps,
           isSampled: memberCount > sampleEndpointIps.length,
+        },
+      };
+    }
+  }
+
+  // 4. ASN Aggregate
+  if (targetEntityId.startsWith("entity-asn-") || targetEntityId.startsWith("asn-")) {
+    const rawAsn = targetEntityId.replace(/^entity-asn-|^asn-/, "");
+    const asnNum = Number(rawAsn);
+    if (Number.isFinite(asnNum) && asnNum > 0) {
+      const memberHosts = allHosts.filter(
+        (h) => h.asn.status === "resolved" && h.asn.asn === asnNum
+      );
+      if (memberHosts.length > 0) {
+        const asOrg =
+          memberHosts[0]?.asn.status === "resolved"
+            ? memberHosts[0].asn.asOrg
+            : `AS${asnNum}`;
+        const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+        const memberCount = memberHosts.length;
+        return {
+          entityId: makeAsnEntityId(asnNum),
+          status: "active",
+          isSelected: true,
+          label: `AS${asnNum} (${asOrg})`,
+          subLabel: `${memberCount} endpoints • ${asOrg} • ${humanBytes(totalBytes)}`,
+          selectedEntity: {
+            kind: "asn",
+            asn: asnNum,
+            asOrg,
+            entityId: makeAsnEntityId(asnNum),
+            memberHosts,
+          },
+        };
+      }
+    }
+  }
+
+  // 5. Unresolved Public Destinations Group
+  if (
+    targetEntityId === UNRESOLVED_PUBLIC_ENTITY_ID ||
+    targetEntityId === "unresolved" ||
+    targetEntityId === "unresolvedGroup"
+  ) {
+    const memberHosts = allHosts.filter(
+      (h) => h.classification.isPublic && h.geo.status === "unresolved"
+    );
+    if (memberHosts.length > 0) {
+      const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = memberHosts.length;
+      return {
+        entityId: UNRESOLVED_PUBLIC_ENTITY_ID,
+        status: "active",
+        isSelected: true,
+        label: `Unresolved Public Destinations (${memberCount})`,
+        subLabel: `${memberCount} endpoints without GeoIP coordinates • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "unresolvedGroup",
+          title: "Unresolved Public Destinations",
+          entityId: UNRESOLVED_PUBLIC_ENTITY_ID,
+          memberHosts,
+        },
+      };
+    }
+  }
+
+  // 6. Local Network Group (LAN / Multicast)
+  if (
+    targetEntityId === LOCAL_LAN_ENTITY_ID ||
+    targetEntityId === "local-lan" ||
+    targetEntityId === "lan"
+  ) {
+    const memberHosts = allHosts.filter((h) => h.classification.isLocalLan);
+    if (memberHosts.length > 0) {
+      const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = memberHosts.length;
+      return {
+        entityId: LOCAL_LAN_ENTITY_ID,
+        status: "active",
+        isSelected: true,
+        label: `Local Network Activity (${memberCount})`,
+        subLabel: `${memberCount} LAN/multicast endpoints • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "localNetworkGroup",
+          title: "Local Network Activity",
+          entityId: LOCAL_LAN_ENTITY_ID,
+          category: "lan",
+          memberHosts,
+        },
+      };
+    }
+  }
+
+  // 7. Special Address Space Group
+  if (
+    targetEntityId === SPECIAL_SPACE_ENTITY_ID ||
+    targetEntityId === "special" ||
+    targetEntityId === "shared"
+  ) {
+    const memberHosts = allHosts.filter(
+      (h) => !h.classification.isPublic && !h.classification.isLocalLan
+    );
+    if (memberHosts.length > 0) {
+      const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = memberHosts.length;
+      return {
+        entityId: SPECIAL_SPACE_ENTITY_ID,
+        status: "active",
+        isSelected: true,
+        label: `Special Address Space Activity (${memberCount})`,
+        subLabel: `${memberCount} CGNAT/special-use endpoints • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "localNetworkGroup",
+          title: "Special Address Space Activity",
+          entityId: SPECIAL_SPACE_ENTITY_ID,
+          category: "special",
+          memberHosts,
         },
       };
     }

@@ -166,7 +166,7 @@ describe("GlobalTrafficMap Component", () => {
     expect(labelText?.textContent).toBe("one.one.one.one");
   });
 
-  it("renders Other Resolved Traffic aggregate node when clusters exceed budget and dispatches otherResolvedGroup on click", () => {
+  it("renders Other Resolved Traffic aggregate node when clusters exceed budget and dispatches otherResolvedAggregate on click", () => {
     const handleSelect = vi.fn();
     // 4 verified resolved locations: US (San Jose), Germany (Frankfurt), Switzerland (Zurich), Japan (Tokyo)
     const denseHosts: BreakdownRow[] = [

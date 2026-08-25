@@ -7,7 +7,16 @@ import {
   type MapViewModelOptions,
   type HostEnrichmentSnapshot,
 } from "../geo/mapViewModel";
-import { OTHER_RESOLVED_ENTITY_ID, type EnrichedHost } from "../geo/geoTypes";
+import {
+  OTHER_RESOLVED_ENTITY_ID,
+  UNRESOLVED_PUBLIC_ENTITY_ID,
+  LOCAL_LAN_ENTITY_ID,
+  SPECIAL_SPACE_ENTITY_ID,
+  makeAsnEntityId,
+  makeHostEntityId,
+  isNodeSelected,
+  type EnrichedHost,
+} from "../geo/geoTypes";
 import { clearGeoCaches } from "../geo/geoDatabase";
 import { calculateArcBezier, sampleArcInto, solveQuadraticBezierSeamCrossing } from "../geo/trafficArcs";
 import { projectGeo } from "../geo/worldGeometry";
@@ -1712,7 +1721,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       expect(model1.activeSelection).not.toBeNull();
       expect(model1.activeSelection?.status).toBe("active");
       expect(model1.activeSelection?.entityId).toBe(OTHER_RESOLVED_ENTITY_ID);
-      expect(["otherResolvedAggregate", "otherResolvedGroup"]).toContain(model1.activeSelection?.selectedEntity?.kind);
+      expect(model1.activeSelection?.selectedEntity?.kind).toBe("otherResolvedAggregate");
       if (model1.activeSelection?.selectedEntity && "memberHosts" in model1.activeSelection.selectedEntity) {
         expect(model1.activeSelection.selectedEntity.memberHosts.length).toBe(3);
       }
@@ -1846,6 +1855,100 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const arc1Reduced = m1Reduced.arcModels.find((a) => a.id.includes("1.1.1.1"))!;
       expect(arc1Reduced.hasParticles).toBe(false);
       expect(arc1Reduced.freshness).toBe("active");
+    });
+  });
+
+  describe("Invariant 8: Unified ASN, Group Selections & String Matcher Fidelity", () => {
+    it("Invariant 8.1: Live ASN selection resolution maps to SelectedAsn and pins constituent clusters", () => {
+      const rows: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [{ name: "one.one.one.one", source: "dns" }], evidence: [] },
+        { label: "8.8.8.8", bytes: 50000, flows: 5, hostnames: [{ name: "dns.google", source: "dns" }], evidence: [] },
+        { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
+      ];
+
+      const model = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-asn", snapshotSequence: 1 },
+        null,
+        {
+          selectedEntityId: makeAsnEntityId(13335),
+          maxVisibleNodes: 2,
+        }
+      );
+
+      expect(model.activeSelection).not.toBeNull();
+      expect(model.activeSelection?.status).toBe("active");
+      expect(model.activeSelection?.entityId).toBe("entity-asn-13335");
+      expect(model.activeSelection?.selectedEntity?.kind).toBe("asn");
+      if (model.activeSelection?.selectedEntity?.kind === "asn") {
+        expect(model.activeSelection.selectedEntity.asn).toBe(13335);
+        expect(model.activeSelection.selectedEntity.asOrg).toBe("Cloudflare, Inc.");
+        expect(model.activeSelection.selectedEntity.memberHosts.length).toBe(1);
+        expect(model.activeSelection.selectedEntity.memberHosts[0]!.ip).toBe("1.1.1.1");
+      }
+
+      // The cluster containing AS13335 MUST be selected and preserved
+      const cfNode = model.aggregateNodes.find((n) => n.sampleEndpointIps.includes("1.1.1.1"));
+      expect(cfNode).toBeDefined();
+      expect(isNodeSelected(cfNode, model.activeSelection?.selectedEntity, model.activeSelection?.entityId)).toBe(true);
+    });
+
+    it("Invariant 8.2: Unresolved and local network group selections resolve live membership and stability", () => {
+      const rows: BreakdownRow[] = [
+        { label: "192.168.1.100", bytes: 10000, flows: 2, hostnames: [], evidence: [] },
+        { label: "100.64.0.1", bytes: 5000, flows: 1, hostnames: [], evidence: [] },
+        { label: "93.184.216.34", bytes: 20000, flows: 4, hostnames: [], evidence: [] },
+      ];
+
+      // Test UNRESOLVED_PUBLIC_ENTITY_ID
+      const mUnresolved = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-groups", snapshotSequence: 1 },
+        null,
+        { selectedEntityId: UNRESOLVED_PUBLIC_ENTITY_ID }
+      );
+      expect(mUnresolved.activeSelection?.status).toBe("active");
+      expect(mUnresolved.activeSelection?.selectedEntity?.kind).toBe("unresolvedGroup");
+
+      // Test LOCAL_LAN_ENTITY_ID
+      const mLan = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-groups", snapshotSequence: 1 },
+        null,
+        { selectedEntityId: LOCAL_LAN_ENTITY_ID }
+      );
+      expect(mLan.activeSelection?.status).toBe("active");
+      expect(mLan.activeSelection?.selectedEntity?.kind).toBe("localNetworkGroup");
+
+      // Test SPECIAL_SPACE_ENTITY_ID
+      const mSpecial = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-groups", snapshotSequence: 1 },
+        null,
+        { selectedEntityId: SPECIAL_SPACE_ENTITY_ID }
+      );
+      expect(mSpecial.activeSelection?.status).toBe("active");
+      expect(mSpecial.activeSelection?.selectedEntity?.kind).toBe("localNetworkGroup");
+    });
+
+    it("Invariant 8.3: isNodeSelected string matcher handles entity-asn, entity-country, and entity-city correctly", () => {
+      const rows: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+      ];
+      const model = deriveMapViewModel(
+        { hosts: rows, captureSessionId: "s-match", snapshotSequence: 1 },
+        null
+      );
+      const node = model.aggregateNodes[0];
+      expect(node).toBeDefined();
+
+      // Match via raw ASN entity ID string
+      expect(isNodeSelected(node, null, "entity-asn-13335")).toBe(true);
+      expect(isNodeSelected(node, null, "entity-asn-99999")).toBe(false);
+
+      // Match via raw Country entity ID string
+      expect(isNodeSelected(node, null, "entity-country-us")).toBe(true);
+      expect(isNodeSelected(node, null, "entity-country-de")).toBe(false);
+
+      // Match via raw Host entity ID string
+      expect(isNodeSelected(node, null, makeHostEntityId("1.1.1.1"))).toBe(true);
+      expect(isNodeSelected(node, null, makeHostEntityId("8.8.8.8"))).toBe(false);
     });
   });
 });

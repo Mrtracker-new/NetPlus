@@ -1,5 +1,5 @@
 import { useState, useMemo, memo } from "react";
-import { type SelectedEntity, type EnrichedHost, makeHostEntityId, humanBytes } from "@netpulse/viz";
+import { type SelectedEntity, type EnrichedHost, makeHostEntityId, makeAsnEntityId, humanBytes } from "@netpulse/viz";
 import { EvidenceChips } from "@netpulse/components";
 import { useOptionalEvidenceNavigation } from "../../context/EvidenceNavigationContext";
 import { useOptionalSidebar } from "./RightRailContext";
@@ -112,18 +112,53 @@ export const GeoContextCard = memo(function GeoContextCard({
               </span>
             </li>
           )}
-          {h?.asn.status === "resolved" && (
-            <>
-              <li>
-                <span>ASN</span>
-                <span className="np-rail-list__val">AS{h.asn.asn}</span>
-              </li>
-              <li>
-                <span>Organization</span>
-                <span className="np-rail-list__val">{h.asn.asOrg}</span>
-              </li>
-            </>
-          )}
+          {(() => {
+            const asRes = h?.asn;
+            if (!asRes || asRes.status !== "resolved") return null;
+            const resolvedAsn = asRes.asn;
+            const resolvedOrg = asRes.asOrg;
+            return (
+              <>
+                <li>
+                  <span>ASN</span>
+                  <span className="np-rail-list__val">
+                    {onSelectEntity ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectEntity({
+                            kind: "asn",
+                            asn: resolvedAsn,
+                            asOrg: resolvedOrg,
+                            entityId: makeAsnEntityId(resolvedAsn),
+                            memberHosts: [h],
+                          })
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          padding: 0,
+                          color: "var(--np-accent, #2fe0d6)",
+                          cursor: "pointer",
+                          textDecoration: "underline",
+                          font: "inherit",
+                        }}
+                        title={`Inspect Autonomous System AS${resolvedAsn}`}
+                      >
+                        AS{resolvedAsn}
+                      </button>
+                    ) : (
+                      `AS${resolvedAsn}`
+                    )}
+                  </span>
+                </li>
+                <li>
+                  <span>Organization</span>
+                  <span className="np-rail-list__val">{resolvedOrg}</span>
+                </li>
+              </>
+            );
+          })()}
           {h && (
             <>
               <li>
@@ -531,7 +566,7 @@ export const GeoContextCard = memo(function GeoContextCard({
     );
   }
 
-  if (entity.kind === "otherResolvedGroup" || entity.kind === "otherResolvedAggregate") {
+  if (entity.kind === "otherResolvedAggregate") {
     return (
       <OtherResolvedCard
         entity={entity}
@@ -599,11 +634,130 @@ export const GeoContextCard = memo(function GeoContextCard({
     );
   }
 
+  if (entity.kind === "asn") {
+    const isTombstone = Boolean(entity.tombstone?.isInactive);
+    const totalBytes =
+      entity.tombstone?.lastObservedBytes ??
+      entity.memberHosts.reduce((s, h) => s + h.bytes, 0);
+    const totalFlows =
+      entity.tombstone?.lastObservedFlows ??
+      entity.memberHosts.reduce((s, h) => s + h.flows, 0);
+    const endpointCount = entity.memberHosts.length;
+
+    return (
+      <section className="np-rail-card np-geo-context-card" aria-label="Autonomous System (ASN) Summary">
+        <div className="np-screen-context__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span className={`np-badge ${isTombstone ? "np-badge--warning" : "np-badge--accent"}`}>
+              Autonomous System (ASN)
+            </span>
+            <h2 className="np-rail-card__title" style={{ marginTop: "4px" }}>
+              AS{entity.asn} ({entity.asOrg}) {isTombstone ? "(Inactive)" : ""}
+            </h2>
+          </div>
+          {onClearSelection && (
+            <button
+              type="button"
+              className="np-iconbtn"
+              onClick={onClearSelection}
+              aria-label="Clear selection"
+              title="Clear selection"
+            >
+              <Icon name="close" />
+            </button>
+          )}
+        </div>
+
+        {isTombstone && entity.tombstone && (
+          <div
+            style={{
+              marginTop: "0.5rem",
+              padding: "0.5rem 0.75rem",
+              background: "rgba(245, 158, 11, 0.12)",
+              border: "1px solid rgba(245, 158, 11, 0.35)",
+              borderRadius: "var(--np-radius-sm, 6px)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "var(--np-warning, #f59e0b)", fontWeight: 600, fontSize: "0.75rem" }}>
+              <Icon name="alertTriangle" style={{ width: "14px", height: "14px" }} />
+              <span>No longer active in live window</span>
+            </div>
+            <p style={{ margin: "4px 0 0", fontSize: "0.72rem", color: "var(--np-text-dim, #94a3b8)" }}>
+              Historical snapshot retained. Observed {humanBytes(entity.tombstone.lastObservedBytes)} across {entity.tombstone.lastObservedFlows} flows before becoming inactive.
+            </p>
+          </div>
+        )}
+
+        <p style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", marginTop: "4px" }}>
+          Traffic routed through Autonomous System AS{entity.asn} ({entity.asOrg}).
+        </p>
+
+        <ul className="np-rail-list" style={{ marginTop: "0.5rem" }}>
+          <li>
+            <span>Active Endpoints</span>
+            <span className="np-rail-list__val">{endpointCount} hosts</span>
+          </li>
+          <li>
+            <span>Total Volume</span>
+            <span className="np-rail-list__val">{humanBytes(totalBytes)}</span>
+          </li>
+          <li>
+            <span>Total Flows</span>
+            <span className="np-rail-list__val">{totalFlows}</span>
+          </li>
+        </ul>
+
+        {entity.memberHosts.length > 0 && (
+          <div style={{ marginTop: "0.75rem" }}>
+            <span style={{ fontSize: "0.7rem", color: "var(--np-text-dim)", display: "block", marginBottom: "4px" }}>
+              ROUTED ENDPOINTS ({entity.memberHosts.length}):
+            </span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "160px", overflowY: "auto" }}>
+              {entity.memberHosts.map((m: EnrichedHost) => (
+                <button
+                  key={m.ip}
+                  type="button"
+                  className="np-pill"
+                  onClick={() => {
+                    onSelectEntity?.({
+                      kind: "endpoint",
+                      entityId: makeHostEntityId(m.ip),
+                      ip: m.ip,
+                      host: m,
+                    });
+                  }}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    width: "100%",
+                    cursor: "pointer",
+                    textAlign: "left",
+                    background: "var(--np-surface-2, #131d2e)",
+                    border: "1px solid var(--np-accent-line, rgba(47, 224, 214, 0.15))",
+                  }}
+                  title={`Select ${m.ip}`}
+                >
+                  <span style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.hostnames[0]?.name || m.ip}
+                  </span>
+                  <span style={{ fontSize: "0.68rem", color: "var(--np-accent)", marginLeft: "6px", flexShrink: 0 }}>
+                    {humanBytes(m.bytes)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
   return null;
 });
 
 interface OtherResolvedCardProps {
-  entity: Extract<SelectedEntity, { kind: "otherResolvedGroup" | "otherResolvedAggregate" }>;
+  entity: Extract<SelectedEntity, { kind: "otherResolvedAggregate" }>;
   onClearSelection?: () => void;
   onSelectEntity?: (entity: SelectedEntity | null) => void;
 }

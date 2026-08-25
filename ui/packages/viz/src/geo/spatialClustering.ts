@@ -711,7 +711,15 @@ export function buildSpatialClusters(
 
     const [hx, hy] = projectGeo(norm.lat, norm.lng, worldWidth, worldHeight);
     const hostGeoCellId = computeGeoCellId(norm.lat, norm.lng);
+    const isAsnSelected =
+      (selectedEntity?.kind === "asn" && host.asn.status === "resolved" && host.asn.asn === selectedEntity.asn) ||
+      (selectedEntityId != null &&
+        selectedEntityId.startsWith("entity-asn-") &&
+        host.asn.status === "resolved" &&
+        host.asn.asn === Number(selectedEntityId.replace("entity-asn-", "")));
+
     const isSelected =
+      isAsnSelected ||
       (canonicalSelectedHostIp != null && canonicalSelectedHostIp !== "" && host.ip === canonicalSelectedHostIp) ||
       (selectedEntityId != null &&
         selectedEntityId !== "" &&
@@ -860,6 +868,16 @@ export function buildSpatialClusters(
             (selectedEntityId && selectedEntityId === makeCountryAggregateEntityId(cc)) ||
             (selectedEntity?.kind === "countryAggregate" && selectedEntity.countryCode.toLowerCase() === cc)
           ) {
+            c.hasSelected = true;
+          }
+        } else if (
+          (selectedEntityId?.startsWith("entity-asn-") || selectedEntity?.kind === "asn")
+        ) {
+          const targetAsn =
+            selectedEntity?.kind === "asn"
+              ? selectedEntity.asn
+              : Number(selectedEntityId?.replace("entity-asn-", ""));
+          if (Number.isFinite(targetAsn) && c.asns.has(targetAsn)) {
             c.hasSelected = true;
           }
         } else if (selectedEntity) {

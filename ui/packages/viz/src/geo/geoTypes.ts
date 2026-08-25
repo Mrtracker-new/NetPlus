@@ -182,6 +182,13 @@ export const OTHER_RESOLVED_NODE_ID = "node-other-resolved" as const;
 export const OTHER_RESOLVED_GEOCELL_ID = "geocell-other-resolved" as const;
 
 /**
+ * Stable identifiers for non-geographic, unresolved, and local network group selections.
+ */
+export const UNRESOLVED_PUBLIC_ENTITY_ID = "entity-unresolved-public" as const;
+export const LOCAL_LAN_ENTITY_ID = "entity-local-network-lan" as const;
+export const SPECIAL_SPACE_ENTITY_ID = "entity-special-address-space" as const;
+
+/**
  * Normalized canonical city key used for identity and aggregation grouping.
  */
 export type CanonicalCityKey = string;
@@ -193,14 +200,23 @@ export type HostEntityId = `entity-host-${string}`;
 export type CityAggregateEntityId = `entity-city-${string}-${string}`;
 export type CountryAggregateEntityId = `entity-country-${string}`;
 export type ClusterEntityId = `entity-cluster-${string}`;
+export type AsnEntityId = `entity-asn-${number}`;
 export type OtherResolvedEntityId = typeof OTHER_RESOLVED_ENTITY_ID;
+export type UnresolvedGroupEntityId = typeof UNRESOLVED_PUBLIC_ENTITY_ID | string;
+export type LocalNetworkGroupEntityId =
+  | typeof LOCAL_LAN_ENTITY_ID
+  | typeof SPECIAL_SPACE_ENTITY_ID
+  | string;
 
 export type EntityId =
   | HostEntityId
   | CityAggregateEntityId
   | CountryAggregateEntityId
   | ClusterEntityId
+  | AsnEntityId
   | OtherResolvedEntityId
+  | UnresolvedGroupEntityId
+  | LocalNetworkGroupEntityId
   | string;
 
 /**
@@ -241,6 +257,10 @@ export function makeCountryAggregateEntityId(countryCode: string): CountryAggreg
 
 export function makeClusterEntityId(geoCellId: string): ClusterEntityId {
   return `entity-cluster-${geoCellId.trim()}`;
+}
+
+export function makeAsnEntityId(asn: number): AsnEntityId {
+  return `entity-asn-${Math.floor(asn)}` as AsnEntityId;
 }
 
 /**
@@ -554,7 +574,7 @@ export type SelectedAsn = {
   kind: "asn";
   asn: number;
   asOrg: string;
-  entityId?: string;
+  entityId?: AsnEntityId | string;
   memberHosts: EnrichedHost[];
   tombstone?: TombstoneDetails;
 };
@@ -562,7 +582,7 @@ export type SelectedAsn = {
 export type SelectedUnresolvedGroup = {
   kind: "unresolvedGroup";
   title: string;
-  entityId?: string;
+  entityId?: UnresolvedGroupEntityId;
   memberHosts: EnrichedHost[];
   tombstone?: TombstoneDetails;
 };
@@ -570,32 +590,9 @@ export type SelectedUnresolvedGroup = {
 export type SelectedLocalNetworkGroup = {
   kind: "localNetworkGroup";
   title: string;
-  entityId?: string;
+  entityId?: LocalNetworkGroupEntityId;
   category: "lan" | "multicast" | "loopback" | "link_local" | "special";
   memberHosts: EnrichedHost[];
-  tombstone?: TombstoneDetails;
-};
-
-/** Backward-compatibility alias for otherResolvedGroup */
-export type SelectedOtherResolvedGroup = {
-  kind: "otherResolvedGroup";
-  title: string;
-  entityId?: string;
-  node?: GeoAggregateNode;
-  memberHosts: EnrichedHost[];
-  /**
-   * Exact endpoint cardinality represented by the selected node.
-   * Never inferred from memberHosts.length when authoritative node data exists.
-   */
-  memberCount?: number;
-  /**
-   * Bounded endpoint inspection sample associated with the selection.
-   */
-  sampleEndpointIps?: string[];
-  /**
-   * Derived presentation state: memberHosts.length < memberCount.
-   */
-  isSampled?: boolean;
   tombstone?: TombstoneDetails;
 };
 
@@ -608,7 +605,6 @@ export type SelectedEntity =
   | SelectedCountryAggregate
   | SelectedCluster
   | SelectedOtherResolvedAggregate
-  | SelectedOtherResolvedGroup
   | SelectedAsn
   | SelectedUnresolvedGroup
   | SelectedLocalNetworkGroup;
@@ -688,10 +684,7 @@ export function isNodeSelected(
       ) {
         return true;
       }
-    } else if (
-      activeSelection.kind === "otherResolvedAggregate" ||
-      activeSelection.kind === "otherResolvedGroup"
-    ) {
+    } else if (activeSelection.kind === "otherResolvedAggregate") {
       if (
         node.nodeKind === "otherResolvedAggregate" ||
         node.entityId === OTHER_RESOLVED_ENTITY_ID ||
@@ -731,6 +724,25 @@ export function isNodeSelected(
         node.sampleEndpointIps.includes(rawId.replace("entity-host-", "")) ||
         node.endpointIps.includes(rawId.replace("entity-host-", ""))
       )) ||
+      (rawId.startsWith("entity-asn-") && (
+        node.asns.includes(Number(rawId.replace("entity-asn-", "")))
+      )) ||
+      (rawId.startsWith("entity-country-") && Boolean(node.countryCode) && (
+        node.countryCode!.toUpperCase() === rawId.replace("entity-country-", "").trim().toUpperCase()
+      )) ||
+      (rawId.startsWith("entity-city-") && (() => {
+        const rawCity = rawId.replace("entity-city-", "").trim();
+        const dash = rawCity.indexOf("-");
+        if (dash > 0) {
+          const cc = rawCity.substring(0, dash).toUpperCase();
+          const ck = rawCity.substring(dash + 1).toLowerCase();
+          return (
+            (!node.countryCode || node.countryCode.toUpperCase() === cc) &&
+            makeCanonicalCityKey(node.label.replace(/\s*\(\d+\)$/, "")) === ck
+          );
+        }
+        return false;
+      })()) ||
       (rawId === OTHER_RESOLVED_ENTITY_ID && node.nodeKind === "otherResolvedAggregate") ||
       (targetCellId !== null && (
         node.geoCellId === targetCellId ||

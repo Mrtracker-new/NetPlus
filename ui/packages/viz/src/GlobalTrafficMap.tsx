@@ -2,6 +2,9 @@ import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type Ke
 import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
+  UNRESOLVED_PUBLIC_ENTITY_ID,
+  LOCAL_LAN_ENTITY_ID,
+  SPECIAL_SPACE_ENTITY_ID,
   isNodeSelected,
   makeHostEntityId,
   type CityAggregateEntityId,
@@ -692,6 +695,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
               handleSetSelection({
                 kind: "unresolvedGroup",
                 title: "Unresolved Public Destinations",
+                entityId: UNRESOLVED_PUBLIC_ENTITY_ID,
                 memberHosts: unresolvedPublicHosts,
               })
             }
@@ -1107,6 +1111,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                   handleSetSelection({
                     kind: "localNetworkGroup",
                     title: "Local Network Activity",
+                    entityId: LOCAL_LAN_ENTITY_ID,
                     category: "lan",
                     memberHosts: localLanHosts,
                   })
@@ -1151,6 +1156,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                   handleSetSelection({
                     kind: "localNetworkGroup",
                     title: "Special Address Space Activity",
+                    entityId: SPECIAL_SPACE_ENTITY_ID,
                     category: "special",
                     memberHosts: specialHosts,
                   })

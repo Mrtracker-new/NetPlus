@@ -2,7 +2,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { GeoContextCard } from "../components/RightRail/GeoContextCard";
-import { enrichHost, makeHostEntityId, type SelectedEntity, type EnrichedHost } from "@netpulse/viz";
+import { enrichHost, makeHostEntityId, OTHER_RESOLVED_ENTITY_ID, type SelectedEntity, type EnrichedHost } from "@netpulse/viz";
 
 afterEach(() => {
   cleanup();
@@ -322,7 +322,8 @@ describe("GeoContextCard Polymorphic Inspector", () => {
     }
 
     const entity: SelectedEntity = {
-      kind: "otherResolvedGroup",
+      kind: "otherResolvedAggregate",
+      entityId: OTHER_RESOLVED_ENTITY_ID,
       title: "Other Resolved Traffic (120)",
       memberHosts: hosts,
     };
@@ -428,5 +429,98 @@ describe("GeoContextCard Polymorphic Inspector", () => {
     expect(screen.getByText("IPv6 Deferred")).toBeInTheDocument();
     expect(screen.getByText("1 hosts")).toBeInTheDocument();
     expect(screen.getByText(/IPv6 deferred •/i)).toBeInTheDocument();
+  });
+
+  it("renders SelectedAsn card with ASN number, organization, volume, flows, and handles member endpoint selection", () => {
+    const host = enrichHost(
+      {
+        label: "1.1.1.1",
+        bytes: 1048576,
+        flows: 14,
+        hostnames: [{ name: "one.one.one.one", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+
+    const onSelectEntity = vi.fn();
+    const entity: SelectedEntity = {
+      kind: "asn",
+      asn: 13335,
+      asOrg: "Cloudflare, Inc.",
+      entityId: "entity-asn-13335",
+      memberHosts: [host],
+    };
+
+    render(<GeoContextCard entity={entity} onSelectEntity={onSelectEntity} />);
+    expect(screen.getByText("Autonomous System (ASN)")).toBeInTheDocument();
+    expect(screen.getByText("AS13335 (Cloudflare, Inc.)")).toBeInTheDocument();
+    expect(screen.getAllByText("1.0 MB").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("14")).toBeInTheDocument();
+    expect(screen.getByText("one.one.one.one")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTitle("Select 1.1.1.1"));
+    expect(onSelectEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "endpoint",
+        ip: "1.1.1.1",
+      })
+    );
+  });
+
+  it("renders inactive tombstone state for SelectedAsn with alert banner and last observed stats", () => {
+    const entity: SelectedEntity = {
+      kind: "asn",
+      asn: 15169,
+      asOrg: "Google LLC",
+      entityId: "entity-asn-15169",
+      memberHosts: [],
+      tombstone: {
+        isInactive: true,
+        lastObservedTs: Date.now() - 5000,
+        lastObservedBytes: 2097152,
+        lastObservedFlows: 8,
+      },
+    };
+
+    render(<GeoContextCard entity={entity} />);
+    expect(screen.getByText("AS15169 (Google LLC) (Inactive)")).toBeInTheDocument();
+    expect(screen.getByText("No longer active in live window")).toBeInTheDocument();
+    expect(screen.getByText(/Observed 2.0 MB across 8 flows/i)).toBeInTheDocument();
+  });
+
+  it("allows navigating from endpoint ASN link to SelectedAsn when onSelectEntity is provided", () => {
+    const host = enrichHost(
+      {
+        label: "8.8.8.8",
+        bytes: 4096,
+        flows: 2,
+        hostnames: [{ name: "dns.google", source: "dns" }],
+        evidence: [],
+      },
+      0
+    );
+
+    const onSelectEntity = vi.fn();
+    const entity: SelectedEntity = {
+      kind: "endpoint",
+      entityId: makeHostEntityId(host.ip),
+      ip: host.ip,
+      host,
+    };
+
+    render(<GeoContextCard entity={entity} onSelectEntity={onSelectEntity} />);
+    const asnButton = screen.getByTitle("Inspect Autonomous System AS15169");
+    expect(asnButton).toBeInTheDocument();
+
+    fireEvent.click(asnButton);
+    expect(onSelectEntity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "asn",
+        asn: 15169,
+        asOrg: "Google LLC",
+        entityId: "entity-asn-15169",
+      })
+    );
   });
 });

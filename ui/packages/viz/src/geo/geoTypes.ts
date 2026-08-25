@@ -508,6 +508,10 @@ export type SelectedCluster = {
   tombstone?: TombstoneDetails;
 };
 
+/**
+ * Presentation aggregate selection for "Other Resolved Traffic" overflow rollup.
+ * Note: As a presentation aggregate created by the rendering budget, it does not bear a tombstone.
+ */
 export type SelectedOtherResolvedAggregate = {
   kind: "otherResolvedAggregate";
   entityId: OtherResolvedEntityId;
@@ -527,7 +531,6 @@ export type SelectedOtherResolvedAggregate = {
    * Derived presentation state: memberHosts.length < memberCount.
    */
   isSampled?: boolean;
-  tombstone?: TombstoneDetails;
 };
 
 export type SelectedAsn = {
@@ -576,7 +579,6 @@ export type SelectedOtherResolvedGroup = {
    * Derived presentation state: memberHosts.length < memberCount.
    */
   isSampled?: boolean;
-  tombstone?: TombstoneDetails;
 };
 
 /**

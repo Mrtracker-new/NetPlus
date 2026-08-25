@@ -879,10 +879,10 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         { maxVisibleNodes: 10 }
       );
 
-      // Must NOT create a tombstone for otherResolved because resolved hosts are live in telemetry
+      // Must NOT create a tombstone for otherResolved because it is a presentation aggregate, not a telemetry lifecycle entity
       expect(m2.tombstones.has(OTHER_RESOLVED_ENTITY_ID)).toBe(false);
 
-      // S2 with OTHER_RESOLVED_ENTITY_ID selected must recover active selection via semantic fallback
+      // S2 with OTHER_RESOLVED_ENTITY_ID selected: since no otherResolved node is rendered, selection cleanly clears without tombstone
       const m2Sel = deriveMapViewModel(
         {
           hosts: [
@@ -898,12 +898,8 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         m1,
         { maxVisibleNodes: 10, selectedEntityId: OTHER_RESOLVED_ENTITY_ID }
       );
-      expect(m2Sel.activeSelection?.status).toBe("active");
-      expect(m2Sel.activeSelection?.entityId).toBe(OTHER_RESOLVED_ENTITY_ID);
-      expect(m2Sel.activeSelection?.selectedEntity.kind).toBe("otherResolvedAggregate");
-      if (m2Sel.activeSelection?.selectedEntity.kind === "otherResolvedAggregate") {
-        expect(m2Sel.activeSelection.selectedEntity.memberCount).toBe(4);
-      }
+      expect(m2Sel.tombstones.has(OTHER_RESOLVED_ENTITY_ID)).toBe(false);
+      expect(m2Sel.activeSelection).toBeNull();
     });
 
     it("Invariant 3: Selected endpoints are guaranteed to survive maxVisibleNodes and remain focal targets", () => {
@@ -1699,7 +1695,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       expect(totalNodeMembers).toBe(model.coverageStats.resolvedHostsCount);
     });
 
-    it("resolves active selection when selecting OTHER_RESOLVED_ENTITY_ID and transitions to tombstone when removed", () => {
+    it("resolves active selection when selecting rendered OTHER_RESOLVED_ENTITY_ID and clears selection without tombstone when removed", () => {
       const rows: BreakdownRow[] = [
         { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [{ name: "us-host", source: "dns" }], evidence: [] },
         { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [{ name: "de-host", source: "dns" }], evidence: [] },
@@ -1728,8 +1724,50 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         selectedEntityId: OTHER_RESOLVED_ENTITY_ID,
       });
 
-      expect(model2.activeSelection?.status).toBe("tombstone");
-      expect(model2.activeSelection?.selectedEntity?.tombstone?.isInactive).toBe(true);
+      // Presentation aggregates are NOT tombstone-bearing lifecycle entities
+      expect(model2.tombstones.has(OTHER_RESOLVED_ENTITY_ID)).toBe(false);
+      expect(model2.activeSelection).toBeNull();
+    });
+
+    it("Budget overflow lifecycle: 120 nodes -> Other exists, 121 -> Other exists, 119 -> Other does not exist and does NOT produce tombstone", () => {
+      // 120 hosts at distinct coordinates
+      const makeHosts = (count: number): BreakdownRow[] =>
+        Array.from({ length: count }, (_, i) => ({
+          label: `100.64.${Math.floor(i / 250)}.${(i % 250) + 1}`,
+          bytes: 1000 + i,
+          flows: 1,
+          hostnames: [],
+          evidence: [],
+        }));
+
+      // In geoDatabase mock, 1.1.1.1 (US), 31.0.0.1 (DE), 9.9.9.9 (CH), 142.250.30.1 (JP) etc. are resolved.
+      // Let's create resolved hosts:
+      const hosts4: BreakdownRow[] = [
+        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+        { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
+        { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
+        { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
+      ];
+
+      // Budget = 2, 4 hosts => 2 clusters rendered: 1 discrete + 1 OtherResolved
+      const mOverflow = deriveMapViewModel(
+        { hosts: hosts4, captureSessionId: "s-budget-test", snapshotSequence: 1 },
+        null,
+        { maxVisibleNodes: 2, selectedEntityId: OTHER_RESOLVED_ENTITY_ID }
+      );
+      expect(mOverflow.aggregateNodes.some((n) => n.nodeKind === "otherResolvedAggregate")).toBe(true);
+      expect(mOverflow.activeSelection?.status).toBe("active");
+      expect(mOverflow.activeSelection?.entityId).toBe(OTHER_RESOLVED_ENTITY_ID);
+
+      // Budget expanded to 10 => 4 clusters rendered, NO OtherResolved
+      const mNoOverflow = deriveMapViewModel(
+        { hosts: hosts4, captureSessionId: "s-budget-test", snapshotSequence: 2 },
+        mOverflow,
+        { maxVisibleNodes: 10, selectedEntityId: OTHER_RESOLVED_ENTITY_ID }
+      );
+      expect(mNoOverflow.aggregateNodes.some((n) => n.nodeKind === "otherResolvedAggregate")).toBe(false);
+      expect(mNoOverflow.tombstones.has(OTHER_RESOLVED_ENTITY_ID)).toBe(false);
+      expect(mNoOverflow.activeSelection).toBeNull();
     });
   });
 

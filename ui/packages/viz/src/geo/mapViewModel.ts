@@ -445,18 +445,6 @@ export function createAggregateTombstone(
       node,
       tombstone,
     };
-  } else if (node.nodeKind === "otherResolvedAggregate") {
-    tombstoneEntity = {
-      kind: "otherResolvedAggregate",
-      entityId: OTHER_RESOLVED_ENTITY_ID,
-      title: node.label,
-      memberHosts: [],
-      memberCount: node.memberCount,
-      sampleEndpointIps: sampleIps,
-      isSampled: node.memberCount > 0,
-      node,
-      tombstone,
-    };
   } else if (node.nodeKind === "cluster") {
     tombstoneEntity = {
       kind: "cluster",
@@ -500,15 +488,15 @@ export function createAggregateTombstone(
  * - City aggregate entities: derived from all resolved hosts with valid city & country
  * - Country aggregate entities: derived from all resolved hosts with valid country
  * - Cluster entities: derived from all resolved hosts using stable quantized geoCell identity
- * - OtherResolved entity: derived from overflow membership / presence of resolved telemetry
  * - Currently rendered node entities: included for visual reconciliation
+ *
+ * (Note: Presentation aggregates like OtherResolved are visual overflow structures and not semantic lifecycle entities.)
  */
 export function deriveLiveSemanticEntityIds(
   snapshot: HostEnrichmentSnapshot,
   aggregateNodes: GeoAggregateNode[] = []
 ): Set<string> {
   const liveEntityIds = new Set<string>();
-  let hasLiveResolvedHosts = false;
 
   for (const host of snapshot.enrichedHosts) {
     // 1. Endpoint entity identity
@@ -516,7 +504,6 @@ export function deriveLiveSemanticEntityIds(
     liveEntityIds.add(host.ip);
 
     if (host.geo.status === "resolved") {
-      hasLiveResolvedHosts = true;
 
       // 2. City aggregate entity identity: derived from current resolved hosts
       if (host.geo.countryCode && host.geo.city) {
@@ -557,18 +544,6 @@ export function deriveLiveSemanticEntityIds(
     }
   }
 
-  // 6. OtherResolved aggregate: overflow membership semantics
-  // If an overflow aggregate node is currently rendered, OR if resolved hosts exist in telemetry
-  // such that otherResolved has live membership backing:
-  const hasRenderedOtherResolved = aggregateNodes.some(
-    (n) => n.nodeKind === "otherResolvedAggregate" || n.entityId === OTHER_RESOLVED_ENTITY_ID
-  );
-  if (hasRenderedOtherResolved || hasLiveResolvedHosts) {
-    liveEntityIds.add(OTHER_RESOLVED_ENTITY_ID);
-    liveEntityIds.add(OTHER_RESOLVED_NODE_ID);
-    liveEntityIds.add(OTHER_RESOLVED_GEOCELL_ID);
-  }
-
   return liveEntityIds;
 }
 
@@ -582,6 +557,8 @@ export function deriveLiveSemanticEntityIds(
  * - E dead across subsequent frames => tombstones[E] is unchanged (frozen historical metrics & timestamp)
  * - E resurrected => E ∉ tombstones
  * - session changed => previous-session tombstones are cleared
+ * - Presentation aggregates (e.g. Other Resolved Traffic) exist solely due to render budget overflow,
+ *   not telemetry lifecycle, and therefore NEVER generate tombstones.
  */
 export function deriveTombstonesSnapshot(
   snapshot: HostEnrichmentSnapshot,
@@ -627,6 +604,15 @@ export function deriveTombstonesSnapshot(
   if (previousModel.aggregateNodes) {
     const lastTs = previousModel.lastUpdatedTs ?? snapshot.snapshotTimestamp ?? 0;
     for (const prevNode of previousModel.aggregateNodes) {
+      // Presentation aggregates (such as Other Resolved Traffic) exist solely due to render budget overflow.
+      // They are not telemetry entities with lifecycle states and must never generate tombstones.
+      if (
+        prevNode.nodeKind === "otherResolvedAggregate" ||
+        prevNode.entityId === OTHER_RESOLVED_ENTITY_ID
+      ) {
+        continue;
+      }
+
       const aggregateEntityId = prevNode.entityId;
 
       // Invariant: Render disappearance must not automatically imply tombstone.
@@ -655,7 +641,13 @@ export function deriveTombstonesSnapshot(
   // 4. Backward-compatibility fallback for legacy activeSelection tombstones
   if (previousModel.activeSelection?.status === "tombstone") {
     const prevSel = previousModel.activeSelection;
-    if (!nextTombstones.has(prevSel.entityId) && !liveEntityIds.has(prevSel.entityId)) {
+    if (
+      prevSel.entityId === OTHER_RESOLVED_ENTITY_ID ||
+      prevSel.selectedEntity?.kind === "otherResolvedAggregate" ||
+      prevSel.selectedEntity?.kind === "otherResolvedGroup"
+    ) {
+      // Presentation aggregates cannot be tombstones
+    } else if (!nextTombstones.has(prevSel.entityId) && !liveEntityIds.has(prevSel.entityId)) {
       const baseLabel = prevSel.label.replace(/\s*\(Inactive\)$/, "");
       const tombstoneDetails: TombstoneDetails = prevSel.tombstoneDetails ||
         prevSel.selectedEntity?.tombstone || {
@@ -997,41 +989,6 @@ export function resolveLiveAggregateSelection(
           label,
           node: enclosingNode,
           memberHosts,
-          memberCount,
-          sampleEndpointIps,
-          isSampled: memberCount > sampleEndpointIps.length,
-        },
-      };
-    }
-  }
-
-  // 4. Other Resolved Traffic Aggregate
-  if (
-    targetEntityId === OTHER_RESOLVED_ENTITY_ID ||
-    targetEntityId === OTHER_RESOLVED_NODE_ID ||
-    targetEntityId === OTHER_RESOLVED_GEOCELL_ID
-  ) {
-    const resolvedHosts = allHosts.filter((h) => h.geo.status === "resolved");
-    if (resolvedHosts.length > 0) {
-      const totalBytes = resolvedHosts.reduce((s, h) => s + h.bytes, 0);
-      const memberCount = resolvedHosts.length;
-      const sampleEndpointIps = resolvedHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
-      const enclosingNode = aggregateNodes.find(
-        (n) => n.nodeKind === "otherResolvedAggregate" || n.entityId === OTHER_RESOLVED_ENTITY_ID
-      );
-
-      return {
-        entityId: OTHER_RESOLVED_ENTITY_ID,
-        status: "active",
-        isSelected: true,
-        label: `Other Resolved Traffic (${memberCount})`,
-        subLabel: `${memberCount} endpoints • ${humanBytes(totalBytes)}`,
-        selectedEntity: {
-          kind: "otherResolvedAggregate",
-          title: `Other Resolved Traffic (${memberCount})`,
-          entityId: OTHER_RESOLVED_ENTITY_ID,
-          node: enclosingNode,
-          memberHosts: resolvedHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS),
           memberCount,
           sampleEndpointIps,
           isSampled: memberCount > sampleEndpointIps.length,

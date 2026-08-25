@@ -722,6 +722,190 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       expect(m2.activeSelection?.tombstoneDetails?.lastObservedTs).toBe(0);
     });
 
+    it("Authoritative Tombstone Invariant: Semantic liveness decoupling - City aggregate disappearance due to render budget (maxVisibleNodes: 1) does NOT create tombstone", () => {
+      // S1: 2 Frankfurt hosts (city aggregate) + 1 US host -> Frankfurt rendered as city aggregate
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
+            { label: "1.1.1.1", bytes: 20000, flows: 20, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-city-decouple",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { maxVisibleNodes: 10 }
+      );
+      const frankfurtNode = m1.aggregateNodes.find((n) => n.entityId === "entity-city-de-frankfurt-am-main");
+      expect(frankfurtNode).toBeDefined();
+
+      // S2: Same hosts active in telemetry, but budget constrained to 1 node (rollup to Other Resolved)
+      const m2 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 7000, flows: 7, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
+            { label: "31.0.0.2", bytes: 5000, flows: 5, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
+            { label: "1.1.1.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-city-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { maxVisibleNodes: 1 }
+      );
+
+      // Frankfurt is not in aggregateNodes (only other-resolved is rendered)
+      expect(m2.aggregateNodes.length).toBe(1);
+      expect(m2.aggregateNodes[0]?.nodeKind).toBe("otherResolvedAggregate");
+
+      // Critical Invariant: Frankfurt MUST NOT become a tombstone because it is semantically live in telemetry!
+      expect(m2.tombstones.has("entity-city-de-frankfurt-am-main")).toBe(false);
+      expect(m2.tombstones.size).toBe(0);
+
+      // If Frankfurt is selected, it must resolve to active status with full live telemetry backing
+      const m2Sel = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 7000, flows: 7, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
+            { label: "31.0.0.2", bytes: 5000, flows: 5, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
+            { label: "1.1.1.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+          ],
+          captureSessionId: "s-city-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { maxVisibleNodes: 1, selectedEntityId: "entity-city-de-frankfurt-am-main" }
+      );
+      expect(m2Sel.activeSelection?.status).toBe("active");
+      expect(m2Sel.activeSelection?.entityId).toBe("entity-city-de-frankfurt-am-main");
+      expect(m2Sel.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+      if (m2Sel.activeSelection?.selectedEntity.kind === "cityAggregate") {
+        expect(m2Sel.activeSelection.selectedEntity.cityName).toBe("Frankfurt am Main");
+        expect(m2Sel.activeSelection.selectedEntity.memberCount).toBe(2);
+      }
+    });
+
+    it("Authoritative Tombstone Invariant: Semantic liveness decoupling - Country aggregate disappearance due to zoom change does NOT create tombstone", () => {
+      // S1: Country aggregate rendered at low zoom
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-country-decouple",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { zoomScale: 0.2 }
+      );
+
+      // S2: Zoom scale increases to 5.0 -> rendered as city aggregate
+      const m2 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-country-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { zoomScale: 5.0 }
+      );
+
+      // Country entity must not be in tombstones
+      expect(m2.tombstones.has("entity-country-de")).toBe(false);
+
+      // Selection of country entity must resolve active
+      const m2Sel = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [], evidence: [] },
+            { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-country-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { zoomScale: 5.0, selectedEntityId: "entity-country-de" }
+      );
+      expect(m2Sel.activeSelection?.status).toBe("active");
+      expect(m2Sel.activeSelection?.entityId).toBe("entity-country-de");
+      expect(m2Sel.activeSelection?.selectedEntity.kind).toBe("countryAggregate");
+    });
+
+    it("Authoritative Tombstone Invariant: Semantic liveness decoupling - OtherResolved is NOT dead when omitted due to render budget expansion", () => {
+      // S1: 4 hosts with budget 2 -> otherResolvedAggregate is rendered
+      const m1 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
+            { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
+            { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-other-decouple",
+          snapshotSequence: 1,
+          snapshotTimestamp: 1000,
+        },
+        null,
+        { maxVisibleNodes: 2, selectedEntityId: OTHER_RESOLVED_ENTITY_ID }
+      );
+      expect(m1.aggregateNodes.some((n) => n.nodeKind === "otherResolvedAggregate")).toBe(true);
+      expect(m1.activeSelection?.status).toBe("active");
+
+      // S2: Same 4 hosts, but budget increased to 10 -> all 4 rendered individually, NO otherResolved node
+      const m2 = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
+            { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
+            { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-other-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { maxVisibleNodes: 10 }
+      );
+
+      // Must NOT create a tombstone for otherResolved because resolved hosts are live in telemetry
+      expect(m2.tombstones.has(OTHER_RESOLVED_ENTITY_ID)).toBe(false);
+
+      // S2 with OTHER_RESOLVED_ENTITY_ID selected must recover active selection via semantic fallback
+      const m2Sel = deriveMapViewModel(
+        {
+          hosts: [
+            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
+            { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
+            { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
+          ],
+          captureSessionId: "s-other-decouple",
+          snapshotSequence: 2,
+          snapshotTimestamp: 2000,
+        },
+        m1,
+        { maxVisibleNodes: 10, selectedEntityId: OTHER_RESOLVED_ENTITY_ID }
+      );
+      expect(m2Sel.activeSelection?.status).toBe("active");
+      expect(m2Sel.activeSelection?.entityId).toBe(OTHER_RESOLVED_ENTITY_ID);
+      expect(m2Sel.activeSelection?.selectedEntity.kind).toBe("otherResolvedAggregate");
+      if (m2Sel.activeSelection?.selectedEntity.kind === "otherResolvedAggregate") {
+        expect(m2Sel.activeSelection.selectedEntity.memberCount).toBe(4);
+      }
+    });
+
     it("Invariant 3: Selected endpoints are guaranteed to survive maxVisibleNodes and remain focal targets", () => {
       const enrichedHosts: EnrichedHost[] = [];
       const hostsById = new Map<string, EnrichedHost>();

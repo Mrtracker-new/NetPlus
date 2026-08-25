@@ -1,7 +1,14 @@
 import type { BreakdownRow } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
+  OTHER_RESOLVED_NODE_ID,
+  OTHER_RESOLVED_GEOCELL_ID,
   makeHostEntityId,
+  makeCityAggregateEntityId,
+  makeCountryAggregateEntityId,
+  makeClusterEntityId,
+  makeCanonicalCityKey,
+  getCanonicalCountryName,
   type HostEntityId,
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
@@ -18,10 +25,16 @@ import {
   type TombstoneRecord,
 } from "./geoTypes";
 import { enrichHost, getLocalOrigin } from "./geoDatabase";
-import { buildSpatialClusters } from "./spatialClustering";
+import {
+  buildSpatialClusters,
+  computeGeoCellId,
+  normalizeCoordinates,
+  MAX_CLUSTER_SAMPLE_IPS,
+} from "./spatialClustering";
 import { calculateArcBezier, getArcOpacity, getArcStrokeWidth, type ArcPathModel } from "./trafficArcs";
 import { computeLabelLayout } from "./labelLayout";
 import { projectGeo } from "./worldGeometry";
+import { humanBytes } from "../utils";
 
 export interface MapViewModelInput {
   hosts: BreakdownRow[];
@@ -474,6 +487,84 @@ export function createAggregateTombstone(
 }
 
 /**
+ * Derives the authoritative set of live semantic entity IDs from a telemetry snapshot.
+ *
+ * Invariant: Semantic entity liveness is strictly decoupled from visual node rendering budgets.
+ * - Host entities: derived from all enriched hosts
+ * - City aggregate entities: derived from all resolved hosts with valid city & country
+ * - Country aggregate entities: derived from all resolved hosts with valid country
+ * - Cluster entities: derived from all resolved hosts using stable quantized geoCell identity
+ * - OtherResolved entity: derived from overflow membership / presence of resolved telemetry
+ * - Currently rendered node entities: included for visual reconciliation
+ */
+export function deriveLiveSemanticEntityIds(
+  snapshot: HostEnrichmentSnapshot,
+  aggregateNodes: GeoAggregateNode[] = []
+): Set<string> {
+  const liveEntityIds = new Set<string>();
+  let hasLiveResolvedHosts = false;
+
+  for (const host of snapshot.enrichedHosts) {
+    // 1. Endpoint entity identity
+    liveEntityIds.add(makeHostEntityId(host.ip));
+    liveEntityIds.add(host.ip);
+
+    if (host.geo.status === "resolved") {
+      hasLiveResolvedHosts = true;
+
+      // 2. City aggregate entity identity: derived from current resolved hosts
+      if (host.geo.countryCode && host.geo.city) {
+        const canonicalCityKey = makeCanonicalCityKey(host.geo.city);
+        if (canonicalCityKey) {
+          liveEntityIds.add(makeCityAggregateEntityId(host.geo.countryCode, canonicalCityKey));
+        }
+      }
+
+      // 3. Country aggregate entity identity: derived from current resolved hosts
+      if (host.geo.countryCode) {
+        liveEntityIds.add(makeCountryAggregateEntityId(host.geo.countryCode));
+      }
+
+      // 4. Cluster entity identity: derived according to stable geoCell semantics
+      const norm = normalizeCoordinates(host.geo.latitude, host.geo.longitude);
+      if (norm) {
+        const geoCellId = computeGeoCellId(norm.lat, norm.lng);
+        liveEntityIds.add(makeClusterEntityId(geoCellId));
+        liveEntityIds.add(geoCellId);
+        liveEntityIds.add(`cluster-${geoCellId}`);
+      }
+    }
+  }
+
+  // 5. Currently rendered visual aggregate nodes (visual reconciliation)
+  for (const node of aggregateNodes) {
+    liveEntityIds.add(node.entityId);
+    if (node.geoCellId) {
+      liveEntityIds.add(makeClusterEntityId(node.geoCellId));
+      liveEntityIds.add(node.geoCellId);
+      liveEntityIds.add(`cluster-${node.geoCellId}`);
+    }
+    if (node.id) {
+      liveEntityIds.add(node.id);
+    }
+  }
+
+  // 6. OtherResolved aggregate: overflow membership semantics
+  // If an overflow aggregate node is currently rendered, OR if resolved hosts exist in telemetry
+  // such that otherResolved has live membership backing:
+  const hasRenderedOtherResolved = aggregateNodes.some(
+    (n) => n.nodeKind === "otherResolvedAggregate" || n.entityId === OTHER_RESOLVED_ENTITY_ID
+  );
+  if (hasRenderedOtherResolved || hasLiveResolvedHosts) {
+    liveEntityIds.add(OTHER_RESOLVED_ENTITY_ID);
+    liveEntityIds.add(OTHER_RESOLVED_NODE_ID);
+    liveEntityIds.add(OTHER_RESOLVED_GEOCELL_ID);
+  }
+
+  return liveEntityIds;
+}
+
+/**
  * Pure, deterministic derivation of the authoritative tombstone snapshot.
  * Keyed strictly by entityId, independent of activeSelection.
  *
@@ -503,18 +594,8 @@ export function deriveTombstonesSnapshot(
     return nextTombstones;
   }
 
-  // Authoritative set of currently live entity IDs
-  const liveEntityIds = new Set<string>();
-  for (const host of snapshot.enrichedHosts) {
-    liveEntityIds.add(makeHostEntityId(host.ip));
-    liveEntityIds.add(host.ip);
-  }
-  for (const node of aggregateNodes) {
-    liveEntityIds.add(node.entityId);
-    if (node.geoCellId) {
-      liveEntityIds.add(`entity-cluster-${node.geoCellId}`);
-    }
-  }
+  // Authoritative set of currently live semantic entity IDs (separated from rendered node set)
+  const liveEntityIds = deriveLiveSemanticEntityIds(snapshot, aggregateNodes);
 
   // 1. Inherit previously recorded tombstones (frozen state preserved for dead entities)
   for (const [entityId, record] of previousTombstones) {
@@ -631,18 +712,94 @@ export function resolveLiveAggregateSelection(
       (targetEntityId === OTHER_RESOLVED_ENTITY_ID && n.nodeKind === "otherResolvedAggregate")
   );
 
-  if (!matchingNode) return null;
+  if (matchingNode) {
+    const sampleIps = matchingNode.sampleEndpointIps;
+    const memberHosts = sampleIps
+      .map((ip) => hostsById.get(ip))
+      .filter((h): h is EnrichedHost => Boolean(h));
+    const memberCount = matchingNode.memberCount;
+    const isSampled = memberHosts.length < memberCount;
 
-  const sampleIps = matchingNode.sampleEndpointIps;
-  const memberHosts = sampleIps
-    .map((ip) => hostsById.get(ip))
-    .filter((h): h is EnrichedHost => Boolean(h));
-  const memberCount = matchingNode.memberCount;
-  const isSampled = memberHosts.length < memberCount;
+    if (matchingNode.nodeKind === "endpoint") {
+      const ip = sampleIps[0] || "";
+      const host = hostsById.get(ip);
+      return {
+        entityId: matchingNode.entityId,
+        status: "active",
+        isSelected: true,
+        label: matchingNode.label,
+        subLabel: matchingNode.subLabel,
+        selectedEntity: {
+          kind: "endpoint",
+          ip,
+          entityId: makeHostEntityId(ip),
+          ...(host ? { host } : {}),
+        } as SelectedEntity,
+      };
+    }
 
-  if (matchingNode.nodeKind === "endpoint") {
-    const ip = sampleIps[0] || "";
-    const host = hostsById.get(ip);
+    if (matchingNode.nodeKind === "cityAggregate") {
+      return {
+        entityId: matchingNode.entityId,
+        status: "active",
+        isSelected: true,
+        label: matchingNode.label,
+        subLabel: matchingNode.subLabel,
+        selectedEntity: {
+          kind: "cityAggregate",
+          cityName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
+          countryCode: matchingNode.countryCode || undefined,
+          entityId: matchingNode.entityId as CityAggregateEntityId,
+          node: matchingNode,
+          memberHosts,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
+        },
+      };
+    }
+
+    if (matchingNode.nodeKind === "countryAggregate") {
+      return {
+        entityId: matchingNode.entityId,
+        status: "active",
+        isSelected: true,
+        label: matchingNode.label,
+        subLabel: matchingNode.subLabel,
+        selectedEntity: {
+          kind: "countryAggregate",
+          countryCode: matchingNode.countryCode || "XX",
+          countryName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
+          entityId: matchingNode.entityId as CountryAggregateEntityId,
+          node: matchingNode,
+          memberHosts,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
+        },
+      };
+    }
+
+    if (matchingNode.nodeKind === "otherResolvedAggregate" || targetEntityId === OTHER_RESOLVED_ENTITY_ID) {
+      return {
+        entityId: matchingNode.entityId,
+        status: "active",
+        isSelected: true,
+        label: matchingNode.label,
+        subLabel: matchingNode.subLabel,
+        selectedEntity: {
+          kind: "otherResolvedAggregate",
+          title: matchingNode.label,
+          entityId: OTHER_RESOLVED_ENTITY_ID,
+          node: matchingNode,
+          memberHosts,
+          memberCount,
+          sampleEndpointIps: sampleIps,
+          isSampled,
+        },
+      };
+    }
+
     return {
       entityId: matchingNode.entityId,
       status: "active",
@@ -650,26 +807,11 @@ export function resolveLiveAggregateSelection(
       label: matchingNode.label,
       subLabel: matchingNode.subLabel,
       selectedEntity: {
-        kind: "endpoint",
-        ip,
-        entityId: makeHostEntityId(ip),
-        ...(host ? { host } : {}),
-      } as SelectedEntity,
-    };
-  }
-
-  if (matchingNode.nodeKind === "cityAggregate") {
-    return {
-      entityId: matchingNode.entityId,
-      status: "active",
-      isSelected: true,
-      label: matchingNode.label,
-      subLabel: matchingNode.subLabel,
-      selectedEntity: {
-        kind: "cityAggregate",
-        cityName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-        countryCode: matchingNode.countryCode || undefined,
-        entityId: matchingNode.entityId as CityAggregateEntityId,
+        kind: "cluster",
+        clusterId: matchingNode.id,
+        entityId: matchingNode.entityId as ClusterEntityId,
+        geoCellId: matchingNode.geoCellId,
+        label: matchingNode.label,
         node: matchingNode,
         memberHosts,
         memberCount,
@@ -679,66 +821,189 @@ export function resolveLiveAggregateSelection(
     };
   }
 
-  if (matchingNode.nodeKind === "countryAggregate") {
-    return {
-      entityId: matchingNode.entityId,
-      status: "active",
-      isSelected: true,
-      label: matchingNode.label,
-      subLabel: matchingNode.subLabel,
-      selectedEntity: {
-        kind: "countryAggregate",
-        countryCode: matchingNode.countryCode || "XX",
-        countryName: matchingNode.label.replace(/\s*\(\d+\)$/, ""),
-        entityId: matchingNode.entityId as CountryAggregateEntityId,
-        node: matchingNode,
-        memberHosts,
-        memberCount,
-        sampleEndpointIps: sampleIps,
-        isSampled,
-      },
-    };
+  // Fallback: Semantic selection resolution for live aggregates not rendered as a single discrete node
+  const allHosts = Array.from(hostsById.values());
+
+  const getResolvedCity = (h: EnrichedHost): string | null =>
+    h.geo.status === "resolved" ? h.geo.city : null;
+
+  const getResolvedCountry = (h: EnrichedHost): string | null =>
+    h.geo.status === "resolved" ? h.geo.country : null;
+
+  // 1. City Aggregate
+  if (targetEntityId.startsWith("entity-city-")) {
+    const raw = targetEntityId.replace("entity-city-", "");
+    const dashIdx = raw.indexOf("-");
+    if (dashIdx > 0) {
+      const countryCode = raw.substring(0, dashIdx).toLowerCase();
+      const cityKey = raw.substring(dashIdx + 1).toLowerCase();
+
+      const memberHosts = allHosts.filter(
+        (h) =>
+          h.geo.status === "resolved" &&
+          h.geo.countryCode?.toLowerCase() === countryCode &&
+          makeCanonicalCityKey(h.geo.city || "") === cityKey
+      );
+
+      if (memberHosts.length > 0) {
+        const firstCity = memberHosts.map(getResolvedCity).find((c): c is string => Boolean(c));
+        const cityName = firstCity || cityKey;
+        const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+        const memberCount = memberHosts.length;
+        const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+        const enclosingNode = aggregateNodes.find((n) =>
+          n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+        );
+
+        return {
+          entityId: targetEntityId,
+          status: "active",
+          isSelected: true,
+          label: `${cityName} (${memberCount})`,
+          subLabel: `${memberCount} endpoints • ${cityName}, ${countryCode.toUpperCase()} • ${humanBytes(totalBytes)}`,
+          selectedEntity: {
+            kind: "cityAggregate",
+            cityName,
+            countryCode: countryCode.toUpperCase(),
+            entityId: targetEntityId as CityAggregateEntityId,
+            node: enclosingNode,
+            memberHosts,
+            memberCount,
+            sampleEndpointIps,
+            isSampled: memberCount > sampleEndpointIps.length,
+          },
+        };
+      }
+    }
   }
 
-  if (matchingNode.nodeKind === "otherResolvedAggregate" || targetEntityId === OTHER_RESOLVED_ENTITY_ID) {
-    return {
-      entityId: matchingNode.entityId,
-      status: "active",
-      isSelected: true,
-      label: matchingNode.label,
-      subLabel: matchingNode.subLabel,
-      selectedEntity: {
-        kind: "otherResolvedAggregate",
-        title: matchingNode.label,
+  // 2. Country Aggregate
+  if (targetEntityId.startsWith("entity-country-")) {
+    const countryCode = targetEntityId.replace("entity-country-", "").toLowerCase();
+    const memberHosts = allHosts.filter(
+      (h) => h.geo.status === "resolved" && h.geo.countryCode?.toLowerCase() === countryCode
+    );
+
+    if (memberHosts.length > 0) {
+      const firstCountry = memberHosts.map(getResolvedCountry).find((c): c is string => Boolean(c));
+      const countryName = getCanonicalCountryName(
+        countryCode.toUpperCase(),
+        firstCountry || "Country"
+      );
+      const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = memberHosts.length;
+      const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+      const enclosingNode = aggregateNodes.find((n) =>
+        n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+      );
+
+      return {
+        entityId: targetEntityId,
+        status: "active",
+        isSelected: true,
+        label: `${countryName} (${memberCount})`,
+        subLabel: `${memberCount} endpoints • ${countryName} (${countryCode.toUpperCase()}) • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "countryAggregate",
+          countryCode: countryCode.toUpperCase(),
+          countryName,
+          entityId: targetEntityId as CountryAggregateEntityId,
+          node: enclosingNode,
+          memberHosts,
+          memberCount,
+          sampleEndpointIps,
+          isSampled: memberCount > sampleEndpointIps.length,
+        },
+      };
+    }
+  }
+
+  // 3. Cluster Aggregate
+  if (
+    targetEntityId.startsWith("entity-cluster-") ||
+    targetEntityId.startsWith("geocell-") ||
+    targetEntityId.startsWith("cluster-geocell-")
+  ) {
+    const geoCellId = targetEntityId
+      .replace(/^entity-cluster-/, "")
+      .replace(/^cluster-/, "");
+
+    const memberHosts = allHosts.filter((h) => {
+      if (h.geo.status !== "resolved") return false;
+      const norm = normalizeCoordinates(h.geo.latitude, h.geo.longitude);
+      return norm ? computeGeoCellId(norm.lat, norm.lng) === geoCellId : false;
+    });
+
+    if (memberHosts.length > 0) {
+      const totalBytes = memberHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = memberHosts.length;
+      const sampleEndpointIps = memberHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+      const enclosingNode = aggregateNodes.find((n) =>
+        n.sampleEndpointIps.some((ip) => memberHosts.some((h) => h.ip === ip))
+      );
+      const firstCity = memberHosts.map(getResolvedCity).find((c): c is string => Boolean(c));
+      const label = firstCity
+        ? `${firstCity} Region (${memberCount})`
+        : `Spatial Cluster (${memberCount})`;
+
+      return {
+        entityId: makeClusterEntityId(geoCellId),
+        status: "active",
+        isSelected: true,
+        label,
+        subLabel: `${memberCount} endpoints • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "cluster",
+          clusterId: enclosingNode?.id || `cluster-${geoCellId}`,
+          entityId: makeClusterEntityId(geoCellId),
+          geoCellId,
+          label,
+          node: enclosingNode,
+          memberHosts,
+          memberCount,
+          sampleEndpointIps,
+          isSampled: memberCount > sampleEndpointIps.length,
+        },
+      };
+    }
+  }
+
+  // 4. Other Resolved Traffic Aggregate
+  if (
+    targetEntityId === OTHER_RESOLVED_ENTITY_ID ||
+    targetEntityId === OTHER_RESOLVED_NODE_ID ||
+    targetEntityId === OTHER_RESOLVED_GEOCELL_ID
+  ) {
+    const resolvedHosts = allHosts.filter((h) => h.geo.status === "resolved");
+    if (resolvedHosts.length > 0) {
+      const totalBytes = resolvedHosts.reduce((s, h) => s + h.bytes, 0);
+      const memberCount = resolvedHosts.length;
+      const sampleEndpointIps = resolvedHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS).map((h) => h.ip);
+      const enclosingNode = aggregateNodes.find(
+        (n) => n.nodeKind === "otherResolvedAggregate" || n.entityId === OTHER_RESOLVED_ENTITY_ID
+      );
+
+      return {
         entityId: OTHER_RESOLVED_ENTITY_ID,
-        node: matchingNode,
-        memberHosts,
-        memberCount,
-        sampleEndpointIps: sampleIps,
-        isSampled,
-      },
-    };
+        status: "active",
+        isSelected: true,
+        label: `Other Resolved Traffic (${memberCount})`,
+        subLabel: `${memberCount} endpoints • ${humanBytes(totalBytes)}`,
+        selectedEntity: {
+          kind: "otherResolvedAggregate",
+          title: `Other Resolved Traffic (${memberCount})`,
+          entityId: OTHER_RESOLVED_ENTITY_ID,
+          node: enclosingNode,
+          memberHosts: resolvedHosts.slice(0, MAX_CLUSTER_SAMPLE_IPS),
+          memberCount,
+          sampleEndpointIps,
+          isSampled: memberCount > sampleEndpointIps.length,
+        },
+      };
+    }
   }
 
-  return {
-    entityId: matchingNode.entityId,
-    status: "active",
-    isSelected: true,
-    label: matchingNode.label,
-    subLabel: matchingNode.subLabel,
-    selectedEntity: {
-      kind: "cluster",
-      clusterId: matchingNode.id,
-      entityId: matchingNode.entityId as ClusterEntityId,
-      geoCellId: matchingNode.geoCellId,
-      label: matchingNode.label,
-      node: matchingNode,
-      memberHosts,
-      memberCount,
-      sampleEndpointIps: sampleIps,
-      isSampled,
-    },
-  };
+  return null;
 }
 
 export function resolveSelection(
@@ -761,16 +1026,31 @@ export function resolveSelection(
   if (!tombstone && !targetEntityId.startsWith("entity-host-")) {
     tombstone = tombstones.get(`entity-host-${targetEntityId}`);
   }
-  if (!tombstone && targetEntityId.startsWith("entity-cluster-")) {
-    const cellId = targetEntityId.replace("entity-cluster-", "");
-    for (const record of tombstones.values()) {
-      if (
-        record.kind === "cluster" &&
-        "geoCellId" in record.selectedEntity &&
-        record.selectedEntity.geoCellId === cellId
-      ) {
-        tombstone = record;
-        break;
+  if (
+    !tombstone &&
+    (targetEntityId.startsWith("entity-cluster-") ||
+      targetEntityId.startsWith("geocell-") ||
+      targetEntityId.startsWith("cluster-geocell-"))
+  ) {
+    const cellId = targetEntityId
+      .replace(/^entity-cluster-/, "")
+      .replace(/^cluster-/, "");
+
+    tombstone =
+      tombstones.get(makeClusterEntityId(cellId)) ||
+      tombstones.get(cellId) ||
+      tombstones.get(`cluster-${cellId}`);
+
+    if (!tombstone) {
+      for (const record of tombstones.values()) {
+        if (
+          record.kind === "cluster" &&
+          "geoCellId" in record.selectedEntity &&
+          record.selectedEntity.geoCellId === cellId
+        ) {
+          tombstone = record;
+          break;
+        }
       }
     }
   }

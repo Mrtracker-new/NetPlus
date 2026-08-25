@@ -247,7 +247,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     return baseArcModels.map((arc) => {
       const nodeId = arc.id.replace(/^arc-/, "");
       const node = nodeById.get(nodeId);
-      const isSelected = isNodeSelected(node, activeSelection);
+      const isSelected = isNodeSelected(node, activeSelection, selectedEntityId);
       const opacity = activeSelection ? (isSelected ? 1.0 : 0.25) : arc.opacity;
 
       return {
@@ -256,7 +256,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         isSelected,
       };
     });
-  }, [origin, baseArcModels, nodeById, activeSelection]);
+  }, [origin, baseArcModels, nodeById, activeSelection, selectedEntityId]);
 
   // 5. Imperative 60fps particle loop mutating SVG circle positions directly
   const particleRefs = useRef<Array<SVGCircleElement | null>>([]);
@@ -827,7 +827,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
             {/* Layer 5: Aggregated Geographic Destination Nodes & Labels */}
             <g className="np-geomap__nodes">
               {aggregateNodes.map((node) => {
-                const isSelected = isNodeSelected(node, activeSelection);
+                const isSelected = isNodeSelected(node, activeSelection, selectedEntityId);
                 const hasSelectionActive = activeSelection !== null;
                 const nodeOpacity = hasSelectionActive ? (isSelected ? 1.0 : 0.3) : 1.0;
 

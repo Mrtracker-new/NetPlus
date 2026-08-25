@@ -1506,6 +1506,186 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       }
     });
 
+    it("12d. Cluster-Radius and Merge Decoupling: Spatial cluster merging under distance threshold changes does NOT create tombstone", () => {
+      const h1 = createCustomHost("1.1.1.1", 50.11, 8.68, 3000, 3, { city: "Frankfurt", countryCode: "DE", locationLevel: "city" });
+      const h2 = createCustomHost("1.1.1.2", 48.13, 11.58, 2000, 2, { city: "Munich", countryCode: "DE", locationLevel: "city" });
+
+      const snapshot1 = {
+        captureSessionId: "s-radius",
+        snapshotSequence: 1,
+        snapshotTimestamp: 1000,
+        enrichedHosts: [h1, h2],
+        hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+        coverageStats: {
+          totalObservedHosts: 2,
+          publicHostsCount: 2,
+          resolvedHostsCount: 2,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 5000,
+          resolvedBytes: 5000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      // Small cluster radius: 2 discrete nodes
+      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+        clusterRadiusPx: 2,
+      });
+      expect(vm1.aggregateNodes.length).toBe(2);
+
+      // Large cluster radius: merged into 1 cluster
+      const vm2 = deriveClusteredMapModel(snapshot1, vm1, {
+        clusterRadiusPx: 100,
+      });
+      expect(vm2.aggregateNodes.length).toBe(1);
+
+      // Must NOT create tombstones for the previous discrete nodes because hosts are still live
+      expect(vm2.tombstones.size).toBe(0);
+    });
+
+    it("12e. Selection Recovery of Live Aggregate when Render Node is Compressed or Merged", () => {
+      const h1 = createCustomHost("1.1.1.1", 51.51, -0.12, 5000, 5, { city: "London", countryCode: "GB", locationLevel: "city" });
+      const h2 = createCustomHost("1.1.1.2", 51.52, -0.11, 4000, 4, { city: "London", countryCode: "GB", locationLevel: "city" });
+
+      const snapshot1 = {
+        captureSessionId: "s-recov",
+        snapshotSequence: 1,
+        snapshotTimestamp: 1000,
+        enrichedHosts: [h1, h2],
+        hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+        coverageStats: {
+          totalObservedHosts: 2,
+          publicHostsCount: 2,
+          resolvedHostsCount: 2,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 9000,
+          resolvedBytes: 9000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      // Frame 1: London rendered as cityAggregate
+      const vm1 = deriveClusteredMapModel(snapshot1, null, {
+        selectedEntityId: "entity-city-gb-london",
+      });
+      expect(vm1.activeSelection?.status).toBe("active");
+      expect(vm1.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+
+      // Frame 2: Budget restricted to 1 node -> rolled into Other Resolved
+      const vm2 = deriveClusteredMapModel(snapshot1, vm1, {
+        maxVisibleNodes: 1,
+        selectedEntityId: "entity-city-gb-london",
+      });
+
+      // Selection must remain ACTIVE with full London metadata, not (Inactive)
+      expect(vm2.activeSelection?.status).toBe("active");
+      expect(vm2.activeSelection?.entityId).toBe("entity-city-gb-london");
+      expect(vm2.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+      if (vm2.activeSelection?.selectedEntity.kind === "cityAggregate") {
+        expect(vm2.activeSelection.selectedEntity.cityName).toBe("London");
+        expect(vm2.activeSelection.selectedEntity.memberCount).toBe(2);
+      }
+      expect(vm2.tombstones.has("entity-city-gb-london")).toBe(false);
+    });
+
+    it("12f. Genuine Cessation and Resurrection for Aggregates: Tombstone is created only upon true telemetry cessation and removed upon resurrection", () => {
+      const h1 = createCustomHost("1.1.1.1", 51.51, -0.12, 5000, 5, { city: "London", countryCode: "GB", locationLevel: "city" });
+      const h2 = createCustomHost("1.1.1.2", 51.52, -0.11, 4000, 4, { city: "London", countryCode: "GB", locationLevel: "city" });
+
+      const snapshotLive = {
+        captureSessionId: "s-res-agg",
+        snapshotSequence: 1,
+        snapshotTimestamp: 1000,
+        enrichedHosts: [h1, h2],
+        hostsById: new Map([["1.1.1.1", h1], ["1.1.1.2", h2]]),
+        coverageStats: {
+          totalObservedHosts: 2,
+          publicHostsCount: 2,
+          resolvedHostsCount: 2,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 9000,
+          resolvedBytes: 9000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      const vm1 = deriveClusteredMapModel(snapshotLive, null, {
+        selectedEntityId: "entity-city-gb-london",
+      });
+      expect(vm1.activeSelection?.status).toBe("active");
+      expect(vm1.activeSelection?.selectedEntity.kind).toBe("cityAggregate");
+
+      // Snapshot 2: Host ceases telemetry
+      const snapshotDead = {
+        captureSessionId: "s-res-agg",
+        snapshotSequence: 2,
+        snapshotTimestamp: 2000,
+        enrichedHosts: [],
+        hostsById: new Map(),
+        coverageStats: {
+          totalObservedHosts: 0,
+          publicHostsCount: 0,
+          resolvedHostsCount: 0,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 0,
+          resolvedBytes: 0,
+          unresolvedBytes: 0,
+          coveragePercent: 0,
+          resolvedBytesPercent: 0,
+        },
+      };
+
+      const vm2 = deriveClusteredMapModel(snapshotDead, vm1, {
+        selectedEntityId: "entity-city-gb-london",
+      });
+      expect(vm2.activeSelection?.status).toBe("tombstone");
+      expect(vm2.tombstones.has("entity-city-gb-london")).toBe(true);
+
+      // Snapshot 3: Host resurrects with new telemetry
+      const h1Resurrected = createCustomHost("1.1.1.1", 51.51, -0.12, 12000, 12, { city: "London", countryCode: "GB", locationLevel: "city" });
+      const h2Resurrected = createCustomHost("1.1.1.2", 51.52, -0.11, 8000, 8, { city: "London", countryCode: "GB", locationLevel: "city" });
+      const snapshotResurrected = {
+        captureSessionId: "s-res-agg",
+        snapshotSequence: 3,
+        snapshotTimestamp: 3000,
+        enrichedHosts: [h1Resurrected, h2Resurrected],
+        hostsById: new Map([["1.1.1.1", h1Resurrected], ["1.1.1.2", h2Resurrected]]),
+        coverageStats: {
+          totalObservedHosts: 2,
+          publicHostsCount: 2,
+          resolvedHostsCount: 2,
+          unresolvedHostsCount: 0,
+          localLanHostsCount: 0,
+          specialHostsCount: 0,
+          totalBytes: 20000,
+          resolvedBytes: 20000,
+          unresolvedBytes: 0,
+          coveragePercent: 100,
+          resolvedBytesPercent: 100,
+        },
+      };
+
+      const vm3 = deriveClusteredMapModel(snapshotResurrected, vm2, {
+        selectedEntityId: "entity-city-gb-london",
+      });
+      expect(vm3.activeSelection?.status).toBe("active");
+      expect(vm3.tombstones.has("entity-city-gb-london")).toBe(false);
+    });
+
     it("13. Four-Point 4D Traffic and Membership Conservation Validation", () => {
       // Create 40 distinct hosts across different cities and countries with randomized multi-dimensional metrics
       const hosts: EnrichedHost[] = [];

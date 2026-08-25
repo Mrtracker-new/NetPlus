@@ -633,6 +633,22 @@ export function isNodeSelected(
       ) {
         return true;
       }
+    } else if (activeSelection.kind === "asn") {
+      if (
+        node.asns.includes(activeSelection.asn) ||
+        node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip))
+      ) {
+        return true;
+      }
+    } else if (
+      activeSelection.kind === "unresolvedGroup" ||
+      activeSelection.kind === "localNetworkGroup"
+    ) {
+      if (
+        node.sampleEndpointIps.some((ip) => activeSelection.memberHosts.some((h) => h.ip === ip))
+      ) {
+        return true;
+      }
     }
   }
 
@@ -645,7 +661,8 @@ export function isNodeSelected(
       (rawId.startsWith("entity-host-") && node.endpointIps.includes(rawId.replace("entity-host-", ""))) ||
       (rawId === OTHER_RESOLVED_ENTITY_ID && node.nodeKind === "otherResolvedAggregate") ||
       (rawId.startsWith("entity-cluster-") && node.geoCellId === rawId.replace("entity-cluster-", "")) ||
-      (rawId.startsWith("cluster-") && node.geoCellId === rawId.replace("cluster-", ""))
+      (rawId.startsWith("cluster-") && node.geoCellId === rawId.replace("cluster-", "")) ||
+      (rawId.startsWith("geocell-") && node.geoCellId === rawId)
     ) {
       return true;
     }

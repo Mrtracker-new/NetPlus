@@ -235,6 +235,158 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       // Must NOT wrap around poles
       expect(targetCluster).toBeNull();
     });
+
+    it("relocates cluster across cell boundary from old bucket to new bucket exactly once", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      const cluster = createMockAccumulator("cluster-reloc", 10, 10, -175, 10);
+      grid.insert(cluster, 10, 10);
+
+      // Initially in cell gx=0, gy=0 -> bucket "0_0"
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_0");
+
+      // Move centroid to x=35, y=10 (crosses into gx=1, gy=0 -> bucket "1_0")
+      cluster.avgX = 35;
+      cluster.avgY = 10;
+      grid.updatePosition(cluster, 35, 10);
+
+      expect(grid.getClusterBucketKey(cluster)).toBe("1_0");
+
+      // Query at old location (x=10, y=10) with small threshold=5 should no longer find the cluster
+      const oldQuery = grid.findNearest(10, 10, 5);
+      expect(oldQuery.targetCluster).toBeNull();
+
+      // Query at new location (x=35, y=10) with threshold=5 must find the cluster
+      const newQuery = grid.findNearest(35, 10, 5);
+      expect(newQuery.targetCluster).toBe(cluster);
+    });
+
+    it("relocates cluster across the antimeridian seam in both directions (N-1 -> 0 and 0 -> N-1)", () => {
+      const grid = new SpatialGridIndex(26, 720, 360); // 28 cols: 0..27
+      const cluster = createMockAccumulator("cluster-seam", 715, 100, 177.5, 10);
+      grid.insert(cluster, 715, 100);
+
+      // Initial bucket in Col 27 (N-1)
+      expect(grid.getClusterBucketKey(cluster)).toBe("27_3");
+
+      // Shift across antimeridian into Col 0 (x=5)
+      cluster.avgX = 5;
+      cluster.avgY = 100;
+      grid.updatePosition(cluster, 5, 100);
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_3");
+
+      // Shift back across antimeridian from Col 0 into Col 27 (x=715)
+      cluster.avgX = 715;
+      cluster.avgY = 100;
+      grid.updatePosition(cluster, 715, 100);
+      expect(grid.getClusterBucketKey(cluster)).toBe("27_3");
+    });
+
+    it("guarantees candidate completeness after centroid relocation when query does not inspect old cell", () => {
+      // Cell size = 10, threshold = 10, cellRadius = 1
+      const grid = new SpatialGridIndex(10, 720, 360);
+      const cluster = createMockAccumulator("cluster-candidate", 9, 100, -175.5, 10);
+      grid.insert(cluster, 9, 100); // Cell 0: [0, 10)
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_10");
+
+      // Centroid moves to x=13.5 (Cell 1: [10, 20))
+      cluster.avgX = 13.5;
+      cluster.avgY = 100;
+      grid.updatePosition(cluster, 13.5, 100);
+      expect(grid.getClusterBucketKey(cluster)).toBe("1_10");
+
+      // Query host at x=23 (Cell 2: [20, 30)) with threshold = 10
+      // Distance from x=23 to centroid x=13.5 is 9.5 <= 10.
+      // Query cell (gx=2) inspects cols 1, 2, 3 (covering [10, 40)), and DOES NOT inspect col 0.
+      // Because cluster was relocated to col 1, it MUST be found.
+      const query = grid.findNearest(23, 100, 10);
+      expect(query.targetCluster).toBe(cluster);
+      expect(Math.sqrt(query.closestDistSq)).toBeCloseTo(9.5, 3);
+    });
+
+    it("treats repeated same-cell updatePosition as an efficient no-op", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      const cluster = createMockAccumulator("cluster-noop", 10, 10, -175, 10);
+      grid.insert(cluster, 10, 10);
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_0");
+
+      // Update to (12, 11) - same cell "0_0"
+      grid.updatePosition(cluster, 12, 11);
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_0");
+
+      // Update to (15, 14) - still same cell "0_0"
+      grid.updatePosition(cluster, 15, 14);
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_0");
+
+      // Query finds the cluster exactly once
+      const query = grid.findNearest(10, 10, 26);
+      expect(query.targetCluster).toBe(cluster);
+    });
+
+    it("removes cluster and deletes empty bucket to enforce memory boundedness", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      const cluster = createMockAccumulator("cluster-rm", 10, 10, -175, 10);
+      grid.insert(cluster, 10, 10);
+      expect(grid.getClusterBucketKey(cluster)).toBe("0_0");
+      expect(grid.size()).toBe(1);
+      expect(grid.bucketCount()).toBe(1);
+
+      grid.remove(cluster);
+      expect(grid.getClusterBucketKey(cluster)).toBeUndefined();
+      expect(grid.size()).toBe(0);
+      expect(grid.bucketCount()).toBe(0);
+
+      const query = grid.findNearest(10, 10, 26);
+      expect(query.targetCluster).toBeNull();
+    });
+
+    it("clears all clusters and buckets via clear()", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      const c1 = createMockAccumulator("cluster-1", 10, 10, -175, 10);
+      const c2 = createMockAccumulator("cluster-2", 50, 50, -155, 30);
+      grid.insert(c1, 10, 10);
+      grid.insert(c2, 50, 50);
+
+      expect(grid.size()).toBe(2);
+      expect(grid.bucketCount()).toBe(2);
+
+      grid.clear();
+      expect(grid.size()).toBe(0);
+      expect(grid.bucketCount()).toBe(0);
+      expect(grid.findNearest(10, 10, 26).targetCluster).toBeNull();
+    });
+
+    it("handles non-finite and invalid search queries gracefully", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      const cluster = createMockAccumulator("cluster-safe", 10, 10, -175, 10);
+      grid.insert(cluster, 10, 10);
+
+      expect(grid.findNearest(NaN, 10, 26).targetCluster).toBeNull();
+      expect(grid.findNearest(10, Infinity, 26).targetCluster).toBeNull();
+      expect(grid.findNearest(10, 10, -5).targetCluster).toBeNull();
+      expect(grid.findNearest(10, 10, 0).targetCluster).toBeNull();
+      expect(grid.findNearest(10, 10, NaN).targetCluster).toBeNull();
+    });
+
+    it("breaks exact distance ties deterministically (higher totalBytes wins)", () => {
+      const grid = new SpatialGridIndex(26, 720, 360);
+      // Two clusters positioned symmetrically equidistant from query point (50, 50)
+      // Cluster A at (40, 50) [dist = 10], TotalBytes = 5,000
+      // Cluster B at (60, 50) [dist = 10], TotalBytes = 20,000
+      const clusterA = createMockAccumulator("cluster-A", 40, 50, -160, 10);
+      clusterA.totalBytes = 5_000;
+      clusterA.geoCellId = "geocell-1";
+
+      const clusterB = createMockAccumulator("cluster-B", 60, 50, -150, 10);
+      clusterB.totalBytes = 20_000;
+      clusterB.geoCellId = "geocell-2";
+
+      grid.insert(clusterA, 40, 50);
+      grid.insert(clusterB, 60, 50);
+
+      const query = grid.findNearest(50, 50, 15);
+      expect(query.targetCluster).toBe(clusterB); // Higher totalBytes wins tie
+      expect(Math.sqrt(query.closestDistSq)).toBeCloseTo(10, 4);
+    });
   });
 
   describe("End-to-End Spatial Clustering with Antimeridian Resolution", () => {
@@ -401,6 +553,44 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       expect(clusters[0]!.totalBytes).toBe(1_700_000);
       expect(clusters[0]!.totalFlows).toBe(17);
       expect(clusters[0]!.endpointIps).toEqual(["1.1.1.1", "8.8.8.8", "8.8.4.4"]);
+    });
+
+    it("guarantees candidate completeness across a 10+ host centroid migration chain", () => {
+      // Create 11 hosts positioned along latitude 0.0 with coordinates such that each host
+      // is within worldDistThreshold (26px) of the evolving cluster centroid, but later hosts
+      // are far outside the initial seed host's grid bucket.
+      //
+      // Screen X progression (worldWidth = 720):
+      // Host 1 (seed, highest bytes): x = 5 (Cell 0: [0, 26))
+      // Host 2: x = 30 -> dist to 5 is 25 <= 26 -> centroid moves to 17.5 (Cell 0)
+      // Host 3: x = 43 -> dist to 17.5 is 25.5 <= 26 -> centroid moves to 26.0 (Cell 1)
+      // Host 4: x = 51 -> dist to 26.0 is 25.0 <= 26 -> centroid moves to 32.25 (Cell 1)
+      // Host 5: x = 58 -> dist to 32.25 is 25.75 <= 26 -> centroid moves to 37.4 (Cell 1)
+      // Host 6: x = 63 -> dist to 37.4 is 25.6 <= 26 -> centroid moves to 41.67 (Cell 1)
+      // Host 7: x = 67 -> dist to 41.67 is 25.33 <= 26 -> centroid moves to 45.29 (Cell 1)
+      // Host 8: x = 71 -> dist to 45.29 is 25.71 <= 26 -> centroid moves to 48.5 (Cell 1)
+      // Host 9: x = 74 -> dist to 48.5 is 25.5 <= 26 -> centroid moves to 51.33 (Cell 1)
+      // Host 10: x = 77 -> dist to 51.33 is 25.67 <= 26 -> centroid moves to 53.9 (Cell 2: [52, 78))
+      // Host 11: x = 79 -> dist to 53.9 is 25.1 <= 26 -> Cell 3: [78, 104)
+      //
+      // Note: Distance from Host 11 (x=79) to initial seed Host 1 (x=5) is 74px >> 26px.
+      // Without dynamic re-indexing, the cluster would remain in Cell 0, which is NOT inspected
+      // by Host 11 in Cell 3 (search neighborhood: Cells 2, 3, 4).
+      // With dynamic re-indexing, all 11 hosts MUST collapse into 1 single cluster.
+
+      const xs = [5, 30, 43, 51, 58, 63, 67, 71, 74, 77, 79];
+      const hosts: EnrichedHost[] = xs.map((x, idx) => {
+        // Invert projectGeo: x = (lng + 180) * 2 => lng = x / 2 - 180
+        const lng = x / 2 - 180;
+        const bytes = 100_000 - idx * 1_000; // Descending byte order ensures Host 1 is seed
+        return createMockHost(`192.0.2.${idx + 1}`, 0.0, lng, bytes);
+      });
+
+      const clusters = buildSpatialClusters(hosts, { zoomScale: 1.0, distanceThreshold: 26 });
+
+      expect(clusters.length).toBe(1);
+      expect(clusters[0]!.memberCount).toBe(11);
+      expect(clusters[0]!.totalBytes).toBe(hosts.reduce((acc, h) => acc + h.bytes, 0));
     });
 
     it("handles high density of 1,000 endpoints within render budget and execution time", () => {

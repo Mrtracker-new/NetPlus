@@ -3,11 +3,9 @@ import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
   makeHostEntityId,
-  type HostEntityId,
   type CityAggregateEntityId,
   type CountryAggregateEntityId,
   type ClusterEntityId,
-  type CoverageStats,
   type EnrichedHost,
   type GeoAggregateNode,
   type MapRenderPolicy,
@@ -24,9 +22,7 @@ import {
   MAP_WIDTH,
   projectGeo,
 } from "./geo/worldGeometry";
-import { calculateArcBezier, getArcOpacity, getArcStrokeWidth, sampleArcInto, type Point } from "./geo/trafficArcs";
-import { buildSpatialClusters } from "./geo/spatialClustering";
-import { computeLabelLayout } from "./geo/labelLayout";
+import { sampleArcInto, type Point } from "./geo/trafficArcs";
 import {
   deriveClusteredMapModel,
   deriveHostEnrichmentSnapshot,

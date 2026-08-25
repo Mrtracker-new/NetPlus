@@ -1,7 +1,6 @@
 import {
   OTHER_RESOLVED_ENTITY_ID,
   OTHER_RESOLVED_GEOCELL_ID,
-  OTHER_RESOLVED_NODE_ID,
   makeHostEntityId,
   makeCityAggregateEntityId,
   makeCountryAggregateEntityId,
@@ -154,8 +153,12 @@ export interface ClusterAccumulator {
  * - X is periodic over [0, worldWidth).
  * - Y is strictly Euclidean / non-periodic over [0, worldHeight].
  * - Grid cells are square with side length cellSize.
+ * - Dynamic spatial indexing: When a cluster accumulates new hosts and its centroid moves,
+ *   its cell bucket must be updated to maintain spatial locality.
  * - Candidate completeness: For every cluster c where toroidalDistance(c, query) <= threshold,
  *   the grid lookup MUST inspect c's cell.
+ * - Memory boundedness: When a bucket becomes empty after cluster relocation or removal,
+ *   the bucket key is deleted from the buckets map.
  */
 export class SpatialGridIndex {
   private cellSize: number;
@@ -164,13 +167,24 @@ export class SpatialGridIndex {
   private numCols: number;
   private numRows: number;
   private buckets = new Map<string, ClusterAccumulator[]>();
+  private clusterBuckets = new Map<ClusterAccumulator, string>();
 
   constructor(cellSize: number, worldWidth = MAP_WIDTH, worldHeight = MAP_HEIGHT) {
-    this.cellSize = Math.max(0.1, cellSize);
-    this.worldWidth = Math.max(1, worldWidth);
-    this.worldHeight = Math.max(1, worldHeight);
+    this.cellSize = Number.isFinite(cellSize) && cellSize > 0 ? cellSize : 26;
+    this.worldWidth = Number.isFinite(worldWidth) && worldWidth > 0 ? worldWidth : MAP_WIDTH;
+    this.worldHeight = Number.isFinite(worldHeight) && worldHeight > 0 ? worldHeight : MAP_HEIGHT;
     this.numCols = Math.max(1, Math.ceil(this.worldWidth / this.cellSize));
     this.numRows = Math.max(1, Math.ceil(this.worldHeight / this.cellSize));
+  }
+
+  private computeCellCoords(x: number, y: number): { gx: number; gy: number; key: string } {
+    const safeX = Number.isFinite(x) ? x : 0;
+    const safeY = Number.isFinite(y) ? y : 0;
+    const wrappedX = normalizeWorldX(safeX, this.worldWidth);
+    const gx = Math.floor(wrappedX / this.cellSize) % this.numCols;
+    const clampedY = Math.max(0, Math.min(this.worldHeight, safeY));
+    const gy = Math.min(this.numRows - 1, Math.floor(clampedY / this.cellSize));
+    return { gx, gy, key: `${gx}_${gy}` };
   }
 
   private getBucketKey(gx: number, gy: number): string {
@@ -178,17 +192,101 @@ export class SpatialGridIndex {
   }
 
   public insert(cluster: ClusterAccumulator, x: number, y: number): void {
-    const wrappedX = normalizeWorldX(x, this.worldWidth);
-    const gx = Math.floor(wrappedX / this.cellSize) % this.numCols;
-    const clampedY = Math.max(0, Math.min(this.worldHeight, y));
-    const gy = Math.min(this.numRows - 1, Math.floor(clampedY / this.cellSize));
-    const key = this.getBucketKey(gx, gy);
+    const { key } = this.computeCellCoords(x, y);
     let list = this.buckets.get(key);
     if (!list) {
       list = [];
       this.buckets.set(key, list);
     }
     list.push(cluster);
+    this.clusterBuckets.set(cluster, key);
+  }
+
+  /**
+   * Updates the spatial index bucket location of an existing cluster when its centroid changes.
+   * Ensures candidate completeness invariant is maintained as clusters evolve dynamically.
+   * If the cluster stays within the same cell bucket, this is an efficient no-op.
+   */
+  public updatePosition(cluster: ClusterAccumulator, newX: number, newY: number): void {
+    const oldKey = this.clusterBuckets.get(cluster);
+    const { key: newKey } = this.computeCellCoords(newX, newY);
+
+    if (oldKey === newKey) {
+      if (!this.clusterBuckets.has(cluster)) {
+        this.clusterBuckets.set(cluster, newKey);
+      }
+      return;
+    }
+
+    if (oldKey) {
+      const oldList = this.buckets.get(oldKey);
+      if (oldList) {
+        const idx = oldList.indexOf(cluster);
+        if (idx !== -1) {
+          oldList.splice(idx, 1);
+          if (oldList.length === 0) {
+            this.buckets.delete(oldKey);
+          }
+        }
+      }
+    }
+
+    let newList = this.buckets.get(newKey);
+    if (!newList) {
+      newList = [];
+      this.buckets.set(newKey, newList);
+    }
+    newList.push(cluster);
+    this.clusterBuckets.set(cluster, newKey);
+  }
+
+  /**
+   * Removes a cluster from the spatial index and cleans up empty buckets.
+   */
+  public remove(cluster: ClusterAccumulator): void {
+    const oldKey = this.clusterBuckets.get(cluster);
+    if (oldKey) {
+      const list = this.buckets.get(oldKey);
+      if (list) {
+        const idx = list.indexOf(cluster);
+        if (idx !== -1) {
+          list.splice(idx, 1);
+          if (list.length === 0) {
+            this.buckets.delete(oldKey);
+          }
+        }
+      }
+      this.clusterBuckets.delete(cluster);
+    }
+  }
+
+  /**
+   * Returns the current bucket key assigned to a cluster.
+   */
+  public getClusterBucketKey(cluster: ClusterAccumulator): string | undefined {
+    return this.clusterBuckets.get(cluster);
+  }
+
+  /**
+   * Clears all buckets and cluster mappings.
+   */
+  public clear(): void {
+    this.buckets.clear();
+    this.clusterBuckets.clear();
+  }
+
+  /**
+   * Returns total number of indexed clusters.
+   */
+  public size(): number {
+    return this.clusterBuckets.size;
+  }
+
+  /**
+   * Returns number of active non-empty spatial grid buckets.
+   */
+  public bucketCount(): number {
+    return this.buckets.size;
   }
 
   /**
@@ -200,11 +298,12 @@ export class SpatialGridIndex {
     hy: number,
     threshold: number
   ): { targetCluster: ClusterAccumulator | null; closestDistSq: number } {
+    if (!Number.isFinite(hx) || !Number.isFinite(hy) || !Number.isFinite(threshold) || threshold <= 0) {
+      return { targetCluster: null, closestDistSq: Infinity };
+    }
+
     const thresholdSq = threshold * threshold;
-    const wrappedX = normalizeWorldX(hx, this.worldWidth);
-    const gx = Math.floor(wrappedX / this.cellSize) % this.numCols;
-    const clampedY = Math.max(0, Math.min(this.worldHeight, hy));
-    const gy = Math.min(this.numRows - 1, Math.floor(clampedY / this.cellSize));
+    const { gx, gy } = this.computeCellCoords(hx, hy);
 
     const cellRadiusX = Math.max(1, Math.ceil(threshold / this.cellSize));
     const cellRadiusY = Math.max(1, Math.ceil(threshold / this.cellSize));
@@ -235,9 +334,25 @@ export class SpatialGridIndex {
           const distDy = Math.abs(hy - c.avgY);
           const distSq = distDx * distDx + distDy * distDy;
 
-          if (distSq <= thresholdSq && distSq < closestDistSq) {
-            closestDistSq = distSq;
-            targetCluster = c;
+          if (distSq <= thresholdSq) {
+            if (distSq < closestDistSq) {
+              closestDistSq = distSq;
+              targetCluster = c;
+            } else if (distSq === closestDistSq && targetCluster) {
+              // Deterministic tie-breaker for identical distance:
+              // 1. Highest totalBytes
+              // 2. Lexicographical geoCellId
+              // 3. First IP
+              if (
+                c.totalBytes > targetCluster.totalBytes ||
+                (c.totalBytes === targetCluster.totalBytes &&
+                  (c.geoCellId < targetCluster.geoCellId ||
+                    (c.geoCellId === targetCluster.geoCellId &&
+                      (c.firstHost?.ip ?? "").localeCompare(targetCluster.firstHost?.ip ?? "") < 0)))
+              ) {
+                targetCluster = c;
+              }
+            }
           }
         }
       }
@@ -616,6 +731,12 @@ export function buildSpatialClusters(
       const [projX, projY] = projectGeo(avgLat, canonicalLng, worldWidth, worldHeight);
       targetCluster.avgX = normalizeWorldX(projX, worldWidth);
       targetCluster.avgY = projY;
+
+      spatialGrid.updatePosition(
+        targetCluster,
+        targetCluster.avgX,
+        targetCluster.avgY
+      );
 
       targetCluster.totalBytes += host.bytes;
       targetCluster.totalFlows += host.flows;

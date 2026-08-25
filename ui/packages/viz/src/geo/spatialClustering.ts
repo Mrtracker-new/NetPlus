@@ -418,7 +418,7 @@ function mapClusterToNode(
       deltaBytes: c.deltaBytes,
       memberCount: 1,
       selectedMemberEntityId: c.selectedMemberEntityId || (c.hasSelected ? makeHostEntityId(first.ip) : null),
-      locationLevel: first.geo.status === "resolved" ? first.geo.locationLevel : "unresolved",
+      locationLevel: first.geo.status === "resolved" ? (first.geo.locationLevel as any) : "unresolved",
       precisionDescription: first.geo.status === "resolved" ? first.geo.precisionDescription : "Unresolved",
     };
   }
@@ -733,7 +733,7 @@ export function buildSpatialClusters(
   const clusters: ClusterAccumulator[] = [];
 
   for (const host of sorted) {
-    if (host.geo.status !== "resolved") continue;
+    if (!host.geo.mapEligible) continue;
 
     const norm = normalizeCoordinates(host.geo.latitude, host.geo.longitude);
     if (!norm) continue;
@@ -770,8 +770,8 @@ export function buildSpatialClusters(
 
     const { targetCluster } = spatialGrid.findNearest(hx, hy, worldDistThreshold);
 
-    const isHostCityLevel = host.geo.locationLevel === "city" && Boolean(host.geo.city);
-    const isHostCountryLevel = host.geo.locationLevel === "country";
+    const isHostCityLevel = ((host.geo.precision as string) === "city" || (host.geo as any).locationLevel === "city") && Boolean(host.geo.city);
+    const isHostCountryLevel = (host.geo.precision as string) === "country" || (host.geo as any).locationLevel === "country";
     const hostCountryCode = host.geo.countryCode ? host.geo.countryCode.trim().toLowerCase() : "";
     const hostCityKey = isHostCityLevel && host.geo.city ? makeCanonicalCityKey(host.geo.city) : "";
 

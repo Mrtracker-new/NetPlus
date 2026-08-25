@@ -208,7 +208,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
     it("Invariant 3: Selection resolves to entityId and persists across cluster regrouping on zoom", () => {
       const rows: BreakdownRow[] = [
         { label: "104.16.0.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] }, // SF (37.77, -122.41)
-        { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },     // SJ (37.33, -121.88)
+        { label: "17.0.0.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },     // Cupertino (37.33, -122.03)
       ];
 
       // World scale (zoom = 1.0) -> screen dist ~1.37px < 26px -> groups into single Bay Area cluster

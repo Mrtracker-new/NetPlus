@@ -227,7 +227,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
   describe("Invariant 3: 3-Tier Entity Identity, Selection Hierarchy & Tombstone UX", () => {
     it("Invariant 3: Selection resolves to entityId and persists across cluster regrouping on zoom", () => {
       const rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
+        { label: "17.0.0.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
         { label: "13.107.4.50", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
       ];
 
@@ -235,27 +235,27 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const modelZoom1 = deriveMapViewModel(
         { hosts: rows, captureSessionId: "s", snapshotSequence: 1 },
         null,
-        { zoomScale: 1.0, selectedEntityId: "entity-host-1.1.1.1" }
+        { zoomScale: 1.0, selectedEntityId: "entity-host-17.0.0.1" }
       );
 
       expect(modelZoom1.aggregateNodes.length).toBe(1);
       const cluster = modelZoom1.aggregateNodes[0]!;
       expect(cluster.entityId).toBeDefined();
       expect(cluster.geoCellId).toBeDefined();
-      expect(cluster.endpointIps).toContain("1.1.1.1");
+      expect(cluster.endpointIps).toContain("17.0.0.1");
       expect(modelZoom1.activeSelection?.isSelected).toBe(true);
 
       // Zoom in (zoom = 8.0) -> unpacks into 2 individual endpoint nodes
       const modelZoom8 = deriveMapViewModel(
         { hosts: rows, captureSessionId: "s", snapshotSequence: 1 },
         modelZoom1,
-        { zoomScale: 8.0, selectedEntityId: "entity-host-1.1.1.1" }
+        { zoomScale: 8.0, selectedEntityId: "entity-host-17.0.0.1" }
       );
 
       expect(modelZoom8.aggregateNodes.length).toBe(2);
-      const selectedNode = modelZoom8.aggregateNodes.find((n) => n.endpointIps.includes("1.1.1.1"));
+      const selectedNode = modelZoom8.aggregateNodes.find((n) => n.endpointIps.includes("17.0.0.1"));
       expect(selectedNode).toBeDefined();
-      expect(selectedNode?.entityId).toBe("entity-host-1.1.1.1");
+      expect(selectedNode?.entityId).toBe("entity-host-17.0.0.1");
       expect(modelZoom8.activeSelection?.isSelected).toBe(true);
     });
 
@@ -738,7 +738,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           hosts: [
             { label: "31.0.0.1", bytes: 6000, flows: 6, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
             { label: "31.0.0.2", bytes: 4000, flows: 4, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
-            { label: "1.1.1.1", bytes: 20000, flows: 20, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+            { label: "17.0.0.1", bytes: 20000, flows: 20, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
           ],
           captureSessionId: "s-city-decouple",
           snapshotSequence: 1,
@@ -756,7 +756,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           hosts: [
             { label: "31.0.0.1", bytes: 7000, flows: 7, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
             { label: "31.0.0.2", bytes: 5000, flows: 5, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
-            { label: "1.1.1.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+            { label: "17.0.0.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
           ],
           captureSessionId: "s-city-decouple",
           snapshotSequence: 2,
@@ -780,7 +780,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           hosts: [
             { label: "31.0.0.1", bytes: 7000, flows: 7, hostnames: [{ name: "fra1", source: "dns" }], evidence: [] },
             { label: "31.0.0.2", bytes: 5000, flows: 5, hostnames: [{ name: "fra2", source: "dns" }], evidence: [] },
-            { label: "1.1.1.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
+            { label: "17.0.0.1", bytes: 25000, flows: 25, hostnames: [{ name: "us1", source: "dns" }], evidence: [] },
           ],
           captureSessionId: "s-city-decouple",
           snapshotSequence: 2,
@@ -856,7 +856,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const m1 = deriveMapViewModel(
         {
           hosts: [
-            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
             { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
             { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
             { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
@@ -875,7 +875,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const m2 = deriveMapViewModel(
         {
           hosts: [
-            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
             { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
             { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
             { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
@@ -895,7 +895,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       const m2Sel = deriveMapViewModel(
         {
           hosts: [
-            { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+            { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
             { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
             { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
             { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
@@ -927,6 +927,9 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           classification: { ip, normalizedIp: ip, version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public IPv4", description: "Public address" },
           geo: {
             status: "resolved",
+            precision: "city",
+            distribution: "unicast",
+            mapEligible: true,
             latitude: lat,
             longitude: lng,
             country: `Country ${i % 30}`,
@@ -939,7 +942,8 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
             precisionDescription: "city-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
-          },
+            explanation: "Resolved test host",
+          } as GeoResolution,
           asn: { status: "resolved", asn: 1000 + i, asOrg: `AS-${i}`, asName: null, source: "local_database", asnDatabaseVersion: "test-v1" },
           anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
           bytes,
@@ -1023,13 +1027,13 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
   describe("Invariant 4: Cumulative vs. Interval Byte Separation", () => {
     it("Invariant 4: cluster.bytes = sum(host.bytes) AND cluster.deltaBytes = sum(host.deltaBytes)", () => {
       const s1Rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 10_000, flows: 1, hostnames: [], evidence: [] },
+        { label: "17.0.0.1", bytes: 10_000, flows: 1, hostnames: [], evidence: [] },
         { label: "8.8.8.8", bytes: 20_000, flows: 1, hostnames: [], evidence: [] },
       ];
       const model1 = deriveMapViewModel({ hosts: s1Rows, captureSessionId: "s", snapshotSequence: 1 }, null);
 
       const s2Rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 10_500, flows: 2, hostnames: [], evidence: [] }, // delta = 500
+        { label: "17.0.0.1", bytes: 10_500, flows: 2, hostnames: [], evidence: [] }, // delta = 500
         { label: "8.8.8.8", bytes: 20_300, flows: 2, hostnames: [], evidence: [] }, // delta = 300
       ];
       const model2 = deriveMapViewModel({ hosts: s2Rows, captureSessionId: "s", snapshotSequence: 2 }, model1, { zoomScale: 1.0 });
@@ -1706,7 +1710,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
 
     it("resolves active selection when selecting rendered OTHER_RESOLVED_ENTITY_ID and clears selection without tombstone when removed", () => {
       const rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [{ name: "us-host", source: "dns" }], evidence: [] },
+        { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [{ name: "us-host", source: "dns" }], evidence: [] },
         { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [{ name: "de-host", source: "dns" }], evidence: [] },
         { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [{ name: "ch-host", source: "dns" }], evidence: [] },
         { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [{ name: "jp-host", source: "dns" }], evidence: [] },
@@ -1749,10 +1753,10 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
           evidence: [],
         }));
 
-      // In geoDatabase mock, 1.1.1.1 (US), 31.0.0.1 (DE), 9.9.9.9 (CH), 142.250.30.1 (JP) etc. are resolved.
+      // In geoDatabase mock, 17.0.0.1 (US), 31.0.0.1 (DE), 9.9.9.9 (CH), 142.250.30.1 (JP) etc. are resolved.
       // Let's create resolved hosts:
       const hosts4: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+        { label: "17.0.0.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
         { label: "31.0.0.1", bytes: 60000, flows: 6, hostnames: [], evidence: [] },
         { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
         { label: "142.250.30.1", bytes: 20000, flows: 2, hostnames: [], evidence: [] },
@@ -1791,7 +1795,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       };
 
       const s0Rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 10_000, flows: 2, hostnames: [], evidence: [] },
+        { label: "104.16.0.1", bytes: 10_000, flows: 2, hostnames: [], evidence: [] },
         { label: "8.8.8.8", bytes: 20_000, flows: 4, hostnames: [], evidence: [] },
         { label: "0.0.0.0", bytes: 0, flows: 0, hostnames: [], evidence: [] },
       ];
@@ -1803,7 +1807,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         { origin, reducedMotion: false, zoomScale: 10.0, clusterRadiusPx: 1 }
       );
 
-      const h1S0 = m0.hostsById.get("1.1.1.1")!;
+      const h1S0 = m0.hostsById.get("104.16.0.1")!;
       const h8S0 = m0.hostsById.get("8.8.8.8")!;
       const h0S0 = m0.hostsById.get("0.0.0.0")!;
 
@@ -1819,9 +1823,9 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         expect(["active", "recent", "stale"]).toContain(arc.freshness);
       }
 
-      // S1: Positive burst on 1.1.1.1 (+5000), 8.8.8.8 is idle (+0)
+      // S1: Positive burst on 104.16.0.1 (+5000), 8.8.8.8 is idle (+0)
       const s1Rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 15_000, flows: 3, hostnames: [], evidence: [] },
+        { label: "104.16.0.1", bytes: 15_000, flows: 3, hostnames: [], evidence: [] },
         { label: "8.8.8.8", bytes: 20_000, flows: 4, hostnames: [], evidence: [] },
         { label: "0.0.0.0", bytes: 0, flows: 0, hostnames: [], evidence: [] },
       ];
@@ -1832,14 +1836,14 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         { origin, reducedMotion: false, zoomScale: 10.0, clusterRadiusPx: 1 }
       );
 
-      const h1S1 = m1.hostsById.get("1.1.1.1")!;
+      const h1S1 = m1.hostsById.get("104.16.0.1")!;
       const h8S1 = m1.hostsById.get("8.8.8.8")!;
       expect(h1S1.freshness).toBe("active");
       expect(h1S1.deltaBytes).toBe(5000);
       expect(h8S1.freshness).toBe("recent");
       expect(h8S1.deltaBytes).toBe(0);
 
-      const arc1S1 = m1.arcModels.find((a) => a.id.includes("1.1.1.1"))!;
+      const arc1S1 = m1.arcModels.find((a) => a.id.includes("104.16.0.1"))!;
       const arc8S1 = m1.arcModels.find((a) => a.id.includes("8.8.8.8"))!;
       expect(arc1S1.hasParticles).toBe(true);
       expect(arc1S1.freshness).toBe("active");
@@ -1852,7 +1856,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         m0,
         { origin, reducedMotion: true, zoomScale: 10.0, clusterRadiusPx: 1 }
       );
-      const arc1Reduced = m1Reduced.arcModels.find((a) => a.id.includes("1.1.1.1"))!;
+      const arc1Reduced = m1Reduced.arcModels.find((a) => a.id.includes("104.16.0.1"))!;
       expect(arc1Reduced.hasParticles).toBe(false);
       expect(arc1Reduced.freshness).toBe("active");
     });
@@ -1861,7 +1865,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
   describe("Invariant 8: Unified ASN, Group Selections & String Matcher Fidelity", () => {
     it("Invariant 8.1: Live ASN selection resolution maps to SelectedAsn and pins constituent clusters", () => {
       const rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [{ name: "one.one.one.one", source: "dns" }], evidence: [] },
+        { label: "104.16.0.1", bytes: 100000, flows: 10, hostnames: [{ name: "one.one.one.one", source: "dns" }], evidence: [] },
         { label: "8.8.8.8", bytes: 50000, flows: 5, hostnames: [{ name: "dns.google", source: "dns" }], evidence: [] },
         { label: "9.9.9.9", bytes: 40000, flows: 4, hostnames: [], evidence: [] },
       ];
@@ -1883,11 +1887,11 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
         expect(model.activeSelection.selectedEntity.asn).toBe(13335);
         expect(model.activeSelection.selectedEntity.asOrg).toBe("Cloudflare, Inc.");
         expect(model.activeSelection.selectedEntity.memberHosts.length).toBe(1);
-        expect(model.activeSelection.selectedEntity.memberHosts[0]!.ip).toBe("1.1.1.1");
+        expect(model.activeSelection.selectedEntity.memberHosts[0]!.ip).toBe("104.16.0.1");
       }
 
       // The cluster containing AS13335 MUST be selected and preserved
-      const cfNode = model.aggregateNodes.find((n) => n.sampleEndpointIps.includes("1.1.1.1"));
+      const cfNode = model.aggregateNodes.find((n) => n.sampleEndpointIps.includes("104.16.0.1"));
       expect(cfNode).toBeDefined();
       expect(isNodeSelected(cfNode, model.activeSelection?.selectedEntity, model.activeSelection?.entityId)).toBe(true);
     });
@@ -1929,7 +1933,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
 
     it("Invariant 8.3: isNodeSelected string matcher handles entity-asn, entity-country, and entity-city correctly", () => {
       const rows: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
+        { label: "104.16.0.1", bytes: 100000, flows: 10, hostnames: [], evidence: [] },
       ];
       const model = deriveMapViewModel(
         { hosts: rows, captureSessionId: "s-match", snapshotSequence: 1 },
@@ -1947,7 +1951,7 @@ describe("Global Traffic Map — Production Invariant Test Suite", () => {
       expect(isNodeSelected(node, null, "entity-country-de")).toBe(false);
 
       // Match via raw Host entity ID string
-      expect(isNodeSelected(node, null, makeHostEntityId("1.1.1.1"))).toBe(true);
+      expect(isNodeSelected(node, null, makeHostEntityId("104.16.0.1"))).toBe(true);
       expect(isNodeSelected(node, null, makeHostEntityId("8.8.8.8"))).toBe(false);
     });
   });

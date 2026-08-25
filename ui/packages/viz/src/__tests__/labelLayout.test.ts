@@ -247,6 +247,9 @@ describe("Deterministic Greedy Collision-Avoidance Label Layout", () => {
       },
       geo: {
         status: "resolved" as const,
+        precision: "city" as const,
+        distribution: "unicast" as const,
+        mapEligible: true as const,
         countryCode: "US",
         country: "United States",
         region: "CA",
@@ -260,6 +263,7 @@ describe("Deterministic Greedy Collision-Avoidance Label Layout", () => {
         precisionDescription: "city-level estimate" as const,
         source: "local_database" as const,
         geoDatabaseVersion: "1.0",
+        explanation: "Resolved test host",
       },
       asn: {
         status: "resolved" as const,
@@ -341,6 +345,9 @@ describe("Deterministic Greedy Collision-Avoidance Label Layout", () => {
       },
       geo: {
         status: "resolved" as const,
+        precision: "city" as const,
+        distribution: "unicast" as const,
+        mapEligible: true as const,
         countryCode: "DE",
         country: "Germany",
         region: "HE",
@@ -354,6 +361,7 @@ describe("Deterministic Greedy Collision-Avoidance Label Layout", () => {
         precisionDescription: "city-level estimate" as const,
         source: "local_database" as const,
         geoDatabaseVersion: "1.0",
+        explanation: "Resolved test host",
       },
       asn: {
         status: "resolved" as const,

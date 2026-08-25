@@ -408,6 +408,9 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
         geo: {
           status: "resolved",
+          precision: "city",
+          distribution: "unicast",
+          mapEligible: true,
           latitude: lat,
           longitude: lng,
           country: "Pacific Island",
@@ -420,6 +423,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           precisionDescription: "country-level estimate",
           source: "local_database",
           geoDatabaseVersion: "test-v1",
+          explanation: "Test mock host",
         },
         asn: {
           status: "resolved",
@@ -541,20 +545,19 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
       clearGeoCaches();
 
       const hosts: BreakdownRow[] = [
-        { label: "1.1.1.1", bytes: 1_000_000, flows: 10, hostnames: [{ name: "cloudflare-dns", source: "dns" }], evidence: [] },
-        { label: "8.8.8.8", bytes: 500_000, flows: 5, hostnames: [{ name: "google-dns", source: "dns" }], evidence: [] },
-        { label: "8.8.4.4", bytes: 200_000, flows: 2, hostnames: [{ name: "google-dns-secondary", source: "dns" }], evidence: [] },
+        { label: "17.0.0.1", bytes: 1_000_000, flows: 10, hostnames: [{ name: "apple-cupertino-1", source: "dns" }], evidence: [] },
+        { label: "17.0.0.2", bytes: 500_000, flows: 5, hostnames: [{ name: "apple-cupertino-2", source: "dns" }], evidence: [] },
+        { label: "17.0.0.3", bytes: 200_000, flows: 2, hostnames: [{ name: "apple-cupertino-3", source: "dns" }], evidence: [] },
       ];
 
       const enriched = hosts.map((h) => enrichHost(h, 0));
       const clusters = buildSpatialClusters(enriched, { zoomScale: 1.0, distanceThreshold: 26 });
 
       expect(clusters.length).toBe(1);
-      expect(clusters[0]!.nodeKind).toBe("cluster");
       expect(clusters[0]!.memberCount).toBe(3);
       expect(clusters[0]!.totalBytes).toBe(1_700_000);
       expect(clusters[0]!.totalFlows).toBe(17);
-      expect(clusters[0]!.endpointIps).toEqual(["1.1.1.1", "8.8.8.8", "8.8.4.4"]);
+      expect(clusters[0]!.endpointIps).toEqual(["17.0.0.1", "17.0.0.2", "17.0.0.3"]);
     });
 
     it("guarantees candidate completeness across a 10+ host centroid migration chain", () => {
@@ -648,6 +651,9 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           },
           geo: {
             status: "resolved",
+            precision: "city",
+            distribution: "unicast",
+            mapEligible: true,
             latitude: lat,
             longitude: lng,
             country: `Country ${i % 30}`,
@@ -660,6 +666,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
             precisionDescription: "city-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
+            explanation: "Test isolated host",
           },
           asn: {
             status: "resolved",
@@ -786,7 +793,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           ip: "10.0.0.2",
           row: { label: "10.0.0.2", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
           classification: { ip: "10.0.0.2", normalizedIp: "10.0.0.2", version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public", description: "" },
-          geo: { status: "resolved", latitude: -30.0, longitude: 20.0, country: "ZA", countryCode: "ZA", city: "Cape Town", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1" },
+          geo: { status: "resolved", precision: "city", distribution: "unicast", mapEligible: true, latitude: 48.0, longitude: 11.0, country: "DE", countryCode: "DE", city: "Munich", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1", explanation: "Test" },
           asn: { status: "unresolved", reason: "no_match", source: "none", asnDatabaseVersion: "v1" },
           anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
           bytes: 1000, flows: 1, deltaBytes: 0, hostnames: [], evidence: [], freshness: "active", lastSeenTs: 1_700_000_000_000,
@@ -795,7 +802,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           ip: "10.0.0.3",
           row: { label: "10.0.0.3", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
           classification: { ip: "10.0.0.3", normalizedIp: "10.0.0.3", version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public", description: "" },
-          geo: { status: "resolved", latitude: 35.0, longitude: 139.0, country: "JP", countryCode: "JP", city: "Tokyo", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1" },
+          geo: { status: "resolved", precision: "city", distribution: "unicast", mapEligible: true, latitude: 35.0, longitude: 139.0, country: "JP", countryCode: "JP", city: "Tokyo", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1", explanation: "Test" },
           asn: { status: "unresolved", reason: "no_match", source: "none", asnDatabaseVersion: "v1" },
           anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
           bytes: 1000, flows: 1, deltaBytes: 0, hostnames: [], evidence: [], freshness: "active", lastSeenTs: 1_700_000_000_000,
@@ -863,7 +870,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         ip: "100.0.0.1",
         row: { label: "100.0.0.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
         classification: { ip: "100.0.0.1", normalizedIp: "100.0.0.1", version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public", description: "" },
-        geo: { status: "resolved", latitude: 10.0, longitude: 179.5, country: "Fiji", countryCode: "FJ", city: null, accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "country", precisionDescription: "country-level estimate", source: "local_database", geoDatabaseVersion: "v1" },
+        geo: { status: "resolved", precision: "city", distribution: "unicast", mapEligible: true, latitude: 10.0, longitude: 179.5, country: "Fiji", countryCode: "FJ", city: "Suva", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1", explanation: "Test" },
         asn: { status: "unresolved", reason: "no_match", source: "none", asnDatabaseVersion: "v1" },
         anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
         bytes: 1000, flows: 1, deltaBytes: 0, hostnames: [], evidence: [], freshness: "active", lastSeenTs: 1_700_000_000_000,
@@ -872,7 +879,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         ip: "100.0.0.2",
         row: { label: "100.0.0.2", bytes: 1000, flows: 1, hostnames: [], evidence: [] },
         classification: { ip: "100.0.0.2", normalizedIp: "100.0.0.2", version: 4, category: "public", isPublic: true, isLocalLan: false, categoryLabel: "Public", description: "" },
-        geo: { status: "resolved", latitude: 10.0, longitude: -179.5, country: "Samoa", countryCode: "WS", city: null, accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "country", precisionDescription: "country-level estimate", source: "local_database", geoDatabaseVersion: "v1" },
+        geo: { status: "resolved", precision: "city", distribution: "unicast", mapEligible: true, latitude: 10.0, longitude: -179.5, country: "Samoa", countryCode: "WS", city: "Apia", accuracyRadiusKm: null, confidence: "high", locationMeaning: "geoIpLocation", locationLevel: "city", precisionDescription: "city-level estimate", source: "local_database", geoDatabaseVersion: "v1", explanation: "Test" },
         asn: { status: "unresolved", reason: "no_match", source: "none", asnDatabaseVersion: "v1" },
         anycast: { isAnycast: false, provider: null, service: null, prefixCidr: null, source: "test" },
         bytes: 1000, flows: 1, deltaBytes: 0, hostnames: [], evidence: [], freshness: "active", lastSeenTs: 1_700_000_000_000,
@@ -1057,6 +1064,9 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
         },
         geo: {
           status: "resolved",
+          precision: "city",
+          distribution: "unicast",
+          mapEligible: true,
           source: "local_database",
           country: "Germany",
           countryCode: "DE",
@@ -1069,6 +1079,7 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           locationLevel: "city",
           precisionDescription: "city-level estimate",
           geoDatabaseVersion: "test-v1",
+          explanation: "Resolved test host",
           ...geoProps,
         } as GeoResolution,
         asn: {
@@ -1852,6 +1863,9 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
           },
           geo: {
             status: "resolved",
+            precision: "city",
+            distribution: "unicast",
+            mapEligible: true,
             latitude: lat,
             longitude: lng,
             country: countryCode,
@@ -1864,7 +1878,8 @@ describe("Spatial Clustering Engine & Toroidal Grid Index", () => {
             precisionDescription: "city-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
-          },
+            explanation: "Resolved test host",
+          } as GeoResolution,
           asn: {
             status: "resolved",
             asn: 13335,

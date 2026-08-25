@@ -173,6 +173,9 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
           },
           geo: {
             status: "resolved",
+            precision: "country" as any,
+            distribution: "unicast",
+            mapEligible: true,
             latitude: -16.0,
             longitude: 179.9,
             country: "Fiji",
@@ -181,10 +184,11 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
             accuracyRadiusKm: null,
             confidence: "medium",
             locationMeaning: "countryOnly",
-            locationLevel: "country",
+            locationLevel: "country" as any,
             precisionDescription: "country-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
+            explanation: "Benchmark test host",
           },
           asn: {
             status: "resolved",
@@ -229,6 +233,9 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
           },
           geo: {
             status: "resolved",
+            precision: "country" as any,
+            distribution: "unicast",
+            mapEligible: true,
             latitude: -16.0,
             longitude: -179.9,
             country: "Fiji",
@@ -237,10 +244,11 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
             accuracyRadiusKm: null,
             confidence: "medium",
             locationMeaning: "countryOnly",
-            locationLevel: "country",
+            locationLevel: "country" as any,
             precisionDescription: "country-level estimate",
             source: "local_database",
             geoDatabaseVersion: "test-v1",
+            explanation: "Benchmark test host",
           },
           asn: {
             status: "resolved",
@@ -284,6 +292,9 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
         },
         geo: {
           status: "resolved",
+          precision: "city",
+          distribution: "unicast",
+          mapEligible: true,
           latitude: 51.5,
           longitude: 0.0,
           country: "United Kingdom",
@@ -296,6 +307,7 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
           precisionDescription: "city-level estimate",
           source: "local_database",
           geoDatabaseVersion: "test-v1",
+          explanation: "Benchmark test host",
         },
         asn: {
           status: "resolved",

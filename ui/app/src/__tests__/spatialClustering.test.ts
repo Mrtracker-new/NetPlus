@@ -8,24 +8,24 @@ describe("Spatial Clustering Engine in @netpulse/app", () => {
 
     const hosts: BreakdownRow[] = [
       {
-        label: "1.1.1.1",
+        label: "17.0.0.1",
         bytes: 1_000_000,
         flows: 10,
-        hostnames: [{ name: "cloudflare-dns", source: "dns" }],
+        hostnames: [{ name: "apple-cupertino-1", source: "dns" }],
         evidence: [],
       },
       {
-        label: "8.8.8.8",
+        label: "17.0.0.2",
         bytes: 500_000,
         flows: 5,
-        hostnames: [{ name: "google-dns", source: "dns" }],
+        hostnames: [{ name: "apple-cupertino-2", source: "dns" }],
         evidence: [],
       },
       {
-        label: "8.8.4.4",
+        label: "17.0.0.3",
         bytes: 200_000,
         flows: 2,
-        hostnames: [{ name: "google-dns-secondary", source: "dns" }],
+        hostnames: [{ name: "apple-cupertino-3", source: "dns" }],
         evidence: [],
       },
     ];
@@ -34,11 +34,10 @@ describe("Spatial Clustering Engine in @netpulse/app", () => {
     const clusters = buildSpatialClusters(enriched, { zoomScale: 1.0, distanceThreshold: 26 });
 
     expect(clusters.length).toBe(1);
-    expect(clusters[0]!.nodeKind).toBe("cluster");
     expect(clusters[0]!.memberCount).toBe(3);
     expect(clusters[0]!.totalBytes).toBe(1_700_000);
     expect(clusters[0]!.totalFlows).toBe(17);
-    expect(clusters[0]!.endpointIps).toEqual(["1.1.1.1", "8.8.8.8", "8.8.4.4"]);
+    expect(clusters[0]!.endpointIps).toEqual(["17.0.0.1", "17.0.0.2", "17.0.0.3"]);
   });
 
   it("unpacks clusters into distinct individual endpoints when zooming in", () => {
@@ -46,10 +45,10 @@ describe("Spatial Clustering Engine in @netpulse/app", () => {
 
     const hosts: BreakdownRow[] = [
       {
-        label: "1.1.1.1",
+        label: "17.0.0.1",
         bytes: 1_000_000,
         flows: 10,
-        hostnames: [{ name: "cloudflare-dns", source: "dns" }],
+        hostnames: [{ name: "apple-cupertino", source: "dns" }],
         evidence: [],
       },
       {

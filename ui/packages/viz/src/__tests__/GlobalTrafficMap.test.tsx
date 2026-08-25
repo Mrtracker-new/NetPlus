@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { GlobalTrafficMap } from "../GlobalTrafficMap";
@@ -134,6 +134,75 @@ describe("GlobalTrafficMap Component", () => {
 
     fireEvent.click(resetBtn);
     expect(resetBtn).toBeDisabled();
+  });
+
+  it("enforces cooperative gestures: wheel without Ctrl/Cmd shows scroll hint and preserves page scroll", () => {
+    render(<GlobalTrafficMap hosts={mockHosts} />);
+
+    const svg = screen.getByRole("img", { name: /Global Traffic Map/i });
+    const resetBtn = screen.getByRole("button", { name: /Reset to world view/i });
+
+    // Normal wheel scroll (without modifier) -> does not zoom, page scrolls naturally
+    const normalWheelEvent = new WheelEvent("wheel", {
+      deltaY: -100,
+      ctrlKey: false,
+      metaKey: false,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      svg.dispatchEvent(normalWheelEvent);
+    });
+
+    expect(resetBtn).toBeDisabled(); // Map did not zoom
+    expect(screen.getByText(/scroll to zoom map/i)).toBeInTheDocument();
+
+    // Intentional zoom with Ctrl modifier -> zooms map and prevents document scroll
+    const ctrlWheelEvent = new WheelEvent("wheel", {
+      deltaY: -100,
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => {
+      svg.dispatchEvent(ctrlWheelEvent);
+    });
+
+    expect(resetBtn).not.toBeDisabled(); // Map zoomed
+    expect(ctrlWheelEvent.defaultPrevented).toBe(true); // Document scroll prevented
+  });
+
+  it("supports keyboard pan and zoom shortcuts (+, -, 0, Arrow keys, Escape) on SVG focus", () => {
+    const handleSelect = vi.fn();
+    render(<GlobalTrafficMap hosts={mockHosts} onSelectEntity={handleSelect} />);
+
+    const svg = screen.getByRole("img", { name: /Global Traffic Map/i });
+    const resetBtn = screen.getByRole("button", { name: /Reset to world view/i });
+
+    // Press '+' to zoom in
+    fireEvent.keyDown(svg, { key: "+" });
+    expect(resetBtn).not.toBeDisabled();
+
+    // Pan with arrow keys
+    fireEvent.keyDown(svg, { key: "ArrowLeft" });
+    fireEvent.keyDown(svg, { key: "ArrowDown" });
+
+    // Press '0' to reset zoom
+    fireEvent.keyDown(svg, { key: "0" });
+    expect(resetBtn).toBeDisabled();
+
+    // Press '-' to zoom out
+    fireEvent.keyDown(svg, { key: "-" });
+  });
+
+  it("supports double-click to zoom in on map point", () => {
+    render(<GlobalTrafficMap hosts={mockHosts} />);
+
+    const svg = screen.getByRole("img", { name: /Global Traffic Map/i });
+    const resetBtn = screen.getByRole("button", { name: /Reset to world view/i });
+
+    fireEvent.doubleClick(svg, { clientX: 200, clientY: 150 });
+    expect(resetBtn).not.toBeDisabled();
   });
 
   it("renders empty state cleanly without crashing when hosts array is empty", () => {

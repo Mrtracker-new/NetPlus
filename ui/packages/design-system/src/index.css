@@ -6647,6 +6647,53 @@ svg path {
   font-size: 0.8rem;
 }
 
+/* Floating Cooperative Gesture Scroll-to-Zoom Hint */
+.np-geomap-scroll-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-hairline);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu);
+  color: var(--np-text);
+  font-family: var(--np-font);
+  font-size: var(--np-fs-xs, 0.75rem);
+  font-weight: var(--np-fw-medium, 550);
+  letter-spacing: var(--np-tracking);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 220ms ease, visibility 220ms ease;
+  user-select: none;
+}
+
+.np-geomap-scroll-hint--visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.np-geomap-scroll-hint__kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-2xs, 0.65rem);
+  font-weight: var(--np-fw-semibold, 650);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-hairline);
+  border-radius: var(--np-radius-xs, 4px);
+  box-shadow: var(--np-neu-sm);
+  color: var(--np-accent-strong);
+}
+
 /* Floating Compact Legend */
 .np-geomap-legend {
   position: absolute;

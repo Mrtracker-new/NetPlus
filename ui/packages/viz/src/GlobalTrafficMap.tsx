@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type WheelEvent } from "react";
+import { memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import {
   OTHER_RESOLVED_ENTITY_ID,
@@ -545,40 +545,80 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
     [hostsById, handleSetSelection]
   );
 
-  // Pan & Zoom Gesture Handlers
-  const handleWheel = useCallback((e: WheelEvent<SVGSVGElement>) => {
-    e.preventDefault();
-    const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
+  // Cooperative Gesture: Modifier-key detection for non-hijacking map zoom
+  const isMac = useMemo(() => {
+    if (typeof navigator === "undefined") return false;
+    return /(Mac|iPhone|iPod|iPad)/i.test(navigator.userAgent || navigator.platform || "");
+  }, []);
+  const modifierLabel = isMac ? "⌘" : "Ctrl";
 
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+  const [showScrollHint, setShowScrollHint] = useState(false);
+  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Convert mouse to SVG map coordinates (720 x 360 space)
-    const svgX = (mouseX / rect.width) * MAP_WIDTH;
-    const svgY = (mouseY / rect.height) * MAP_HEIGHT;
+  // Cooperative Gesture Pan & Zoom: Non-passive wheel listener to prevent dual scroll
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
 
-    const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
-    setTransform((prev) => {
-      const nextScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale * zoomFactor));
-      if (nextScale === prev.scale) return prev;
+    const onNativeWheel = (e: globalThis.WheelEvent) => {
+      // Intentional zoom: Ctrl / Meta held OR trackpad pinch-to-zoom (emits ctrlKey=true)
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (hintTimeoutRef.current) {
+          clearTimeout(hintTimeoutRef.current);
+          setShowScrollHint(false);
+        }
 
-      // Center zoom around mouse point
-      const nextX = svgX - (svgX - prev.x) * (nextScale / prev.scale);
-      const nextY = svgY - (svgY - prev.y) * (nextScale / prev.scale);
+        const rect = svg.getBoundingClientRect();
+        const width = rect && rect.width > 0 ? rect.width : MAP_WIDTH;
+        const height = rect && rect.height > 0 ? rect.height : MAP_HEIGHT;
+        const left = rect ? rect.left : 0;
+        const top = rect ? rect.top : 0;
 
-      // Clamp panning boundaries
-      const maxPanX = 0;
-      const minPanX = MAP_WIDTH * (1 - nextScale);
-      const maxPanY = 0;
-      const minPanY = MAP_HEIGHT * (1 - nextScale);
+        const mouseX = e.clientX - left;
+        const mouseY = e.clientY - top;
 
-      return {
-        scale: nextScale,
-        x: Math.max(minPanX, Math.min(maxPanX, nextX)),
-        y: Math.max(minPanY, Math.min(maxPanY, nextY)),
-      };
-    });
+        const svgX = (mouseX / width) * MAP_WIDTH;
+        const svgY = (mouseY / height) * MAP_HEIGHT;
+
+        const zoomFactor = e.deltaY < 0 ? 1.15 : 0.87;
+        setTransform((prev) => {
+          const nextScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev.scale * zoomFactor));
+          if (nextScale === prev.scale) return prev;
+
+          const nextX = svgX - (svgX - prev.x) * (nextScale / prev.scale);
+          const nextY = svgY - (svgY - prev.y) * (nextScale / prev.scale);
+
+          const maxPanX = 0;
+          const minPanX = MAP_WIDTH * (1 - nextScale);
+          const maxPanY = 0;
+          const minPanY = MAP_HEIGHT * (1 - nextScale);
+
+          return {
+            scale: nextScale,
+            x: Math.max(minPanX, Math.min(maxPanX, nextX)),
+            y: Math.max(minPanY, Math.min(maxPanY, nextY)),
+          };
+        });
+      } else {
+        // Page scrolling: allow natural document scroll without hijacking, show temporary cooperative hint
+        setShowScrollHint(true);
+        if (hintTimeoutRef.current) {
+          clearTimeout(hintTimeoutRef.current);
+        }
+        hintTimeoutRef.current = setTimeout(() => {
+          setShowScrollHint(false);
+        }, 1500);
+      }
+    };
+
+    svg.addEventListener("wheel", onNativeWheel, { passive: false });
+    return () => {
+      svg.removeEventListener("wheel", onNativeWheel);
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current);
+      }
+    };
   }, []);
 
   const handleMouseDown = useCallback((e: MouseEvent<SVGSVGElement>) => {
@@ -618,11 +658,15 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
 
   const handleDoubleClick = useCallback((e: MouseEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const svgX = (mouseX / rect.width) * MAP_WIDTH;
-    const svgY = (mouseY / rect.height) * MAP_HEIGHT;
+    const width = rect && rect.width > 0 ? rect.width : MAP_WIDTH;
+    const height = rect && rect.height > 0 ? rect.height : MAP_HEIGHT;
+    const left = rect ? rect.left : 0;
+    const top = rect ? rect.top : 0;
+
+    const mouseX = e.clientX - left;
+    const mouseY = e.clientY - top;
+    const svgX = (mouseX / width) * MAP_WIDTH;
+    const svgY = (mouseY / height) * MAP_HEIGHT;
 
     setTransform((prev) => {
       const nextScale = Math.min(MAX_ZOOM, prev.scale * 1.75);
@@ -880,7 +924,6 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           role="img"
           aria-label={`Global Traffic Map: ${distinctCountries.length} active countries, ${coverageStats.resolvedHostsCount} resolved endpoints, ${coverageStats.unresolvedHostsCount} unresolved endpoints, total volume ${humanBytes(coverageStats.totalBytes)}`}
           tabIndex={0}
-          onWheel={handleWheel}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
@@ -1169,6 +1212,16 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
           >
             ⟲
           </button>
+        </div>
+
+        {/* Cooperative Gesture Scroll-to-Zoom Overlay Hint */}
+        <div
+          className={`np-geomap-scroll-hint${showScrollHint ? " np-geomap-scroll-hint--visible" : ""}`}
+          role="status"
+          aria-live="polite"
+          aria-hidden={!showScrollHint}
+        >
+          <span>Use <kbd className="np-geomap-scroll-hint__kbd">{modifierLabel}</kbd> + scroll to zoom map</span>
         </div>
 
         {/* Floating Compact Legend */}

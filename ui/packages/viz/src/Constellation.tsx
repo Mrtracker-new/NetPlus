@@ -10,6 +10,7 @@ import { memo, useCallback, useEffect, useId, useMemo, useReducer, useRef, useSt
 import type { BreakdownRow, EvidenceRef } from "@netpulse/contract";
 import { EvidenceChips } from "@netpulse/components";
 import { humanBytes, hostSourceLabel, primaryHostName } from "./utils";
+import { calculateTooltipPlacement } from "./geo/tooltipPlacement";
 
 const W = 720;
 const H = 500;
@@ -354,6 +355,22 @@ export const Constellation = memo(function Constellation({
   const tipPos = hovered != null ? posRef.current[hovered] : null;
   const quiet = placed.length === 0;
 
+  const tooltipPlacement = useMemo(() => {
+    if (!tip || !tipPos) return null;
+    return calculateTooltipPlacement({
+      nodeX: tipPos.x,
+      nodeY: tipPos.y,
+      nodeRadius: tip.size + 4,
+      tooltipWidth: 220,
+      tooltipHeight: 165,
+      wrapperWidth: W,
+      wrapperHeight: H,
+      gap: 14,
+      padding: 12,
+      preferredY: "top",
+    });
+  }, [tip, tipPos]);
+
   return (
     <div className={quiet ? "np-cons np-cons--quiet" : "np-cons"}>
       <div className="np-cons__stage">
@@ -369,8 +386,8 @@ export const Constellation = memo(function Constellation({
         >
           <defs>
             <pattern id={gridId} width="32" height="32" patternUnits="userSpaceOnUse">
-              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(47, 224, 214, 0.1)" strokeWidth="0.8" />
-              <circle cx="0" cy="0" r="1" fill="rgba(47, 224, 214, 0.2)" />
+              <path d="M 32 0 L 0 0 0 32" fill="none" stroke="var(--np-accent-soft, rgba(47, 224, 214, 0.1))" strokeWidth="0.8" />
+              <circle cx="0" cy="0" r="1" fill="var(--np-accent-line, rgba(47, 224, 214, 0.2))" />
             </pattern>
             <radialGradient id={fadeId} cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#fff" stopOpacity="0.85" />
@@ -382,8 +399,8 @@ export const Constellation = memo(function Constellation({
             </mask>
 
             <radialGradient id={youGradId} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#5cf0e7" />
-              <stop offset="100%" stopColor="#2fe0d6" />
+              <stop offset="0%" stopColor="var(--np-accent-strong, #5cf0e7)" />
+              <stop offset="100%" stopColor="var(--np-accent, #2fe0d6)" />
             </radialGradient>
           </defs>
 
@@ -410,7 +427,7 @@ export const Constellation = memo(function Constellation({
                     } ${RINGS[RINGS.length - 1]!} 0 0 1 ${
                       Math.cos(0.55) * RINGS[RINGS.length - 1]!
                     } ${Math.sin(0.55) * RINGS[RINGS.length - 1]!} Z`}
-                    fill="rgba(47, 224, 214, 0.045)"
+                    fill="var(--np-accent-soft, rgba(47, 224, 214, 0.045))"
                   />
                 </g>
               </g>
@@ -517,8 +534,8 @@ export const Constellation = memo(function Constellation({
                         strokeWidth: 1.5,
                       }}
                     />
-                    <text className="np-cons__node-label" y={p.size + 11}>
-                      {truncate(hostNameStr)}
+                    <text className="np-cons__node-label" y={p.size + 12}>
+                      {truncate(hostNameStr, 18)}
                     </text>
                   </g>
                 </g>
@@ -535,7 +552,7 @@ export const Constellation = memo(function Constellation({
               cx={CX}
               cy={CY}
               r={YOU_R}
-              style={{ fill: "#2fe0d6", stroke: "#5cf0e7", strokeWidth: 2 }}
+              fill={`url(#${youGradId})`}
             />
             <text className="np-cons__you-label" x={CX} y={CY + 4}>
               YOU
@@ -544,23 +561,26 @@ export const Constellation = memo(function Constellation({
 
           {/* Layer 8: HUD Layer */}
           <g className="np-cons__layer-hud" pointerEvents="none">
-            <path d="M 14 26 L 14 14 L 26 14" fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
-            <path d={`M ${W - 26} 14 L ${W - 14} 14 L ${W - 14} 26`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
-            <path d={`M 14 ${H - 26} L 14 ${H - 14} L 26 ${H - 14}`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
-            <path d={`M ${W - 26} ${H - 14} L ${W - 14} ${H - 14} L ${W - 14} ${H - 26}`} fill="none" stroke="rgba(47, 224, 214, 0.45)" strokeWidth="1.5" />
+            <path d="M 16 28 L 16 16 L 28 16" fill="none" stroke="var(--np-accent-line, rgba(47, 224, 214, 0.45))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={`M ${W - 28} 16 L ${W - 16} 16 L ${W - 16} 28`} fill="none" stroke="var(--np-accent-line, rgba(47, 224, 214, 0.45))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={`M 16 ${H - 28} L 16 ${H - 16} L 28 ${H - 16}`} fill="none" stroke="var(--np-accent-line, rgba(47, 224, 214, 0.45))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={`M ${W - 28} ${H - 16} L ${W - 16} ${H - 16} L ${W - 16} ${H - 28}`} fill="none" stroke="var(--np-accent-line, rgba(47, 224, 214, 0.45))" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
 
-            <text x={CX} y={CY - RINGS[2]! - 8} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="middle">000°</text>
-            <text x={CX + RINGS[2]! + 12} y={CY + 3} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="start">090°</text>
-            <text x={CX} y={CY + RINGS[2]! + 14} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="middle">180°</text>
-            <text x={CX - RINGS[2]! - 12} y={CY + 3} fill="rgba(47, 224, 214, 0.5)" fontSize="9.5" fontFamily="var(--np-font-mono)" textAnchor="end">270°</text>
+            <text x={CX} y={CY - RINGS[2]! - 8} fill="var(--np-text-mute, #737d94)" fontSize="10" fontFamily="var(--np-font-mono)" textAnchor="middle" opacity="0.8">000°</text>
+            <text x={CX + RINGS[2]! + 14} y={CY + 3} fill="var(--np-text-mute, #737d94)" fontSize="10" fontFamily="var(--np-font-mono)" textAnchor="start" opacity="0.8">090°</text>
+            <text x={CX} y={CY + RINGS[2]! + 15} fill="var(--np-text-mute, #737d94)" fontSize="10" fontFamily="var(--np-font-mono)" textAnchor="middle" opacity="0.8">180°</text>
+            <text x={CX - RINGS[2]! - 14} y={CY + 3} fill="var(--np-text-mute, #737d94)" fontSize="10" fontFamily="var(--np-font-mono)" textAnchor="end" opacity="0.8">270°</text>
           </g>
         </svg>
 
         {/* Layer 9: Tooltip Panel */}
-        {tip && tipPos && (
+        {tip && tooltipPlacement && (
           <div
-            className="np-cons__tip"
-            style={{ left: `${(tipPos.x / W) * 100}%`, top: `${(tipPos.y / H) * 100}%` }}
+            className={`np-cons__tip np-cons__tip--${tooltipPlacement.placementY}`}
+            style={{
+              left: `${(tooltipPlacement.left / W) * 100}%`,
+              top: `${(tooltipPlacement.top / H) * 100}%`,
+            }}
           >
             {(() => {
               const nm = primaryHostName(tip.row);

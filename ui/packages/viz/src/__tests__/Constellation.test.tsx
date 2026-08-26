@@ -60,6 +60,23 @@ describe("Constellation Component", () => {
     expect(screen.getAllByText("dns.google").length).toBeGreaterThan(0);
   });
 
+  it("renders collision-safe hover tooltip with traffic, flows, and protocol info", () => {
+    render(<Constellation hosts={mockHosts} />);
+
+    const nodeBtn = screen.getByRole("button", { name: /Host one.one.one.one/i });
+    fireEvent.mouseEnter(nodeBtn);
+
+    // Tooltip should be rendered with details
+    const trafficLabel = screen.getByText("Traffic");
+    expect(trafficLabel).toBeInTheDocument();
+    expect(screen.getByText("1.0 MB")).toBeInTheDocument();
+    expect(screen.getByText("Flows")).toBeInTheDocument();
+    expect(screen.getByText("12")).toBeInTheDocument();
+
+    fireEvent.mouseLeave(nodeBtn);
+    expect(screen.queryByText("Flows")).not.toBeInTheDocument();
+  });
+
   it("generates unique SVG defs IDs using React useId across multiple instances", () => {
     const { container } = render(
       <div>

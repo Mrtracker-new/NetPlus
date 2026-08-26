@@ -57,9 +57,9 @@ export class WidgetErrorBoundary extends Component<
 }
 
 const SEVERITY_ICON: Record<Severity, ReactNode> = {
-  neutral: "•",
-  notable: "◆",
-  finding: <Icon name="alertTriangle" style={{ width: "12px", height: "12px", display: "inline-block", verticalAlign: "middle" }} />,
+  neutral: <span className="np-card__pip np-card__pip--neutral" aria-hidden="true" />,
+  notable: <span className="np-card__pip np-card__pip--notable" aria-hidden="true" />,
+  finding: <Icon name="alertTriangle" className="np-card__finding-icon" style={{ width: "13px", height: "13px", display: "inline-block", verticalAlign: "middle" }} />,
 };
 
 interface CardProps {
@@ -226,8 +226,9 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
               <h2 id="dashboard-live-title" className="np-dash__section-title">
                 {vizMode === "map" ? "Global Traffic Map" : t("live_traffic")}
               </h2>
-              <span className="np-situation-chip" style={{ fontSize: "0.68rem" }}>
-                ● LIVE TELEMETRY
+              <span className="np-telemetry-badge" aria-label="Live Telemetry Active">
+                <span className="np-pulse-dot" aria-hidden="true" />
+                <span>LIVE TELEMETRY</span>
               </span>
             </div>
             <div className="np-viz-mode-toggle" role="group" aria-label="Traffic visualization mode">
@@ -237,7 +238,23 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                 onClick={() => dispatchEvent({ type: "SET_VIZ_MODE", mode: "map" })}
                 aria-pressed={vizMode === "map"}
               >
-                🌍 GLOBAL MAP
+                <svg
+                  className="np-viz-mode-icon"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" y1="12" x2="22" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                </svg>
+                <span>GLOBAL MAP</span>
               </button>
               <button
                 type="button"
@@ -245,7 +262,25 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                 onClick={() => dispatchEvent({ type: "SET_VIZ_MODE", mode: "topology" })}
                 aria-pressed={vizMode === "topology"}
               >
-                🕸 TOPOLOGY
+                <svg
+                  className="np-viz-mode-icon"
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="18" cy="5" r="3" />
+                  <circle cx="6" cy="12" r="3" />
+                  <circle cx="18" cy="19" r="3" />
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                </svg>
+                <span>TOPOLOGY</span>
               </button>
             </div>
           </div>

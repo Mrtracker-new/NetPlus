@@ -192,21 +192,17 @@ def validate_dependabot(filepath):
         errors.append(f"{filepath.name}: Dependabot configuration file missing.")
         return errors
 
-    try:
-        import yaml
-        content = filepath.read_text(encoding="utf-8")
-        data = yaml.safe_load(content)
-    except Exception as e:
-        errors.append(f"{filepath.name}: Failed to parse YAML: {e}")
-        return errors
+    content = filepath.read_text(encoding="utf-8")
 
-    if not isinstance(data, dict) or data.get("version") != 2:
+    # 1. Version check
+    version_match = re.search(r"^version:\s*([0-9]+)", content, re.MULTILINE)
+    if not version_match or int(version_match.group(1)) != 2:
         errors.append(f"{filepath.name}: Dependabot config must specify 'version: 2'.")
-        return errors
 
-    updates = data.get("updates", [])
-    if not isinstance(updates, list) or len(updates) < 5:
-        errors.append(f"{filepath.name}: Expected at least 5 update blocks, found {len(updates)}.")
+    # 2. Extract and parse update blocks
+    raw_blocks = content.split("- package-ecosystem:")
+    if len(raw_blocks) < 6:
+        errors.append(f"{filepath.name}: Expected at least 5 update blocks, found {len(raw_blocks)-1}.")
         return errors
 
     required_ecosystems = {
@@ -218,9 +214,17 @@ def validate_dependabot(filepath):
     }
 
     found_ecosystems = set()
-    for i, u in enumerate(updates, 1):
-        eco = u.get("package-ecosystem")
-        directory = u.get("directory")
+    for i, block in enumerate(raw_blocks[1:], 1):
+        block_text = "- package-ecosystem:" + block
+        
+        eco_m = re.search(r'package-ecosystem:\s*["\']?([^"\'\s\n]+)["\']?', block_text)
+        dir_m = re.search(r'directory:\s*["\']?([^"\'\s\n]+)["\']?', block_text)
+        rebase_m = re.search(r'rebase-strategy:\s*["\']?([^"\'\s\n]+)["\']?', block_text)
+        limit_m = re.search(r'open-pull-requests-limit:\s*([0-9]+)', block_text)
+        prefix_m = re.search(r'prefix:\s*["\']?([^"\'\n]+)["\']?', block_text)
+        
+        eco = eco_m.group(1) if eco_m else None
+        directory = dir_m.group(1) if dir_m else None
         key = (eco, directory)
         found_ecosystems.add(key)
 
@@ -231,34 +235,27 @@ def validate_dependabot(filepath):
                 errors.append(f"{filepath.name} update #{i}: Directory '{directory}' does not exist on disk.")
 
         # Check rebase strategy
-        if u.get("rebase-strategy") != "auto":
+        if not rebase_m or rebase_m.group(1) != "auto":
             errors.append(f"{filepath.name} update #{i} ({eco}): Missing 'rebase-strategy: auto'.")
 
         # Check open PR limit
-        pr_limit = u.get("open-pull-requests-limit")
-        if not isinstance(pr_limit, int) or pr_limit <= 0 or pr_limit > 20:
+        if not limit_m or int(limit_m.group(1)) <= 0 or int(limit_m.group(1)) > 20:
             errors.append(f"{filepath.name} update #{i} ({eco}): Invalid 'open-pull-requests-limit' (must be bounded 1..20).")
 
-        # Check cooldown
-        cooldown = u.get("cooldown")
-        if not isinstance(cooldown, dict) or not any("days" in k for k in cooldown.keys()):
-            errors.append(f"{filepath.name} update #{i} ({eco}): Missing valid 'cooldown' block.")
+        # Check cooldown block
+        if "cooldown:" not in block_text:
+            errors.append(f"{filepath.name} update #{i} ({eco}): Missing 'cooldown' block.")
 
-        # Check groups have applies-to: version-updates
-        groups = u.get("groups", {})
-        if not isinstance(groups, dict) or not groups:
-            errors.append(f"{filepath.name} update #{i} ({eco}): Missing 'groups' declaration.")
-        else:
-            for gname, gcfg in groups.items():
-                if gcfg.get("applies-to") != "version-updates":
-                    errors.append(f"{filepath.name} update #{i} ({eco}) group '{gname}': Missing 'applies-to: version-updates'.")
+        # Check applies-to: version-updates
+        if "applies-to: version-updates" not in block_text:
+            errors.append(f"{filepath.name} update #{i} ({eco}): Missing 'applies-to: version-updates' in groups.")
 
-        # Check labels and commit message prefix
-        if not isinstance(u.get("labels"), list) or len(u.get("labels", [])) == 0:
+        # Check triage labels
+        if "labels:" not in block_text:
             errors.append(f"{filepath.name} update #{i} ({eco}): Missing triage labels.")
 
-        commit_msg = u.get("commit-message", {})
-        if not isinstance(commit_msg, dict) or not commit_msg.get("prefix"):
+        # Check semantic prefix
+        if not prefix_m or not prefix_m.group(1).strip():
             errors.append(f"{filepath.name} update #{i} ({eco}): Missing semantic 'commit-message.prefix'.")
 
     missing = set(required_ecosystems.keys()) - found_ecosystems

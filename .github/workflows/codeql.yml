@@ -7,41 +7,46 @@ on:
     branches: [main]
   schedule:
     - cron: "30 2 * * 0" # Weekly Sunday 02:30 UTC
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/') }}
 
-permissions:
-  actions: read
-  contents: read
+permissions: {}
 
 jobs:
   analyze:
     name: CodeQL Static Security Analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         language: [actions, javascript-typescript]
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+        uses: github/codeql-action/init@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           languages: ${{ matrix.language }}
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@5595ccaf912efad79be6eef63a5619ff05969be3 # v4.37.6
         with:
           output: sarif-results
-          upload: never
+          upload: "false"
 
       - name: Upload CodeQL Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: codeql-results-${{ matrix.language }}
           path: sarif-results/*.sarif
-          retention-days: 14
+          retention-days: 7

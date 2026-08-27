@@ -7,8 +7,7 @@ on:
     - cron: "0 2 * * *" # Daily at 02:00 UTC
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,28 +16,79 @@ jobs:
   fuzz:
     name: Cargo Fuzz Protocol Dissectors
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
 
       - name: Install Rust nightly toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # master
+        with:
+          toolchain: nightly
 
-      - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked || true
+      - name: Install cargo-fuzz prebuilt binary
+        uses: taiki-e/install-action@d8c10dae823f48238abff23fee4146b448aed2f1 # v2
+        with:
+          tool: cargo-fuzz
 
-      - name: Run Fuzz Targets (Bounded 60s per target)
+      - name: Run Fuzz Targets (Bounded ~60s per target)
+        shell: bash
         run: |
+          mkdir -p fuzz/logs fuzz/artifacts
           targets=("fuzz_decode_frame" "fuzz_ethernet" "fuzz_ipv4" "fuzz_ipv6" "fuzz_tcp" "fuzz_udp" "fuzz_dns" "fuzz_http" "fuzz_tls")
+          failed_targets=()
+          echo "=== Protocol Dissector Fuzzing Run ==="
+
           for t in "${targets[@]}"; do
-            echo "::group::Fuzzing $t"
-            cargo fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 || true
+            echo "::group::Fuzzing target: $t"
+            log_file="fuzz/logs/${t}.log"
+
+            set +e
+            cargo fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 2>&1 | tee "$log_file"
+            exit_code=${PIPESTATUS[0]}
+            set -e
+
+            if [ $exit_code -eq 0 ]; then
+              echo "::notice::Target $t PASSED (clean exit, no crash detected)"
+            else
+              echo "::error::Target $t FAILED with exit code $exit_code"
+              if grep -q -i "AddressSanitizer\|MemorySanitizer\|UndefinedBehaviorSanitizer" "$log_file"; then
+                echo "::error::Target $t classification: SANITIZER FAILURE"
+              elif grep -q -i "deadly signal\|panic\|assertion failed\|SIGABRT\|SIGSEGV" "$log_file"; then
+                echo "::error::Target $t classification: CRASH / PANIC"
+              elif grep -q -i "timeout\|ALARM" "$log_file"; then
+                echo "::error::Target $t classification: TIMEOUT"
+              elif grep -q -i "out-of-memory\|rss limit exceeded" "$log_file"; then
+                echo "::error::Target $t classification: OOM / RSS EXCEEDED"
+              else
+                echo "::error::Target $t classification: HARNESS / EXECUTION FAILURE"
+              fi
+              failed_targets+=("$t (exit code $exit_code)")
+            fi
             echo "::endgroup::"
           done
 
-      - name: Upload Crash Artifacts (if any)
+          echo "=== Fuzzing Summary ==="
+          if [ ${#failed_targets[@]} -gt 0 ]; then
+            echo "::error::Fuzzing encountered failures on ${#failed_targets[@]} target(s):"
+            for f in "${failed_targets[@]}"; do
+              echo "  - $f"
+            done
+            exit 1
+          else
+            echo "All ${#targets[@]} fuzz targets completed cleanly with zero crashes."
+          fi
+
+      - name: Upload Fuzzing Logs & Crash Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: fuzz-crash-artifacts
-          path: fuzz/artifacts/
+          name: fuzz-diagnostics-and-crashes
+          path: |
+            fuzz/logs/
+            fuzz/artifacts/
           if-no-files-found: ignore
+          retention-days: 14

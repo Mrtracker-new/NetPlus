@@ -347,7 +347,7 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1"
           NO_STRIP: "true"
-        run: pnpm --filter @netpulse/app exec tauri build
+        run: pnpm exec tauri build
 
       - name: Validate OS Bundle Directories & Generate Checksums (Linux / macOS)
         if: matrix.os != 'windows-latest'

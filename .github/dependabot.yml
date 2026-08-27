@@ -1,57 +1,144 @@
+# NetPulse Dependabot Configuration
+# Automates weekly dependency updates and security patches across all package ecosystems.
+
 version: 2
+
 updates:
+  # 1. Rust Root Workspace (crates/ & shared modules)
   - package-ecosystem: "cargo"
     directory: "/"
+    target-branch: "main"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 1
+    labels:
+      - "dependencies"
+      - "cargo"
+      - "rust-workspace"
+    commit-message:
+      prefix: "chore(cargo)"
+      include: "scope"
     groups:
       root-workspace:
+        applies-to: version-updates
         patterns:
           - "*"
 
+  # 2. Tauri Desktop Shell (src-tauri)
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
+    target-branch: "main"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 1
+    labels:
+      - "dependencies"
+      - "cargo"
+      - "desktop-shell"
+    commit-message:
+      prefix: "chore(tauri)"
+      include: "scope"
     groups:
       desktop-shell:
+        applies-to: version-updates
         patterns:
           - "*"
 
+  # 3. Protocol Dissector Fuzz Harness (fuzz)
   - package-ecosystem: "cargo"
     directory: "/fuzz"
+    target-branch: "main"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    cooldown:
+      default-days: 3
+    labels:
+      - "dependencies"
+      - "cargo"
+      - "fuzzing"
+    commit-message:
+      prefix: "chore(fuzz)"
+      include: "scope"
     groups:
       fuzz-harness:
+        applies-to: version-updates
         patterns:
           - "*"
 
+  # 4. TypeScript / pnpm Workspace (UI packages & frontend app)
   - package-ecosystem: "npm"
     directory: "/"
+    target-branch: "main"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 10
+    rebase-strategy: "auto"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 3
+      semver-patch-days: 1
+    labels:
+      - "dependencies"
+      - "npm"
+      - "ui-frontend"
+    commit-message:
+      prefix: "chore(npm)"
+      include: "scope"
     groups:
       pnpm-ui-dependencies:
+        applies-to: version-updates
         patterns:
           - "*"
 
+  # 5. GitHub Actions Toolchain & Security Actions (.github/workflows)
   - package-ecosystem: "github-actions"
     directory: "/"
+    target-branch: "main"
     schedule:
       interval: "weekly"
       day: "monday"
+      time: "03:00"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    cooldown:
+      default-days: 3
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "security"
+    commit-message:
+      prefix: "ci(actions)"
+      include: "scope"
     groups:
       actions:
+        applies-to: version-updates
         patterns:
           - "*"
-

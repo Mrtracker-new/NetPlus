@@ -11,6 +11,7 @@ permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
+  RUSTUP_TOOLCHAIN: nightly
 
 jobs:
   fuzz:
@@ -28,6 +29,7 @@ jobs:
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # master
         with:
           toolchain: nightly
+          components: rust-src, llvm-tools-preview
 
       - name: Install cargo-fuzz prebuilt binary
         uses: taiki-e/install-action@d8c10dae823f48238abff23fee4146b448aed2f1 # v2
@@ -47,7 +49,7 @@ jobs:
             log_file="fuzz/logs/${t}.log"
 
             set +e
-            cargo fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 2>&1 | tee "$log_file"
+            cargo +nightly fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 2>&1 | tee "$log_file"
             exit_code=${PIPESTATUS[0]}
             set -e
 

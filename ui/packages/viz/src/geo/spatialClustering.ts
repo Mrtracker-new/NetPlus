@@ -16,6 +16,8 @@ import {
   type NodeKind,
   type SelectedEntity,
   type TelemetryFreshness,
+  type CloudRegionResolution,
+  type ObservedPoPResolution,
 } from "./geoTypes";
 import { projectGeo, MAP_WIDTH, MAP_HEIGHT } from "./worldGeometry";
 import { humanBytes } from "../utils";
@@ -390,7 +392,11 @@ function mapClusterToNode(
     const label = primaryName || first.ip;
     const locationPart =
       first.geo.status === "resolved"
-        ? first.geo.city
+        ? first.geo.resolutionLevel === "cloud_region"
+          ? `${(first.geo as CloudRegionResolution).regionName || "Cloud Region"} (${(first.geo as CloudRegionResolution).cloudRegion})`
+          : first.geo.resolutionLevel === "observed_pop"
+          ? `${(first.geo as ObservedPoPResolution).popName || first.geo.city || "Serving PoP"}`
+          : first.geo.city
           ? `${first.geo.city}, ${first.geo.countryCode}`
           : first.geo.country
         : "";
@@ -405,8 +411,8 @@ function mapClusterToNode(
       label,
       subLabel,
       countryCode: first.geo.status === "resolved" ? first.geo.countryCode : null,
-      latitude: first.geo.status === "resolved" ? first.geo.latitude : avgLat,
-      longitude: first.geo.status === "resolved" ? first.geo.longitude : avgLng,
+      latitude: first.geo.status === "resolved" && first.geo.latitude !== undefined ? first.geo.latitude : avgLat,
+      longitude: first.geo.status === "resolved" && first.geo.longitude !== undefined ? first.geo.longitude : avgLng,
       x,
       y,
       totalBytes: c.totalBytes,
@@ -418,7 +424,7 @@ function mapClusterToNode(
       deltaBytes: c.deltaBytes,
       memberCount: 1,
       selectedMemberEntityId: c.selectedMemberEntityId || (c.hasSelected ? makeHostEntityId(first.ip) : null),
-      locationLevel: first.geo.status === "resolved" ? (first.geo.locationLevel as any) : "unresolved",
+      locationLevel: first.geo.status === "resolved" ? first.geo.locationLevel : "unresolved",
       precisionDescription: first.geo.status === "resolved" ? first.geo.precisionDescription : "Unresolved",
     };
   }
@@ -770,8 +776,8 @@ export function buildSpatialClusters(
 
     const { targetCluster } = spatialGrid.findNearest(hx, hy, worldDistThreshold);
 
-    const isHostCityLevel = ((host.geo.precision as string) === "city" || (host.geo as any).locationLevel === "city") && Boolean(host.geo.city);
-    const isHostCountryLevel = (host.geo.precision as string) === "country" || (host.geo as any).locationLevel === "country";
+    const isHostCityLevel = (host.geo.locationLevel === "city" || (host.geo.precision as string) === "city") && Boolean(host.geo.city);
+    const isHostCountryLevel = (host.geo.locationLevel as string) === "country" || (host.geo.precision as string) === "country";
     const hostCountryCode = host.geo.countryCode ? host.geo.countryCode.trim().toLowerCase() : "";
     const hostCityKey = isHostCityLevel && host.geo.city ? makeCanonicalCityKey(host.geo.city) : "";
 

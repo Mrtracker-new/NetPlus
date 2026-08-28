@@ -57,11 +57,12 @@ describe("Observed Hostname Classifier (100% Offline Token-Boundary Matching)", 
     expect(extractLocationFromHostname("ec2-54-210-0-1.compute-1.amazonaws.com")).toBeNull();
   });
 
-  it("never returns physical coordinates in GeoHint", () => {
+  it("returns verified IATA metro centroid coordinates and accuracy radius in GeoHint", () => {
     const res = extractLocationFromHostname("ord-router-01.backbone.net");
     expect(res).not.toBeNull();
-    expect((res as any).latitude).toBeUndefined();
-    expect((res as any).longitude).toBeUndefined();
+    expect(res?.latitude).toBeCloseTo(41.8781, 2);
+    expect(res?.longitude).toBeCloseTo(-87.6298, 2);
+    expect(res?.accuracyRadiusKm).toBe(50);
     expect((res as any).mapEligible).toBeUndefined();
   });
 });

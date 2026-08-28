@@ -1254,11 +1254,13 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
             role="tooltip"
             id={`np-geomap-tooltip-${baseId}`}
             aria-hidden="true"
-            style={{
-              left: `${tooltipPlacement.left}px`,
-              top: `${tooltipPlacement.top}px`,
-              ["--pointer-x" as any]: `${tooltipPlacement.pointerX}px`,
-            }}
+            style={
+              {
+                left: `${tooltipPlacement.left}px`,
+                top: `${tooltipPlacement.top}px`,
+                "--pointer-x": `${tooltipPlacement.pointerX}px`,
+              } as React.CSSProperties
+            }
           >
             <div className="np-geomap-tooltip__arrow" />
             <div className="np-geomap-tooltip__header">
@@ -1275,6 +1277,8 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
                   ? `COUNTRY (${hoveredNode.memberCount || 1})`
                   : hoveredNode.nodeKind === "otherResolvedAggregate"
                   ? `AGGREGATE (${hoveredNode.memberCount || 1})`
+                  : hoveredNode.locationLevel === "region"
+                  ? "CLOUD REGION"
                   : "PUBLIC ENDPOINT"}
               </span>
               {hoveredNode.freshness === "active" && (

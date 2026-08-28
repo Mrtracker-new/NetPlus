@@ -112,6 +112,33 @@ async function main(): Promise<void> {
     checkIntervals(anycast, "anycast");
     checkAnycastPayloads(anycast);
 
+    // Cloud Region prefixes
+    const cloudPrefixes = await loadExport<Array<{
+      start: number;
+      end: number;
+      provider: string;
+      cloudRegion: string;
+      regionName: string;
+      countryCode: string;
+      latitude: number;
+      longitude: number;
+      accuracyRadiusKm: number;
+      source: string;
+      cidr: string;
+    }>>("generatedCloudPrefixes.ts", "CLOUD_REGION_PREFIXES");
+    if (cloudPrefixes.length === 0)
+      throw new Error("CLOUD_REGION_PREFIXES is empty -- this is a hard build error");
+    checkIntervals(cloudPrefixes, "cloud");
+    for (let i = 0; i < cloudPrefixes.length; i++) {
+      const cp = cloudPrefixes[i]!;
+      if (!cp.provider?.trim()) throw new Error(`cloud[${i}]: empty provider`);
+      if (!cp.cloudRegion?.trim()) throw new Error(`cloud[${i}]: empty cloudRegion`);
+      if (!/^[A-Z]{2}$/.test(cp.countryCode)) throw new Error(`cloud[${i}]: invalid countryCode "${cp.countryCode}"`);
+      if (cp.latitude < -90 || cp.latitude > 90) throw new Error(`cloud[${i}]: invalid latitude ${cp.latitude}`);
+      if (cp.longitude < -180 || cp.longitude > 180) throw new Error(`cloud[${i}]: invalid longitude ${cp.longitude}`);
+    }
+    console.log(`  OK: cloud region payloads -- ${cloudPrefixes.length} cloud prefixes`);
+
     // Metadata
     const meta = await loadExport<{
       geoDatabaseVersion: string;
@@ -129,6 +156,16 @@ async function main(): Promise<void> {
       console.warn(`  WARNING: generatedSchemaVersion is ${meta.generatedSchemaVersion} (expected 1)`);
 
     console.log(`  OK: metadata -- provider=${meta.provider}, db=${meta.geoDatabaseVersion}, schema=v${meta.generatedSchemaVersion}`);
+
+    // Production build guard
+    if (process.argv.includes("--prod")) {
+      if (geoIntervals.length < 10000) {
+        throw new Error(`Production size check FAIL: geo interval count (${geoIntervals.length}) is stub-sized. Run \`pnpm geoip:update\` before production release.`);
+      }
+      if (asnIntervals.length < 5000) {
+        throw new Error(`Production size check FAIL: ASN interval count (${asnIntervals.length}) is stub-sized.`);
+      }
+    }
 
     // Age check (optional)
     if (process.argv.includes("--check-age")) {
@@ -168,6 +205,16 @@ async function main(): Promise<void> {
       console.log("  NOTE: geo intervals are empty (stub file) -- run geoip:update to populate");
     } else {
       console.log(`  OK: spot-check B -- geo interval count is ${geoIntervals.length.toLocaleString()}`);
+    }
+
+    // Spot-check C: AWS us-east-1 in cloud prefixes
+    const awsStart = 0x345f7800; // 52.95.120.0
+    const awsPrefix = cloudPrefixes.find(p => p.start <= awsStart && p.end >= awsStart);
+    if (!awsPrefix) {
+      console.error("  Spot-check C FAIL: 52.95.120.0/24 not found in cloud prefixes");
+      allOk = false;
+    } else {
+      console.log(`  OK: spot-check C -- 52.95.120.0/24 mapped to cloud region ${awsPrefix.cloudRegion} (${awsPrefix.regionName})`);
     }
 
   } catch (err) {

@@ -1,0 +1,196 @@
+[
+  {
+    "provider": "AWS",
+    "cloudRegion": "us-east-1",
+    "regionName": "US East (N. Virginia)",
+    "country": "United States",
+    "countryCode": "US",
+    "regionCode": "VA",
+    "city": null,
+    "latitude": 39.0438,
+    "longitude": -77.4874,
+    "accuracyRadiusKm": 80,
+    "source": "aws_ip_ranges",
+    "sourceUrl": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "52.95.120.0/24",
+      "54.239.28.0/24",
+      "52.92.0.0/17",
+      "54.240.0.0/16"
+    ]
+  },
+  {
+    "provider": "AWS",
+    "cloudRegion": "eu-central-1",
+    "regionName": "Europe (Frankfurt)",
+    "country": "Germany",
+    "countryCode": "DE",
+    "regionCode": "HE",
+    "city": null,
+    "latitude": 50.1109,
+    "longitude": 8.6821,
+    "accuracyRadiusKm": 60,
+    "source": "aws_ip_ranges",
+    "sourceUrl": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "3.120.100.0/24",
+      "3.120.0.0/14",
+      "18.184.0.0/15"
+    ]
+  },
+  {
+    "provider": "AWS",
+    "cloudRegion": "us-west-2",
+    "regionName": "US West (Oregon)",
+    "country": "United States",
+    "countryCode": "US",
+    "regionCode": "OR",
+    "city": null,
+    "latitude": 45.8491,
+    "longitude": -119.7006,
+    "accuracyRadiusKm": 100,
+    "source": "aws_ip_ranges",
+    "sourceUrl": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "52.88.0.0/16",
+      "54.186.0.0/16"
+    ]
+  },
+  {
+    "provider": "AWS",
+    "cloudRegion": "ap-southeast-1",
+    "regionName": "Asia Pacific (Singapore)",
+    "country": "Singapore",
+    "countryCode": "SG",
+    "regionCode": "SG",
+    "city": null,
+    "latitude": 1.3521,
+    "longitude": 103.8198,
+    "accuracyRadiusKm": 40,
+    "source": "aws_ip_ranges",
+    "sourceUrl": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "54.169.0.0/16",
+      "54.251.0.0/16"
+    ]
+  },
+  {
+    "provider": "AWS",
+    "cloudRegion": "ap-northeast-1",
+    "regionName": "Asia Pacific (Tokyo)",
+    "country": "Japan",
+    "countryCode": "JP",
+    "regionCode": "13",
+    "city": null,
+    "latitude": 35.6762,
+    "longitude": 139.6503,
+    "accuracyRadiusKm": 50,
+    "source": "aws_ip_ranges",
+    "sourceUrl": "https://ip-ranges.amazonaws.com/ip-ranges.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "54.178.0.0/16",
+      "54.248.0.0/15"
+    ]
+  },
+  {
+    "provider": "Google Cloud",
+    "cloudRegion": "us-central1",
+    "regionName": "US Central (Iowa)",
+    "country": "United States",
+    "countryCode": "US",
+    "regionCode": "IA",
+    "city": null,
+    "latitude": 41.2619,
+    "longitude": -95.8608,
+    "accuracyRadiusKm": 80,
+    "source": "gcp_cloud_ranges",
+    "sourceUrl": "https://www.gstatic.com/ipranges/cloud.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "34.120.88.0/24",
+      "34.66.0.0/15",
+      "34.68.0.0/15"
+    ]
+  },
+  {
+    "provider": "Google Cloud",
+    "cloudRegion": "europe-west3",
+    "regionName": "Europe West (Frankfurt)",
+    "country": "Germany",
+    "countryCode": "DE",
+    "regionCode": "HE",
+    "city": null,
+    "latitude": 50.1109,
+    "longitude": 8.6821,
+    "accuracyRadiusKm": 60,
+    "source": "gcp_cloud_ranges",
+    "sourceUrl": "https://www.gstatic.com/ipranges/cloud.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "35.198.130.0/24",
+      "35.246.0.0/16",
+      "34.159.0.0/16"
+    ]
+  },
+  {
+    "provider": "Google Cloud",
+    "cloudRegion": "asia-east1",
+    "regionName": "Asia East (Taiwan)",
+    "country": "Taiwan",
+    "countryCode": "TW",
+    "regionCode": "CHW",
+    "city": null,
+    "latitude": 24.0518,
+    "longitude": 120.5161,
+    "accuracyRadiusKm": 50,
+    "source": "gcp_cloud_ranges",
+    "sourceUrl": "https://www.gstatic.com/ipranges/cloud.json",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "35.185.128.0/17",
+      "35.187.144.0/20"
+    ]
+  },
+  {
+    "provider": "Microsoft Azure",
+    "cloudRegion": "eastus",
+    "regionName": "East US (Virginia)",
+    "country": "United States",
+    "countryCode": "US",
+    "regionCode": "VA",
+    "city": null,
+    "latitude": 37.3719,
+    "longitude": -79.8164,
+    "accuracyRadiusKm": 100,
+    "source": "azure_service_tags",
+    "sourceUrl": "https://www.microsoft.com/en-us/download/details.aspx?id=56519",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "20.190.159.0/24",
+      "20.36.0.0/15"
+    ]
+  },
+  {
+    "provider": "Microsoft Azure",
+    "cloudRegion": "westeurope",
+    "regionName": "West Europe (Netherlands)",
+    "country": "Netherlands",
+    "countryCode": "NL",
+    "regionCode": "NH",
+    "city": null,
+    "latitude": 52.3676,
+    "longitude": 4.9041,
+    "accuracyRadiusKm": 60,
+    "source": "azure_service_tags",
+    "sourceUrl": "https://www.microsoft.com/en-us/download/details.aspx?id=56519",
+    "verifiedAt": "2026-08-01",
+    "prefixes": [
+      "13.69.0.0/16"
+    ]
+  }
+]

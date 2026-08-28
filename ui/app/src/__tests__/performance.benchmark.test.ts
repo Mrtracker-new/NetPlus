@@ -293,6 +293,7 @@ describe("Performance, Scale & Adversarial Benchmark Suite", () => {
         },
         geo: {
           status: "resolved",
+          resolutionLevel: "city_estimate",
           precision: "city",
           distribution: "unicast",
           mapEligible: true,

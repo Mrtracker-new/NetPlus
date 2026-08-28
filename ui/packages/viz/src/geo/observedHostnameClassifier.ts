@@ -17,6 +17,9 @@ export interface GeoHint {
   countryCode: string;
   regionCode?: string;
   iataCode: string;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number;
   confidence: "medium" | "low";
   source: "observed_hostname";
   matchedToken: string;
@@ -161,6 +164,9 @@ interface MetroHubInfo {
   locationName: string;
   countryCode: string;
   regionCode?: string;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number;
 }
 
 /**
@@ -168,67 +174,67 @@ interface MetroHubInfo {
  */
 const IATA_METRO_HUBS: Record<string, MetroHubInfo> = {
   // Europe
-  FRA: { locationName: "Frankfurt", countryCode: "DE" },
-  AMS: { locationName: "Amsterdam", countryCode: "NL" },
-  LHR: { locationName: "London", countryCode: "GB" },
-  LGW: { locationName: "London", countryCode: "GB" },
-  CDG: { locationName: "Paris", countryCode: "FR" },
-  ZRH: { locationName: "Zurich", countryCode: "CH" },
-  ARN: { locationName: "Stockholm", countryCode: "SE" },
-  CPH: { locationName: "Copenhagen", countryCode: "DK" },
-  HEL: { locationName: "Helsinki", countryCode: "FI" },
-  MAD: { locationName: "Madrid", countryCode: "ES" },
-  BCN: { locationName: "Barcelona", countryCode: "ES" },
-  MXP: { locationName: "Milan", countryCode: "IT" },
-  VIE: { locationName: "Vienna", countryCode: "AT" },
-  DUB: { locationName: "Dublin", countryCode: "IE" },
-  WAW: { locationName: "Warsaw", countryCode: "PL" },
-  OSL: { locationName: "Oslo", countryCode: "NO" },
+  FRA: { locationName: "Frankfurt", countryCode: "DE", latitude: 50.1109, longitude: 8.6821, accuracyRadiusKm: 50 },
+  AMS: { locationName: "Amsterdam", countryCode: "NL", latitude: 52.3676, longitude: 4.9041, accuracyRadiusKm: 50 },
+  LHR: { locationName: "London", countryCode: "GB", latitude: 51.5074, longitude: -0.1278, accuracyRadiusKm: 50 },
+  LGW: { locationName: "London", countryCode: "GB", latitude: 51.5074, longitude: -0.1278, accuracyRadiusKm: 50 },
+  CDG: { locationName: "Paris", countryCode: "FR", latitude: 48.8566, longitude: 2.3522, accuracyRadiusKm: 50 },
+  ZRH: { locationName: "Zurich", countryCode: "CH", latitude: 47.3769, longitude: 8.5417, accuracyRadiusKm: 50 },
+  ARN: { locationName: "Stockholm", countryCode: "SE", latitude: 59.3293, longitude: 18.0686, accuracyRadiusKm: 50 },
+  CPH: { locationName: "Copenhagen", countryCode: "DK", latitude: 55.6761, longitude: 12.5683, accuracyRadiusKm: 50 },
+  HEL: { locationName: "Helsinki", countryCode: "FI", latitude: 60.1699, longitude: 24.9384, accuracyRadiusKm: 50 },
+  MAD: { locationName: "Madrid", countryCode: "ES", latitude: 40.4168, longitude: -3.7038, accuracyRadiusKm: 50 },
+  BCN: { locationName: "Barcelona", countryCode: "ES", latitude: 41.3879, longitude: 2.1699, accuracyRadiusKm: 50 },
+  MXP: { locationName: "Milan", countryCode: "IT", latitude: 45.4642, longitude: 9.1900, accuracyRadiusKm: 50 },
+  VIE: { locationName: "Vienna", countryCode: "AT", latitude: 48.2082, longitude: 16.3738, accuracyRadiusKm: 50 },
+  DUB: { locationName: "Dublin", countryCode: "IE", latitude: 53.3498, longitude: -6.2603, accuracyRadiusKm: 50 },
+  WAW: { locationName: "Warsaw", countryCode: "PL", latitude: 52.2297, longitude: 21.0122, accuracyRadiusKm: 50 },
+  OSL: { locationName: "Oslo", countryCode: "NO", latitude: 59.9139, longitude: 10.7522, accuracyRadiusKm: 50 },
 
   // North America
-  IAD: { locationName: "Ashburn / Washington DC", countryCode: "US", regionCode: "VA" },
-  DCA: { locationName: "Washington DC", countryCode: "US", regionCode: "DC" },
-  SFO: { locationName: "San Francisco", countryCode: "US", regionCode: "CA" },
-  SJC: { locationName: "San Jose", countryCode: "US", regionCode: "CA" },
-  OAK: { locationName: "Oakland", countryCode: "US", regionCode: "CA" },
-  LAX: { locationName: "Los Angeles", countryCode: "US", regionCode: "CA" },
-  ORD: { locationName: "Chicago", countryCode: "US", regionCode: "IL" },
-  DFW: { locationName: "Dallas", countryCode: "US", regionCode: "TX" },
-  JFK: { locationName: "New York", countryCode: "US", regionCode: "NY" },
-  EWR: { locationName: "Newark / New York", countryCode: "US", regionCode: "NJ" },
-  LGA: { locationName: "New York", countryCode: "US", regionCode: "NY" },
-  SEA: { locationName: "Seattle", countryCode: "US", regionCode: "WA" },
-  MIA: { locationName: "Miami", countryCode: "US", regionCode: "FL" },
-  ATL: { locationName: "Atlanta", countryCode: "US", regionCode: "GA" },
-  BOS: { locationName: "Boston", countryCode: "US", regionCode: "MA" },
-  DEN: { locationName: "Denver", countryCode: "US", regionCode: "CO" },
-  PHX: { locationName: "Phoenix", countryCode: "US", regionCode: "AZ" },
-  YYZ: { locationName: "Toronto", countryCode: "CA", regionCode: "ON" },
-  YVR: { locationName: "Vancouver", countryCode: "CA", regionCode: "BC" },
-  YUL: { locationName: "Montreal", countryCode: "CA", regionCode: "QC" },
+  IAD: { locationName: "Ashburn / Washington DC", countryCode: "US", regionCode: "VA", latitude: 39.0438, longitude: -77.4874, accuracyRadiusKm: 60 },
+  DCA: { locationName: "Washington DC", countryCode: "US", regionCode: "DC", latitude: 38.9072, longitude: -77.0369, accuracyRadiusKm: 50 },
+  SFO: { locationName: "San Francisco", countryCode: "US", regionCode: "CA", latitude: 37.7749, longitude: -122.4194, accuracyRadiusKm: 50 },
+  SJC: { locationName: "San Jose", countryCode: "US", regionCode: "CA", latitude: 37.3382, longitude: -121.8863, accuracyRadiusKm: 50 },
+  OAK: { locationName: "Oakland", countryCode: "US", regionCode: "CA", latitude: 37.8044, longitude: -122.2712, accuracyRadiusKm: 50 },
+  LAX: { locationName: "Los Angeles", countryCode: "US", regionCode: "CA", latitude: 34.0522, longitude: -118.2437, accuracyRadiusKm: 50 },
+  ORD: { locationName: "Chicago", countryCode: "US", regionCode: "IL", latitude: 41.8781, longitude: -87.6298, accuracyRadiusKm: 50 },
+  DFW: { locationName: "Dallas", countryCode: "US", regionCode: "TX", latitude: 32.7767, longitude: -96.7970, accuracyRadiusKm: 50 },
+  JFK: { locationName: "New York", countryCode: "US", regionCode: "NY", latitude: 40.7128, longitude: -74.0060, accuracyRadiusKm: 50 },
+  EWR: { locationName: "Newark / New York", countryCode: "US", regionCode: "NJ", latitude: 40.7357, longitude: -74.1724, accuracyRadiusKm: 50 },
+  LGA: { locationName: "New York", countryCode: "US", regionCode: "NY", latitude: 40.7128, longitude: -74.0060, accuracyRadiusKm: 50 },
+  SEA: { locationName: "Seattle", countryCode: "US", regionCode: "WA", latitude: 47.6062, longitude: -122.3321, accuracyRadiusKm: 50 },
+  MIA: { locationName: "Miami", countryCode: "US", regionCode: "FL", latitude: 25.7617, longitude: -80.1918, accuracyRadiusKm: 50 },
+  ATL: { locationName: "Atlanta", countryCode: "US", regionCode: "GA", latitude: 33.7490, longitude: -84.3880, accuracyRadiusKm: 50 },
+  BOS: { locationName: "Boston", countryCode: "US", regionCode: "MA", latitude: 42.3601, longitude: -71.0589, accuracyRadiusKm: 50 },
+  DEN: { locationName: "Denver", countryCode: "US", regionCode: "CO", latitude: 39.7392, longitude: -104.9903, accuracyRadiusKm: 50 },
+  PHX: { locationName: "Phoenix", countryCode: "US", regionCode: "AZ", latitude: 33.4484, longitude: -112.0740, accuracyRadiusKm: 50 },
+  YYZ: { locationName: "Toronto", countryCode: "CA", regionCode: "ON", latitude: 43.6532, longitude: -79.3832, accuracyRadiusKm: 50 },
+  YVR: { locationName: "Vancouver", countryCode: "CA", regionCode: "BC", latitude: 49.2827, longitude: -123.1207, accuracyRadiusKm: 50 },
+  YUL: { locationName: "Montreal", countryCode: "CA", regionCode: "QC", latitude: 45.5017, longitude: -73.5673, accuracyRadiusKm: 50 },
 
   // Asia / Pacific
-  NRT: { locationName: "Tokyo", countryCode: "JP" },
-  HND: { locationName: "Tokyo", countryCode: "JP" },
-  KIX: { locationName: "Osaka", countryCode: "JP" },
-  SIN: { locationName: "Singapore", countryCode: "SG" },
-  HKG: { locationName: "Hong Kong", countryCode: "HK" },
-  TPE: { locationName: "Taipei", countryCode: "TW" },
-  ICN: { locationName: "Seoul", countryCode: "KR" },
-  SYD: { locationName: "Sydney", countryCode: "AU" },
-  MEL: { locationName: "Melbourne", countryCode: "AU" },
-  BOM: { locationName: "Mumbai", countryCode: "IN" },
-  DEL: { locationName: "Delhi", countryCode: "IN" },
-  BLR: { locationName: "Bengaluru", countryCode: "IN" },
-  BKK: { locationName: "Bangkok", countryCode: "TH" },
+  NRT: { locationName: "Tokyo", countryCode: "JP", latitude: 35.6762, longitude: 139.6503, accuracyRadiusKm: 50 },
+  HND: { locationName: "Tokyo", countryCode: "JP", latitude: 35.6762, longitude: 139.6503, accuracyRadiusKm: 50 },
+  KIX: { locationName: "Osaka", countryCode: "JP", latitude: 34.6937, longitude: 135.5023, accuracyRadiusKm: 50 },
+  SIN: { locationName: "Singapore", countryCode: "SG", latitude: 1.3521, longitude: 103.8198, accuracyRadiusKm: 40 },
+  HKG: { locationName: "Hong Kong", countryCode: "HK", latitude: 22.3193, longitude: 114.1694, accuracyRadiusKm: 40 },
+  TPE: { locationName: "Taipei", countryCode: "TW", latitude: 25.0330, longitude: 121.5654, accuracyRadiusKm: 40 },
+  ICN: { locationName: "Seoul", countryCode: "KR", latitude: 37.5665, longitude: 126.9780, accuracyRadiusKm: 50 },
+  SYD: { locationName: "Sydney", countryCode: "AU", latitude: -33.8688, longitude: 151.2093, accuracyRadiusKm: 50 },
+  MEL: { locationName: "Melbourne", countryCode: "AU", latitude: -37.8136, longitude: 144.9631, accuracyRadiusKm: 50 },
+  BOM: { locationName: "Mumbai", countryCode: "IN", latitude: 19.0760, longitude: 72.8777, accuracyRadiusKm: 50 },
+  DEL: { locationName: "Delhi", countryCode: "IN", latitude: 28.7041, longitude: 77.1025, accuracyRadiusKm: 50 },
+  BLR: { locationName: "Bengaluru", countryCode: "IN", latitude: 12.9716, longitude: 77.5946, accuracyRadiusKm: 50 },
+  BKK: { locationName: "Bangkok", countryCode: "TH", latitude: 13.7563, longitude: 100.5018, accuracyRadiusKm: 50 },
 
   // Middle East / Africa / Latin America
-  DXB: { locationName: "Dubai", countryCode: "AE" },
-  JNB: { locationName: "Johannesburg", countryCode: "ZA" },
-  GRU: { locationName: "Sao Paulo", countryCode: "BR" },
-  GIG: { locationName: "Rio de Janeiro", countryCode: "BR" },
-  EZE: { locationName: "Buenos Aires", countryCode: "AR" },
-  SCL: { locationName: "Santiago", countryCode: "CL" },
+  DXB: { locationName: "Dubai", countryCode: "AE", latitude: 25.2048, longitude: 55.2708, accuracyRadiusKm: 50 },
+  JNB: { locationName: "Johannesburg", countryCode: "ZA", latitude: -26.2041, longitude: 28.0473, accuracyRadiusKm: 50 },
+  GRU: { locationName: "Sao Paulo", countryCode: "BR", latitude: -23.5505, longitude: -46.6333, accuracyRadiusKm: 50 },
+  GIG: { locationName: "Rio de Janeiro", countryCode: "BR", latitude: -22.9068, longitude: -43.1729, accuracyRadiusKm: 50 },
+  EZE: { locationName: "Buenos Aires", countryCode: "AR", latitude: -34.6037, longitude: -58.3816, accuracyRadiusKm: 50 },
+  SCL: { locationName: "Santiago", countryCode: "CL", latitude: -33.4489, longitude: -70.6693, accuracyRadiusKm: 50 },
 };
 
 /**
@@ -304,6 +310,9 @@ export function extractLocationFromHostname(hostname: string | null | undefined)
             countryCode: hub.countryCode,
             regionCode: hub.regionCode,
             iataCode: matched.code,
+            latitude: hub.latitude,
+            longitude: hub.longitude,
+            accuracyRadiusKm: hub.accuracyRadiusKm,
             confidence: matched.matchKind === "hostname_label" ? "medium" : "low",
             source: "observed_hostname",
             matchedToken: token,

@@ -43,6 +43,7 @@ const ROOT = path.resolve(__dirname, "..");
 const OUTPUT_DIR = path.join(ROOT, "ui", "packages", "viz", "src", "geo");
 const SCRIPTS_DIR = path.join(ROOT, "scripts");
 const ANYCAST_JSON = path.join(SCRIPTS_DIR, "anycast-known-prefixes.json");
+const CLOUD_JSON = path.join(SCRIPTS_DIR, "cloud-provider-known-regions.json");
 const TMP_DIR = path.join(SCRIPTS_DIR, ".tmp");
 
 const now = new Date();
@@ -85,6 +86,40 @@ interface AnycastSourceRecord {
   source: string;
   sourceUrl: string;
   verifiedAt: string;
+}
+
+interface CloudRegionSourceDefinition {
+  provider: string;
+  cloudRegion: string;
+  regionName: string;
+  country: string;
+  countryCode: string;
+  regionCode: string;
+  city: string | null;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number;
+  source: string;
+  sourceUrl: string;
+  verifiedAt: string;
+  prefixes: string[];
+}
+
+interface CloudPrefixRecord {
+  start: number;
+  end: number;
+  provider: string;
+  cloudRegion: string;
+  regionName: string;
+  country: string;
+  countryCode: string;
+  regionCode: string;
+  city: string | null;
+  latitude: number;
+  longitude: number;
+  accuracyRadiusKm: number;
+  source: string;
+  cidr: string;
 }
 
 interface GeoInterval  { start: number; end: number; record: GeoRecord; }
@@ -381,6 +416,74 @@ function compileAnycast(sourceRecords: AnycastSourceRecord[]): AnycastPrefixReco
 }
 
 // ---------------------------------------------------------------------------
+// Cloud Provider Known Regions compiler
+// ---------------------------------------------------------------------------
+
+function validateCloudPayloads(prefixes: CloudPrefixRecord[]): void {
+  for (let i = 0; i < prefixes.length; i++) {
+    const cp = prefixes[i]!;
+    if (!cp.provider?.trim()) throw new Error(`cloud[${i}]: empty provider for ${cp.cidr}`);
+    if (!cp.cloudRegion?.trim()) throw new Error(`cloud[${i}]: empty cloudRegion for ${cp.cidr}`);
+    if (!cp.regionName?.trim()) throw new Error(`cloud[${i}]: empty regionName for ${cp.cidr}`);
+    if (!/^[A-Z]{2}$/.test(cp.countryCode)) throw new Error(`cloud[${i}]: invalid countryCode "${cp.countryCode}" for ${cp.cidr}`);
+    if (cp.latitude < -90 || cp.latitude > 90) throw new Error(`cloud[${i}]: invalid latitude ${cp.latitude} for ${cp.cidr}`);
+    if (cp.longitude < -180 || cp.longitude > 180) throw new Error(`cloud[${i}]: invalid longitude ${cp.longitude} for ${cp.cidr}`);
+    if (cp.accuracyRadiusKm < 0) throw new Error(`cloud[${i}]: accuracyRadiusKm < 0 for ${cp.cidr}`);
+    if (!Number.isSafeInteger(cp.start) || !Number.isSafeInteger(cp.end))
+      throw new Error(`cloud[${i}]: C13 -- not safe integers`);
+    if (cp.start < 0 || cp.end > 0xFFFFFFFF)
+      throw new Error(`cloud[${i}]: C3 -- out of uint32 range`);
+    if (cp.start > cp.end) throw new Error(`cloud[${i}]: C1 -- start > end`);
+    if (i > 0) {
+      const prev = prefixes[i - 1]!;
+      if (prev.end >= cp.start) throw new Error(`cloud[${i}]: C2 -- overlap with prev interval`);
+      if (prev.start > cp.start) throw new Error(`cloud[${i}]: C6 -- not sorted`);
+    }
+  }
+}
+
+function compileCloudPrefixes(sourceRecords: CloudRegionSourceDefinition[]): CloudPrefixRecord[] {
+  const prefixes: CloudPrefixRecord[] = [];
+  const STALE_DAYS = 180;
+  for (const reg of sourceRecords) {
+    if (!isValidUrl(reg.sourceUrl))
+      throw new Error(`Cloud source validation: invalid sourceUrl "${reg.sourceUrl}" for region ${reg.cloudRegion}`);
+    if (!isValidIsoDate(reg.verifiedAt))
+      throw new Error(`Cloud source validation: invalid verifiedAt "${reg.verifiedAt}" for region ${reg.cloudRegion}`);
+    const age = daysSince(reg.verifiedAt);
+    if (age > STALE_DAYS)
+      console.warn(`  WARNING: stale cloud region record (${age}d): ${reg.provider} ${reg.cloudRegion}`);
+
+    for (const cidr of reg.prefixes) {
+      const range = cidrToRange(cidr);
+      if (!range) {
+        console.warn(`  WARNING: skipping invalid cloud CIDR: ${cidr}`);
+        continue;
+      }
+      const [start, end] = range;
+      prefixes.push({
+        start,
+        end,
+        provider: reg.provider,
+        cloudRegion: reg.cloudRegion,
+        regionName: reg.regionName,
+        country: reg.country,
+        countryCode: reg.countryCode,
+        regionCode: reg.regionCode,
+        city: reg.city ?? null,
+        latitude: reg.latitude,
+        longitude: reg.longitude,
+        accuracyRadiusKm: reg.accuracyRadiusKm,
+        source: reg.source,
+        cidr,
+      });
+    }
+  }
+  prefixes.sort((a, b) => a.start - b.start || a.end - b.end);
+  return prefixes;
+}
+
+// ---------------------------------------------------------------------------
 // Code emitters
 // ---------------------------------------------------------------------------
 
@@ -456,6 +559,36 @@ function emitAnycastPrefixes(prefixes: AnycastPrefixRecord[]): string {
   return header + "\n" + rows + "\n];\n";
 }
 
+function emitCloudPrefixes(prefixes: CloudPrefixRecord[]): string {
+  const header = [
+    "// AUTO-GENERATED -- do not edit manually.",
+    `// Run \`pnpm geoip:update\` to regenerate from scripts/cloud-provider-known-regions.json.`,
+    `import type { IPv4Int } from "./geoTypes";`,
+    ``,
+    `export interface CloudPrefixRecord {`,
+    `  start: IPv4Int;`,
+    `  end: IPv4Int;`,
+    `  provider: string;`,
+    `  cloudRegion: string;`,
+    `  regionName: string;`,
+    `  country: string;`,
+    `  countryCode: string;`,
+    `  regionCode: string;`,
+    `  city: string | null;`,
+    `  latitude: number;`,
+    `  longitude: number;`,
+    `  accuracyRadiusKm: number;`,
+    `  source: string;`,
+    `  cidr: string;`,
+    `}`,
+    ``,
+    `/** Sorted ascending by start. Non-overlapping. */`,
+    `export const CLOUD_REGION_PREFIXES: CloudPrefixRecord[] = [`,
+  ].join("\n");
+  const rows = prefixes.map(p => `  ${JSON.stringify(p, null, 2).split("\n").join("\n  ")}`).join(",\n");
+  return header + "\n" + rows + "\n];\n";
+}
+
 function emitMetadata(meta: object): string {
   const iface = [
     "// AUTO-GENERATED -- do not edit manually.",
@@ -479,6 +612,7 @@ function emitMetadata(meta: object): string {
     `  countriesCount: number;`,
     `  cityRecordsCount: number;`,
     `  anycastPrefixesCount: number;`,
+    `  cloudPrefixesCount: number;`,
     `  asnRangesCount: number;`,
     `}`,
     ``,
@@ -538,6 +672,14 @@ async function main(): Promise<void> {
   validateAnycastPayloads(anycastPrefixes);
   console.log(`  OK: ${anycastPrefixes.length} anycast prefixes`);
 
+  // Step 3b: Validate cloud region source records
+  console.log("\nValidating cloud region source records...");
+  const cloudSource: CloudRegionSourceDefinition[] =
+    JSON.parse(fs.readFileSync(CLOUD_JSON, "utf8"));
+  const cloudPrefixes = compileCloudPrefixes(cloudSource);
+  validateCloudPayloads(cloudPrefixes);
+  console.log(`  OK: ${cloudPrefixes.length} cloud region prefixes`);
+
   // Step 4: Parse and compile intervals
   console.log("\nParsing City CSV...");
   const rawGeo = await parseCityCSV(cityPath);
@@ -585,6 +727,7 @@ async function main(): Promise<void> {
     countriesCount: countryCodes.size,
     cityRecordsCount: cityRecords,
     anycastPrefixesCount: anycastPrefixes.length,
+    cloudPrefixesCount: cloudPrefixes.length,
     asnRangesCount: mergedAsn.length,
   };
 
@@ -600,11 +743,15 @@ async function main(): Promise<void> {
     path.join(OUTPUT_DIR, "generatedAnycastPrefixes.ts"),
     emitAnycastPrefixes(anycastPrefixes), "utf8");
   fs.writeFileSync(
+    path.join(OUTPUT_DIR, "generatedCloudPrefixes.ts"),
+    emitCloudPrefixes(cloudPrefixes), "utf8");
+  fs.writeFileSync(
     path.join(OUTPUT_DIR, "generatedDatabaseMetadata.ts"),
     emitMetadata(metadata), "utf8");
   console.log("  OK: generatedGeoIntervals.ts");
   console.log("  OK: generatedAsnIntervals.ts");
   console.log("  OK: generatedAnycastPrefixes.ts");
+  console.log("  OK: generatedCloudPrefixes.ts");
   console.log("  OK: generatedDatabaseMetadata.ts");
 
   // Freshness check
@@ -622,6 +769,7 @@ City records:            ${cityRecords.toLocaleString()}
 DB-IP Lite ASN build:    ${YEAR_MONTH}
 ASN ranges:              ${mergedAsn.length.toLocaleString()}
 Anycast prefixes:        ${anycastPrefixes.length}
+Cloud prefixes:          ${cloudPrefixes.length}
 Generated schema v:      ${GENERATED_SCHEMA_VERSION}
 Age check:               ${ageStatus} (${ageDays}d old, threshold: ${maxAgeDays}d)
 `);

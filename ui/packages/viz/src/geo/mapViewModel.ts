@@ -165,6 +165,23 @@ export function deriveHostEnrichmentSnapshot(
   let networkResolvedBytes = 0;
   let unknownBytes = 0;
 
+  // 8-Level Exact Breakdown Variables
+  let physicalEndpointHostsCount = 0;
+  let cityEstimateHostsCount = 0;
+  let cloudRegionHostsCount = 0;
+  let observedPopHostsCount = 0;
+  let countryHostsCount = 0;
+  let networkHostsCount = 0;
+  let anycastHostsCount = 0;
+
+  let physicalEndpointBytes = 0;
+  let cityEstimateBytes = 0;
+  let cloudRegionBytes = 0;
+  let observedPopBytes = 0;
+  let countryBytes = 0;
+  let networkBytes = 0;
+  let anycastBytes = 0;
+
   const effectiveTimestamp =
     snapshotTimestamp !== undefined
       ? snapshotTimestamp
@@ -203,6 +220,43 @@ export function deriveHostEnrichmentSnapshot(
     const enriched = enrichHost(row, deltaBytes, effectiveTimestamp);
     enrichedHosts.push(enriched);
     hostsById.set(ip, enriched);
+
+    // 8-Level Resolution Ladder Accounting
+    const resLevel = enriched.geo.resolutionLevel;
+
+    switch (resLevel) {
+      case "physical_endpoint":
+        physicalEndpointHostsCount++;
+        physicalEndpointBytes += currentBytes;
+        break;
+      case "city_estimate":
+        cityEstimateHostsCount++;
+        cityEstimateBytes += currentBytes;
+        break;
+      case "cloud_region":
+        cloudRegionHostsCount++;
+        cloudRegionBytes += currentBytes;
+        break;
+      case "observed_pop":
+        observedPopHostsCount++;
+        observedPopBytes += currentBytes;
+        break;
+      case "country":
+        countryHostsCount++;
+        countryBytes += currentBytes;
+        break;
+      case "network":
+        networkHostsCount++;
+        networkBytes += currentBytes;
+        break;
+      case "anycast":
+        anycastHostsCount++;
+        anycastBytes += currentBytes;
+        break;
+      case "unknown":
+      default:
+        break;
+    }
 
     // Progressive resolution accounting
     switch (enriched.geo.precision) {
@@ -270,6 +324,16 @@ export function deriveHostEnrichmentSnapshot(
   const resolvedBytesPercent =
     totalPublicBytes > 0 ? (resolvedBytes / totalPublicBytes) * 100 : 0;
 
+  const visualAnchorHostsCount =
+    physicalEndpointHostsCount + cityEstimateHostsCount + cloudRegionHostsCount + observedPopHostsCount;
+  const visualAnchorBytes =
+    physicalEndpointBytes + cityEstimateBytes + cloudRegionBytes + observedPopBytes;
+
+  const visualAnchorCoveragePercent =
+    publicHostsCount > 0 ? (visualAnchorHostsCount / publicHostsCount) * 100 : 0;
+  const visualAnchorBytesPercent =
+    totalPublicBytes > 0 ? (visualAnchorBytes / totalPublicBytes) * 100 : 0;
+
   const knownNetworkHosts =
     cityResolvedHostsCount +
     regionResolvedHostsCount +
@@ -294,6 +358,30 @@ export function deriveHostEnrichmentSnapshot(
     coveragePercent,
     resolvedBytesPercent,
     networkIdentityCoveragePercent,
+
+    // 8-Level Counts
+    physicalEndpointHostsCount,
+    cityEstimateHostsCount,
+    cloudRegionHostsCount,
+    observedPopHostsCount,
+    countryHostsCount,
+    networkHostsCount,
+    anycastHostsCount,
+
+    // 8-Level Bytes
+    captureTotalBytes: totalBytes,
+    physicalEndpointBytes,
+    cityEstimateBytes,
+    cloudRegionBytes,
+    observedPopBytes,
+    countryBytes,
+    networkBytes,
+    anycastBytes,
+
+    // Visual Anchor Percentages
+    visualAnchorCoveragePercent,
+    visualAnchorBytesPercent,
+
     cityResolvedHostsCount,
     regionResolvedHostsCount,
     countryResolvedHostsCount,
@@ -1072,7 +1160,7 @@ export function resolveLiveAggregateSelection(
     const geoCellId = targetGeoCellId;
 
     const memberHosts = allHosts.filter((h) => {
-      if (h.geo.status !== "resolved") return false;
+      if (h.geo.status !== "resolved" || h.geo.latitude === undefined || h.geo.longitude === undefined) return false;
       const norm = normalizeCoordinates(h.geo.latitude, h.geo.longitude);
       return norm ? computeGeoCellId(norm.lat, norm.lng) === geoCellId : false;
     });

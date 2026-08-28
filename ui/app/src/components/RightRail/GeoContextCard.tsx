@@ -1,5 +1,13 @@
 import { useState, useMemo, memo } from "react";
-import { type SelectedEntity, type EnrichedHost, makeHostEntityId, makeAsnEntityId, humanBytes } from "@netpulse/viz";
+import {
+  type SelectedEntity,
+  type EnrichedHost,
+  type CloudRegionResolution,
+  type ObservedPoPResolution,
+  makeHostEntityId,
+  makeAsnEntityId,
+  humanBytes,
+} from "@netpulse/viz";
 import { EvidenceChips } from "@netpulse/components";
 import { useOptionalEvidenceNavigation } from "../../context/EvidenceNavigationContext";
 import { useOptionalSidebar } from "./RightRailContext";
@@ -86,22 +94,52 @@ export const GeoContextCard = memo(function GeoContextCard({
               <li>
                 <span>Location</span>
                 <span className="np-rail-list__val">
-                  {h.geo.city ? `${h.geo.city}, ${h.geo.countryCode}` : h.geo.country}
+                  {h.geo.resolutionLevel === "cloud_region"
+                    ? `${(h.geo as CloudRegionResolution).regionName || "Cloud Region"} (${(h.geo as CloudRegionResolution).cloudRegion})`
+                    : h.geo.resolutionLevel === "observed_pop"
+                    ? `${(h.geo as ObservedPoPResolution).popName || h.geo.city} [${(h.geo as ObservedPoPResolution).popCode || "POP"}]`
+                    : h.geo.city ? `${h.geo.city}, ${h.geo.countryCode}` : h.geo.country}
                 </span>
               </li>
-              <li>
-                <span>Coordinates</span>
-                <span className="np-rail-list__val">
-                  {h.geo.latitude.toFixed(2)}°, {h.geo.longitude.toFixed(2)}°
-                </span>
-              </li>
+              {h.geo.latitude !== undefined && h.geo.longitude !== undefined && (
+                <li>
+                  <span>Coordinates</span>
+                  <span className="np-rail-list__val">
+                    {h.geo.latitude.toFixed(2)}°, {h.geo.longitude.toFixed(2)}°
+                  </span>
+                </li>
+              )}
               <li>
                 <span>Geographic Precision</span>
                 <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent-strong)" }}>
-                  {(h.geo as any).precisionDescription || `${String((h.geo as any).precision || "CITY").toUpperCase()} estimate`}
+                  {h.geo.precisionDescription}
                 </span>
               </li>
-              {h.geo.distribution === "anycast" && (
+              {h.geo.resolutionLevel === "cloud_region" && (
+                <li>
+                  <span>Cloud Anchor</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent)" }}>
+                    {(h.geo as CloudRegionResolution).provider} ({(h.geo as CloudRegionResolution).cloudRegion})
+                  </span>
+                </li>
+              )}
+              {h.geo.resolutionLevel === "observed_pop" && (
+                <li>
+                  <span>Observed PoP</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent)" }}>
+                    {(h.geo as ObservedPoPResolution).popCode} - {(h.geo as ObservedPoPResolution).popName}
+                  </span>
+                </li>
+              )}
+              {h.geo.provenance && (
+                <li>
+                  <span>Provenance</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-text-dim)" }}>
+                    {h.geo.provenance.source}
+                  </span>
+                </li>
+              )}
+              {h.geo.distribution === "anycast" && h.geo.resolutionLevel !== "observed_pop" && (
                 <li>
                   <span>Routing Type</span>
                   <span

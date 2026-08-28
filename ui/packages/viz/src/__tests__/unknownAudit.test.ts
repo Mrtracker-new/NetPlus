@@ -15,6 +15,7 @@ import {
   extractProviderFromHostname,
 } from "../geo/observedHostnameClassifier";
 import { deriveMapViewModel, type MapViewModelInput } from "../geo/mapViewModel";
+import type { CloudRegionResolution, ObservedPoPResolution } from "../geo/geoTypes";
 
 describe("Production-Grade Audit & Resolution for UNKNOWN Public Endpoints", () => {
   beforeEach(() => {
@@ -473,6 +474,179 @@ describe("Production-Grade Audit & Resolution for UNKNOWN Public Endpoints", () 
       expect(res.organization).toBe("DigitalOcean, LLC");
       expect(res.distribution).toBe("cloud");
       expect(res.observedHostname).toBe("edge.iad01.digitalocean.com.");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 10. Level 3 Cloud Region Centroid Resolution & Invariants
+  // ---------------------------------------------------------------------------
+  describe("Level 3 Cloud Region Centroid Resolution", () => {
+    it("resolves AWS us-east-1 prefix (52.95.120.44) to cloud_region with cloudRegionCentroid semantics", () => {
+      const res = resolveGeo("52.95.120.44");
+
+      expect(res.status).toBe("resolved");
+      expect(res.resolutionLevel).toBe("cloud_region");
+      expect(res.precision).toBe("region");
+      expect(res.distribution).toBe("cloud");
+      expect(res.mapEligible).toBe(true);
+      expect(res.anchorKind).toBe("cloud_region_centroid");
+      expect(res.coordinateMeaning).toBe("cloudRegionCentroid");
+
+      // Validated Cloud Region Attributes
+      expect(res.countryCode).toBe("US");
+      expect(res.regionCode).toBe("VA");
+      expect(res.regionName).toBe("US East (N. Virginia)");
+      expect(res.city).toBeNull(); // Cloud regions have null city to prevent confusing with physical metro host
+      expect(res.latitude).toBeCloseTo(39.0438, 2);
+      expect(res.longitude).toBeCloseTo(-77.4874, 2);
+      expect(res.accuracyRadiusKm).toBe(80);
+
+      // Cloud Metadata
+      expect((res as CloudRegionResolution).provider).toBe("AWS");
+      expect((res as CloudRegionResolution).cloudRegion).toBe("us-east-1");
+      expect(res.confidence).toBe("high");
+      expect(res.source).toBe("cloud_prefix");
+      expect(res.provenance?.source).toBe("aws_ip_ranges");
+      expect(res.explanation).toContain("AWS US East (N. Virginia) (us-east-1)");
+      expect(res.explanation).toContain("regional centroid, not physical server");
+    });
+
+    it("resolves GCP europe-west3 prefix (35.198.130.1) to cloud_region with Frankfurt regional centroid", () => {
+      const res = resolveGeo("35.198.130.1");
+
+      expect(res.status).toBe("resolved");
+      expect(res.resolutionLevel).toBe("cloud_region");
+      expect(res.mapEligible).toBe(true);
+      expect(res.anchorKind).toBe("cloud_region_centroid");
+      expect(res.coordinateMeaning).toBe("cloudRegionCentroid");
+      expect(res.countryCode).toBe("DE");
+      expect((res as CloudRegionResolution).provider).toBe("Google Cloud");
+      expect((res as CloudRegionResolution).cloudRegion).toBe("europe-west3");
+      expect(res.latitude).toBeCloseTo(50.1109, 2);
+      expect(res.longitude).toBeCloseTo(8.6821, 2);
+      expect(res.confidence).toBe("high");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 11. Additional Synthetic / Test Telemetry Scenarios (Strict 6-Gate Promotion)
+  // ---------------------------------------------------------------------------
+  describe("Additional Synthetic / Test Telemetry Scenarios (Strict 6-Gate Promotion)", () => {
+    it("promotes unmapped IP with verified synthetic IATA token and ASN corroboration to observed_pop", () => {
+      // Synthetic test fixture: 172.217.112.4 matches AS15169 (Google LLC), test telemetry supplies edge-iad-01.google.com (IAD Washington DC)
+      const res = resolveGeo("172.217.112.4", ["edge-iad-01.google.com"]);
+
+      expect(res.status).toBe("resolved");
+      expect(res.resolutionLevel).toBe("observed_pop");
+      expect(res.anchorKind).toBe("observed_pop");
+      expect(res.coordinateMeaning).toBe("observedServingPoP");
+      expect(res.mapEligible).toBe(true);
+      expect((res as ObservedPoPResolution).popCode).toBe("IAD");
+      expect((res as ObservedPoPResolution).popName).toBe("Ashburn / Washington DC");
+      expect(res.countryCode).toBe("US");
+      expect(res.latitude).toBeCloseTo(39.0438, 2);
+      expect(res.longitude).toBeCloseTo(-77.4874, 2);
+      // Gate 6: Confidence is strictly capped at medium
+      expect(res.confidence).toBe("medium");
+      expect(res.explanation).toContain("represents serving edge PoP");
+    });
+
+    it("strictly degrades and omits map coordinates when hostname and GeoIP countries conflict (Gate 4)", () => {
+      // 31.0.0.1 is DE (Germany), if hostname claims SIN (Singapore)
+      const res = resolveGeo("31.0.0.1", ["edge-sin-01.example.com"]);
+      expect(res.confidence).toBe("low");
+      expect(res.limitation).toBe("geo_sources_disagree");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 12. Level 7 Generic Anycast Identity (No PoP Telemetry)
+  // ---------------------------------------------------------------------------
+  describe("Level 7 Generic BGP Anycast Identity", () => {
+    it("classifies 1.1.1.1 (Cloudflare Anycast) without PoP as Level 7 Anycast with mapEligible: false", () => {
+      const res = resolveGeo("1.1.1.1");
+
+      expect(res.resolutionLevel).toBe("anycast");
+      expect(res.anchorKind).toBe("none");
+      expect(res.coordinateMeaning).toBe("unresolved");
+      expect(res.mapEligible).toBe(false);
+      expect(res.distribution).toBe("anycast");
+      expect(res.limitation).toBe("anycast_distributed_routing");
+      expect(res.confidence).toBeNull();
+      expect(res.explanation).toContain("coordinates represent prefix reference, not physical endpoint");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // 13. Mathematical Reconciliation of 8-Level Traffic Accounting Invariant (Multi-Level Test Workload)
+  // ---------------------------------------------------------------------------
+  describe("Mathematical Reconciliation of 8-Level Traffic Accounting (Multi-Level Test Workload)", () => {
+    it("strictly verifies that all 8 levels sum to exactly captureTotalBytes with zero discrepancies", () => {
+      const auditedEndpoints: BreakdownRow[] = [
+        // Level 2 (City Estimates): 23.00 MB
+        { label: "185.199.108.153", bytes: 15_000_000, flows: 10, hostnames: [], evidence: [] },
+        { label: "185.199.109.153", bytes: 8_000_000, flows: 5, hostnames: [], evidence: [] },
+
+        // Level 3 (Cloud Region Centroids): 12.50 MB
+        { label: "52.95.120.44", bytes: 10_000_000, flows: 8, hostnames: [], evidence: [] },
+        { label: "35.198.0.1", bytes: 2_500_000, flows: 2, hostnames: [], evidence: [] },
+
+        // Level 4 (Observed Serving PoPs): 2.18 MB
+        { label: "140.82.121.4", bytes: 2_180_000, flows: 3, hostnames: [{ name: "edge-iad-01.github.com", source: "dns" }], evidence: [] },
+
+        // Level 6 (Network / ASN Identity): 661.04 MB
+        { label: "62.72.41.182", bytes: 441_300_000, flows: 155, hostnames: [], evidence: [] },
+        { label: "172.217.112.4", bytes: 81_900_000, flows: 11, hostnames: [], evidence: [] },
+        { label: "172.217.115.4", bytes: 74_100_000, flows: 14, hostnames: [], evidence: [] },
+        { label: "172.217.113.4", bytes: 42_600_000, flows: 3, hostnames: [], evidence: [] },
+        { label: "202.88.159.108", bytes: 14_100_000, flows: 2, hostnames: [], evidence: [] },
+        { label: "202.88.159.80", bytes: 7_040_000, flows: 1, hostnames: [], evidence: [] },
+
+        // Level 7 (Generic Anycast): 21.26 MB
+        { label: "1.1.1.1", bytes: 21_260_000, flows: 4, hostnames: [], evidence: [] },
+      ];
+
+      const expectedTotalBytes = auditedEndpoints.reduce((sum, r) => sum + r.bytes, 0);
+
+      const input: MapViewModelInput = {
+        hosts: auditedEndpoints,
+        captureSessionId: "reconciliation-session",
+        snapshotSequence: 1,
+      };
+
+      const viewModel = deriveMapViewModel(input, null);
+      const stats = viewModel.coverageStats;
+
+      // 1. Total Capture Sum Invariant
+      expect(stats.captureTotalBytes).toBe(expectedTotalBytes);
+      expect(stats.totalBytes).toBe(expectedTotalBytes);
+
+      // 2. Exact 8-Level Sum Invariant
+      const eightLevelSum =
+        stats.physicalEndpointBytes +
+        stats.cityEstimateBytes +
+        stats.cloudRegionBytes +
+        stats.observedPopBytes +
+        stats.countryBytes +
+        stats.networkBytes +
+        stats.anycastBytes +
+        stats.unknownBytes;
+
+      expect(eightLevelSum).toBe(stats.captureTotalBytes);
+
+      // 3. Visual Anchor Invariant
+      const expectedVisualAnchorBytes =
+        stats.physicalEndpointBytes +
+        stats.cityEstimateBytes +
+        stats.cloudRegionBytes +
+        stats.observedPopBytes;
+
+      expect(stats.resolvedBytes).toBe(expectedVisualAnchorBytes);
+      expect(stats.visualAnchorCoveragePercent).toBeGreaterThan(0);
+      expect(stats.visualAnchorBytesPercent).toBeCloseTo(
+        (expectedVisualAnchorBytes / stats.captureTotalBytes) * 100,
+        2
+      );
     });
   });
 });

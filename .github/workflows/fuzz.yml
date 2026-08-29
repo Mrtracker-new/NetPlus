@@ -29,12 +29,21 @@ jobs:
         uses: dtolnay/rust-toolchain@efa25f7f19611383d5b0ccf2d1c8914531636bf9 # master
         with:
           toolchain: nightly
+          targets: x86_64-unknown-linux-gnu
           components: rust-src, llvm-tools-preview
 
       - name: Install cargo-fuzz prebuilt binary
         uses: taiki-e/install-action@d8c10dae823f48238abff23fee4146b448aed2f1 # v2
         with:
           tool: cargo-fuzz
+
+      - name: Configure fuzzing toolchain
+        shell: bash
+        run: |
+          rustup default nightly-x86_64-unknown-linux-gnu
+          rustup override set nightly-x86_64-unknown-linux-gnu
+          rustup target add x86_64-unknown-linux-gnu
+          rustup show active-toolchain
 
       - name: Run Fuzz Targets (Bounded ~60s per target)
         shell: bash
@@ -49,7 +58,7 @@ jobs:
             log_file="fuzz/logs/${t}.log"
 
             set +e
-            cargo +nightly fuzz run "$t" -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 2>&1 | tee "$log_file"
+            cargo fuzz run "$t" --target x86_64-unknown-linux-gnu -- -max_total_time=60 -max_len=4096 -rss_limit_mb=4096 2>&1 | tee "$log_file"
             exit_code=${PIPESTATUS[0]}
             set -e
 
@@ -57,7 +66,9 @@ jobs:
               echo "::notice::Target $t PASSED (clean exit, no crash detected)"
             else
               echo "::error::Target $t FAILED with exit code $exit_code"
-              if grep -q -i "AddressSanitizer\|MemorySanitizer\|UndefinedBehaviorSanitizer" "$log_file"; then
+              if grep -q -i "error: failed to build fuzz script\|error: sanitizer is incompatible\|error\[E0463\]\|can't find crate for\|could not compile" "$log_file"; then
+                echo "::error::Target $t classification: BUILD / HARNESS CONFIGURATION FAILURE"
+              elif grep -q -E "AddressSanitizer:\s*(heap|stack|global|use-after|null|deadly)|MemorySanitizer:|UndefinedBehaviorSanitizer:|SUMMARY: AddressSanitizer" "$log_file"; then
                 echo "::error::Target $t classification: SANITIZER FAILURE"
               elif grep -q -i "deadly signal\|panic\|assertion failed\|SIGABRT\|SIGSEGV" "$log_file"; then
                 echo "::error::Target $t classification: CRASH / PANIC"

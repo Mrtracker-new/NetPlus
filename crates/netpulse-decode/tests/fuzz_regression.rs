@@ -97,18 +97,38 @@ fn test_replay_committed_corpus_seeds() {
 
     let mut sample_count = 0;
     for target in targets {
-        let target_dir = corpus_dir.join(target);
-        if let Ok(entries) = fs::read_dir(target_dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_file() {
-                    if let Ok(bytes) = fs::read(&path) {
+        let candidate_dirs = [
+            corpus_dir.join(format!("fuzz_{target}")),
+            corpus_dir.join(target),
+        ];
+
+        let mut target_seeds_found = 0;
+        for target_dir in &candidate_dirs {
+            if target_dir.is_dir() {
+                let entries = fs::read_dir(target_dir).unwrap_or_else(|e| {
+                    panic!("failed to read corpus directory {:?}: {e}", target_dir)
+                });
+                for entry in entries {
+                    let entry = entry.unwrap_or_else(|e| {
+                        panic!("failed to read corpus entry in {:?}: {e}", target_dir)
+                    });
+                    let path = entry.path();
+                    if path.is_file() {
+                        let bytes = fs::read(&path).unwrap_or_else(|e| {
+                            panic!("failed to read corpus seed {:?}: {e}", path)
+                        });
                         replay_sample(&bytes);
                         sample_count += 1;
+                        target_seeds_found += 1;
                     }
                 }
             }
         }
+
+        assert!(
+            target_seeds_found > 0,
+            "Expected at least 1 committed corpus seed file for target '{target}'"
+        );
     }
 
     assert!(

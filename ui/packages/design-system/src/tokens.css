@@ -89,6 +89,24 @@
   --np-radius-lg: 28px;
   --np-radius-pill: 999px;
 
+  /* ---- Centralized Depth & Surface System ---- */
+  --np-surface-0: #e9edf3;
+  --np-surface-recessed: #e0e5ee;
+  --np-surface-raised: #eef1f7;
+  --np-surface-elevated: #f4f7fc;
+  --np-surface-overlay: #ffffff;
+
+  --np-neu-card: -6px -6px 14px var(--np-neu-highlight), 6px 6px 16px var(--np-neu-shadow);
+  --np-neu-control: -3px -3px 8px var(--np-neu-highlight), 3px 3px 9px var(--np-neu-shadow);
+  --np-neu-control-hover: -4px -4px 10px var(--np-neu-highlight), 4px 4px 12px var(--np-neu-shadow);
+  --np-neu-overlay: -10px -10px 24px var(--np-neu-highlight), 12px 12px 30px var(--np-neu-shadow);
+
+  /* ---- Centralized Semantic Tokens ---- */
+  --np-sem-failure: #c44d53;
+  --np-sem-investigate: #b87a1f;
+  --np-sem-nominal: #28926d;
+  --np-sem-informational: #6e7890;
+
   /* ---- Neumorphic elevation: the signature dual light/dark soft shadow ----
    * Raised plates catch light top-left, cast shadow bottom-right. Inset = pressed.
    * Tuned against the --np-surface-1 plate; components apply these on that family. */
@@ -163,6 +181,41 @@
   --np-border: rgba(255, 255, 255, 0.07);
   --np-border-strong: rgba(255, 255, 255, 0.13);
   --np-hairline: rgba(255, 255, 255, 0.05);
+
+  /* ---- Centralized Depth & Surface System (Dark Observatory) ---- */
+  --np-surface-0: #0a0d14;          /* Level 0: Deep matte substrate */
+  --np-surface-recessed: #0c1018;   /* Level 3: Sunken instruments / wells */
+  --np-surface-raised: #131a27;     /* Level 1: Primary structural plates */
+  --np-surface-elevated: #172132;   /* Level 2: Interactive tactile controls */
+  --np-surface-overlay: #1b2639;    /* Level 4: Floating popovers / tooltips */
+
+  --np-highlight: rgba(255, 255, 255, 0.055);
+  --np-highlight-strong: rgba(255, 255, 255, 0.09);
+  --np-shadow-ambient: rgba(0, 0, 0, 0.45);
+  --np-shadow-occlusion: rgba(0, 0, 0, 0.65);
+
+  --np-neu-card: 
+    inset 0 1px 0 var(--np-highlight),
+    0 1px 2px var(--np-shadow-ambient),
+    0 8px 24px -4px var(--np-shadow-ambient);
+
+  --np-neu-control: 
+    inset 0 1px 0 var(--np-highlight-strong),
+    0 2px 6px var(--np-shadow-ambient);
+
+  --np-neu-control-hover: 
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    0 4px 12px var(--np-shadow-occlusion);
+
+  --np-neu-overlay: 
+    inset 0 1px 0 var(--np-highlight-strong),
+    0 16px 40px rgba(0, 0, 0, 0.7);
+
+  /* ---- Centralized Semantic Tokens ---- */
+  --np-sem-failure: #ef6167;
+  --np-sem-investigate: #f2b64d;
+  --np-sem-nominal: #46c48d;
+  --np-sem-informational: #8b93a8;
 
   --np-text: #e7ebf3;
   --np-text-dim: #9aa3b8;

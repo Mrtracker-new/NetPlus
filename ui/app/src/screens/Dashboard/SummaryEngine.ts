@@ -22,21 +22,21 @@ export function generateSituationSummary(
   }
 
   // Generate headline
-  let headline = "Your Network is Healthy";
+  let headline = "Network Operating Normally";
   if (overallHealth === "finding") {
     headline = `Attention Needed — ${findings.length} security/performance finding${findings.length > 1 ? "s" : ""}`;
   } else if (overallHealth === "notable") {
     headline = `Notable Activity — ${notables.length} event${notables.length > 1 ? "s" : ""} recorded`;
-  } else if (totalBytes > 10_000_000) {
-    headline = "High Network Activity";
   }
 
   // Generate natural language explanation paragraph
   const sentenceList: string[] = [];
   if (overallHealth === "healthy") {
     sentenceList.push("Everything looks normal across your local connection.");
+  } else if (overallHealth === "finding") {
+    sentenceList.push("Recent security or performance findings require your review.");
   } else {
-    sentenceList.push("Recent network events require your review.");
+    sentenceList.push("Notable network events recorded across your connection.");
   }
 
   sentenceList.push(`${hostsCount} host${hostsCount === 1 ? "" : "s"} and ${flowsCount} active flow${flowsCount === 1 ? "" : "s"} observed.`);

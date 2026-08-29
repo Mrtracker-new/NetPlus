@@ -35,43 +35,33 @@ export function useDashboardController() {
   // 2. Hero View Model (State Machine)
   const heroViewModel: HeroViewModel = useMemo(() => {
     const findings = feed.filter((c) => c.severity === "finding");
-    const totalBytes = monitor?.by_protocol.rows.reduce((s, r) => s + r.bytes, 0) ?? 0;
-    const hostsCount = monitor?.by_host.rows.length ?? 0;
+    const notables = feed.filter((c) => c.severity === "notable");
 
     if (findings.length > 0) {
       return {
         state: "finding",
-        badgeText: "Attention Required",
+        badgeText: "Attention",
         title: "Security & Performance Findings Detected",
         subtitle: `${findings.length} finding${findings.length > 1 ? "s" : ""} require your review.`,
       };
     }
 
-    if (totalBytes > 10_000_000) {
+    if (notables.length > 0) {
       return {
         state: "spike",
-        badgeText: "High Traffic",
-        title: "Traffic Spike Active",
-        subtitle: `Observed high throughput (${humanBytes(totalBytes)}) on local network.`,
-      };
-    }
-
-    if (hostsCount > 10) {
-      return {
-        state: "new_device",
-        badgeText: "Active Hosts",
-        title: `${hostsCount} Devices Connected`,
-        subtitle: "Multiple active hosts communicating over local interfaces.",
+        badgeText: "Notable",
+        title: "Notable Network Activity",
+        subtitle: `${notables.length} notable event${notables.length > 1 ? "s" : ""} recorded across local connection.`,
       };
     }
 
     return {
       state: "healthy",
-      badgeText: "Optimal",
-      title: "Network is Healthy",
-      subtitle: "Everything looks normal. Passive real-time capture running.",
+      badgeText: "Nominal",
+      title: "Network Operating Normally",
+      subtitle: "Passive telemetry active. No critical anomalies detected.",
     };
-  }, [feed, monitor]);
+  }, [feed]);
 
   // 3. KPI View Models
   const kpiViewModels: KpiViewModel[] = useMemo(() => {
@@ -88,27 +78,25 @@ export function useDashboardController() {
       }
       currentRateBps = throughputDeltas[throughputDeltas.length - 1] ?? 0;
     }
-    const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s";
+    const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s (Idle)";
     const sparklineActivity =
       throughputDeltas.length > 1
         ? throughputDeltas.slice(-8)
-        : throughputDeltas.length === 1
-        ? [0, throughputDeltas[0]!]
-        : [0, 0];
-    const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [hosts, hosts];
-    const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [flows, flows];
-    const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [feed.length, feed.length];
+        : [];
+    const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [];
+    const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [];
+    const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [];
 
     return [
       {
         id: "activity",
         label: "Network Activity",
         value: humanBytes(bytes),
-        rateDown: currentRateBps > 0 ? `▼ ${rateFormatted}` : "▼ 0 B/s",
+        rateDown: currentRateBps > 0 ? `▼ ${rateFormatted}` : "▼ 0 B/s (Idle)",
         rateUp: undefined,
         statusBadge: {
-          text: bytes > 5_000_000 ? "Spike" : "Healthy",
-          variant: bytes > 5_000_000 ? "spike" : "healthy",
+          text: currentRateBps > 10_000_000 ? "Active" : "Nominal",
+          variant: "healthy",
         },
         sparklineData: sparklineActivity,
         tooltip: {
@@ -123,8 +111,8 @@ export function useDashboardController() {
         label: "Hosts Observed",
         value: String(hosts),
         statusBadge: {
-          text: hosts > 8 ? "Spike" : "Healthy",
-          variant: "healthy",
+          text: hosts > 0 ? "Observed" : "Standby",
+          variant: hosts > 0 ? "healthy" : "quiet",
         },
         sparklineData: sparklineHosts,
         tooltip: {
@@ -139,14 +127,14 @@ export function useDashboardController() {
         label: "Active Flows",
         value: String(flows),
         statusBadge: {
-          text: flows > 30 ? "Congested" : "Quiet",
-          variant: flows > 30 ? "congested" : "quiet",
+          text: flows > 0 ? "Active" : "Standby",
+          variant: flows > 0 ? "healthy" : "quiet",
         },
         sparklineData: sparklineFlows,
         tooltip: {
           peak: `${flows} flows`,
-          avg: `${flows} concurrent`,
-          percentile: "5-tuple sessions",
+          avg: "Concurrent network streams",
+          percentile: "Active TCP/UDP sockets",
           trend: flows > 0 ? "Active" : "Standby",
         },
       },
@@ -155,8 +143,8 @@ export function useDashboardController() {
         label: "Narrative Cards",
         value: String(feed.length),
         statusBadge: {
-          text: feed.some((f) => f.severity === "finding") ? "Spike" : "Learning",
-          variant: feed.some((f) => f.severity === "finding") ? "spike" : "learning",
+          text: feed.some((f) => f.severity === "finding") ? "Finding" : feed.length > 0 ? "Active" : "Learning",
+          variant: feed.some((f) => f.severity === "finding") ? "spike" : feed.length > 0 ? "healthy" : "learning",
         },
         sparklineData: sparklineCards,
         tooltip: {
@@ -172,15 +160,18 @@ export function useDashboardController() {
   // 4. Health Telemetry View Model
   const healthViewModel: HealthViewModel = useMemo(() => {
     const isCapturing = (monitor?.by_protocol.rows.length ?? 0) > 0 || (monitor?.capture_stats?.buffer_frames ?? 0) > 0;
-    const hasDrops = (monitor?.capture_drops ?? 0) > 0;
+    const shedStage = monitor?.capture_stats?.shed_stage;
+    const isDropping = shedStage === "drop_packets";
+    const isDegraded = shedStage === "payloads_off" || shedStage === "sample_dissection" || shedStage === "coarsen_metrics";
+
     return {
       capture: {
         connected: isCapturing,
         label: isCapturing ? "Active" : "Standby",
       },
       flowEngine: {
-        healthy: !hasDrops,
-        label: hasDrops ? "Dropping" : "Healthy",
+        healthy: !isDropping,
+        label: isDropping ? "Dropping" : isDegraded ? "Degraded" : isCapturing ? "Healthy" : "Standby",
       },
       storage: {
         healthy: true,

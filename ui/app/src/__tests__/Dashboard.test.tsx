@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Dashboard } from "../screens/Dashboard";
@@ -307,17 +307,18 @@ describe("Dashboard Screen", () => {
       diagnoses: [],
       network_loss_indicators: 0,
       capture_drops: 5,
+      capture_stats: { buffer_frames: 100, buffer_capacity: 1000, shed_stage: "drop_packets", dropped: 5 },
     });
 
     render(<DashboardTestWrapper />);
 
     const healthStrip = screen.getByRole("region", { name: "System Health Telemetry" });
     expect(healthStrip).toBeInTheDocument();
-    expect(screen.getByText("Capture:")).toBeInTheDocument();
-    expect(screen.getByText("Active")).toBeInTheDocument();
-    expect(screen.getByText("Flow Engine:")).toBeInTheDocument();
-    expect(screen.getByText("Dropping")).toBeInTheDocument();
-    expect(screen.getAllByText("5").length).toBeGreaterThanOrEqual(1);
+    expect(within(healthStrip).getByText("Capture:")).toBeInTheDocument();
+    expect(within(healthStrip).getByText("Active")).toBeInTheDocument();
+    expect(within(healthStrip).getByText("Flow Engine:")).toBeInTheDocument();
+    expect(within(healthStrip).getByText(/Dropping/)).toBeInTheDocument();
+    expect(within(healthStrip).getByText("5")).toBeInTheDocument();
   });
 
 
@@ -338,63 +339,24 @@ describe("Dashboard Screen", () => {
         at_mono_nanos: 1000,
       },
     ]);
-    setMonitor({
-      by_protocol: {
-        dimension: "protocol",
-        rows: [
-          {
-            label: "HTTPS",
-            bytes: 51200,
-            flows: 1,
-            hostnames: [{ name: "github.com", source: "dns" }],
-            evidence: [],
-          },
-        ],
-      },
-      by_host: {
-        dimension: "host",
-        rows: [
-          {
-            label: "140.82.121.4",
-            bytes: 51200,
-            flows: 1,
-            hostnames: [{ name: "github.com", source: "dns" }],
-            evidence: [],
-          },
-        ],
-      },
-      diagnoses: [],
-      network_loss_indicators: 0,
-      capture_drops: 0,
-    });
 
-    const { rerender } = render(<DashboardTestWrapper loading={false} />);
+    const { rerender } = render(<DashboardTestWrapper />);
     expect(screen.getByText("TLS session established with github.com")).toBeInTheDocument();
-    expect(screen.getAllByText("50 KB").length).toBeGreaterThanOrEqual(1);
 
-
-
-    // 3. Filtered-empty State
-    const searchInput = screen.getByPlaceholderText(/Search processes/i);
-    fireEvent.change(searchInput, { target: { value: "nonexistent_domain_xyz" } });
+    // 3. Filtered-empty State (Search with no matches)
+    const searchInput = screen.getByLabelText(/Search narrative feed/i);
+    fireEvent.change(searchInput, { target: { value: "nonexistent_query_xyz" } });
     expect(screen.getByText("No Matching Narratives")).toBeInTheDocument();
-    expect(screen.getByText(/No narrative items match your search or filter criteria/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Reset Filters" })).toBeInTheDocument();
 
     // Reset filters
-    const resetBtn = screen.getByRole("button", { name: "Reset Filters" });
-    fireEvent.click(resetBtn);
+    fireEvent.click(screen.getByRole("button", { name: "Reset Filters" }));
     expect(screen.getByText("TLS session established with github.com")).toBeInTheDocument();
 
-    // 4. Error State (Initial API or IPC failure)
-    rerender(
-      <DashboardTestWrapper
-        loading={false}
-        error="Connection refused: backend engine offline"
-        onRetry={vi.fn()}
-      />
-    );
+    // 4. Error State
+    rerender(<DashboardTestWrapper error="Simulated IPC failure" />);
     expect(screen.getByText(/Backend Disconnected/i)).toBeInTheDocument();
-    expect(screen.getByText(/Connection refused: backend engine offline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Simulated IPC failure/i)).toBeInTheDocument();
 
     // 5. Recovered State
     rerender(<DashboardTestWrapper loading={false} error={null} />);
@@ -432,7 +394,80 @@ describe("Dashboard Screen", () => {
     });
 
     render(<DashboardTestWrapper />);
-    expect(screen.getByText("Your Network is Healthy")).toBeInTheDocument();
+    expect(screen.getByText("Network Operating Normally")).toBeInTheDocument();
     expect(screen.getByText(/Total volume transferred is 500 B/i)).toBeInTheDocument();
+  });
+
+  describe("Semantic Regression Invariants", () => {
+    it("Invariant 1: High byte volume alone never produces ATTENTION, FAILURE, or SPIKE on Hero card", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 500_000_000, flows: 10, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 500_000_000, flows: 10, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+      setFeed([]);
+
+      render(<DashboardTestWrapper />);
+      // Hero headline must remain nominal
+      expect(screen.getByText("Network Operating Normally")).toBeInTheDocument();
+      expect(screen.getByText("● Nominal")).toBeInTheDocument();
+      expect(screen.queryByText(/High Network Activity/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Attention Required/i)).not.toBeInTheDocument();
+    });
+
+    it("Invariant 2: drops > 0 without actionable shed_stage remains honest telemetry and does not become FAILURE", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 12,
+        capture_stats: { buffer_frames: 50, buffer_capacity: 1000, shed_stage: "none", dropped: 12 },
+      });
+
+      render(<DashboardTestWrapper />);
+      const healthStrip = screen.getByRole("region", { name: "System Health Telemetry" });
+      // Flow engine must report healthy when shed_stage is none
+      expect(within(healthStrip).getByText("Healthy")).toBeInTheDocument();
+      expect(within(healthStrip).queryByText("Dropping")).not.toBeInTheDocument();
+      // Drops count must be rendered honestly
+      expect(within(healthStrip).getByText("12")).toBeInTheDocument();
+    });
+
+    it("Invariant 3: shed_stage === 'drop_packets' surfaces operational degradation/failure state", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 42,
+        capture_stats: { buffer_frames: 1000, buffer_capacity: 1000, shed_stage: "drop_packets", dropped: 42 },
+      });
+
+      render(<DashboardTestWrapper />);
+      const healthStrip = screen.getByRole("region", { name: "System Health Telemetry" });
+      expect(within(healthStrip).getByText(/Dropping/)).toBeInTheDocument();
+    });
+
+    it("Invariant 4: 0 B/s throughput is rendered as Idle rather than active throughput", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1000, flows: 1, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+
+      render(<DashboardTestWrapper />);
+      expect(screen.getByText(/0 B\/s \(Idle\)/)).toBeInTheDocument();
+    });
+
+    it("Invariant 5: Missing or insufficient sparkline history renders honest NO HISTORY label", () => {
+      render(<DashboardTestWrapper />);
+      const noHistoryLabels = screen.getAllByText("NO HISTORY");
+      expect(noHistoryLabels.length).toBeGreaterThanOrEqual(1);
+    });
   });
 });

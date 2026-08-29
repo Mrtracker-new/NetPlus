@@ -31,6 +31,7 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
               : "np-health-strip__val np-health-strip__val--warning"
           }
         >
+          {!health.flowEngine.healthy && <span className="np-health-glyph" aria-hidden="true">⚠ </span>}
           {health.flowEngine.label}
         </span>
       </div>
@@ -63,7 +64,7 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
 
       <div className="np-health-strip__item" title="Packet Drop Count">
         <span className="np-health-strip__label">Drops:</span>
-        <span className={health.drops > 0 ? "np-health-strip__val np-health-strip__val--warning" : "np-health-strip__val"}>
+        <span className={health.drops > 0 ? "np-health-strip__val np-health-strip__val--numeric" : "np-health-strip__val"}>
           {health.drops}
         </span>
       </div>

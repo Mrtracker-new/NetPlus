@@ -43,7 +43,7 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
             )}
           </div>
 
-          {kpi.sparklineData.length > 1 && (
+          {kpi.sparklineData.length > 1 ? (
             <div className="np-kpi-card__spark">
               <Sparkline
                 data={kpi.sparklineData}
@@ -51,12 +51,17 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
                 height={28}
                 color={
                   kpi.statusBadge.variant === "spike"
-                    ? "var(--np-finding)"
+                    ? "var(--np-sem-failure, var(--np-finding))"
                     : kpi.statusBadge.variant === "congested"
-                    ? "var(--np-notable)"
-                    : "var(--np-accent)"
+                    ? "var(--np-sem-investigate, var(--np-notable))"
+                    : "var(--np-sem-nominal, var(--np-accent))"
                 }
               />
+            </div>
+          ) : (
+            <div className="np-kpi-card__spark np-kpi-card__spark--empty" aria-label="No historical telemetry">
+              <span className="np-kpi-spark-empty-label">NO HISTORY</span>
+              <div className="np-kpi-spark-baseline" aria-hidden="true" />
             </div>
           )}
 

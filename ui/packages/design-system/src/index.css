@@ -8141,6 +8141,638 @@ svg path {
   border: 0;
 }
 
+/* ==========================================================================
+   Applications & Lineage Screen — True Neumorphic Instrument System
+   ========================================================================== */
+
+.np-apps {
+  width: 100%;
+}
+
+.np-apps__header {
+  margin-bottom: var(--np-4, 16px);
+}
+
+/* ---- True Neumorphic Summary KPI Cards ---- */
+.np-apps-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--np-3, 12px);
+  margin-bottom: var(--np-4, 16px);
+}
+
+.np-apps-kpi {
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-md, 12px);
+  padding: 14px 18px;
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-card);
+  position: relative;
+  overflow: hidden;
+  transition: transform var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease), border-color var(--np-t, 0.15s ease);
+  cursor: pointer;
+  user-select: none;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.np-apps-kpi:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-kpi:active {
+  transform: translateY(0);
+  box-shadow: var(--np-neu-inset);
+}
+
+.np-apps-kpi:focus-visible {
+  outline: none;
+  box-shadow: var(--np-neu-inset), 0 0 0 2px var(--np-accent);
+}
+
+.np-apps-kpi[data-active="true"] {
+  border-color: var(--np-accent-line);
+  box-shadow: var(--np-neu-inset), 0 0 0 1px var(--np-accent-soft);
+}
+
+.np-apps-kpi__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--np-1, 4px);
+}
+
+.np-apps-kpi__label {
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-medium, 550);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.08em);
+  color: var(--np-text-mute, #8b9bb4);
+}
+
+.np-apps-kpi__gem {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.5), 0 0 4px rgba(0, 0, 0, 0.3);
+  display: inline-block;
+}
+
+.np-apps-kpi__gem[data-tier="all"] {
+  background: var(--np-accent);
+}
+
+.np-apps-kpi__gem[data-tier="flows"] {
+  background: var(--np-accent-2);
+}
+
+.np-apps-kpi__gem[data-tier="high"] {
+  background: var(--np-good);
+}
+
+.np-apps-kpi__gem[data-tier="unknown"] {
+  background: var(--np-notable);
+}
+
+.np-apps-kpi__value {
+  font-size: 1.75rem;
+  font-weight: var(--np-fw-bold, 700);
+  letter-spacing: -0.02em;
+  color: var(--np-text);
+  line-height: 1.15;
+}
+
+.np-apps-kpi[data-tier="high"][data-has-count="true"] .np-apps-kpi__value {
+  color: var(--np-good);
+}
+
+.np-apps-kpi[data-tier="unknown"][data-has-count="true"] .np-apps-kpi__value {
+  color: var(--np-notable);
+}
+
+/* ---- True Neumorphic Filter Instrument Bar ---- */
+.np-apps-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3, 12px);
+  margin-bottom: var(--np-4, 16px);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-card);
+  padding: 10px 16px;
+  border-radius: var(--np-radius-md, 12px);
+  min-height: 52px;
+}
+
+.np-apps-filters__search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 260px;
+  min-width: 200px;
+}
+
+.np-apps-filters__search-icon {
+  position: absolute;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  color: var(--np-text-mute, #8b9bb4);
+  pointer-events: none;
+}
+
+.np-apps-filters__search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 34px 0 36px;
+  font-size: var(--np-fs-sm, 0.78rem);
+  font-family: var(--np-font);
+  border-radius: var(--np-radius-sm, 12px);
+  border: 1px solid var(--np-border-strong);
+  background: var(--np-surface-recessed);
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-text);
+  outline: none;
+  transition: border-color var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease);
+}
+
+.np-apps-filters__search-input:focus-visible {
+  border-color: var(--np-accent-line);
+  box-shadow: var(--np-neu-inset), 0 0 0 1px var(--np-accent);
+}
+
+.np-apps-filters__clear-search {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--np-text-mute);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 50%;
+  transition: color var(--np-t, 0.15s ease), transform var(--np-t, 0.15s ease);
+}
+
+.np-apps-filters__clear-search:hover {
+  color: var(--np-text);
+  transform: scale(1.1);
+}
+
+.np-apps-filters__clear-search:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--np-accent);
+}
+
+.np-apps-filters__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.np-apps-filters__btn {
+  font-size: var(--np-fs-sm, 0.78rem);
+  font-weight: var(--np-fw-medium, 550);
+  font-family: var(--np-font);
+  padding: 6px 14px;
+  border-radius: var(--np-radius-pill, 999px);
+  background: var(--np-surface-1);
+  color: var(--np-text-dim);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all var(--np-t, 0.15s ease);
+  user-select: none;
+}
+
+.np-apps-filters__btn:hover {
+  color: var(--np-text);
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-filters__btn:active {
+  transform: translateY(0);
+  box-shadow: var(--np-neu-inset);
+}
+
+.np-apps-filters__btn:focus-visible {
+  outline: none;
+  box-shadow: var(--np-neu-inset), 0 0 0 2px var(--np-accent);
+}
+
+.np-apps-filters__btn[data-active="true"] {
+  border-color: var(--np-accent-line);
+  background: var(--np-surface-2);
+  color: var(--np-text);
+  box-shadow: var(--np-neu-inset);
+  font-weight: var(--np-fw-semibold, 650);
+}
+
+.np-apps-filters__btn-gem {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.np-apps-filters__btn-gem[data-tier="all"] {
+  background: var(--np-accent);
+}
+
+.np-apps-filters__btn-gem[data-tier="high"] {
+  background: var(--np-good);
+}
+
+.np-apps-filters__btn-gem[data-tier="low"] {
+  background: var(--np-notable);
+}
+
+.np-apps-filters__btn-gem[data-tier="unknown"] {
+  background: var(--np-neutral);
+}
+
+/* ---- Filter Banner Plate ---- */
+.np-apps-filter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--np-4, 16px);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-accent-line);
+  box-shadow: var(--np-neu-card);
+  padding: 10px 16px;
+  border-radius: var(--np-radius-md, 12px);
+  color: var(--np-text);
+  font-size: var(--np-fs-sm, 0.78rem);
+}
+
+/* ---- Process Lineage Table Plate ---- */
+.np-apps-table-container {
+  overflow-x: auto;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-md, 12px);
+  box-shadow: var(--np-neu-card);
+  padding: 8px;
+}
+
+.np-apps-table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: separate;
+  border-spacing: 0 4px;
+}
+
+.np-apps-th {
+  padding: 8px 14px;
+  text-align: left;
+  color: var(--np-text-mute);
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-medium, 550);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.08em);
+}
+
+.np-apps-th--right {
+  text-align: right;
+}
+
+.np-apps-row {
+  background: transparent;
+  transition: background var(--np-t, 0.15s ease);
+  border-radius: var(--np-radius-sm, 12px);
+}
+
+.np-apps-row:hover {
+  background: var(--np-surface-2);
+}
+
+.np-apps-row[data-expanded="true"] {
+  background: var(--np-surface-2);
+}
+
+.np-apps-td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  font-size: var(--np-fs-sm, 0.78rem);
+  color: var(--np-text);
+}
+
+.np-apps-td--name {
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text);
+}
+
+.np-apps-td--right {
+  text-align: right;
+}
+
+.np-apps-process-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.np-apps-process-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--np-radius-xs, 6px);
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--np-accent);
+  flex-shrink: 0;
+}
+
+.np-apps-process-title {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-sm, 0.78rem);
+  color: var(--np-text);
+  word-break: break-all;
+}
+
+.np-apps-pid-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--np-radius-xs, 6px);
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs, 0.6875rem);
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  color: var(--np-text-dim);
+}
+
+.np-apps-flows-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--np-fs-sm, 0.78rem);
+  font-weight: var(--np-fw-medium, 550);
+  color: var(--np-accent);
+}
+
+/* ---- Attribution Confidence Badges ---- */
+.np-apps-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--np-radius-pill, 999px);
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-semibold, 650);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  user-select: none;
+}
+
+.np-apps-badge--high {
+  color: var(--np-good);
+  border-color: var(--np-good-soft);
+}
+
+.np-apps-badge--low {
+  color: var(--np-notable);
+  border-color: var(--np-notable-soft);
+}
+
+.np-apps-badge--unknown {
+  color: var(--np-neutral);
+  border-color: var(--np-border);
+}
+
+.np-apps-badge__glyph {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+/* ---- Native Row Disclosure Toggle ---- */
+.np-apps-row__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--np-radius-pill, 999px);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-medium, 550);
+  font-family: var(--np-font);
+  cursor: pointer;
+  transition: all var(--np-t, 0.15s ease);
+  user-select: none;
+}
+
+.np-apps-row__toggle:hover {
+  color: var(--np-text);
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-row__toggle:active {
+  transform: translateY(0);
+  box-shadow: var(--np-neu-inset);
+}
+
+.np-apps-row__toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--np-neu-inset), 0 0 0 2px var(--np-accent);
+}
+
+.np-apps-row__chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  transition: transform var(--np-t, 0.15s ease);
+}
+
+.np-apps-row__chevron[data-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* ---- Recessed Lineage Conduit Tray ---- */
+.np-apps-lineage-tray {
+  background: var(--np-surface-recessed);
+  box-shadow: var(--np-neu-inset);
+  border-radius: var(--np-radius-sm, 12px);
+  padding: 14px 18px;
+  margin: 4px 6px 8px 6px;
+  border: 1px solid var(--np-border);
+}
+
+.np-apps-lineage-tray__header {
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.08em);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.np-apps-lineage-tray__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-apps-flow-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  padding: 8px 14px;
+  border-radius: var(--np-radius-xs, 6px);
+  transition: transform var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease);
+}
+
+.np-apps-flow-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-flow-card__id {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-sm, 0.78rem);
+  font-weight: var(--np-fw-medium, 550);
+  color: var(--np-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.np-apps-flow-card__id-gem {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--np-accent);
+  box-shadow: 0 0 4px var(--np-accent);
+}
+
+.np-apps-flow-card__inspect {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-semibold, 650);
+  font-family: var(--np-font);
+  border-radius: var(--np-radius-pill, 999px);
+  background: var(--np-surface-elevated);
+  border: 1px solid var(--np-accent-line);
+  box-shadow: var(--np-neu-control);
+  color: var(--np-accent);
+  cursor: pointer;
+  transition: all var(--np-t, 0.15s ease);
+}
+
+.np-apps-flow-card__inspect:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+  color: var(--np-text);
+  border-color: var(--np-accent);
+}
+
+.np-apps-flow-card__inspect:active {
+  transform: translateY(0);
+  box-shadow: var(--np-neu-inset);
+}
+
+.np-apps-flow-card__inspect:focus-visible {
+  outline: none;
+  box-shadow: var(--np-neu-inset), 0 0 0 2px var(--np-accent);
+}
+
+.np-apps-skeleton__sub {
+  margin-top: 6px;
+}
+
+.np-apps-skeleton__bar {
+  margin-bottom: var(--np-4, 16px);
+}
+
+.np-apps-filter-banner__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.np-apps-empty-tray {
+  margin: var(--np-6, 32px) 0;
+}
+
+.np-apps-lineage-row > td {
+  padding: 0;
+  border: none;
+}
+
+/* ---- Reduced Motion Support ---- */
+@media (prefers-reduced-motion: reduce) {
+  .np-apps-kpi,
+  .np-apps-filters__btn,
+  .np-apps-filters__clear-search,
+  .np-apps-row,
+  .np-apps-row__toggle,
+  .np-apps-row__chevron,
+  .np-apps-flow-card,
+  .np-apps-flow-card__inspect {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ---- Responsive Breakpoints ---- */
+@media (max-width: 1024px) {
+  .np-apps-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .np-apps-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .np-apps-filters__search {
+    width: 100%;
+  }
+
+  .np-apps-filters__group {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .np-apps-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+
 
 
 

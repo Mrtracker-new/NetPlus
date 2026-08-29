@@ -30,5 +30,6 @@
   },
   "inspect_flow": "Inspeccionar Flujo",
   "expand": "Expandir",
-  "collapse": "Contraer"
+  "collapse": "Contraer",
+  "clear_search": "Limpiar búsqueda"
 }

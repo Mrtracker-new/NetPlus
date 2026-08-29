@@ -19,65 +19,61 @@ export function ProcessRow({
 
   const confidenceBadge =
     group.confidence === "high"
-      ? { label: t("confidence_labels.high"), color: "var(--np-good, #28926d)" }
+      ? { label: t("confidence_labels.high"), glyph: "●", className: "np-apps-badge--high" }
       : group.confidence === "low"
-      ? { label: t("confidence_labels.low"), color: "var(--np-notable, #b87a1f)" }
-      : { label: t("confidence_labels.unknown"), color: "var(--np-neutral, #97a0b4)" };
+      ? { label: t("confidence_labels.low"), glyph: "●", className: "np-apps-badge--low" }
+      : { label: t("confidence_labels.unknown"), glyph: "○", className: "np-apps-badge--unknown" };
 
   const lineageRegionId = `flow-lineage-${group.key}`;
+
+  const handleRowClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest("button")) {
+      return;
+    }
+    onToggleExpand(group.key);
+  };
 
   return (
     <>
       {/* Primary Collapsible Process Row */}
       <tr
-        onClick={() => onToggleExpand(group.key)}
-        style={{
-          cursor: "pointer",
-          background: isExpanded ? "var(--np-surface-2, rgba(255, 255, 255, 0.04))" : "transparent",
-          transition: "background var(--np-t, 0.15s ease)",
-        }}
+        className="np-apps-row"
+        data-expanded={isExpanded}
+        onClick={handleRowClick}
       >
-        <td style={{ padding: "0.65rem 0.85rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span aria-hidden="true" style={{ fontSize: "0.75rem", color: "var(--np-muted, #8b9bb4)", transition: "transform 0.15s ease" }}>
-              {isExpanded ? "▼" : "▶"}
-            </span>
-            <span>{group.processName}</span>
+        <td className="np-apps-td np-apps-td--name">
+          <div className="np-apps-process-cell">
+            <div className="np-apps-process-icon" aria-hidden="true">
+              <Icon name="apps" style={{ width: "16px", height: "16px" }} />
+            </div>
+            <span className="np-apps-process-title">{group.processName}</span>
           </div>
         </td>
-        <td style={{ padding: "0.65rem 0.85rem", color: "var(--np-text-dim, #9ca3af)" }}>
-          {group.pid !== null ? `PID ${group.pid}` : "—"}
+        <td className="np-apps-td">
+          <span className="np-apps-pid-chip">
+            {group.pid !== null ? `PID ${group.pid}` : "—"}
+          </span>
         </td>
-        <td style={{ padding: "0.65rem 0.85rem" }}>
-          <span style={{ fontSize: "0.85rem", color: "var(--np-accent, #2fe0d6)" }}>
+        <td className="np-apps-td">
+          <span className="np-apps-flows-count">
             {group.flowsCount} {group.flowsCount === 1 ? "flow" : "flows"}
           </span>
         </td>
-        <td style={{ padding: "0.65rem 0.85rem" }}>
+        <td className="np-apps-td">
           <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.35rem",
-              padding: "0.2rem 0.5rem",
-              borderRadius: "var(--np-radius-sm, 4px)",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              background: "rgba(255, 255, 255, 0.05)",
-              color: confidenceBadge.color,
-              border: `1px solid ${confidenceBadge.color}`,
-            }}
+            className={`np-apps-badge ${confidenceBadge.className}`}
             aria-label={`Attribution confidence: ${confidenceBadge.label}`}
           >
-            <span aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", backgroundColor: confidenceBadge.color, display: "inline-block" }} />
-            {confidenceBadge.label}
+            <span className="np-apps-badge__glyph" aria-hidden="true">
+              {confidenceBadge.glyph}
+            </span>
+            <span>{confidenceBadge.label}</span>
           </span>
         </td>
-        <td style={{ padding: "0.65rem 0.85rem", textAlign: "right" }}>
+        <td className="np-apps-td np-apps-td--right">
           <button
             type="button"
-            className="np-btn np-btn--ghost"
-            style={{ fontSize: "0.8rem", padding: "0.25rem 0.6rem" }}
+            className="np-apps-row__toggle"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand(group.key);
@@ -86,46 +82,49 @@ export function ProcessRow({
             aria-controls={lineageRegionId}
             aria-label={`${isExpanded ? t("collapse") : t("expand")} ${group.processName}`}
           >
-            {isExpanded ? t("collapse") : t("expand")}
+            <span>{isExpanded ? t("collapse") : t("expand")}</span>
+            <span
+              className="np-apps-row__chevron"
+              data-expanded={isExpanded}
+              aria-hidden="true"
+            >
+              <Icon name="chevronRight" style={{ width: "12px", height: "12px" }} />
+            </span>
           </button>
         </td>
       </tr>
 
-      {/* Expanded Child Flow Rows */}
+      {/* Expanded Child Flow Lineage Conduit Tray */}
       {isExpanded && (
-        <tr id={lineageRegionId}>
-          <td colSpan={5} style={{ padding: "0.65rem 1rem 1rem 2.5rem", background: "var(--np-bg, #0b1019)" }}>
-            <div style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", marginBottom: "0.5rem", fontWeight: 600 }}>
-              Active Flow Lineage:
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem" }}>
-              {group.flowIds.map((flowId) => (
-                <div
-                  key={flowId}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    background: "var(--np-surface-1, #131b2a)",
-                    padding: "0.4rem 0.75rem",
-                    borderRadius: "var(--np-radius-md, 8px)",
-                    border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-                  }}
-                >
-                  <span style={{ fontSize: "0.85rem", fontFamily: "monospace", color: "var(--np-text, #e2e8f0)" }}>
-                    Flow #{flowId}
-                  </span>
-                  <button
-                    type="button"
-                    className="np-btn np-btn--ghost"
-                    style={{ fontSize: "0.75rem", padding: "0.2rem 0.5rem", border: "1px solid var(--np-accent, #2fe0d6)", color: "var(--np-accent, #2fe0d6)", display: "inline-flex", alignItems: "center", gap: "0.3rem" }}
-                    onClick={() => onInspectFlow(flowId)}
-                  >
-                    <Icon name="search" style={{ width: "12px", height: "12px" }} />
-                    {t("inspect_flow")}
-                  </button>
-                </div>
-              ))}
+        <tr id={lineageRegionId} className="np-apps-lineage-row">
+          <td colSpan={5}>
+            <div className="np-apps-lineage-tray">
+              <div className="np-apps-lineage-tray__header">
+                <Icon name="timeline" style={{ width: "14px", height: "14px", color: "var(--np-accent)" }} />
+                <span>Active Flow Lineage ({group.flowsCount})</span>
+              </div>
+              <div className="np-apps-lineage-tray__list">
+                {group.flowIds.map((flowId) => (
+                  <div key={`flow-${flowId}`} className="np-apps-flow-card">
+                    <span className="np-apps-flow-card__id">
+                      <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
+                      Flow #{flowId}
+                    </span>
+                    <button
+                      type="button"
+                      className="np-apps-flow-card__inspect"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onInspectFlow(flowId);
+                      }}
+                      aria-label={`${t("inspect_flow")} #${flowId}`}
+                    >
+                      <Icon name="search" style={{ width: "12px", height: "12px" }} />
+                      <span>{t("inspect_flow")}</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           </td>
         </tr>
@@ -133,3 +132,4 @@ export function ProcessRow({
     </>
   );
 }
+

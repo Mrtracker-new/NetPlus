@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { ConfidenceFilterOption } from "../../hooks/useAppsController";
+import { Icon } from "../../icons";
 
 export interface AppsFiltersProps {
   searchQuery: string;
@@ -23,39 +24,29 @@ export function AppsFilters({
     { id: "unknown", labelKey: "filter_unknown" },
   ];
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape" && searchQuery.length > 0) {
+      e.preventDefault();
+      onSearchChange("");
+    }
+  };
+
+  const handleFilterClick = (targetId: ConfidenceFilterOption) => {
+    if (targetId === "all") {
+      onConfidenceChange("all");
+    } else if (confidenceFilter === targetId) {
+      onConfidenceChange("all");
+    } else {
+      onConfidenceChange(targetId);
+    }
+  };
+
   return (
-    <div
-      className="np-apps-filters"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "1rem",
-        marginBottom: "1.5rem",
-        background: "var(--np-surface-1, #131b2a)",
-        border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-        padding: "0.85rem 1.25rem",
-        borderRadius: "var(--np-radius-lg, 12px)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-      }}
-    >
+    <div className="np-apps-filters">
       {/* Search Input Container */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", flex: "1 1 260px", minWidth: "200px" }}>
-        <span
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: "0.75rem",
-            display: "flex",
-            alignItems: "center",
-            color: "var(--np-muted, #8b9bb4)",
-            pointerEvents: "none",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
+      <div className="np-apps-filters__search">
+        <span className="np-apps-filters__search-icon" aria-hidden="true">
+          <Icon name="search" style={{ width: "14px", height: "14px" }} />
         </span>
         <input
           type="search"
@@ -63,25 +54,27 @@ export function AppsFilters({
           placeholder={t("search_placeholder")}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "0.45rem 0.75rem 0.45rem 2.2rem",
-            fontSize: "0.85rem",
-            borderRadius: "var(--np-radius-md, 8px)",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.12))",
-            background: "var(--np-bg, #0b1019)",
-            color: "var(--np-text, #e2e8f0)",
-            outline: "none",
-          }}
+          onKeyDown={handleKeyDown}
+          className="np-apps-filters__search-input"
         />
+        {searchQuery.length > 0 && (
+          <button
+            type="button"
+            className="np-apps-filters__clear-search"
+            onClick={() => onSearchChange("")}
+            aria-label={t("clear_search")}
+            title={t("clear_search")}
+          >
+            <Icon name="close" style={{ width: "12px", height: "12px" }} />
+          </button>
+        )}
       </div>
 
       {/* Confidence Level Filter Buttons */}
       <div
-        className="np-filter-group"
+        className="np-apps-filters__group"
         role="group"
         aria-label="Filter applications by attribution confidence"
-        style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}
       >
         {filters.map((f) => {
           const isSelected = confidenceFilter === f.id;
@@ -89,23 +82,19 @@ export function AppsFilters({
             <button
               type="button"
               key={f.id}
-              className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
+              className="np-apps-filters__btn"
+              data-active={isSelected}
+              data-tier={f.id}
               aria-pressed={isSelected}
               aria-label={`Filter by ${t(f.labelKey as any)}`}
-              style={{
-                fontSize: "0.8rem",
-                padding: "0.35rem 0.75rem",
-                borderRadius: "var(--np-radius-md, 8px)",
-                background: isSelected ? "var(--np-accent, #2fe0d6)" : "var(--np-surface-2, #1c2636)",
-                color: isSelected ? "#000" : "var(--np-text, #e2e8f0)",
-                border: "none",
-                fontWeight: isSelected ? 600 : 400,
-                cursor: "pointer",
-                transition: "all 0.15s ease",
-              }}
-              onClick={() => onConfidenceChange(f.id)}
+              onClick={() => handleFilterClick(f.id)}
             >
-              {t(f.labelKey as any)}
+              <span
+                className="np-apps-filters__btn-gem"
+                data-tier={f.id}
+                aria-hidden="true"
+              />
+              <span>{t(f.labelKey as any)}</span>
             </button>
           );
         })}
@@ -113,3 +102,4 @@ export function AppsFilters({
     </div>
   );
 }
+

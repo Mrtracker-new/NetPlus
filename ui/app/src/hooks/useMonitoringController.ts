@@ -98,15 +98,15 @@ function buildDomainFromSnapshot(
   }
 
   const colors = [
-    "var(--np-monitor-primary, #00f2fe)",
+    "var(--np-accent, #2fe0d6)",
     "var(--np-accent-2, #7c83f7)",
-    "var(--np-monitor-warning, #f59e0b)",
-    "var(--np-monitor-success, #10b981)",
-    "var(--np-monitor-danger, #ef4444)",
+    "var(--np-sem-investigate, #f59e0b)",
+    "var(--np-sem-nominal, #10b981)",
+    "var(--np-sem-failure, #ef4444)",
   ];
 
   const processes: ProcessMetricRow[] = monitor.by_protocol.rows.map((row, idx) => {
-    const color = colors[idx % colors.length] || "var(--np-monitor-primary, #00f2fe)";
+    const color = colors[idx % colors.length] || "var(--np-accent, #2fe0d6)";
     const rateKb = Math.round(row.bytes / 1024);
 
     return {

@@ -16,7 +16,7 @@ export function ThroughputLineageCard({
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {/* Color Legend */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-monitor-primary, #00f2fe)" }} />
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-accent, #2fe0d6)" }} />
             <span>Ingress (Download)</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
@@ -35,3 +35,4 @@ export function ThroughputLineageCard({
     </div>
   );
 }
+

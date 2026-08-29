@@ -44,15 +44,7 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as any)}
             disabled={processes.length === 0}
-            style={{
-              background: "var(--np-surface-2, #1e2636)",
-              color: "var(--np-text-dim, #9ca3af)",
-              border: "1px solid var(--np-border, rgba(255,255,255,0.1))",
-              borderRadius: "4px",
-              padding: "2px 6px",
-              fontSize: "0.75rem",
-              cursor: processes.length === 0 ? "default" : "pointer",
-            }}
+            className="np-monitor-select"
             aria-label="Sort process attributes"
           >
             <option value="bandwidth">Sort: Bandwidth</option>
@@ -64,19 +56,12 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
 
         {/* Working Pagination Controls */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>
+          <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)" }}>
             Page {currentPage + 1} of {maxPage + 1}
           </span>
           <button
-            style={{
-              background: "var(--np-surface-2, #1e2636)",
-              border: "1px solid var(--np-border, rgba(255,255,255,0.12))",
-              borderRadius: "4px",
-              padding: "2px 8px",
-              color: currentPage === 0 ? "var(--np-text-mute)" : "var(--np-text)",
-              fontSize: "12px",
-              cursor: currentPage === 0 ? "default" : "pointer",
-            }}
+            type="button"
+            className="np-monitor-icon-btn"
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={currentPage === 0}
             aria-label="Previous process page"
@@ -84,15 +69,8 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
             ‹
           </button>
           <button
-            style={{
-              background: "var(--np-surface-2, #1e2636)",
-              border: "1px solid var(--np-border, rgba(255,255,255,0.12))",
-              borderRadius: "4px",
-              padding: "2px 8px",
-              color: currentPage >= maxPage ? "var(--np-text-mute)" : "var(--np-text)",
-              fontSize: "12px",
-              cursor: currentPage >= maxPage ? "default" : "pointer",
-            }}
+            type="button"
+            className="np-monitor-icon-btn"
             onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
             disabled={currentPage >= maxPage}
             aria-label="Next process page"
@@ -112,13 +90,13 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
             alignItems: "center",
             justifyContent: "center",
             gap: "0.5rem",
-            color: "var(--np-text-mute, #9ca3af)",
+            color: "var(--np-text-mute)",
             fontSize: "0.85rem",
             textAlign: "center",
             padding: "1rem",
           }}
         >
-          <Icon name="zap" style={{ width: "24px", height: "24px", color: "var(--np-accent, #2fe0d6)" }} />
+          <Icon name="zap" style={{ width: "24px", height: "24px", color: "var(--np-accent)" }} />
           <span>Capture Standby — No active process telemetry recorded.</span>
         </div>
       ) : (
@@ -133,38 +111,27 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
                       height: "8px",
                       borderRadius: "50%",
                       backgroundColor: p.color,
+                      display: "inline-block",
                     }}
                   />
                   <span style={{ color: "var(--np-text)" }}>{p.name}</span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", fontFamily: "var(--np-font-mono)" }}>
                   <Sparkline values={p.history} data={p.history} color={p.color} width={50} height={14} />
                   <span style={{ color: "var(--np-text-dim)" }}>{p.formattedBandwidth}</span>
-                  <span style={{ color: "var(--np-text)", fontWeight: 600, minWidth: "40px", textAlign: "right" }}>
+                  <span style={{ color: "var(--np-text)", fontWeight: 700, minWidth: "40px", textAlign: "right" }}>
                     {p.utilizationPercent}%
                   </span>
                 </div>
               </div>
 
-              {/* Gradient Progress Bar */}
-              <div
-                style={{
-                  width: "100%",
-                  height: "8px",
-                  backgroundColor: "var(--np-surface-2, rgba(255,255,255,0.08))",
-                  borderRadius: "4px",
-                  overflow: "hidden",
-                  boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3)",
-                }}
-              >
+              {/* Recessed Progress Meter Track */}
+              <div className="np-process-track">
                 <div
+                  className="np-process-fill"
                   style={{
-                    width: `${Math.min(100, Math.max(5, p.utilizationPercent * 7))}%`,
-                    height: "100%",
+                    width: `${Math.min(100, Math.max(4, p.utilizationPercent * 7))}%`,
                     backgroundColor: p.color,
-                    borderRadius: "4px",
-                    boxShadow: `0 0 6px ${p.color}`,
-                    transition: "width 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                   }}
                 />
               </div>
@@ -175,3 +142,4 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
     </div>
   );
 }
+

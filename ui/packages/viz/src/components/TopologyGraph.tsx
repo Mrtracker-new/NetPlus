@@ -60,6 +60,8 @@ export const TopologyGraph = memo(function TopologyGraph({
       <svg
         viewBox={`0 0 ${width} ${height}`}
         style={{ width: "100%", height: "100%", display: "block" }}
+        role="img"
+        aria-label="Network applications lineage topology graph"
       >
         {/* Draw Connected Edges with Anchored Boundary Ports */}
         {edges.map((e, idx) => {
@@ -87,19 +89,19 @@ export const TopologyGraph = memo(function TopologyGraph({
           const pathD = `M ${startX},${startY} C ${midX},${startY} ${midX},${endY} ${endX},${endY}`;
 
           return (
-            <g key={idx}>
-              {/* Soft outer glow line */}
+            <g key={idx} aria-hidden="true">
+              {/* Soft outer line */}
               <path
                 d={pathD}
                 fill="none"
-                stroke="var(--np-accent-soft, rgba(0,242,254,0.15))"
-                strokeWidth={5}
+                stroke="var(--np-accent-soft, rgba(47,224,214,0.15))"
+                strokeWidth={4}
               />
               {/* Animated flow line */}
               <path
                 d={pathD}
                 fill="none"
-                stroke="var(--np-monitor-accent, #06b6d4)"
+                stroke="var(--np-accent, #2fe0d6)"
                 strokeWidth={1.75}
                 className={e.animated !== false ? "np-flow-line" : undefined}
                 opacity={0.85}
@@ -113,10 +115,10 @@ export const TopologyGraph = memo(function TopologyGraph({
           const isSelected = selectedNodeId === n.id;
           const statusColor =
             n.status === "healthy"
-              ? "var(--np-monitor-primary, #00f2fe)"
+              ? "var(--np-accent, #2fe0d6)"
               : n.status === "warning"
-              ? "var(--np-monitor-warning, #f59e0b)"
-              : "var(--np-monitor-danger, #ef4444)";
+              ? "var(--np-sem-investigate, #f59e0b)"
+              : "var(--np-sem-failure, #ef4444)";
 
           const displayLabel = formatNodeLabel(n.label);
 
@@ -143,14 +145,13 @@ export const TopologyGraph = memo(function TopologyGraph({
                 width={144}
                 height={40}
                 rx={10}
-                fill="var(--np-surface-2, #1e2636)"
+                fill="var(--np-surface-raised, var(--np-surface-2))"
                 stroke={
                   isSelected
-                    ? "var(--np-monitor-primary, #00f2fe)"
-                    : "var(--np-border-strong, rgba(255,255,255,0.15))"
+                    ? "var(--np-accent, #2fe0d6)"
+                    : "var(--np-border-strong)"
                 }
                 strokeWidth={isSelected ? 2 : 1}
-                filter="drop-shadow(0 4px 12px rgba(0,0,0,0.3))"
               />
               {/* Status Indicator Dot */}
               <circle cx={-56} cy={0} r={5} fill={statusColor} />
@@ -158,7 +159,7 @@ export const TopologyGraph = memo(function TopologyGraph({
               <text
                 x={-44}
                 y={n.sublabel ? -3 : 4}
-                fill="var(--np-text, #fff)"
+                fill="var(--np-text)"
                 fontSize="11"
                 fontWeight="600"
               >
@@ -169,8 +170,9 @@ export const TopologyGraph = memo(function TopologyGraph({
                 <text
                   x={-44}
                   y={12}
-                  fill="var(--np-text-mute, #9ca3af)"
+                  fill="var(--np-text-mute)"
                   fontSize="9.5"
+                  fontFamily="var(--np-font-mono)"
                 >
                   {n.sublabel}
                 </text>

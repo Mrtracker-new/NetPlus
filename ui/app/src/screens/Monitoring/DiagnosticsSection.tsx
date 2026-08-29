@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { HealthIndicator } from "@netpulse/viz";
 import type { Diagnosis, EvidenceRef } from "@netpulse/contract";
 import type { SubsystemStatus, ActiveAlert, IntelligentRecommendation } from "./monitoringTypes";
@@ -22,18 +22,34 @@ export function DiagnosticsSection({
 }: DiagnosticsSectionProps) {
   const [selectedSubsystem, setSelectedSubsystem] = useState<SubsystemStatus | null>(null);
 
+  // Close subsystem details on Escape key
+  useEffect(() => {
+    if (!selectedSubsystem) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedSubsystem(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedSubsystem]);
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "0.5rem" }}>
-      {/* Subsystem Health Grid - Neumorphic Style */}
+      {/* Subsystem Health Grid — True Neumorphic Tiles */}
       <div className="np-monitor-card" aria-label="System Subsystem Health">
         <div className="np-monitor-card__header">
           <h3 className="np-monitor-card__title">System Subsystem Health</h3>
-          <span style={{ fontSize: "0.78rem", color: "var(--np-text-mute)" }}>
+          <span style={{ fontSize: "0.78rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)" }}>
             {subsystems.filter((s) => s.status === "healthy").length}/{subsystems.length} Subsystems Healthy
           </span>
         </div>
 
-        {/* Spacious 4-Column Responsive Neumorphic Grid */}
+        {/* Spacious 4-Column Responsive Grid */}
         <div
           style={{
             display: "grid",
@@ -47,25 +63,18 @@ export function DiagnosticsSection({
             return (
               <div
                 key={i}
-                style={{
-                  background: isSelected
-                    ? "var(--np-surface-3, #27354a)"
-                    : "var(--np-surface-2, #161d2b)",
-                  padding: "0.85rem 1rem",
-                  borderRadius: "var(--np-radius-sm, 12px)",
-                  border: isSelected
-                    ? "1px solid var(--np-monitor-primary, #00f2fe)"
-                    : "1px solid var(--np-border-strong, rgba(255,255,255,0.1))",
-                  cursor: "pointer",
-                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-                  boxShadow: isSelected
-                    ? "var(--np-neu-inset), 0 0 16px rgba(0,242,254,0.25)"
-                    : "var(--np-neu-sm)",
-                }}
+                className={`np-subsystem-tile ${isSelected ? "np-subsystem-tile--selected" : ""}`}
                 onClick={() => setSelectedSubsystem(isSelected ? null : sub)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setSelectedSubsystem(isSelected ? null : sub);
+                  }
+                }}
                 role="button"
                 tabIndex={0}
-                aria-label={`Inspect ${sub.name} status`}
+                aria-pressed={isSelected}
+                aria-label={`Inspect ${sub.name} status: ${sub.status}, ${sub.detail}`}
               >
                 <HealthIndicator status={sub.status} label={sub.name} sublabel={sub.detail} layout="vertical" />
               </div>
@@ -73,45 +82,25 @@ export function DiagnosticsSection({
           })}
         </div>
 
-        {/* Subsystem Detail Popover */}
+        {/* Subsystem Detail Drawer — Level 4 Overlay Plate */}
         {selectedSubsystem && (
-          <div
-            style={{
-              background: "var(--np-surface-2, #161d2b)",
-              border: "1px solid var(--np-monitor-primary, #00f2fe)",
-              borderRadius: "var(--np-radius-sm, 12px)",
-              padding: "0.75rem 1rem",
-              marginTop: "0.75rem",
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              fontSize: "0.85rem",
-              boxShadow: "var(--np-neu-inset), 0 0 20px rgba(0,242,254,0.15)",
-            }}
-          >
+          <div className="np-subsystem-detail-drawer" style={{ marginTop: "0.75rem" }}>
             <div>
               <span style={{ fontWeight: 600, color: "var(--np-text)" }}>
                 {selectedSubsystem.name} Subsystem
               </span>
-              <span style={{ color: "var(--np-text-dim)", marginLeft: "0.75rem" }}>
+              <span style={{ color: "var(--np-text-dim)", marginLeft: "0.75rem", fontFamily: "var(--np-font-mono)", fontSize: "0.8rem" }}>
                 Status: {selectedSubsystem.status.toUpperCase()} • Metric: {selectedSubsystem.detail}
               </span>
             </div>
             <button
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "var(--np-text-mute)",
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "4px",
-              }}
+              type="button"
+              className="np-monitor-icon-btn"
+              style={{ padding: "4px 6px" }}
               onClick={() => setSelectedSubsystem(null)}
               aria-label="Close details"
             >
-              <Icon name="close" style={{ width: "14px", height: "14px" }} />
+              <Icon name="close" style={{ width: "12px", height: "12px" }} />
             </button>
           </div>
         )}
@@ -129,7 +118,7 @@ export function DiagnosticsSection({
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
             {alerts.length === 0 ? (
-              <p style={{ color: "var(--np-good, #10b981)", fontSize: "0.85rem", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
+              <p style={{ color: "var(--np-sem-nominal, var(--np-good))", fontSize: "0.85rem", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 <Icon name="checkCircle" style={{ width: "14px", height: "14px" }} />
                 <span>No active telemetry alerts detected. System metrics nominal.</span>
               </p>
@@ -140,13 +129,13 @@ export function DiagnosticsSection({
                   style={{
                     background:
                       a.severity === "critical"
-                        ? "rgba(239, 68, 68, 0.1)"
-                        : "rgba(245, 158, 11, 0.1)",
+                        ? "var(--np-finding-soft)"
+                        : "var(--np-notable-soft)",
                     borderLeft: `3px solid ${
-                      a.severity === "critical" ? "#ef4444" : "#f59e0b"
+                      a.severity === "critical" ? "var(--np-sem-failure, #ef4444)" : "var(--np-sem-investigate, #f59e0b)"
                     }`,
                     padding: "0.6rem 0.85rem",
-                    borderRadius: "8px",
+                    borderRadius: "var(--np-radius-xs)",
                     boxShadow: "var(--np-neu-sm)",
                     fontSize: "0.825rem",
                   }}
@@ -169,15 +158,15 @@ export function DiagnosticsSection({
               <div
                 key={r.id}
                 style={{
-                  background: "var(--np-surface-2, #161d2b)",
+                  background: "var(--np-surface-recessed)",
                   padding: "0.65rem 0.85rem",
-                  borderRadius: "var(--np-radius-sm, 12px)",
+                  borderRadius: "var(--np-radius-sm)",
                   fontSize: "0.825rem",
-                  border: "1px solid var(--np-border, rgba(255,255,255,0.06))",
+                  border: "1px solid var(--np-border)",
                   boxShadow: "var(--np-neu-sm)",
                 }}
               >
-                <div style={{ fontWeight: 600, color: "var(--np-monitor-primary, #00f2fe)", display: "flex", alignItems: "center", gap: "0.35rem" }}>
+                <div style={{ fontWeight: 600, color: "var(--np-accent-strong, var(--np-text))", display: "flex", alignItems: "center", gap: "0.35rem" }}>
                   <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
                   <span>{r.title}</span>
                 </div>
@@ -204,3 +193,4 @@ export function DiagnosticsSection({
     </div>
   );
 }
+

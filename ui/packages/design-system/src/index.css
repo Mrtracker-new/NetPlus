@@ -6390,56 +6390,194 @@ button {
   gap: var(--np-3);
 }
 
+/* Time-Range Segmented Control — Level 3 Recessed Trench with Level 2 Tactile Buttons */
+.np-monitor-time-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 3px;
+  gap: 3px;
+  box-shadow: var(--np-neu-inset);
+  box-sizing: border-box;
+}
+
+.np-monitor-time-btn {
+  background: transparent;
+  color: var(--np-text-dim);
+  border: none;
+  border-radius: calc(var(--np-radius-sm) - 3px);
+  padding: 5px 12px;
+  font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-medium);
+  cursor: pointer;
+  outline: none;
+  transition: all var(--np-t);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.np-monitor-time-btn:hover:not(.np-monitor-time-btn--active) {
+  color: var(--np-text);
+  background: var(--np-surface-2);
+}
+
+.np-monitor-time-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+}
+
+.np-monitor-time-btn--active {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  color: var(--np-text);
+  font-weight: var(--np-fw-bold);
+  box-shadow: var(--np-neu-control);
+}
+
+/* Soft LED Status Badge */
 .np-monitor-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.3rem 0.85rem;
+  padding: 0.25rem 0.75rem;
   border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-xs);
   font-weight: var(--np-fw-medium);
   letter-spacing: 0.02em;
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--np-border-strong);
-  box-shadow: var(--np-neu-sm);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  transition: all var(--np-t);
 }
 
 .np-monitor-badge--live {
-  background: rgba(16, 185, 129, 0.12);
-  color: var(--np-monitor-success);
-  border-color: rgba(16, 185, 129, 0.3);
-  box-shadow: var(--np-neu-sm), 0 0 10px rgba(16, 185, 129, 0.2);
+  background: var(--np-good-soft);
+  color: var(--np-sem-nominal, var(--np-good));
+  border-color: var(--np-good-soft);
+}
+
+.np-monitor-badge--idle {
+  background: var(--np-surface-recessed);
+  color: var(--np-text-mute);
+  border-color: var(--np-border);
 }
 
 .np-monitor-badge--simulation {
-  background: rgba(6, 182, 212, 0.12);
-  color: var(--np-monitor-accent);
-  border-color: rgba(6, 182, 212, 0.3);
-  box-shadow: var(--np-neu-sm), 0 0 10px rgba(6, 182, 212, 0.2);
+  background: var(--np-accent-soft);
+  color: var(--np-accent-strong);
+  border-color: var(--np-accent-soft);
 }
 
 .np-monitor-badge--warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--np-monitor-warning);
-  border-color: rgba(245, 158, 11, 0.3);
-  box-shadow: var(--np-neu-sm), 0 0 10px rgba(245, 158, 11, 0.2);
+  background: var(--np-notable-soft);
+  color: var(--np-sem-investigate, var(--np-notable));
+  border-color: var(--np-notable-soft);
 }
 
 .np-monitor-badge--danger {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--np-monitor-danger);
-  border-color: rgba(239, 68, 68, 0.3);
-  box-shadow: var(--np-neu-sm), 0 0 10px rgba(239, 68, 68, 0.2);
+  background: var(--np-finding-soft);
+  color: var(--np-sem-failure, var(--np-finding));
+  border-color: var(--np-finding-soft);
 }
 
+/* Capture Health Panel — Level 1 Plate with Level 3 Recessed Wells */
+.np-capture-health-panel {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  padding: var(--np-4);
+  box-shadow: var(--np-neu-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+}
+
+.np-capture-health-panel__title {
+  font-size: 11px;
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+  margin: 0;
+}
+
+.np-capture-health-wells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--np-3);
+}
+
+.np-capture-health-well {
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 12px 16px;
+  box-shadow: var(--np-neu-inset);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 88px;
+  box-sizing: border-box;
+}
+
+.np-capture-health-well__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide);
+}
+
+.np-capture-health-well__main {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--np-2);
+  font-family: var(--np-font-mono);
+}
+
+.np-capture-health-well__val {
+  font-size: var(--np-fs-lg);
+  font-weight: var(--np-fw-bold);
+  color: var(--np-text);
+  font-family: var(--np-font-mono);
+  line-height: 1;
+}
+
+.np-capture-health-well__sub {
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+  font-family: var(--np-font-mono);
+}
+
+.np-capture-health-gauge-track {
+  width: 100%;
+  height: 6px;
+  background: var(--np-surface-2);
+  border-radius: var(--np-radius-pill);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.np-capture-health-gauge-fill {
+  height: 100%;
+  border-radius: var(--np-radius-pill);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Symmetrical 2x2 Grid */
 .np-monitor-grid {
   display: grid;
   gap: 1.25rem;
   width: 100%;
 }
 
-/* Responsive 4-Tier Grid Breakpoints */
 @media (min-width: 1200px) {
   .np-monitor-grid {
     grid-template-columns: 1fr 1fr;
@@ -6453,8 +6591,8 @@ button {
 }
 
 .np-monitor-card {
-  background: var(--np-surface-1);
-  border: 1px solid var(--np-border-strong);
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius);
   padding: var(--np-4);
   display: flex;
@@ -6463,7 +6601,7 @@ button {
   gap: var(--np-3);
   position: relative;
   overflow: hidden;
-  box-shadow: var(--np-neu);
+  box-shadow: var(--np-neu-card);
   height: 100%;
   box-sizing: border-box;
 }
@@ -6481,6 +6619,117 @@ button {
   display: flex;
   align-items: center;
   gap: var(--np-2);
+}
+
+/* Subsystem Health Grid Tiles */
+.np-subsystem-tile {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all var(--np-t);
+  box-shadow: var(--np-neu-control);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.np-subsystem-tile:hover {
+  box-shadow: var(--np-neu-control-hover);
+  transform: translateY(-1px);
+}
+
+.np-subsystem-tile:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+
+.np-subsystem-tile--selected {
+  background: var(--np-surface-recessed);
+  border-color: var(--np-accent);
+  box-shadow: var(--np-neu-inset);
+  transform: none;
+}
+
+.np-subsystem-detail-drawer {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 12px 16px;
+  box-shadow: var(--np-neu-card);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--np-fs-sm);
+  box-sizing: border-box;
+}
+
+/* Process Attributes Progress Bars & Controls */
+.np-process-track {
+  width: 100%;
+  height: 6px;
+  background: var(--np-surface-recessed);
+  border-radius: var(--np-radius-pill);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--np-border);
+}
+
+.np-process-fill {
+  height: 100%;
+  border-radius: var(--np-radius-pill);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.np-monitor-select {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  color: var(--np-text);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-xs);
+  padding: 3px 8px;
+  font-size: var(--np-fs-xs);
+  cursor: pointer;
+  box-shadow: var(--np-neu-control);
+  outline: none;
+  transition: all var(--np-t);
+}
+
+.np-monitor-select:focus-visible {
+  outline: 2px solid var(--np-accent);
+}
+
+.np-monitor-icon-btn {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-xs);
+  padding: 3px 8px;
+  color: var(--np-text);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: var(--np-neu-control);
+  transition: all var(--np-t);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.np-monitor-icon-btn:hover:not(:disabled) {
+  box-shadow: var(--np-neu-control-hover);
+  transform: translateY(-1px);
+}
+
+.np-monitor-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+.np-monitor-icon-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
 }
 
 /* SVG Line & Edge Pulse Animation */

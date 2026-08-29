@@ -52,11 +52,11 @@ export class MonitoringMapper {
       activeHostsCount: String(domain.activeHosts),
       activeFlowsCount: String(domain.activeFlows),
       throughputSeries: [
-        { name: "Ingress", data: aggregatedIngress, color: "var(--np-monitor-primary, #00f2fe)" },
+        { name: "Ingress", data: aggregatedIngress, color: "var(--np-accent, #2fe0d6)" },
         { name: "Egress", data: aggregatedEgress, color: "var(--np-accent-2, #7c83f7)" },
       ],
       gainsSeries: [
-        { name: "Throughput Gains", data: aggregatedGains, color: "var(--np-monitor-primary, #00f2fe)" },
+        { name: "Throughput Gains", data: aggregatedGains, color: "var(--np-accent, #2fe0d6)" },
       ],
       timestamps,
       peakGainBadge,

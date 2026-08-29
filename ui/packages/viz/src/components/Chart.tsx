@@ -102,15 +102,17 @@ export const Chart = memo(function Chart({
       <svg
         viewBox={`0 0 ${W} ${H}`}
         style={{ width: "100%", height: "100%", display: "block" }}
+        role="img"
+        aria-label={variant === "throughput" ? "Throughput and Lineage time-series spline chart" : "Throughput burst rate gains spline chart"}
         onMouseLeave={() => setHoverIndex(null)}
       >
         <defs>
           <linearGradient id={gradientId1} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--np-monitor-primary, #00f2fe)" stopOpacity="0.35" />
-            <stop offset="100%" stopColor="var(--np-monitor-primary, #00f2fe)" stopOpacity="0.0" />
+            <stop offset="0%" stopColor="var(--np-accent, #2fe0d6)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="var(--np-accent, #2fe0d6)" stopOpacity="0.0" />
           </linearGradient>
           <linearGradient id={gradientId2} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--np-accent-2, #7c83f7)" stopOpacity="0.25" />
+            <stop offset="0%" stopColor="var(--np-accent-2, #7c83f7)" stopOpacity="0.2" />
             <stop offset="100%" stopColor="var(--np-accent-2, #7c83f7)" stopOpacity="0.0" />
           </linearGradient>
           <clipPath id={clipId}>
@@ -137,6 +139,7 @@ export const Chart = memo(function Chart({
                 fill="var(--np-text-mute)"
                 fontSize="10"
                 textAnchor="end"
+                fontFamily="var(--np-font-mono)"
               >
                 {defaultFormatTick(tick)}
               </text>
@@ -155,6 +158,7 @@ export const Chart = memo(function Chart({
               fill="var(--np-text-mute)"
               fontSize="10"
               textAnchor="middle"
+              fontFamily="var(--np-font-mono)"
             >
               {ts}
             </text>
@@ -169,7 +173,7 @@ export const Chart = memo(function Chart({
             const seriesColor = series[sIdx]?.color;
             const color =
               seriesColor ||
-              (sIdx === 0 ? "var(--np-monitor-primary, #00f2fe)" : "var(--np-accent-2, #7c83f7)");
+              (sIdx === 0 ? "var(--np-accent, #2fe0d6)" : "var(--np-accent-2, #7c83f7)");
             const gradId = sIdx === 0 ? gradientId1 : gradientId2;
 
             return (
@@ -212,7 +216,7 @@ export const Chart = memo(function Chart({
               y1={10}
               x2={hoverPt.x}
               y2={10 + chartH}
-              stroke="var(--np-monitor-primary, #00f2fe)"
+              stroke="var(--np-accent, #2fe0d6)"
               strokeDasharray="2 2"
               opacity={0.7}
             />
@@ -228,9 +232,9 @@ export const Chart = memo(function Chart({
                   r={4}
                   fill={
                     seriesColor ||
-                    (sIdx === 0 ? "var(--np-monitor-primary, #00f2fe)" : "#7c83f7")
+                    (sIdx === 0 ? "var(--np-accent, #2fe0d6)" : "var(--np-accent-2, #7c83f7)")
                   }
-                  stroke="#fff"
+                  stroke="var(--np-surface-raised, #fff)"
                   strokeWidth={1.5}
                 />
               );
@@ -245,15 +249,15 @@ export const Chart = memo(function Chart({
               cx={peakPt.x}
               cy={peakPt.y}
               r={5}
-              fill="var(--np-monitor-primary, #00f2fe)"
-              stroke="#fff"
+              fill="var(--np-accent, #2fe0d6)"
+              stroke="var(--np-surface-raised, #fff)"
               strokeWidth={2}
             />
           </g>
         )}
       </svg>
 
-      {/* Floating Callout Badge for Peak Gains */}
+      {/* Tactile Callout Badge for Peak Gains */}
       {variant === "gains" && peakBadgeText && (
         <div
           style={{
@@ -261,15 +265,16 @@ export const Chart = memo(function Chart({
             top: `${(peakPt.y / H) * 100 - 18}%`,
             left: `${(peakPt.x / W) * 100}%`,
             transform: "translate(-50%, -100%)",
-            background: "rgba(0, 242, 254, 0.2)",
-            border: "1px solid var(--np-monitor-primary, #00f2fe)",
-            color: "#fff",
-            padding: "2px 6px",
-            borderRadius: "4px",
+            background: "var(--np-surface-raised, var(--np-surface-1))",
+            border: "1px solid var(--np-border-strong)",
+            color: "var(--np-text)",
+            padding: "2px 8px",
+            borderRadius: "var(--np-radius-pill)",
             fontSize: "10px",
+            fontFamily: "var(--np-font-mono)",
             fontWeight: 700,
             whiteSpace: "nowrap",
-            boxShadow: "0 0 12px rgba(0, 242, 254, 0.4)",
+            boxShadow: "var(--np-neu-control)",
             pointerEvents: "none",
           }}
         >

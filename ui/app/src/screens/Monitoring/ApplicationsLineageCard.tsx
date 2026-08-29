@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TopologyGraph, type TopologyNode, type TopologyEdge } from "@netpulse/viz";
 import { Icon } from "../../icons";
 
@@ -19,6 +19,31 @@ export function ApplicationsLineageCard({
     "Custom Rules" | "All Traffic" | "High Bandwidth" | "Critical Path"
   >("Custom Rules");
   const [showDropdown, setShowDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on Escape key or outside click
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowDropdown(false);
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showDropdown]);
 
   // Filter nodes & edges based on active filter mode
   let filteredNodes = nodes;
@@ -49,7 +74,7 @@ export function ApplicationsLineageCard({
     <div className="np-monitor-card" aria-label="Applications & Lineage Topology Graph">
       <div className="np-monitor-card__header">
         <h3 className="np-monitor-card__title">Applications & Lineage</h3>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }} ref={dropdownRef}>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>
             {filteredNodes.length} Active Nodes
           </span>
@@ -57,16 +82,19 @@ export function ApplicationsLineageCard({
             type="button"
             className="np-monitor-badge"
             style={{
-              background: "var(--np-surface-2, #1e2636)",
-              color: "var(--np-text, #fff)",
+              background: "var(--np-surface-raised, var(--np-surface-1))",
+              color: "var(--np-text)",
               cursor: "pointer",
-              border: "1px solid var(--np-border-strong, rgba(255,255,255,0.12))",
+              border: "1px solid var(--np-border)",
               fontSize: "0.75rem",
-              padding: "0.2rem 0.6rem",
-              borderRadius: "var(--np-radius-sm, 6px)",
+              padding: "0.25rem 0.65rem",
+              borderRadius: "var(--np-radius-sm)",
+              boxShadow: "var(--np-neu-control)",
+              outline: "none",
             }}
             onClick={() => setShowDropdown((prev) => !prev)}
             aria-expanded={showDropdown}
+            aria-haspopup="listbox"
             aria-label="Filter lineage topology rules"
           >
             {filterMode} ▾
@@ -74,51 +102,55 @@ export function ApplicationsLineageCard({
 
           {showDropdown && (
             <div
+              aria-label="Topology rules options"
               style={{
                 position: "absolute",
                 top: "100%",
                 right: 0,
                 marginTop: "6px",
-                background: "var(--np-surface-1, #151d2a)",
-                border: "1px solid var(--np-border-strong, rgba(255,255,255,0.15))",
-                borderRadius: "8px",
+                background: "var(--np-surface-overlay, var(--np-surface-1))",
+                border: "1px solid var(--np-border-strong)",
+                borderRadius: "var(--np-radius-sm)",
                 padding: "4px",
                 display: "flex",
                 flexDirection: "column",
                 gap: "2px",
-                zIndex: 50,
-                boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
-                minWidth: "150px",
+                zIndex: "var(--np-z-overlay, 100)",
+                boxShadow: "var(--np-neu-overlay)",
+                minWidth: "160px",
+                backdropFilter: "var(--np-glass-blur)",
               }}
             >
               {(["Custom Rules", "All Traffic", "High Bandwidth", "Critical Path"] as const).map(
-                (mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    style={{
-                      background:
-                        filterMode === mode ? "var(--np-surface-3, #1e293b)" : "transparent",
-                      color:
-                        filterMode === mode
-                          ? "var(--np-monitor-primary, #00f2fe)"
-                          : "var(--np-text)",
-                      border: "none",
-                      padding: "6px 12px",
-                      borderRadius: "4px",
-                      fontSize: "0.78rem",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      fontWeight: filterMode === mode ? 600 : 400,
-                    }}
-                    onClick={() => {
-                      setFilterMode(mode);
-                      setShowDropdown(false);
-                    }}
-                  >
-                    {mode}
-                  </button>
-                )
+                (mode) => {
+                  const isSelected = filterMode === mode;
+                  return (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={isSelected}
+                      style={{
+                        background: isSelected ? "var(--np-surface-2)" : "transparent",
+                        color: isSelected ? "var(--np-accent-strong, var(--np-text))" : "var(--np-text)",
+                        border: "none",
+                        padding: "6px 12px",
+                        borderRadius: "var(--np-radius-xs)",
+                        fontSize: "0.78rem",
+                        textAlign: "left",
+                        cursor: "pointer",
+                        fontWeight: isSelected ? 600 : 400,
+                        outline: "none",
+                        transition: "all var(--np-t)",
+                      }}
+                      onClick={() => {
+                        setFilterMode(mode);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      {mode}
+                    </button>
+                  );
+                }
               )}
             </div>
           )}
@@ -134,13 +166,13 @@ export function ApplicationsLineageCard({
             alignItems: "center",
             justifyContent: "center",
             gap: "0.5rem",
-            color: "var(--np-text-mute, #9ca3af)",
+            color: "var(--np-text-mute)",
             fontSize: "0.85rem",
             textAlign: "center",
             padding: "1rem",
           }}
         >
-          <Icon name="radio" style={{ width: "24px", height: "24px", color: "var(--np-accent, #2fe0d6)" }} />
+          <Icon name="radio" style={{ width: "24px", height: "24px", color: "var(--np-accent)" }} />
           <span>Capture Standby — Start a packet capture to observe live network flow lineage.</span>
         </div>
       ) : (
@@ -153,19 +185,19 @@ export function ApplicationsLineageCard({
         />
       )}
 
-      {/* Node Inspection Detail Popover */}
+      {/* Node Inspection Detail Popover — Level 4 Overlay Plate */}
       {selectedNode && (
         <div
           style={{
-            background: "var(--np-surface-2, #1e2636)",
-            border: "1px solid var(--np-monitor-primary, #00f2fe)",
-            borderRadius: "var(--np-radius-sm, 8px)",
+            background: "var(--np-surface-raised, var(--np-surface-1))",
+            border: "1px solid var(--np-border)",
+            borderRadius: "var(--np-radius-sm)",
             padding: "0.6rem 0.85rem",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
             fontSize: "0.825rem",
-            boxShadow: "0 0 16px rgba(0,242,254,0.15)",
+            boxShadow: "var(--np-neu-card)",
             marginTop: "0.5rem",
           }}
         >
@@ -179,23 +211,16 @@ export function ApplicationsLineageCard({
           </div>
           <button
             type="button"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "var(--np-text-mute)",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "4px",
-            }}
+            className="np-monitor-icon-btn"
+            style={{ padding: "4px 6px" }}
             onClick={() => onSelectNode?.(null)}
             aria-label="Close node details"
           >
-            <Icon name="close" style={{ width: "14px", height: "14px" }} />
+            <Icon name="close" style={{ width: "12px", height: "12px" }} />
           </button>
         </div>
       )}
     </div>
   );
 }
+

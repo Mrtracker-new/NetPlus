@@ -203,6 +203,81 @@ describe("Timeline Screen & useTimelineController", () => {
     expect(await screen.findByText("Normal ping")).toBeInTheDocument();
     expect(prevButton).toBeDisabled();
   });
+
+  it("supports deep searching inside event diagnostic lines", async () => {
+    setFeed([
+      {
+        headline: "Encrypted Flow",
+        summary: "Normal encrypted traffic",
+        lines: ["Target host: secure.gateway.corp", "Port: 8443"],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<TimelineTestWrapper />);
+
+    const searchInput = screen.getByPlaceholderText("Search timeline events by headline, summary, packet ID...");
+    fireEvent.change(searchInput, { target: { value: "secure.gateway.corp" } });
+
+    expect(await screen.findByText("Encrypted Flow")).toBeInTheDocument();
+  });
+
+  it("toggles severity filter when clicking Summary KPI tiles", async () => {
+    setFeed([
+      {
+        headline: "Finding 1",
+        summary: "Suspicious packet",
+        lines: [],
+        severity: "finding",
+        evidence: [],
+        at_mono_nanos: 1000,
+      },
+      {
+        headline: "Neutral 1",
+        summary: "Normal packet",
+        lines: [],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 2000,
+      },
+    ]);
+
+    render(<TimelineTestWrapper />);
+
+    const findingsKpi = screen.getByRole("button", { name: /Findings: 1/i });
+    fireEvent.click(findingsKpi);
+
+    // Only Finding 1 should remain in ribbon
+    expect(screen.getByRole("button", { name: /Finding 1/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Neutral 1/i })).not.toBeInTheDocument();
+
+    // Clicking again resets filter to all
+    fireEvent.click(findingsKpi);
+    expect(screen.getByRole("button", { name: /Finding 1/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Neutral 1/i })).toBeInTheDocument();
+  });
+
+  it("handles copy diagnostic logs with visual feedback", async () => {
+    setFeed([
+      {
+        headline: "Event with logs",
+        summary: "Log details available",
+        lines: ["line 1 output", "line 2 output"],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<TimelineTestWrapper />);
+
+    const copyButton = await screen.findByRole("button", { name: "Copy diagnostic logs" });
+    fireEvent.click(copyButton);
+
+    expect(await screen.findByText("Copied!")).toBeInTheDocument();
+  });
 });
 
 describe("formatTimelineAxis Utility", () => {

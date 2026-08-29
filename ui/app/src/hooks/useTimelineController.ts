@@ -44,10 +44,25 @@ export function useTimelineController() {
   }, [events, severityFilter, searchQuery]);
 
   // Deterministic initial auto-selection:
-  // Runs only when selectedEventIndex === null and filteredEvents become available.
-  // Selects highest-severity event (finding > notable > neutral), breaking ties by earliest timestamp.
+  // Runs when selectedEventIndex === null or when highlightPacketId is provided from evidence navigation.
+  // Selects target packet if highlighted, else highest-severity event (finding > notable > neutral).
   useEffect(() => {
-    if (selectedEventIndex === null && filteredEvents.length > 0) {
+    if (filteredEvents.length === 0) {
+      if (selectedEventIndex !== null) setSelectedEventIndex(null);
+      return;
+    }
+
+    if (highlightPacketId !== undefined) {
+      const matchIndex = filteredEvents.findIndex(
+        (e) => (e as { packetId?: number }).packetId === highlightPacketId
+      );
+      if (matchIndex !== -1 && matchIndex !== selectedEventIndex) {
+        setSelectedEventIndex(matchIndex);
+        return;
+      }
+    }
+
+    if (selectedEventIndex === null) {
       let bestIndex = 0;
       let bestSeverityWeight = -1;
 
@@ -60,10 +75,11 @@ export function useTimelineController() {
         }
       }
       setSelectedEventIndex(bestIndex);
-    } else if (selectedEventIndex !== null && selectedEventIndex >= filteredEvents.length) {
-      setSelectedEventIndex(filteredEvents.length > 0 ? filteredEvents.length - 1 : null);
+    } else if (selectedEventIndex >= filteredEvents.length) {
+      setSelectedEventIndex(filteredEvents.length - 1);
     }
-  }, [filteredEvents, selectedEventIndex]);
+  }, [filteredEvents, selectedEventIndex, highlightPacketId]);
+
 
   // Dynamic Time Axis Ticks
   const axisTicks = useMemo(() => {

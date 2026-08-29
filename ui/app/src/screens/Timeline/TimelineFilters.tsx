@@ -1,3 +1,4 @@
+import { useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { SeverityFilter } from "../../utils/timeline.utils";
 import { Icon } from "../../icons";
@@ -20,6 +21,7 @@ export function TimelineFilters({
   hasActiveFilters,
 }: TimelineFiltersProps) {
   const { t } = useTranslation(["timeline"]);
+  const filterRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const filters: Array<{ id: SeverityFilter; label: string }> = [
     { id: "all", label: t("filter_all") },
@@ -28,123 +30,104 @@ export function TimelineFilters({
     { id: "neutral", label: t("filter_neutral") },
   ];
 
+  const handleFilterKeyDown = useCallback(
+    (e: React.KeyboardEvent, index: number) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const next = (index + 1) % filters.length;
+        filterRefs.current[next]?.focus();
+        onSeverityChange(filters[next]!.id);
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const prev = (index - 1 + filters.length) % filters.length;
+        filterRefs.current[prev]?.focus();
+        onSeverityChange(filters[prev]!.id);
+      }
+    },
+    [filters, onSeverityChange]
+  );
+
   return (
-    <div
-      className="np-timeline-filters"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        flexWrap: "wrap",
-        gap: "1rem",
-        marginBottom: "1.5rem",
-        background: "var(--np-surface-1, #131b2a)",
-        border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-        padding: "0.85rem 1.25rem",
-        borderRadius: "var(--np-radius-lg, 12px)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-      }}
-    >
-      {/* Search Input Container */}
-      <div style={{ position: "relative", display: "flex", alignItems: "center", flex: "1 1 260px", minWidth: "200px" }}>
-        <span
-          aria-hidden="true"
-          style={{
-            position: "absolute",
-            left: "0.75rem",
-            display: "flex",
-            alignItems: "center",
-            color: "var(--np-muted, #8b9bb4)",
-            pointerEvents: "none",
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <div className="np-timeline-filters" role="search" aria-label="Filter timeline events">
+      {/* Recessed Search Input Container */}
+      <div className="np-timeline-filters__search">
+        <span aria-hidden="true" className="np-timeline-filters__search-icon">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="11" cy="11" r="8" />
             <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
         </span>
         <input
           type="search"
+          className="np-timeline-filters__search-input"
           placeholder={t("search_placeholder")}
+          aria-label={t("search_placeholder")}
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "0.45rem 0.75rem 0.45rem 2.2rem",
-            fontSize: "0.85rem",
-            borderRadius: "var(--np-radius-md, 8px)",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.12))",
-            background: "var(--np-bg, #0b1019)",
-            color: "var(--np-text, #e2e8f0)",
-            outline: "none",
-          }}
         />
+        {searchQuery.length > 0 && (
+          <button
+            type="button"
+            className="np-timeline-filters__clear-search"
+            onClick={() => onSearchChange("")}
+            aria-label="Clear search text"
+          >
+            <Icon name="close" style={{ width: "12px", height: "12px" }} />
+          </button>
+        )}
       </div>
 
-      {/* Severity Filter Toggle Buttons */}
+      {/* Tactile Severity Selector Group */}
       <div
-        className="np-filter-group"
+        className="np-timeline-filters__group"
         role="group"
         aria-label="Filter events by severity"
-        style={{ display: "flex", gap: "0.35rem", flexWrap: "wrap" }}
       >
-        {filters.map((f) => {
+        {filters.map((f, i) => {
           const isSelected = severityFilter === f.id;
-          const activeBg =
-            f.id === "finding"
-              ? "var(--np-danger, #ff5c7c)"
-              : f.id === "notable"
-              ? "var(--np-warning, #ffb800)"
-              : "var(--np-accent, #2fe0d6)";
 
           return (
             <button
               type="button"
               key={f.id}
-              className={`np-btn ${isSelected ? "np-btn--primary" : "np-btn--ghost"}`}
-              aria-pressed={isSelected}
-              style={{
-                fontSize: "0.8rem",
-                padding: "0.35rem 0.75rem",
-                borderRadius: "var(--np-radius-md, 8px)",
-                background: isSelected ? activeBg : "var(--np-surface-2, #1c2636)",
-                color: isSelected ? "#000" : "var(--np-text, #e2e8f0)",
-                border: "none",
-                fontWeight: isSelected ? 600 : 400,
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "0.35rem",
+              ref={(el) => {
+                filterRefs.current[i] = el;
               }}
+              className="np-timeline-filters__btn"
+              data-sev={f.id}
+              aria-pressed={isSelected}
               onClick={() => onSeverityChange(f.id)}
+              onKeyDown={(e) => handleFilterKeyDown(e, i)}
             >
-              {f.id === "finding" && (
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? "#000" : "var(--np-danger, #ff5c7c)" }} />
+              {f.id !== "all" && (
+                <span
+                  className="np-timeline-filters__dot"
+                  data-sev={f.id}
+                  aria-hidden="true"
+                />
               )}
-              {f.id === "notable" && (
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isSelected ? "#000" : "var(--np-warning, #ffb800)" }} />
-              )}
-              {f.label}
+              <span>{f.label}</span>
             </button>
           );
         })}
       </div>
 
+      {/* Clear Active Filters Action */}
       {hasActiveFilters && (
         <button
           type="button"
-          className="np-btn np-btn--ghost"
+          className="np-timeline-filters__clear-btn"
           onClick={onClearFilters}
-          style={{
-            fontSize: "0.8rem",
-            padding: "0.35rem 0.75rem",
-            borderRadius: "var(--np-radius-md, 8px)",
-            border: "1px solid var(--np-accent, #2fe0d6)",
-            color: "var(--np-accent, #2fe0d6)",
-            whiteSpace: "nowrap",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.3rem",
-          }}
+          aria-label="Clear Timeline Filters"
         >
           <Icon name="close" style={{ width: "12px", height: "12px" }} />
           <span>{t("clear_filter")}</span>
@@ -153,3 +136,5 @@ export function TimelineFilters({
     </div>
   );
 }
+
+

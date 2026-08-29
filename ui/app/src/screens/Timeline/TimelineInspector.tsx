@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { EvidenceChips } from "@netpulse/components";
 import type { TimelineEvent } from "../../utils/timeline.utils";
 import type { NavigationSource } from "../../context/EvidenceNavigationContext";
+import { Icon } from "../../icons";
 
 export interface TimelineInspectorProps {
   event: TimelineEvent;
@@ -21,108 +23,171 @@ export function TimelineInspector({
   onNavigateEvidence,
 }: TimelineInspectorProps) {
   const { t } = useTranslation(["timeline"]);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   const severityColor =
     event.severity === "finding"
-      ? "var(--np-danger, #ff5c7c)"
+      ? "var(--np-finding, #ef6167)"
       : event.severity === "notable"
-      ? "var(--np-warning, #ffb800)"
+      ? "var(--np-notable, #f2b64d)"
       : "var(--np-accent, #2fe0d6)";
+
+  const handleCopyLogs = async () => {
+    if (!event.lines || event.lines.length === 0) return;
+    const logText = event.lines.join("\n");
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(logText);
+      } else if (typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.value = logText;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+    } catch {
+      setCopied(true);
+    }
+  };
 
   return (
     <section
+      className="np-timeline-inspector"
       aria-label="Selected timeline event inspector"
-      style={{
-        marginTop: "2rem",
-        background: "var(--np-surface-1, #131b2a)",
-        border: `1px solid ${severityColor}`,
-        borderRadius: "var(--np-radius-lg, 12px)",
-        padding: "1.25rem 1.5rem",
-        boxShadow: "0 6px 24px rgba(0,0,0,0.3)",
-        transition: "all 0.2s ease-in-out",
-      }}
     >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "0.5rem" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      {/* Top Subtle Severity Accent Bar */}
+      <div
+        className="np-timeline-inspector__accent-rim"
+        style={{ background: severityColor }}
+        aria-hidden="true"
+      />
+
+      {/* Header Bar */}
+      <div className="np-timeline-inspector__header">
+        <div className="np-timeline-inspector__lead">
           <span
-            style={{
-              padding: "0.2rem 0.6rem",
-              fontSize: "0.75rem",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              borderRadius: "var(--np-radius-sm, 4px)",
-              background: severityColor,
-              color: "#000",
-            }}
+            className="np-timeline-inspector__badge"
+            style={{ background: severityColor }}
           >
             {event.severity}
           </span>
-          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text, #e2e8f0)" }}>
-            {event.headline}
-          </h3>
+          <h3 className="np-timeline-inspector__title">{event.headline}</h3>
         </div>
 
         {/* Previous / Next Stepper Controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span style={{ fontSize: "0.8rem", color: "var(--np-muted, #8b9bb4)", marginRight: "0.5rem" }}>
+        <div className="np-timeline-inspector__controls">
+          <span className="np-timeline-inspector__counter">
             {currentIndex + 1} of {totalCount}
           </span>
           <button
             type="button"
-            className="np-btn np-btn--ghost"
+            className="np-timeline-inspector__btn-stepper"
             onClick={onPrev}
             disabled={currentIndex <= 0}
             aria-disabled={currentIndex <= 0}
             aria-label={`Previous event (${currentIndex} of ${totalCount})`}
-            style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem", cursor: currentIndex <= 0 ? "not-allowed" : "pointer", opacity: currentIndex <= 0 ? 0.5 : 1 }}
           >
-            ◀ {t("prev_event")}
+            <span>◀</span>
+            <span>{t("prev_event")}</span>
           </button>
           <button
             type="button"
-            className="np-btn np-btn--ghost"
+            className="np-timeline-inspector__btn-stepper"
             onClick={onNext}
             disabled={currentIndex >= totalCount - 1}
             aria-disabled={currentIndex >= totalCount - 1}
             aria-label={`Next event (${currentIndex + 2} of ${totalCount})`}
-            style={{ fontSize: "0.8rem", padding: "0.3rem 0.6rem", cursor: currentIndex >= totalCount - 1 ? "not-allowed" : "pointer", opacity: currentIndex >= totalCount - 1 ? 0.5 : 1 }}
           >
-            {t("next_event")} ▶
+            <span>{t("next_event")}</span>
+            <span>▶</span>
           </button>
         </div>
       </div>
 
-      <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", color: "var(--np-subtext, #94a3b8)", lineHeight: "1.5" }}>
-        {event.summary}
-      </p>
+      {/* Event Summary Narrative */}
+      <p className="np-timeline-inspector__summary">{event.summary}</p>
 
       {/* Backing Evidence Chips */}
       {event.evidence && event.evidence.length > 0 && (
-        <div style={{ marginBottom: "1rem" }}>
-          <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "var(--np-muted, #8b9bb4)", marginBottom: "0.35rem" }}>
-            Telemetry Evidence:
+        <div className="np-timeline-inspector__evidence-section">
+          <div className="np-timeline-inspector__section-label">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polygon points="12 2 2 7 12 12 22 7 12 2" />
+              <polyline points="2 17 12 22 22 17" />
+              <polyline points="2 12 12 17 22 12" />
+            </svg>
+            <span>Telemetry Evidence</span>
           </div>
-          <EvidenceChips evidence={event.evidence} onNavigate={(ref: any) => onNavigateEvidence(ref, "timeline")} />
+          <EvidenceChips
+            evidence={event.evidence}
+            onNavigate={(ref: any) => onNavigateEvidence(ref, "timeline")}
+          />
         </div>
       )}
 
-      {/* Event Details Grid */}
+      {/* Event Log Lines / Telemetry Well */}
       {event.lines && event.lines.length > 0 && (
-        <div
-          style={{
-            background: "var(--np-bg, #0b1019)",
-            padding: "0.75rem 1rem",
-            borderRadius: "var(--np-radius-md, 8px)",
-            fontFamily: "monospace",
-            fontSize: "0.8rem",
-            color: "var(--np-text, #e2e8f0)",
-          }}
-        >
-          {event.lines.map((line, i) => (
-            <div key={i}>{line}</div>
-          ))}
+        <div>
+          <div className="np-timeline-inspector__diagnostic-bar">
+            <div className="np-timeline-inspector__section-label" style={{ margin: 0 }}>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="4 17 10 11 4 5" />
+                <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+              <span>Diagnostic Output</span>
+            </div>
+            <button
+              type="button"
+              className="np-btn np-btn--ghost np-timeline-inspector__copy-btn"
+              onClick={handleCopyLogs}
+              aria-label="Copy diagnostic logs"
+            >
+              <Icon name="copy" style={{ width: "12px", height: "12px" }} />
+              <span>{copied ? "Copied!" : "Copy"}</span>
+            </button>
+          </div>
+          <div className="np-timeline-inspector__log-well">
+            {event.lines.map((line, i) => (
+              <div className="np-timeline-inspector__log-line" key={i}>
+                <span className="np-timeline-inspector__log-num">{i + 1}</span>
+                <span>{line}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </section>
   );
 }
+
+

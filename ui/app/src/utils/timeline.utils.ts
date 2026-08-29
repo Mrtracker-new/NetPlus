@@ -94,7 +94,7 @@ export function formatTimelineAxis(min: number, max: number): TimelineAxisTick[]
   ];
 }
 
-/** Normalize and search timeline event across multiple fields */
+/** Normalize and search timeline event across multiple fields (headline, summary, severity, evidence, lines) */
 export function matchesTimelineSearch(event: NarrativeCard, query: string): boolean {
   if (!query.trim()) return true;
   const q = query.toLowerCase().trim().replace(/\s+/g, " ");
@@ -108,5 +108,10 @@ export function matchesTimelineSearch(event: NarrativeCard, query: string): bool
     if (ev.kind.toLowerCase().includes(q)) return true;
   }
 
+  if (event.lines && event.lines.some((l) => l.toLowerCase().includes(q))) {
+    return true;
+  }
+
   return false;
 }
+

@@ -1,119 +1,116 @@
 import { useTranslation } from "react-i18next";
-import type { TimelineSummaryMetrics } from "../../utils/timeline.utils";
+import type { TimelineSummaryMetrics, SeverityFilter } from "../../utils/timeline.utils";
 
 export interface TimelineSummaryProps {
   metrics: TimelineSummaryMetrics;
+  activeSeverity?: SeverityFilter;
+  onSelectSeverity?: (severity: SeverityFilter) => void;
 }
 
-export function TimelineSummary({ metrics }: TimelineSummaryProps) {
+export function TimelineSummary({
+  metrics,
+  activeSeverity = "all",
+  onSelectSeverity,
+}: TimelineSummaryProps) {
   const { t } = useTranslation(["timeline"]);
 
+  const handleCardClick = (targetSev: SeverityFilter) => {
+    if (!onSelectSeverity) return;
+    if (activeSeverity === targetSev) {
+      onSelectSeverity("all");
+    } else {
+      onSelectSeverity(targetSev);
+    }
+  };
+
   return (
-    <section aria-labelledby="timeline-summary-title" style={{ marginBottom: "1.5rem" }}>
+    <section aria-labelledby="timeline-summary-title" style={{ marginBottom: "1.25rem" }}>
       <h2 id="timeline-summary-title" className="np-sr-only">
         {t("title")} {t("summary_events")}
       </h2>
-      <div
-        className="np-timeline-summary"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
-          gap: "1rem",
-        }}
-      >
-        {/* Total Events */}
-        <div
-          className="np-kpi"
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "1rem 1.25rem",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-            position: "relative",
-            overflow: "hidden",
-          }}
+      <div className="np-timeline-summary">
+        {/* Total Events KPI Tile */}
+        <button
+          type="button"
+          className="np-timeline-kpi"
+          data-sev="all"
+          data-active={activeSeverity === "all" ? "true" : "false"}
+          onClick={() => handleCardClick("all")}
+          aria-pressed={activeSeverity === "all"}
+          aria-label={`${t("summary_events")}: ${metrics.totalEvents}. Click to show all events.`}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-            <span className="np-kpi__label" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-muted, #8b9bb4)" }}>
-              {t("summary_events")}
-            </span>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--np-accent, #2fe0d6)" }} />
+          <div className="np-timeline-kpi__top">
+            <span className="np-timeline-kpi__label">{t("summary_events")}</span>
+            <span className="np-timeline-kpi__gem" data-sev="all" aria-hidden="true" />
           </div>
-          <div className="np-kpi__value" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--np-text, #e2e8f0)" }}>
-            {metrics.totalEvents}
-          </div>
-        </div>
+          <div className="np-timeline-kpi__value">{metrics.totalEvents}</div>
+        </button>
 
-        {/* Findings KPI */}
-        <div
-          className="np-kpi"
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: metrics.findingsCount > 0 ? "1px solid rgba(255, 92, 124, 0.3)" : "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "1rem 1.25rem",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-          }}
+        {/* Findings KPI Tile */}
+        <button
+          type="button"
+          className="np-timeline-kpi"
+          data-sev="finding"
+          data-has-count={metrics.findingsCount > 0 ? "true" : "false"}
+          data-active={activeSeverity === "finding" ? "true" : "false"}
+          onClick={() => handleCardClick("finding")}
+          aria-pressed={activeSeverity === "finding"}
+          aria-label={`${t("summary_findings")}: ${metrics.findingsCount}. Click to filter by findings.`}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-            <span className="np-kpi__label" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-muted, #8b9bb4)" }}>
-              {t("summary_findings")}
-            </span>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--np-danger, #ff5c7c)" }} />
+          <div className="np-timeline-kpi__top">
+            <span className="np-timeline-kpi__label">{t("summary_findings")}</span>
+            <span className="np-timeline-kpi__gem" data-sev="finding" aria-hidden="true" />
           </div>
-          <div className="np-kpi__value" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--np-danger, #ff5c7c)" }}>
-            {metrics.findingsCount}
-          </div>
-        </div>
+          <div className="np-timeline-kpi__value">{metrics.findingsCount}</div>
+        </button>
 
-        {/* Notable KPI */}
-        <div
-          className="np-kpi"
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: metrics.notableCount > 0 ? "1px solid rgba(255, 184, 0, 0.3)" : "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "1rem 1.25rem",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-          }}
+        {/* Notable KPI Tile */}
+        <button
+          type="button"
+          className="np-timeline-kpi"
+          data-sev="notable"
+          data-has-count={metrics.notableCount > 0 ? "true" : "false"}
+          data-active={activeSeverity === "notable" ? "true" : "false"}
+          onClick={() => handleCardClick("notable")}
+          aria-pressed={activeSeverity === "notable"}
+          aria-label={`${t("summary_notable")}: ${metrics.notableCount}. Click to filter by notable events.`}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-            <span className="np-kpi__label" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-muted, #8b9bb4)" }}>
-              {t("summary_notable")}
-            </span>
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "var(--np-warning, #ffb800)" }} />
+          <div className="np-timeline-kpi__top">
+            <span className="np-timeline-kpi__label">{t("summary_notable")}</span>
+            <span className="np-timeline-kpi__gem" data-sev="notable" aria-hidden="true" />
           </div>
-          <div className="np-kpi__value" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--np-warning, #ffb800)" }}>
-            {metrics.notableCount}
-          </div>
-        </div>
+          <div className="np-timeline-kpi__value">{metrics.notableCount}</div>
+        </button>
 
-        {/* Time Span KPI */}
+        {/* Time Span KPI Tile */}
         <div
-          className="np-kpi"
-          style={{
-            background: "var(--np-surface-1, #131b2a)",
-            border: "1px solid var(--np-surface-2, rgba(255, 255, 255, 0.08))",
-            borderRadius: "var(--np-radius-lg, 12px)",
-            padding: "1rem 1.25rem",
-            boxShadow: "0 4px 16px rgba(0,0,0,0.2)",
-          }}
+          className="np-timeline-kpi"
+          data-sev="span"
+          style={{ cursor: "default" }}
+          aria-label={`${t("summary_span")}: ${metrics.timeSpanStr}`}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-            <span className="np-kpi__label" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--np-muted, #8b9bb4)" }}>
-              {t("summary_span")}
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--np-muted, #8b9bb4)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="np-timeline-kpi__top">
+            <span className="np-timeline-kpi__label">{t("summary_span")}</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--np-text-mute, #8b9bb4)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="10" />
               <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
-          <div className="np-kpi__value" style={{ fontSize: "1.75rem", fontWeight: 700, color: "var(--np-text, #e2e8f0)" }}>
-            {metrics.timeSpanStr}
-          </div>
+          <div className="np-timeline-kpi__value">{metrics.timeSpanStr}</div>
         </div>
       </div>
     </section>
   );
 }
+
+

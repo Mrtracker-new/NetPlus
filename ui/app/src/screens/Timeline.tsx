@@ -43,7 +43,7 @@ export function Timeline() {
 
   return (
     <section className="np-timeline" aria-label={t("title")}>
-      <header style={{ marginBottom: "1rem" }}>
+      <header className="np-timeline__header">
         <h1 className="np-hero__title">{t("title")}</h1>
         <p className="np-hero__sub">{t("hero_subtitle")}</p>
       </header>
@@ -55,9 +55,9 @@ export function Timeline() {
 
       {/* Highlight Filter Banner */}
       {highlightPacketId !== undefined && (
-        <div style={{ marginBottom: "1.25rem" }}>
+        <div style={{ marginBottom: "1rem" }}>
           <Notice level="warning">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
               <span>{t("filter_banner", { packetId: highlightPacketId })}</span>
               <button
                 type="button"
@@ -83,7 +83,13 @@ export function Timeline() {
       ) : (
         <>
           {/* Summary KPI Header Card */}
-          {summaryMetrics && <TimelineSummary metrics={summaryMetrics} />}
+          {summaryMetrics && (
+            <TimelineSummary
+              metrics={summaryMetrics}
+              activeSeverity={severityFilter}
+              onSelectSeverity={actions.setSeverityFilter}
+            />
+          )}
 
           {/* Search & Severity Filter Bar */}
           <TimelineFilters
@@ -139,3 +145,4 @@ export function Timeline() {
     </section>
   );
 }
+

@@ -13,10 +13,10 @@ export interface TimeRibbonProps {
   axisTicks?: Array<{ positionPercent: number; label: string }>;
 }
 
-const RIBBON_LANES: Array<{ severity: Severity; label: string }> = [
-  { severity: "finding", label: "Findings" },
-  { severity: "notable", label: "Notable" },
-  { severity: "neutral", label: "Events" },
+const RIBBON_LANES: Array<{ severity: Severity; label: string; color: string }> = [
+  { severity: "finding", label: "Findings", color: "var(--np-finding, #ef6167)" },
+  { severity: "notable", label: "Notable", color: "var(--np-notable, #f2b64d)" },
+  { severity: "neutral", label: "Events", color: "var(--np-accent, #2fe0d6)" },
 ];
 
 /** Events on one shared time axis, laned by severity: anything at the
@@ -90,8 +90,22 @@ export const TimeRibbon = memo(function TimeRibbon({
         const laneEvents = events.filter((e) => e.severity === lane.severity);
         return (
           <div className="np-ribbon__lane" key={lane.severity}>
-            <span className="np-ribbon__lane-label">{lane.label}</span>
-            <div className="np-ribbon__track" style={{ position: "relative" }}>
+            <span className="np-ribbon__lane-label">
+              <span
+                className="np-ribbon__lane-dot"
+                style={{ background: lane.color }}
+                aria-hidden="true"
+              />
+              {lane.label}
+            </span>
+            <div
+              className={`np-ribbon__track ${laneEvents.length === 0 ? "np-ribbon__track--empty" : ""}`}
+            >
+              {laneEvents.length === 0 && (
+                <span className="np-ribbon__empty-guide" aria-hidden="true">
+                  — No {lane.label.toLowerCase()} in window —
+                </span>
+              )}
               {laneEvents.map((e) => {
                 const globalIndex = events.indexOf(e);
                 const isHighlighted =
@@ -127,8 +141,18 @@ export const TimeRibbon = memo(function TimeRibbon({
       })}
 
       <div className="np-ribbon__axis">
-        <span aria-hidden="true" style={{ fontSize: "0.7rem", color: "var(--np-muted, #8b9bb4)", opacity: 0.85, display: "flex", alignItems: "center" }}>
-          ← / → scrub
+        <span
+          aria-hidden="true"
+          style={{
+            fontSize: "0.7rem",
+            color: "var(--np-text-mute, #8b9bb4)",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <span>← / →</span>
+          <span>scrub</span>
         </span>
         <div className="np-ribbon__axis-track">
           {axisTicks && axisTicks.length > 0 ? (
@@ -142,13 +166,20 @@ export const TimeRibbon = memo(function TimeRibbon({
                   whiteSpace: "nowrap",
                 }}
               >
+                <span className="np-ribbon__axis-tick-mark" aria-hidden="true" />
                 {tick.label}
               </span>
             ))
           ) : (
             <>
-              <span style={{ position: "absolute", left: "2%", transform: "translateX(-50%)" }}>earlier</span>
-              <span style={{ position: "absolute", left: "98%", transform: "translateX(-50%)" }}>now</span>
+              <span style={{ position: "absolute", left: "2%", transform: "translateX(-50%)" }}>
+                <span className="np-ribbon__axis-tick-mark" aria-hidden="true" />
+                earlier
+              </span>
+              <span style={{ position: "absolute", left: "98%", transform: "translateX(-50%)" }}>
+                <span className="np-ribbon__axis-tick-mark" aria-hidden="true" />
+                now
+              </span>
             </>
           )}
         </div>
@@ -158,3 +189,4 @@ export const TimeRibbon = memo(function TimeRibbon({
 });
 
 TimeRibbon.displayName = "TimeRibbon";
+

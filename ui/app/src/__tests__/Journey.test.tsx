@@ -125,7 +125,11 @@ describe("Journey Screen & useJourneyController", () => {
 
     // Check Stage Titles & Narration
     expect(screen.getAllByText("DNS Resolution").length).toBeGreaterThan(0);
-    expect(screen.getByText("Resolved google.com to 142.250.190.46 in 24ms")).toBeInTheDocument();
+    expect(screen.getAllByText("Resolved google.com to 142.250.190.46 in 24ms").length).toBeGreaterThan(0);
+
+    // Check KPI Status typography class applied to Unavailable
+    const statusKpiValues = document.querySelectorAll(".np-kpi__value--status");
+    expect(statusKpiValues.length).toBeGreaterThanOrEqual(2); // Duration & TTFB
 
     // Check Collapsible Fanout Provider Group
     const cloudflareGroup = screen.getByText(/cloudflare.com/i);
@@ -136,7 +140,7 @@ describe("Journey Screen & useJourneyController", () => {
     expect(await screen.findByText("static.cloudflare.com")).toBeInTheDocument();
   });
 
-  it("supports keyboard navigation (Enter/Space) to select journey stages", async () => {
+  it("supports keyboard navigation (Enter/Space and Arrow keys) to select journey stages", async () => {
     vi.spyOn(ipc, "query").mockResolvedValue(mockJourneyResponse);
 
     setFeed([
@@ -159,6 +163,11 @@ describe("Journey Screen & useJourneyController", () => {
 
     fireEvent.keyDown(stageTab, { key: "Enter" });
     expect(stageTab).toHaveAttribute("aria-selected", "true");
+
+    // Test ArrowRight navigation to next stage
+    fireEvent.keyDown(stageTab, { key: "ArrowRight" });
+    const stage2Tabs = screen.getAllByRole("tab", { name: /Stage 2: TCP Connection/i });
+    expect(stage2Tabs[0]).toHaveAttribute("aria-selected", "true");
   });
 
   it("supports searching and selecting sessions from dropdown picker", async () => {

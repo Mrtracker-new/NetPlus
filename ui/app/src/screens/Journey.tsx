@@ -1,19 +1,33 @@
 // Website Journey — the flagship "what happened after I typed the URL?" view
 // Reconstructs the complete page-load story stage by stage and narrates it.
 
-import { useRef, useEffect, useCallback } from "react";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import type { EvidenceRef } from "@netpulse/contract";
-import { EmptyState, Notice, Skeleton, EvidenceChips } from "@netpulse/components";
+import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { Icon } from "../icons";
 import { useJourneyController } from "../hooks/useJourneyController";
-import { JourneyFlow, STAGE_CONFIG_REGISTRY } from "@netpulse/viz";
+import { JourneyFlow } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
+
+type KpiValueKind = "metric" | "status";
+
+const KPI_STATUS_VALUES = new Set([
+  "unavailable",
+  "n/a",
+  "pending",
+  "skipped",
+]);
+
+function getKpiKind(val: string | number): KpiValueKind {
+  return typeof val === "string" && KPI_STATUS_VALUES.has(val.trim().toLowerCase())
+    ? "status"
+    : "metric";
+}
 
 export function Journey() {
   const { t } = useTranslation(["journey", "common"]);
   const { navigationTarget, navigateToEvidence, clearNavigationTarget } = useEvidenceNavigation();
-  const stageRefs = useRef<Array<HTMLLIElement | null>>([]);
 
   const {
     journey,
@@ -30,16 +44,6 @@ export function Journey() {
     summaryMetrics,
     refetch,
   } = useJourneyController();
-
-  // Scroll into view centered when selectedStageIndex changes
-  useEffect(() => {
-    if (selectedStageIndex !== null && stageRefs.current[selectedStageIndex]) {
-      const el = stageRefs.current[selectedStageIndex];
-      if (typeof el?.scrollIntoView === "function") {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }
-  }, [selectedStageIndex]);
 
   const handleNavigateEvidence = useCallback(
     (ref: EvidenceRef, source?: NavigationSource) => {
@@ -70,10 +74,21 @@ export function Journey() {
     );
   }
 
+  const kpiItems = summaryMetrics
+    ? [
+        { label: t("summary_duration"), value: summaryMetrics.durationStr },
+        { label: t("summary_ttfb"), value: summaryMetrics.ttfbStr },
+        { label: t("summary_requests"), value: summaryMetrics.requests },
+        { label: t("summary_organizations"), value: summaryMetrics.organizations },
+        { label: t("summary_third_party"), value: summaryMetrics.thirdPartyCount },
+        { label: t("summary_evidence"), value: summaryMetrics.evidenceCount },
+      ]
+    : [];
+
   return (
     <section className="np-journey" aria-label={t("title")}>
       {/* 1. Page Header */}
-      <header style={{ marginBottom: "1rem" }}>
+      <header style={{ marginBottom: "0.75rem" }}>
         <h1 className="np-hero__title">{t("title")}</h1>
         <p className="np-hero__sub">{t("hero_subtitle")}</p>
       </header>
@@ -105,30 +120,22 @@ export function Journey() {
         </div>
       )}
 
-      {/* 2. Session / Search Bar */}
+      {/* 2. Session / Search Bar (True Neumorphic Instrument Bar) */}
       <div className="np-session-bar">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", whiteSpace: "nowrap" }}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--np-accent, #2fe0d6)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-          </svg>
-          <label htmlFor="journey-session-picker" style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--np-text)" }}>
+        <div className="np-session-bar__lead">
+          <span className="np-session-bar__icon-gem" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+            </svg>
+          </span>
+          <label htmlFor="journey-session-picker" className="np-session-bar__label">
             {t("select_session")}:
           </label>
         </div>
 
-        {/* Search Input Container with Icon */}
-        <div style={{ position: "relative", display: "flex", alignItems: "center", flex: "1 1 240px", minWidth: "200px" }}>
-          <span
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              left: "0.75rem",
-              display: "flex",
-              alignItems: "center",
-              color: "var(--np-text-mute)",
-              pointerEvents: "none",
-            }}
-          >
+        {/* Search Input Container with Recessed Well */}
+        <div className="np-session-bar__search-wrap">
+          <span className="np-session-bar__search-icon" aria-hidden="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -136,65 +143,41 @@ export function Journey() {
           </span>
           <input
             type="search"
+            className="np-session-bar__input"
             placeholder={t("search_sessions")}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "0.45rem 0.75rem 0.45rem 2.2rem",
-              fontSize: "0.85rem",
-              borderRadius: "var(--np-radius-md, 8px)",
-              border: "1px solid var(--np-border)",
-              background: "var(--np-surface-2)",
-              color: "var(--np-text)",
-              outline: "none",
-            }}
           />
         </div>
 
-        {/* Custom Session Dropdown */}
-        <div style={{ flex: "2 1 280px", minWidth: "220px" }}>
+        {/* Custom Session Dropdown with Tactile Raised Button Styling */}
+        <div className="np-session-bar__select-wrap">
           <select
             id="journey-session-picker"
+            className="np-session-bar__select"
             value={activeSessionId ?? ""}
             onChange={(e) => setSelectedSessionId(Number(e.target.value) || null)}
-            style={{
-              width: "100%",
-              padding: "0.45rem 0.85rem",
-              fontSize: "0.85rem",
-              fontWeight: 500,
-              borderRadius: "var(--np-radius-md, 8px)",
-              background: "var(--np-surface-2)",
-              color: "var(--np-text)",
-              border: "1px solid var(--np-border)",
-              cursor: "pointer",
-              outline: "none",
-            }}
           >
-            {filteredSessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                #{s.id} · {s.domain} ({s.category})
+            {filteredSessions.length === 0 ? (
+              <option value="" disabled>
+                {t("no_sessions_found", { defaultValue: "No matching sessions" })}
               </option>
-            ))}
+            ) : (
+              filteredSessions.map((s) => (
+                <option key={s.id} value={s.id}>
+                  #{s.id} · {s.domain} ({s.category})
+                </option>
+              ))
+            )}
           </select>
         </div>
 
         {navigationTarget?.screen === "journey" && (
           <button
             type="button"
-            className="np-btn np-btn--ghost"
-            style={{
-              fontSize: "0.8rem",
-              padding: "0.35rem 0.75rem",
-              borderRadius: "var(--np-radius-md, 8px)",
-              border: "1px solid var(--np-accent)",
-              color: "var(--np-accent)",
-              whiteSpace: "nowrap",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "0.3rem",
-            }}
+            className="np-session-bar__clear-btn"
             onClick={clearNavigationTarget}
+            aria-label="Clear active session filter"
           >
             <Icon name="close" style={{ width: "13px", height: "13px" }} />
             {t("clear_filter")}
@@ -210,42 +193,29 @@ export function Journey() {
         />
       ) : (
         <>
-          {/* 3. KPI Summary Grid */}
+          {/* 3. KPI Summary Grid with Status Geometry Protection */}
           {summaryMetrics && (
-            <section aria-labelledby="journey-summary-title" style={{ marginBottom: "1.5rem" }}>
+            <section aria-labelledby="journey-summary-title" style={{ marginBottom: "1.25rem" }}>
               <h2 id="journey-summary-title" className="np-dash__section-title">
                 {t("summary_title")}
               </h2>
               <div className="np-journey-summary">
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_duration")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.durationStr}</div>
-                </div>
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_ttfb")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.ttfbStr}</div>
-                </div>
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_requests")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.requests}</div>
-                </div>
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_organizations")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.organizations}</div>
-                </div>
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_third_party")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.thirdPartyCount}</div>
-                </div>
-                <div className="np-kpi">
-                  <div className="np-kpi__label">{t("summary_evidence")}</div>
-                  <div className="np-kpi__value">{summaryMetrics.evidenceCount}</div>
-                </div>
+                {kpiItems.map((item, idx) => {
+                  const kind = getKpiKind(item.value);
+                  return (
+                    <div className="np-kpi" key={idx}>
+                      <div className="np-kpi__label">{item.label}</div>
+                      <div className={`np-kpi__value ${kind === "status" ? "np-kpi__value--status" : ""}`}>
+                        {item.value}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}
 
-          {/* 4. JourneyFlow — PRIMARY INTERACTION */}
+          {/* 4. JourneyFlow — Master–Detail Console */}
           <section aria-label="Journey Stage Diagram">
             <JourneyFlow
               stages={journey.stages}
@@ -262,47 +232,6 @@ export function Journey() {
               ? `Selected stage ${selectedStageIndex + 1}: ${journey.stages[selectedStageIndex].title}`
               : ""}
           </div>
-
-          {/* 5. Narration / Evidence Details */}
-          <ol className="np-journey__stages">
-            {journey.stages.map((stage, i) => {
-              const isSelected = selectedStageIndex === i;
-              const config = STAGE_CONFIG_REGISTRY[stage.kind];
-
-              return (
-                <li
-                  key={`${stage.kind}-${i}`}
-                  ref={(el) => {
-                    stageRefs.current[i] = el;
-                  }}
-                  tabIndex={0}
-                  role="tab"
-                  aria-selected={isSelected}
-                  aria-label={`Stage ${i + 1}: ${stage.title}`}
-                  className={`np-journey__stage ${isSelected ? "np-journey__stage--active" : ""}`}
-                  onClick={() => setSelectedStageIndex(i)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setSelectedStageIndex(i);
-                    }
-                  }}
-                >
-                  <div className="np-journey__stage-header">
-                    <div className="np-journey__stage-title">
-                      <span aria-hidden="true">{config?.glyph ?? "•"}</span>
-                      <span>
-                        Stage {i + 1}: {stage.title}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="np-journey__stage-narration">{stage.narration}</p>
-                  {stage.detail && <p className="np-journey__stage-detail">{stage.detail}</p>}
-                  <EvidenceChips evidence={stage.evidence} onNavigate={handleNavigateEvidence} />
-                </li>
-              );
-            })}
-          </ol>
         </>
       )}
     </section>

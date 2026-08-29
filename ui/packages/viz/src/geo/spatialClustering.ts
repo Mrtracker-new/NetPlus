@@ -381,77 +381,156 @@ function mapClusterToNode(
   const avgLng = c.avgLng;
   const x = c.avgX;
   const y = c.avgY;
-  const geoCellId = c.geoCellId;
-  const asns = Array.from(c.asns).sort((a, b) => a - b);
+    const geoCellId = c.geoCellId;
+    const asns = Array.from(c.asns).sort((a, b) => a - b);
 
-  const freshness: TelemetryFreshness = c.anyActive ? "active" : c.anyRecent ? "recent" : "stale";
+    const freshness: TelemetryFreshness = c.anyActive ? "active" : c.anyRecent ? "recent" : "stale";
 
-  if (count === 1) {
-    // Single Endpoint Node
-    const primaryName = first.hostnames[0]?.name;
-    const label = primaryName || first.ip;
-    const locationPart =
-      first.geo.status === "resolved"
-        ? first.geo.resolutionLevel === "cloud_region"
-          ? `${(first.geo as CloudRegionResolution).regionName || "Cloud Region"} (${(first.geo as CloudRegionResolution).cloudRegion})`
-          : first.geo.resolutionLevel === "observed_pop"
-          ? `${(first.geo as ObservedPoPResolution).popName || first.geo.city || "Serving PoP"}`
-          : first.geo.city
-          ? `${first.geo.city}, ${first.geo.countryCode}`
-          : first.geo.country
-        : "";
-    const subLabel = primaryName ? `${first.ip} • ${locationPart}` : locationPart;
-    const sampleEndpointIps = [first.ip];
+    if (count === 1) {
+      // Single Endpoint Node
+      const primaryName = first.hostnames[0]?.name;
+      const label = primaryName || first.ip;
+      const locationPart =
+        first.geo.status === "resolved"
+          ? first.geo.resolutionLevel === "cloud_region"
+            ? `${(first.geo as CloudRegionResolution).regionName || "Cloud Region"} (${(first.geo as CloudRegionResolution).cloudRegion})`
+            : first.geo.resolutionLevel === "observed_pop"
+            ? `${(first.geo as ObservedPoPResolution).popName || first.geo.city || "Serving PoP"}`
+            : first.geo.city
+            ? `${first.geo.city}, ${first.geo.countryCode}`
+            : first.geo.country
+          : "";
+      const subLabel = primaryName ? `${first.ip} • ${locationPart}` : locationPart;
+      const sampleEndpointIps = [first.ip];
+      const nodeLatitude = first.geo.status === "resolved" && first.geo.latitude !== undefined ? first.geo.latitude : avgLat;
+      const nodeLongitude = first.geo.status === "resolved" && first.geo.longitude !== undefined ? first.geo.longitude : avgLng;
 
-    return {
-      id: makeEndpointRenderNodeId(first.ip),
-      entityId: makeHostEntityId(first.ip),
-      geoCellId,
-      nodeKind: "endpoint" as NodeKind,
-      label,
-      subLabel,
-      countryCode: first.geo.status === "resolved" ? first.geo.countryCode : null,
-      latitude: first.geo.status === "resolved" && first.geo.latitude !== undefined ? first.geo.latitude : avgLat,
-      longitude: first.geo.status === "resolved" && first.geo.longitude !== undefined ? first.geo.longitude : avgLng,
-      x,
-      y,
-      totalBytes: c.totalBytes,
-      totalFlows: c.totalFlows,
-      sampleEndpointIps,
-      endpointIps: sampleEndpointIps,
-      asns,
-      freshness,
-      deltaBytes: c.deltaBytes,
-      memberCount: 1,
-      selectedMemberEntityId: c.selectedMemberEntityId || (c.hasSelected ? makeHostEntityId(first.ip) : null),
-      locationLevel: first.geo.status === "resolved" ? first.geo.locationLevel : "unresolved",
-      precisionDescription: first.geo.status === "resolved" ? first.geo.precisionDescription : "Unresolved",
-    };
-  }
+      const singleScopedCoords = first.geography?.coordinates || first.geo.scopedCoordinates || {
+        latitude: nodeLatitude,
+        longitude: nodeLongitude,
+        scope: first.geographicPrecision === "facility" ? "facility" : "city",
+      };
 
-  // Multi-Endpoint Node Classification Partition (Mutually Exclusive)
-  const hasCountry = c.normalizedCountryCodes.size === 1 && Array.from(c.normalizedCountryCodes)[0] !== "";
-  const countryCode = hasCountry ? Array.from(c.normalizedCountryCodes)[0]!.toUpperCase() : null;
-  const countryName = countryCode ? getCanonicalCountryName(countryCode, c.firstResolvedCountryName || "Country") : "Region";
-  const sampleEndpointIps = [...c.endpointIps];
+      return {
+        id: makeEndpointRenderNodeId(first.ip),
+        entityId: makeHostEntityId(first.ip),
+        geoCellId,
+        nodeKind: "endpoint" as NodeKind,
+        label,
+        subLabel,
+        countryCode: first.geo.status === "resolved" ? first.geo.countryCode : null,
+        latitude: nodeLatitude,
+        longitude: nodeLongitude,
+        x,
+        y,
+        totalBytes: c.totalBytes,
+        totalFlows: c.totalFlows,
+        sampleEndpointIps,
+        endpointIps: sampleEndpointIps,
+        asns,
+        freshness,
+        deltaBytes: c.deltaBytes,
+        memberCount: 1,
+        selectedMemberEntityId: c.selectedMemberEntityId || (c.hasSelected ? makeHostEntityId(first.ip) : null),
+        locationLevel: first.geo.status === "resolved" ? first.geo.locationLevel : "unresolved",
+        precisionDescription: first.geo.status === "resolved" ? first.geo.precisionDescription : "Unresolved",
+        clusterPrecision: (first.geographicPrecision as "facility" | "city" | "region" | "country" | "continent") || "city",
+        scopedCoordinates: singleScopedCoords,
+      };
+    }
 
-  // 1. City Aggregate
-  if (
-    c.allCityLevel &&
-    hasCountry &&
-    c.canonicalCityKeys.size === 1 &&
-    Array.from(c.canonicalCityKeys)[0] !== ""
-  ) {
-    const canonicalCityKey = Array.from(c.canonicalCityKeys)[0]!;
-    const cityName = c.firstResolvedCityName || canonicalCityKey;
-    const label = `${cityName} (${count})`;
-    const subLabel = `${count} endpoints • ${cityName}, ${countryCode} • ${humanBytes(c.totalBytes)}`;
+    // Multi-Endpoint Node Classification Partition (Mutually Exclusive)
+    const hasCountry = c.normalizedCountryCodes.size === 1 && Array.from(c.normalizedCountryCodes)[0] !== "";
+    const countryCode = hasCountry ? Array.from(c.normalizedCountryCodes)[0]!.toUpperCase() : null;
+    const countryName = countryCode ? getCanonicalCountryName(countryCode, c.firstResolvedCountryName || "Country") : "Region";
+    const sampleEndpointIps = [...c.endpointIps];
+
+    // 1. City Aggregate
+    if (
+      c.allCityLevel &&
+      hasCountry &&
+      c.canonicalCityKeys.size === 1 &&
+      Array.from(c.canonicalCityKeys)[0] !== ""
+    ) {
+      const canonicalCityKey = Array.from(c.canonicalCityKeys)[0]!;
+      const cityName = c.firstResolvedCityName || canonicalCityKey;
+      const label = `${cityName} (${count})`;
+      const subLabel = `${count} endpoints • ${cityName}, ${countryCode} • ${humanBytes(c.totalBytes)}`;
+
+      return {
+        id: makeAggregateRenderNodeId(geoCellId, zoomTier),
+        entityId: makeCityAggregateEntityId(countryCode!, canonicalCityKey),
+        geoCellId,
+        nodeKind: "cityAggregate" as NodeKind,
+        label,
+        subLabel,
+        countryCode,
+        latitude: avgLat,
+        longitude: avgLng,
+        x,
+        y,
+        totalBytes: c.totalBytes,
+        totalFlows: c.totalFlows,
+        sampleEndpointIps,
+        endpointIps: sampleEndpointIps,
+        asns,
+        freshness,
+        deltaBytes: c.deltaBytes,
+        memberCount: count,
+        selectedMemberEntityId: c.selectedMemberEntityId || null,
+        locationLevel: "city",
+        precisionDescription: `${count} endpoints aggregated at ${cityName}, ${countryCode} estimate`,
+        clusterPrecision: "city",
+        scopedCoordinates: { latitude: avgLat, longitude: avgLng, scope: "city" },
+      };
+    }
+
+    // 2. Country Aggregate
+    if (c.allCountryLevel && hasCountry) {
+      const label = `${countryName} (${count})`;
+      const subLabel = `${count} endpoints • ${countryName} (${countryCode}) • ${humanBytes(c.totalBytes)}`;
+
+      return {
+        id: makeAggregateRenderNodeId(geoCellId, zoomTier),
+        entityId: makeCountryAggregateEntityId(countryCode!),
+        geoCellId,
+        nodeKind: "countryAggregate" as NodeKind,
+        label,
+        subLabel,
+        countryCode,
+        latitude: avgLat,
+        longitude: avgLng,
+        x,
+        y,
+        totalBytes: c.totalBytes,
+        totalFlows: c.totalFlows,
+        sampleEndpointIps,
+        endpointIps: sampleEndpointIps,
+        asns,
+        freshness,
+        deltaBytes: c.deltaBytes,
+        memberCount: count,
+        selectedMemberEntityId: c.selectedMemberEntityId || null,
+        locationLevel: "country",
+        precisionDescription: `${count} endpoints aggregated at country-level representation for ${countryName}`,
+        clusterPrecision: "country",
+        scopedCoordinates: { latitude: avgLat, longitude: avgLng, scope: "region" },
+      };
+    }
+
+    // 3. Spatial Aggregate (Cluster)
+    const label = countryCode && c.firstResolvedCityName
+      ? `${c.firstResolvedCityName} Region (${count})`
+      : countryCode
+      ? `${countryName} Cluster (${count})`
+      : `Spatial Cluster (${count})`;
+    const subLabel = `${count} endpoints • ${humanBytes(c.totalBytes)}`;
 
     return {
       id: makeAggregateRenderNodeId(geoCellId, zoomTier),
-      entityId: makeCityAggregateEntityId(countryCode!, canonicalCityKey),
+      entityId: makeClusterEntityId(geoCellId),
       geoCellId,
-      nodeKind: "cityAggregate" as NodeKind,
+      nodeKind: "cluster" as NodeKind,
       label,
       subLabel,
       countryCode,
@@ -468,199 +547,138 @@ function mapClusterToNode(
       deltaBytes: c.deltaBytes,
       memberCount: count,
       selectedMemberEntityId: c.selectedMemberEntityId || null,
-      locationLevel: "city",
-      precisionDescription: `${count} endpoints aggregated at ${cityName}, ${countryCode} estimate`,
+      locationLevel: "multiLocation",
+      precisionDescription: `${count} endpoints aggregated at spatial grid centroid representation`,
+      clusterPrecision: c.allCityLevel ? "city" : "region",
+      scopedCoordinates: { latitude: avgLat, longitude: avgLng, scope: "region" },
     };
   }
 
-  // 2. Country Aggregate
-  if (c.allCountryLevel && hasCountry) {
-    const label = `${countryName} (${count})`;
-    const subLabel = `${count} endpoints • ${countryName} (${countryCode}) • ${humanBytes(c.totalBytes)}`;
+  function createOtherResolvedAggregate(
+    overflowClusters: ClusterAccumulator[],
+    zoomTier: number,
+    worldWidth: number,
+    worldHeight: number
+  ): GeoAggregateNode {
+    let totalBytes = 0;
+    let totalFlows = 0;
+    let deltaBytes = 0;
+    let memberCount = 0;
+    let anyActive = false;
+    let anyRecent = false;
 
-    return {
-      id: makeAggregateRenderNodeId(geoCellId, zoomTier),
-      entityId: makeCountryAggregateEntityId(countryCode!),
-      geoCellId,
-      nodeKind: "countryAggregate" as NodeKind,
-      label,
-      subLabel,
-      countryCode,
-      latitude: avgLat,
-      longitude: avgLng,
-      x,
-      y,
-      totalBytes: c.totalBytes,
-      totalFlows: c.totalFlows,
-      sampleEndpointIps,
-      endpointIps: sampleEndpointIps,
-      asns,
-      freshness,
-      deltaBytes: c.deltaBytes,
-      memberCount: count,
-      selectedMemberEntityId: c.selectedMemberEntityId || null,
-      locationLevel: "country",
-      precisionDescription: `${count} endpoints aggregated at country-level representation for ${countryName}`,
-    };
-  }
+    const sampleEndpointIps: string[] = [];
+    const sampleIpSet = new Set<string>();
+    const asnSet = new Set<number>();
+    const geoCellSet = new Set<string>();
+    const countryCodeSet = new Set<string>();
 
-  // 3. Spatial Aggregate (Cluster)
-  const label = countryCode && c.firstResolvedCityName
-    ? `${c.firstResolvedCityName} Region (${count})`
-    : countryCode
-    ? `${countryName} Cluster (${count})`
-    : `Spatial Cluster (${count})`;
-  const subLabel = `${count} endpoints • ${humanBytes(c.totalBytes)}`;
+    let totalWeight = 0;
+    let weightedLatSum = 0;
+    let unitXSum = 0;
+    let unitYSum = 0;
 
-  return {
-    id: makeAggregateRenderNodeId(geoCellId, zoomTier),
-    entityId: makeClusterEntityId(geoCellId),
-    geoCellId,
-    nodeKind: "cluster" as NodeKind,
-    label,
-    subLabel,
-    countryCode,
-    latitude: avgLat,
-    longitude: avgLng,
-    x,
-    y,
-    totalBytes: c.totalBytes,
-    totalFlows: c.totalFlows,
-    sampleEndpointIps,
-    endpointIps: sampleEndpointIps,
-    asns,
-    freshness,
-    deltaBytes: c.deltaBytes,
-    memberCount: count,
-    selectedMemberEntityId: c.selectedMemberEntityId || null,
-    locationLevel: "multiLocation",
-    precisionDescription: `${count} endpoints aggregated at spatial grid centroid representation`,
-  };
-}
+    for (const c of overflowClusters) {
+      totalBytes += c.totalBytes;
+      totalFlows += c.totalFlows;
+      deltaBytes += c.deltaBytes;
+      memberCount += c.count;
+      if (c.anyActive) anyActive = true;
+      if (c.anyRecent) anyRecent = true;
 
-function createOtherResolvedAggregate(
-  overflowClusters: ClusterAccumulator[],
-  zoomTier: number,
-  worldWidth: number,
-  worldHeight: number
-): GeoAggregateNode {
-  let totalBytes = 0;
-  let totalFlows = 0;
-  let deltaBytes = 0;
-  let memberCount = 0;
-  let anyActive = false;
-  let anyRecent = false;
+      for (const ip of c.endpointIps) {
+        if (sampleIpSet.size < MAX_CLUSTER_SAMPLE_IPS && !sampleIpSet.has(ip)) {
+          sampleIpSet.add(ip);
+          sampleEndpointIps.push(ip);
+        }
+      }
+      for (const asn of c.asns) {
+        asnSet.add(asn);
+      }
+      geoCellSet.add(c.geoCellId);
+      const cc = c.firstHost.geo.status === "resolved" ? c.firstHost.geo.countryCode : null;
+      if (cc) countryCodeSet.add(cc);
 
-  const sampleEndpointIps: string[] = [];
-  const sampleIpSet = new Set<string>();
-  const asnSet = new Set<number>();
-  const geoCellSet = new Set<string>();
-  const countryCodeSet = new Set<string>();
+      // Antimeridian-safe weighted circular centroid
+      const w = c.totalBytes;
+      totalWeight += w;
+      weightedLatSum += w * c.avgLat;
+      const rad = (c.avgLng * Math.PI) / 180;
+      unitXSum += w * Math.cos(rad);
+      unitYSum += w * Math.sin(rad);
+    }
 
-  let totalWeight = 0;
-  let weightedLatSum = 0;
-  let unitXSum = 0;
-  let unitYSum = 0;
+    let avgLat: number;
+    let avgLng: number;
 
-  for (const c of overflowClusters) {
-    totalBytes += c.totalBytes;
-    totalFlows += c.totalFlows;
-    deltaBytes += c.deltaBytes;
-    memberCount += c.count;
-    if (c.anyActive) anyActive = true;
-    if (c.anyRecent) anyRecent = true;
-
-    for (const ip of c.endpointIps) {
-      if (sampleIpSet.size < MAX_CLUSTER_SAMPLE_IPS && !sampleIpSet.has(ip)) {
-        sampleIpSet.add(ip);
-        sampleEndpointIps.push(ip);
+    if (totalWeight > 0) {
+      avgLat = weightedLatSum / totalWeight;
+      const rawLng = (Math.atan2(unitYSum, unitXSum) * 180) / Math.PI;
+      avgLng = normalizeLongitude(rawLng);
+    } else {
+      // Zero-weight fallback: unweighted arithmetic latitude + unweighted circular mean of longitudes
+      let unweightedLatSum = 0;
+      let unweightedUx = 0;
+      let unweightedUy = 0;
+      for (const c of overflowClusters) {
+        unweightedLatSum += c.avgLat;
+        const rad = (c.avgLng * Math.PI) / 180;
+        unweightedUx += Math.cos(rad);
+        unweightedUy += Math.sin(rad);
+      }
+      avgLat = unweightedLatSum / overflowClusters.length;
+      if (Math.abs(unweightedUx) < 1e-9 && Math.abs(unweightedUy) < 1e-9) {
+        avgLng = 0;
+      } else {
+        const rawLng = (Math.atan2(unweightedUy, unweightedUx) * 180) / Math.PI;
+        avgLng = normalizeLongitude(rawLng);
       }
     }
-    for (const asn of c.asns) {
-      asnSet.add(asn);
-    }
-    geoCellSet.add(c.geoCellId);
-    const cc = c.firstHost.geo.status === "resolved" ? c.firstHost.geo.countryCode : null;
-    if (cc) countryCodeSet.add(cc);
 
-    // Antimeridian-safe weighted circular centroid
-    const w = c.totalBytes;
-    totalWeight += w;
-    weightedLatSum += w * c.avgLat;
-    const rad = (c.avgLng * Math.PI) / 180;
-    unitXSum += w * Math.cos(rad);
-    unitYSum += w * Math.sin(rad);
+    const [projX, projY] = projectGeo(avgLat, avgLng, worldWidth, worldHeight);
+    const x = normalizeWorldX(projX, worldWidth);
+    const y = projY;
+
+    const asns = Array.from(asnSet).sort((a, b) => a - b);
+    const locationCount = geoCellSet.size;
+    const countryCode = countryCodeSet.size === 1 ? Array.from(countryCodeSet)[0]! : null;
+
+    const freshness: TelemetryFreshness = anyActive ? "active" : anyRecent ? "recent" : "stale";
+
+    const label = `Other Resolved Traffic (${memberCount})`;
+    const subLabel = `${memberCount} endpoints • ${humanBytes(totalBytes)}`;
+
+    // Selection metadata follows the rendered aggregate that contains the selected entity
+    const selectedMemberEntityId =
+      overflowClusters.find((c) => Boolean(c.selectedMemberEntityId))?.selectedMemberEntityId || null;
+
+    return {
+      id: makeOtherResolvedRenderNodeId(zoomTier),
+      entityId: OTHER_RESOLVED_ENTITY_ID,
+      geoCellId: OTHER_RESOLVED_GEOCELL_ID,
+      nodeKind: "otherResolvedAggregate" as NodeKind,
+      label,
+      subLabel,
+      countryCode,
+      latitude: avgLat,
+      longitude: avgLng,
+      x,
+      y,
+      totalBytes,
+      totalFlows,
+      sampleEndpointIps,
+      endpointIps: sampleEndpointIps,
+      asns,
+      freshness,
+      deltaBytes,
+      memberCount,
+      selectedMemberEntityId: selectedMemberEntityId || undefined,
+      locationLevel: "multiLocation",
+      precisionDescription: `${memberCount} endpoints across ${locationCount} geographic cells consolidated under render budget`,
+      clusterPrecision: "region",
+      scopedCoordinates: { latitude: avgLat, longitude: avgLng, scope: "region" },
+    };
   }
-
-  let avgLat: number;
-  let avgLng: number;
-
-  if (totalWeight > 0) {
-    avgLat = weightedLatSum / totalWeight;
-    const rawLng = (Math.atan2(unitYSum, unitXSum) * 180) / Math.PI;
-    avgLng = normalizeLongitude(rawLng);
-  } else {
-    // Zero-weight fallback: unweighted arithmetic latitude + unweighted circular mean of longitudes
-    let unweightedLatSum = 0;
-    let unweightedUx = 0;
-    let unweightedUy = 0;
-    for (const c of overflowClusters) {
-      unweightedLatSum += c.avgLat;
-      const rad = (c.avgLng * Math.PI) / 180;
-      unweightedUx += Math.cos(rad);
-      unweightedUy += Math.sin(rad);
-    }
-    avgLat = unweightedLatSum / overflowClusters.length;
-    if (Math.abs(unweightedUx) < 1e-9 && Math.abs(unweightedUy) < 1e-9) {
-      avgLng = 0;
-    } else {
-      const rawLng = (Math.atan2(unweightedUy, unweightedUx) * 180) / Math.PI;
-      avgLng = normalizeLongitude(rawLng);
-    }
-  }
-
-  const [projX, projY] = projectGeo(avgLat, avgLng, worldWidth, worldHeight);
-  const x = normalizeWorldX(projX, worldWidth);
-  const y = projY;
-
-  const asns = Array.from(asnSet).sort((a, b) => a - b);
-  const locationCount = geoCellSet.size;
-  const countryCode = countryCodeSet.size === 1 ? Array.from(countryCodeSet)[0]! : null;
-
-  const freshness: TelemetryFreshness = anyActive ? "active" : anyRecent ? "recent" : "stale";
-
-  const label = `Other Resolved Traffic (${memberCount})`;
-  const subLabel = `${memberCount} endpoints • ${humanBytes(totalBytes)}`;
-
-  // Selection metadata follows the rendered aggregate that contains the selected entity
-  const selectedMemberEntityId =
-    overflowClusters.find((c) => Boolean(c.selectedMemberEntityId))?.selectedMemberEntityId || null;
-
-  return {
-    id: makeOtherResolvedRenderNodeId(zoomTier),
-    entityId: OTHER_RESOLVED_ENTITY_ID,
-    geoCellId: OTHER_RESOLVED_GEOCELL_ID,
-    nodeKind: "otherResolvedAggregate" as NodeKind,
-    label,
-    subLabel,
-    countryCode,
-    latitude: avgLat,
-    longitude: avgLng,
-    x,
-    y,
-    totalBytes,
-    totalFlows,
-    sampleEndpointIps,
-    endpointIps: sampleEndpointIps,
-    asns,
-    freshness,
-    deltaBytes,
-    memberCount,
-    selectedMemberEntityId: selectedMemberEntityId || undefined,
-    locationLevel: "multiLocation",
-    precisionDescription: `Aggregated representation of ${memberCount} endpoints across ${locationCount} spatial locations`,
-  };
-}
 
 /**
  * Deterministic screen-space spatial clustering engine.

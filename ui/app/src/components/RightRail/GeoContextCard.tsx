@@ -106,6 +106,7 @@ export const GeoContextCard = memo(function GeoContextCard({
                   <span>Coordinates</span>
                   <span className="np-rail-list__val">
                     {h.geo.latitude.toFixed(2)}°, {h.geo.longitude.toFixed(2)}°
+                    {h.geography?.coordinates?.scope ? ` (${h.geography.coordinates.scope} scope)` : ""}
                   </span>
                 </li>
               )}
@@ -115,6 +116,22 @@ export const GeoContextCard = memo(function GeoContextCard({
                   {h.geo.precisionDescription}
                 </span>
               </li>
+              {h.identityPrecision && (
+                <li>
+                  <span>Identity Precision</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent)" }}>
+                    {h.identityPrecision.toUpperCase()}
+                  </span>
+                </li>
+              )}
+              {h.infrastructure?.type && (
+                <li>
+                  <span>Infrastructure</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-text-dim)" }}>
+                    {h.infrastructure.type.toUpperCase()}{h.infrastructure.provider ? ` (${h.infrastructure.provider})` : ""}
+                  </span>
+                </li>
+              )}
               {h.geo.resolutionLevel === "cloud_region" && (
                 <li>
                   <span>Cloud Anchor</span>
@@ -168,13 +185,29 @@ export const GeoContextCard = memo(function GeoContextCard({
               <li>
                 <span>Geographic Precision</span>
                 <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-warning, #f2b64d)" }}>
-                  {h.geo.precision.toUpperCase()}
+                  {h.geographicPrecision?.toUpperCase() || h.geo.precision.toUpperCase()}
                 </span>
               </li>
+              {h.identityPrecision && (
+                <li>
+                  <span>Identity Precision</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-accent)" }}>
+                    {h.identityPrecision.toUpperCase()}
+                  </span>
+                </li>
+              )}
+              {h.infrastructure?.type && (
+                <li>
+                  <span>Infrastructure</span>
+                  <span className="np-rail-list__val" style={{ fontSize: "0.72rem", color: "var(--np-text-dim)" }}>
+                    {h.infrastructure.type.toUpperCase()}{h.infrastructure.provider ? ` (${h.infrastructure.provider})` : ""}
+                  </span>
+                </li>
+              )}
               <li>
                 <span>Resolution Status</span>
                 <span className="np-rail-list__val" style={{ color: "var(--np-text-mute)", fontSize: "0.72rem" }}>
-                  {h.geo.explanation || (h.geo.reason === "ipv6_deferred"
+                  {h.resolutionReason || h.geo.explanation || (h.geo.reason === "ipv6_deferred"
                     ? "Unresolved (IPv6 GeoIP deferred)"
                     : `Unresolved (${h.geo.reason})`)}
                 </span>
@@ -731,15 +764,15 @@ function UnresolvedGroupCard({
   );
 
   const countryCount = useMemo(
-    () => entity.memberHosts.filter((h) => h.geo.precision === "country").length,
+    () => entity.memberHosts.filter((h) => h.geo.precision === "country" || h.geographicPrecision === "country").length,
     [entity.memberHosts]
   );
   const networkCount = useMemo(
-    () => entity.memberHosts.filter((h) => h.geo.precision === "network").length,
+    () => entity.memberHosts.filter((h) => h.geo.precision === "network" || (h.geographicPrecision === "unknown" && h.identityPrecision && h.identityPrecision !== "unknown")).length,
     [entity.memberHosts]
   );
   const unknownCount = useMemo(
-    () => entity.memberHosts.filter((h) => h.geo.precision === "unknown").length,
+    () => entity.memberHosts.filter((h) => (h.geo.precision === "unknown" || h.geographicPrecision === "unknown") && (!h.identityPrecision || h.identityPrecision === "unknown")).length,
     [entity.memberHosts]
   );
   const ipv6DeferredCount = useMemo(
@@ -750,9 +783,9 @@ function UnresolvedGroupCard({
   const filteredHosts = useMemo(() => {
     return entity.memberHosts.filter((h) => {
       if (precisionFilter !== "ALL") {
-        if (precisionFilter === "COUNTRY" && h.geo.precision !== "country") return false;
-        if (precisionFilter === "NETWORK" && h.geo.precision !== "network") return false;
-        if (precisionFilter === "UNKNOWN" && h.geo.precision !== "unknown") return false;
+        if (precisionFilter === "COUNTRY" && !(h.geo.precision === "country" || h.geographicPrecision === "country")) return false;
+        if (precisionFilter === "NETWORK" && !(h.geo.precision === "network" || (h.geographicPrecision === "unknown" && h.identityPrecision && h.identityPrecision !== "unknown"))) return false;
+        if (precisionFilter === "UNKNOWN" && !((h.geo.precision === "unknown" || h.geographicPrecision === "unknown") && (!h.identityPrecision || h.identityPrecision === "unknown"))) return false;
       }
       if (searchTerm.trim()) {
         const query = searchTerm.trim().toLowerCase();
@@ -761,8 +794,8 @@ function UnresolvedGroupCard({
         const matchesAsn = h.asn.status === "resolved" && (
           String(h.asn.asn).includes(query) || h.asn.asOrg.toLowerCase().includes(query)
         );
-        const matchesCountry = Boolean(h.geo.countryCode?.toLowerCase().includes(query) || (h.geo as any).country?.toLowerCase().includes(query));
-        const matchesExplanation = h.geo.explanation.toLowerCase().includes(query);
+        const matchesCountry = Boolean(h.geo.countryCode?.toLowerCase().includes(query) || (h.geo as any).country?.toLowerCase().includes(query) || h.geography?.country?.toLowerCase().includes(query));
+        const matchesExplanation = (h.resolutionReason || h.geo.explanation || "").toLowerCase().includes(query);
         return matchesIp || matchesHostname || matchesAsn || matchesCountry || matchesExplanation;
       }
       return true;
@@ -938,20 +971,24 @@ function UnresolvedGroupCard({
                         borderRadius: "3px",
                         fontWeight: 600,
                         background:
-                          m.geo.precision === "country"
+                          m.geographicPrecision === "country" || m.geo.precision === "country"
                             ? "rgba(47, 224, 214, 0.15)"
-                            : m.geo.precision === "network"
+                            : (m.identityPrecision && m.identityPrecision !== "unknown") || m.geo.precision === "network"
                             ? "rgba(242, 182, 77, 0.15)"
                             : "rgba(255, 255, 255, 0.08)",
                         color:
-                          m.geo.precision === "country"
+                          m.geographicPrecision === "country" || m.geo.precision === "country"
                             ? "var(--np-accent, #2fe0d6)"
-                            : m.geo.precision === "network"
+                            : (m.identityPrecision && m.identityPrecision !== "unknown") || m.geo.precision === "network"
                             ? "var(--np-warning, #f2b64d)"
                             : "var(--np-text-dim)",
                       }}
                     >
-                      {m.geo.precision.toUpperCase()}
+                      {m.geographicPrecision === "country" || m.geo.precision === "country"
+                        ? "COUNTRY"
+                        : m.identityPrecision && m.identityPrecision !== "unknown"
+                        ? m.identityPrecision.toUpperCase()
+                        : m.geo.precision.toUpperCase()}
                     </span>
 
                     {m.asn.status === "resolved" && (

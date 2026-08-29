@@ -221,7 +221,7 @@ export function deriveHostEnrichmentSnapshot(
     enrichedHosts.push(enriched);
     hostsById.set(ip, enriched);
 
-    // 8-Level Resolution Ladder Accounting
+    // 8-Level Resolution Ladder Accounting (Legacy)
     const resLevel = enriched.geo.resolutionLevel;
 
     switch (resLevel) {
@@ -316,6 +316,61 @@ export function deriveHostEnrichmentSnapshot(
     }
   }
 
+  // Compute Dual-Dimension Breakdown across public endpoints
+  const geographicBreakdown = {
+    exact: 0,
+    facility: 0,
+    city: 0,
+    region: 0,
+    country: 0,
+    continent: 0,
+    unknown: 0,
+  };
+  const geographicBytesBreakdown = {
+    exact: 0,
+    facility: 0,
+    city: 0,
+    region: 0,
+    country: 0,
+    continent: 0,
+    unknown: 0,
+  };
+
+  const identityBreakdown = {
+    prefix: 0,
+    asn: 0,
+    organization: 0,
+    provider: 0,
+    unknown: 0,
+  };
+  const identityBytesBreakdown = {
+    prefix: 0,
+    asn: 0,
+    organization: 0,
+    provider: 0,
+    unknown: 0,
+  };
+
+  let networkOnlyPresentationHostsCount = 0;
+  let networkOnlyPresentationBytes = 0;
+
+  for (const host of enrichedHosts) {
+    if (!host.classification.isPublic) continue;
+
+    const geoPrec = host.geographicPrecision || "unknown";
+    geographicBreakdown[geoPrec] = (geographicBreakdown[geoPrec] || 0) + 1;
+    geographicBytesBreakdown[geoPrec] = (geographicBytesBreakdown[geoPrec] || 0) + host.bytes;
+
+    const idPrec = host.identityPrecision || "unknown";
+    identityBreakdown[idPrec] = (identityBreakdown[idPrec] || 0) + 1;
+    identityBytesBreakdown[idPrec] = (identityBytesBreakdown[idPrec] || 0) + host.bytes;
+
+    if (geoPrec === "unknown" && idPrec !== "unknown") {
+      networkOnlyPresentationHostsCount++;
+      networkOnlyPresentationBytes += host.bytes;
+    }
+  }
+
   const physicalCoveragePercent =
     publicHostsCount > 0 ? (resolvedHostsCount / publicHostsCount) * 100 : 0;
   const coveragePercent = physicalCoveragePercent;
@@ -359,12 +414,39 @@ export function deriveHostEnrichmentSnapshot(
     resolvedBytesPercent,
     networkIdentityCoveragePercent,
 
+    // Dual-Dimension Matrices
+    geographicBreakdown,
+    geographicBytesBreakdown,
+    identityBreakdown,
+    identityBytesBreakdown,
+
+    // Exact 7-Tier Counts
+    exactHostsCount: geographicBreakdown.exact,
+    facilityHostsCount: geographicBreakdown.facility,
+    cityHostsCount: geographicBreakdown.city,
+    regionHostsCount: geographicBreakdown.region,
+    countryHostsCount,
+    continentHostsCount: geographicBreakdown.continent,
+    unknownGeographicHostsCount: geographicBreakdown.unknown,
+
+    // Exact 7-Tier Bytes
+    exactBytes: geographicBytesBreakdown.exact,
+    facilityBytes: geographicBytesBreakdown.facility,
+    cityBytes: geographicBytesBreakdown.city,
+    regionBytes: geographicBytesBreakdown.region,
+    countryBytes,
+    continentBytes: geographicBytesBreakdown.continent,
+    unknownGeographicBytes: geographicBytesBreakdown.unknown,
+
+    // Derived Presentation Category (Network-Only: Geography unknown + Identity resolved)
+    networkOnlyPresentationHostsCount,
+    networkOnlyPresentationBytes,
+
     // 8-Level Counts
     physicalEndpointHostsCount,
     cityEstimateHostsCount,
     cloudRegionHostsCount,
     observedPopHostsCount,
-    countryHostsCount,
     networkHostsCount,
     anycastHostsCount,
 
@@ -374,7 +456,6 @@ export function deriveHostEnrichmentSnapshot(
     cityEstimateBytes,
     cloudRegionBytes,
     observedPopBytes,
-    countryBytes,
     networkBytes,
     anycastBytes,
 
@@ -393,16 +474,22 @@ export function deriveHostEnrichmentSnapshot(
     networkResolvedBytes,
     unknownBytes,
     precisionBreakdown: {
+      exact: geographicBreakdown.exact,
+      facility: geographicBreakdown.facility,
       city: cityResolvedHostsCount,
       region: regionResolvedHostsCount,
       country: countryResolvedHostsCount,
+      continent: geographicBreakdown.continent,
       network: networkResolvedHostsCount,
       unknown: unknownHostsCount,
     },
     bytesBreakdown: {
+      exact: geographicBytesBreakdown.exact,
+      facility: geographicBytesBreakdown.facility,
       city: cityResolvedBytes,
       region: regionResolvedBytes,
       country: countryResolvedBytes,
+      continent: geographicBytesBreakdown.continent,
       network: networkResolvedBytes,
       unknown: unknownBytes,
     },

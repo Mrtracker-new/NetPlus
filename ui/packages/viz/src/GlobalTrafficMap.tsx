@@ -852,7 +852,7 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         </div>
         <div
           className="np-geomap-hud__item"
-          title={`Geographic Traffic Coverage: ${coverageStats.resolvedBytesPercent.toFixed(0)}% volume (${humanBytes(coverageStats.resolvedBytes)} / ${humanBytes(coverageStats.totalBytes)}). Progressive Breakdown: City: ${coverageStats.cityResolvedHostsCount} · Region: ${coverageStats.regionResolvedHostsCount} · Country: ${coverageStats.countryResolvedHostsCount} · Network: ${coverageStats.networkResolvedHostsCount} · Unknown: ${coverageStats.unknownHostsCount}`}
+          title={`Geographic Traffic Coverage: ${coverageStats.resolvedBytesPercent.toFixed(0)}% volume (${humanBytes(coverageStats.resolvedBytes)} / ${humanBytes(coverageStats.resolvedBytes + coverageStats.unresolvedBytes)}). Progressive Breakdown: City: ${coverageStats.cityResolvedHostsCount} · Region: ${coverageStats.regionResolvedHostsCount} · Country: ${coverageStats.countryResolvedHostsCount} · Network: ${coverageStats.networkResolvedHostsCount} · Unknown: ${coverageStats.unknownHostsCount}`}
         >
           <span className="np-geomap-hud__label">GEOGRAPHIC COVERAGE</span>
           <span
@@ -888,15 +888,20 @@ export const GlobalTrafficMap = memo(function GlobalTrafficMap({
         </div>
       </header>
 
-      {/* 2. Prominent Coverage & Unresolved Alert Banner */}
+      {/* 2. Prominent Coverage & Resolution Accounting Banner */}
       {unresolvedPublicHosts.length > 0 && (
         <div className="np-geomap-coverage-banner" role="status" aria-live="polite">
           <div className="np-geomap-coverage-banner__info">
             <span className="np-geomap-coverage-banner__icon" aria-hidden="true">
-              ⚠
+              ℹ
             </span>
             <span>
-              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> without physical coordinate resolution ({humanBytes(coverageStats.unresolvedBytes)} · {(100 - coverageStats.resolvedBytesPercent).toFixed(0)}% of observed traffic{coverageStats.countryResolvedHostsCount + coverageStats.networkResolvedHostsCount > 0 ? `, ${coverageStats.countryResolvedHostsCount + coverageStats.networkResolvedHostsCount} enriched with country/network identity` : ""}{coverageStats.unknownHostsCount > 0 ? `, ${coverageStats.unknownHostsCount} unknown` : ""}{coverageStats.ipv6DeferredHostsCount && coverageStats.ipv6DeferredHostsCount > 0 ? `, ${coverageStats.ipv6DeferredHostsCount} IPv6 deferred` : ""}). Physical locations omitted to preserve semantic accuracy.
+              <strong>{unresolvedPublicHosts.length} public endpoint{unresolvedPublicHosts.length > 1 ? "s" : ""}</strong> without physical coordinate resolution ({humanBytes(coverageStats.unresolvedBytes)} · {(100 - coverageStats.resolvedBytesPercent).toFixed(0)}% of observed traffic
+              {coverageStats.countryHostsCount > 0 ? ` · ${coverageStats.countryHostsCount} country-level` : ""}
+              {coverageStats.networkOnlyPresentationHostsCount > 0 ? ` · ${coverageStats.networkOnlyPresentationHostsCount} network-only` : ""}
+              {coverageStats.unknownGeographicHostsCount > 0 ? ` · ${coverageStats.unknownGeographicHostsCount} unknown` : ""}
+              {coverageStats.ipv6DeferredHostsCount && coverageStats.ipv6DeferredHostsCount > 0 ? ` · ${coverageStats.ipv6DeferredHostsCount} IPv6 deferred` : ""}
+              ). 100% traffic accounted with defensible semantic precision; physical coordinates omitted to prevent false precision.
             </span>
           </div>
           <button

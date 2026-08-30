@@ -331,6 +331,485 @@ fn lossy_flow_evidence(flows: &[&Flow]) -> Vec<EvidenceRef> {
         .collect()
 }
 
+/// A stage in the end-to-end diagnostic chain (Device -> Interface -> Router -> ISP -> DNS -> CDN -> Destination).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DiagnosticChainStageKind {
+    Device,
+    Interface,
+    Router,
+    Isp,
+    Dns,
+    Cdn,
+    Destination,
+}
+
+impl DiagnosticChainStageKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            DiagnosticChainStageKind::Device => "Device (Local Stack)",
+            DiagnosticChainStageKind::Interface => "Network Interface",
+            DiagnosticChainStageKind::Router => "Router / Gateway",
+            DiagnosticChainStageKind::Isp => "Internet Service Provider",
+            DiagnosticChainStageKind::Dns => "DNS Resolver",
+            DiagnosticChainStageKind::Cdn => "CDN / Edge Distribution",
+            DiagnosticChainStageKind::Destination => "Destination Server",
+        }
+    }
+}
+
+/// The diagnostic health status of a stage in the diagnostic chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DiagnosticStageStatus {
+    Healthy,
+    Degraded,
+    Investigate,
+    Unknown,
+    NotMeasurable,
+}
+
+/// The measurement state: directly observed vs inferred vs unknown vs not measurable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MeasurementState {
+    Observed,
+    Inferred,
+    Unknown,
+    NotMeasurable,
+}
+
+/// Detection state: whether the node/feature was detected in the active traffic window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum DetectionState {
+    Detected,
+    NotDetected,
+}
+
+/// One stage node in the authoritative diagnostic chain.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DiagnosticStageNode {
+    pub stage: DiagnosticChainStageKind,
+    pub status: DiagnosticStageStatus,
+    pub measurement_state: MeasurementState,
+    pub detection_state: DetectionState,
+    pub label: String,
+    pub summary: String,
+    pub detail: Option<String>,
+    pub latency_ms: Option<f32>,
+    pub evidence: Vec<EvidenceRef>,
+    pub causes: Vec<Cause>,
+    pub affected_targets: Vec<String>,
+}
+
+/// The complete end-to-end diagnostic chain.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DiagnosticChain {
+    pub stages: Vec<DiagnosticStageNode>,
+}
+
+/// Build the authoritative diagnostic chain from observed telemetry, loss accounting, and hypotheses.
+pub fn build_diagnostic_chain(
+    flows: &[&Flow],
+    loss: LossAccounting,
+    diagnoses: &[Diagnosis],
+    capture_stats: Option<&netpulse_capture::CaptureStats>,
+    _dns_setup_gap_nanos: Option<u64>,
+    names: &NameMap,
+) -> DiagnosticChain {
+    let mut stages = Vec::with_capacity(7);
+
+    // 1. Device (Local Machine Stack)
+    let device_node = match capture_stats {
+        Some(cs) => {
+            let buf_pct = if cs.buffer_capacity > 0 {
+                (cs.buffer_frames * 100) / cs.buffer_capacity
+            } else {
+                0
+            };
+            if cs.shed_stage != netpulse_capture::ShedStage::None || buf_pct > 85 {
+                DiagnosticStageNode {
+                    stage: DiagnosticChainStageKind::Device,
+                    status: DiagnosticStageStatus::Degraded,
+                    measurement_state: MeasurementState::Observed,
+                    detection_state: DetectionState::Detected,
+                    label: DiagnosticChainStageKind::Device.label().to_string(),
+                    summary: "Capture Ring Buffer Saturated".to_string(),
+                    detail: Some(format!("Buffer utilization at {}% with load shedding active", buf_pct)),
+                    latency_ms: None,
+                    evidence: Vec::new(),
+                    causes: Vec::new(),
+                    affected_targets: Vec::new(),
+                }
+            } else {
+                DiagnosticStageNode {
+                    stage: DiagnosticChainStageKind::Device,
+                    status: DiagnosticStageStatus::Healthy,
+                    measurement_state: MeasurementState::Observed,
+                    detection_state: DetectionState::Detected,
+                    label: DiagnosticChainStageKind::Device.label().to_string(),
+                    summary: "Local Capture Pipeline Operational".to_string(),
+                    detail: Some("Buffer nominal, zero memory overrun".to_string()),
+                    latency_ms: None,
+                    evidence: Vec::new(),
+                    causes: Vec::new(),
+                    affected_targets: Vec::new(),
+                }
+            }
+        }
+        None => DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Device,
+            status: DiagnosticStageStatus::Unknown,
+            measurement_state: MeasurementState::Unknown,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Device.label().to_string(),
+            summary: "Local Engine Standby".to_string(),
+            detail: Some("No active packet capture stream".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        },
+    };
+    stages.push(device_node);
+
+    // 2. Network Interface
+    let wifi_diag = diagnoses.iter().find(|d| d.cause == Cause::LocalWifi);
+    let iface_node = if loss.capture_drops > 0 {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Interface,
+            status: DiagnosticStageStatus::Degraded,
+            measurement_state: MeasurementState::Observed,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Interface.label().to_string(),
+            summary: "Capture Packet Drops Detected".to_string(),
+            detail: Some(format!("{} frames dropped by kernel/adapter buffer", loss.capture_drops)),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    } else if let Some(d) = wifi_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Interface,
+            status: DiagnosticStageStatus::Degraded,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Interface.label().to_string(),
+            summary: "Local Wi-Fi / Link Degradation Inferred".to_string(),
+            detail: Some(d.explanation.clone()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::LocalWifi],
+            affected_targets: Vec::new(),
+        }
+    } else if capture_stats.is_some() {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Interface,
+            status: DiagnosticStageStatus::Healthy,
+            measurement_state: MeasurementState::Observed,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Interface.label().to_string(),
+            summary: "Network Interface Operational".to_string(),
+            detail: Some("Full packet capture fidelity with zero drops".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    } else {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Interface,
+            status: DiagnosticStageStatus::Unknown,
+            measurement_state: MeasurementState::Unknown,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Interface.label().to_string(),
+            summary: "Interface Standby".to_string(),
+            detail: None,
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    };
+    stages.push(iface_node);
+
+    // 3. Router / Gateway
+    let router_node = if let Some(d) = wifi_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Router,
+            status: DiagnosticStageStatus::Investigate,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Router.label().to_string(),
+            summary: "Gateway Link Jitter / Loss Inferred".to_string(),
+            detail: Some("Widespread loss across multiple destinations indicates local hop instability".to_string()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::LocalWifi],
+            affected_targets: Vec::new(),
+        }
+    } else if !flows.is_empty() {
+        // Look for local subnet flows to calculate local gateway RTT if available
+        let local_rtts: Vec<f32> = flows
+            .iter()
+            .filter(|f| {
+                match f.key.dst_ip {
+                    IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
+                    IpAddr::V6(v6) => {
+                        v6.is_loopback()
+                            || (v6.segments()[0] & 0xfe00 == 0xfc00)
+                            || (v6.segments()[0] & 0xffc0 == 0xfe80)
+                    }
+                }
+            })
+            .filter_map(|f| f.stats.rtt_estimate_nanos.map(|n| (n as f32) / 1_000_000.0))
+            .collect();
+        if !local_rtts.is_empty() {
+            let avg_rtt = local_rtts.iter().sum::<f32>() / (local_rtts.len() as f32);
+            DiagnosticStageNode {
+                stage: DiagnosticChainStageKind::Router,
+                status: DiagnosticStageStatus::Healthy,
+                measurement_state: MeasurementState::Observed,
+                detection_state: DetectionState::Detected,
+                label: DiagnosticChainStageKind::Router.label().to_string(),
+                summary: "Gateway Subnet Reachable".to_string(),
+                detail: Some(format!("{:.1}ms local subnet RTT", avg_rtt)),
+                latency_ms: Some(avg_rtt),
+                evidence: Vec::new(),
+                causes: Vec::new(),
+                affected_targets: Vec::new(),
+            }
+        } else {
+            DiagnosticStageNode {
+                stage: DiagnosticChainStageKind::Router,
+                status: DiagnosticStageStatus::Healthy,
+                measurement_state: MeasurementState::Inferred,
+                detection_state: DetectionState::Detected,
+                label: DiagnosticChainStageKind::Router.label().to_string(),
+                summary: "Gateway Route Active".to_string(),
+                detail: Some("Traffic actively traversing local gateway".to_string()),
+                latency_ms: None,
+                evidence: Vec::new(),
+                causes: Vec::new(),
+                affected_targets: Vec::new(),
+            }
+        }
+    } else {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Router,
+            status: DiagnosticStageStatus::Unknown,
+            measurement_state: MeasurementState::Unknown,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Router.label().to_string(),
+            summary: "Gateway Route Unobserved".to_string(),
+            detail: Some("No flows observed across gateway in current window".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    };
+    stages.push(router_node);
+
+    // 4. ISP (Scientific Honesty: Passive capture does not directly sample upstream ISP hops without active traceroute)
+    let isp_node = DiagnosticStageNode {
+        stage: DiagnosticChainStageKind::Isp,
+        status: DiagnosticStageStatus::Unknown,
+        measurement_state: MeasurementState::NotMeasurable,
+        detection_state: DetectionState::NotDetected,
+        label: DiagnosticChainStageKind::Isp.label().to_string(),
+        summary: "ISP Upstream Hop Not Sampled".to_string(),
+        detail: Some("Passive capture does not directly sample upstream ISP infrastructure without active traceroute probe".to_string()),
+        latency_ms: None,
+        evidence: Vec::new(),
+        causes: Vec::new(),
+        affected_targets: Vec::new(),
+    };
+    stages.push(isp_node);
+
+    // 5. DNS
+    let dns_diag = diagnoses.iter().find(|d| d.cause == Cause::SlowDns);
+    let dns_flows: Vec<&Flow> = flows.iter().filter(|f| f.l7 == L7Proto::Dns).copied().collect();
+    let dns_node = if let Some(d) = dns_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Dns,
+            status: DiagnosticStageStatus::Degraded,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Dns.label().to_string(),
+            summary: "Slow DNS Lookup Inferred".to_string(),
+            detail: Some(d.explanation.clone()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::SlowDns],
+            affected_targets: Vec::new(),
+        }
+    } else if !dns_flows.is_empty() {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Dns,
+            status: DiagnosticStageStatus::Healthy,
+            measurement_state: MeasurementState::Observed,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Dns.label().to_string(),
+            summary: "DNS Resolution Nominal".to_string(),
+            detail: Some(format!("{} DNS query flows observed in window", dns_flows.len())),
+            latency_ms: None,
+            evidence: dns_flows.iter().map(|f| EvidenceRef::Flow(f.id)).collect(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    } else {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Dns,
+            status: DiagnosticStageStatus::NotMeasurable,
+            measurement_state: MeasurementState::NotMeasurable,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Dns.label().to_string(),
+            summary: "No DNS Queries in Window".to_string(),
+            detail: Some("No DNS queries observed in current capture window".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    };
+    stages.push(dns_node);
+
+    // 6. CDN / Edge
+    let distant_diag = diagnoses.iter().find(|d| d.cause == Cause::DistantServer);
+    let edge_hosts: Vec<String> = flows
+        .iter()
+        .filter_map(|f| {
+            names.get(&f.key.dst_ip).and_then(|hn_list| {
+                hn_list.iter().find(|hn| {
+                    let n = hn.name.to_lowercase();
+                    n.contains("cdn") || n.contains("edge") || n.contains("cloudflare") || n.contains("akamai") || n.contains("fastly")
+                }).map(|hn| hn.name.clone())
+            })
+        })
+        .collect();
+
+    let cdn_node = if let Some(d) = distant_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Cdn,
+            status: DiagnosticStageStatus::Investigate,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Cdn.label().to_string(),
+            summary: "Edge / Path Latency Divergence".to_string(),
+            detail: Some("Distant server latency significantly exceeds baseline".to_string()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::DistantServer],
+            affected_targets: edge_hosts,
+        }
+    } else if !edge_hosts.is_empty() {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Cdn,
+            status: DiagnosticStageStatus::Healthy,
+            measurement_state: MeasurementState::Observed,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Cdn.label().to_string(),
+            summary: "Edge Distribution Detected".to_string(),
+            detail: Some(format!("{} edge endpoints active", edge_hosts.len())),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: edge_hosts,
+        }
+    } else {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Cdn,
+            status: DiagnosticStageStatus::NotMeasurable,
+            measurement_state: MeasurementState::NotMeasurable,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Cdn.label().to_string(),
+            summary: "No Edge Endpoints in Window".to_string(),
+            detail: Some("No CDN or edge distribution nodes identified in current active flows".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    };
+    stages.push(cdn_node);
+
+    // 7. Destination Server
+    let congestion_diag = diagnoses.iter().find(|d| d.cause == Cause::Congestion);
+    let dest_node = if flows.is_empty() {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Destination,
+            status: DiagnosticStageStatus::Unknown,
+            measurement_state: MeasurementState::Unknown,
+            detection_state: DetectionState::NotDetected,
+            label: DiagnosticChainStageKind::Destination.label().to_string(),
+            summary: "No Remote Traffic Observed".to_string(),
+            detail: Some("Capture standby — start traffic to observe destination health".to_string()),
+            latency_ms: None,
+            evidence: Vec::new(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    } else if let Some(d) = distant_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Destination,
+            status: DiagnosticStageStatus::Degraded,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Destination.label().to_string(),
+            summary: "Distant Server Latency".to_string(),
+            detail: Some(d.explanation.clone()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::DistantServer],
+            affected_targets: Vec::new(),
+        }
+    } else if let Some(d) = congestion_diag {
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Destination,
+            status: DiagnosticStageStatus::Degraded,
+            measurement_state: MeasurementState::Inferred,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Destination.label().to_string(),
+            summary: "Heavy Flow Link Congestion".to_string(),
+            detail: Some(d.explanation.clone()),
+            latency_ms: None,
+            evidence: d.evidence.clone(),
+            causes: vec![Cause::Congestion],
+            affected_targets: Vec::new(),
+        }
+    } else {
+        let total_bytes: u64 = flows.iter().map(|f| f.stats.bytes).sum();
+        let rtts: Vec<f32> = flows
+            .iter()
+            .filter_map(|f| f.stats.rtt_estimate_nanos.map(|n| (n as f32) / 1_000_000.0))
+            .collect();
+        let avg_rtt = if !rtts.is_empty() {
+            Some(rtts.iter().sum::<f32>() / (rtts.len() as f32))
+        } else {
+            None
+        };
+        DiagnosticStageNode {
+            stage: DiagnosticChainStageKind::Destination,
+            status: DiagnosticStageStatus::Healthy,
+            measurement_state: MeasurementState::Observed,
+            detection_state: DetectionState::Detected,
+            label: DiagnosticChainStageKind::Destination.label().to_string(),
+            summary: "Destination Endpoints Healthy".to_string(),
+            detail: Some(format!("{} active flows ({} bytes)", flows.len(), total_bytes)),
+            latency_ms: avg_rtt,
+            evidence: flows.iter().take(5).map(|f| EvidenceRef::Flow(f.id)).collect(),
+            causes: Vec::new(),
+            affected_targets: Vec::new(),
+        }
+    };
+    stages.push(dest_node);
+
+    DiagnosticChain { stages }
+}
+
 /// A monitoring snapshot over a window: the usage breakdowns
 /// plus any degradation diagnoses, ready to hand to the UI as one bundle.
 #[derive(Debug, Clone)]
@@ -340,6 +819,7 @@ pub struct MonitorSnapshot {
     pub diagnoses: Vec<Diagnosis>,
     pub loss: LossAccounting,
     pub capture_stats: Option<netpulse_capture::CaptureStats>,
+    pub diagnostic_chain: DiagnosticChain,
 }
 
 /// Build a full monitoring snapshot from a window's flows and loss split.
@@ -350,12 +830,22 @@ pub fn snapshot(
     names: &NameMap,
     capture_stats: Option<netpulse_capture::CaptureStats>,
 ) -> MonitorSnapshot {
+    let diagnoses = diagnose(flows, loss, dns_setup_gap_nanos);
+    let diagnostic_chain = build_diagnostic_chain(
+        flows,
+        loss,
+        &diagnoses,
+        capture_stats.as_ref(),
+        dns_setup_gap_nanos,
+        names,
+    );
     MonitorSnapshot {
         by_protocol: breakdown_by_protocol(flows),
         by_host: breakdown_by_host(flows, names),
-        diagnoses: diagnose(flows, loss, dns_setup_gap_nanos),
+        diagnoses,
         loss,
         capture_stats,
+        diagnostic_chain,
     }
 }
 
@@ -491,5 +981,89 @@ mod tests {
         assert_eq!(snap.loss.network_loss_indicators, 0);
         // Capture drops alone never manufacture a network diagnosis.
         assert!(snap.diagnoses.is_empty());
+    }
+
+    #[test]
+    fn diagnostic_chain_builds_all_seven_stages_in_order() {
+        let f1 = flow(1, ip(1, 1, 1, 1), L7Proto::Dns, 100, Some(15_000_000), 0);
+        let f2 = flow(2, ip(93, 184, 216, 34), L7Proto::Tls, 1000, Some(22_000_000), 0);
+        let cs = netpulse_capture::CaptureStats {
+            received: 50,
+            buffer_frames: 50,
+            buffer_capacity: 1000,
+            shed_stage: netpulse_capture::ShedStage::None,
+            dropped: 0,
+        };
+        let snap = snapshot(&[&f1, &f2], LossAccounting::default(), None, &NameMap::new(), Some(cs));
+        let chain = &snap.diagnostic_chain;
+        assert_eq!(chain.stages.len(), 7);
+
+        assert_eq!(chain.stages[0].stage, DiagnosticChainStageKind::Device);
+        assert_eq!(chain.stages[0].status, DiagnosticStageStatus::Healthy);
+        assert_eq!(chain.stages[0].measurement_state, MeasurementState::Observed);
+
+        assert_eq!(chain.stages[1].stage, DiagnosticChainStageKind::Interface);
+        assert_eq!(chain.stages[1].status, DiagnosticStageStatus::Healthy);
+
+        assert_eq!(chain.stages[2].stage, DiagnosticChainStageKind::Router);
+
+        assert_eq!(chain.stages[3].stage, DiagnosticChainStageKind::Isp);
+        assert_eq!(chain.stages[3].status, DiagnosticStageStatus::Unknown);
+        assert_eq!(chain.stages[3].measurement_state, MeasurementState::NotMeasurable);
+
+        assert_eq!(chain.stages[4].stage, DiagnosticChainStageKind::Dns);
+        assert_eq!(chain.stages[4].status, DiagnosticStageStatus::Healthy);
+        assert_eq!(chain.stages[4].measurement_state, MeasurementState::Observed);
+
+        assert_eq!(chain.stages[5].stage, DiagnosticChainStageKind::Cdn);
+        assert_eq!(chain.stages[5].status, DiagnosticStageStatus::NotMeasurable);
+
+        assert_eq!(chain.stages[6].stage, DiagnosticChainStageKind::Destination);
+        assert_eq!(chain.stages[6].status, DiagnosticStageStatus::Healthy);
+    }
+
+    #[test]
+    fn diagnostic_chain_reflects_local_wifi_and_slow_dns_degradation() {
+        let f1 = flow(1, ip(1, 1, 1, 1), L7Proto::Tls, 100, Some(20_000_000), 2);
+        let f2 = flow(2, ip(2, 2, 2, 2), L7Proto::Tls, 100, Some(22_000_000), 1);
+        let f3 = flow(3, ip(3, 3, 3, 3), L7Proto::Tls, 100, Some(19_000_000), 3);
+        let loss = LossAccounting {
+            network_loss_indicators: 6,
+            capture_drops: 0,
+        };
+        let cs = netpulse_capture::CaptureStats {
+            received: 50,
+            buffer_frames: 50,
+            buffer_capacity: 1000,
+            shed_stage: netpulse_capture::ShedStage::None,
+            dropped: 0,
+        };
+        let snap = snapshot(&[&f1, &f2, &f3], loss, Some(500_000_000), &NameMap::new(), Some(cs));
+        let chain = &snap.diagnostic_chain;
+
+        let iface = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Interface).unwrap();
+        assert_eq!(iface.status, DiagnosticStageStatus::Degraded);
+        assert_eq!(iface.measurement_state, MeasurementState::Inferred);
+
+        let router = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Router).unwrap();
+        assert_eq!(router.status, DiagnosticStageStatus::Investigate);
+        assert_eq!(router.measurement_state, MeasurementState::Inferred);
+
+        let dns = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Dns).unwrap();
+        assert_eq!(dns.status, DiagnosticStageStatus::Degraded);
+        assert_eq!(dns.measurement_state, MeasurementState::Inferred);
+    }
+
+    #[test]
+    fn diagnostic_chain_empty_telemetry_yields_honest_unknown_states() {
+        let snap = snapshot(&[], LossAccounting::default(), None, &NameMap::new(), None);
+        let chain = &snap.diagnostic_chain;
+        assert_eq!(chain.stages.len(), 7);
+        for stage in &chain.stages {
+            assert!(
+                stage.status == DiagnosticStageStatus::Unknown
+                    || stage.status == DiagnosticStageStatus::NotMeasurable
+            );
+        }
     }
 }

@@ -739,12 +739,14 @@ fn live_loop(
 
         if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
             last_rebuild = std::time::Instant::now();
+            let inflight_count = buffer.len();
             ctx.rebuild_and_commit(
                 latest_mono,
                 capture.stats().into(),
-                buffer.len(),
+                inflight_count,
                 buffer_drops,
             );
+            buffer.clear();
 
             // Poll the OS socket tables and feed the correlator, timestamped in the
             // same capture-relative monotonic clock the flows use.

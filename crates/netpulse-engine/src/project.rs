@@ -11,13 +11,15 @@ use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
     AttributionDto, BreakdownDto, BreakdownRowDto, CaptureStatsDto, CauseDto, CurriculumLessonDto,
-    CurriculumModuleDto, DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto, ExerciseKindDto,
-    ExplorerEntryDto, ExportFormatDto, ExportPreviewDto, FanoutNodeDto, FindingCategoryDto,
-    FindingKindDto, GroundedExerciseDto, HostNameDto, JourneyStageDto, LearningProgressDto,
-    LessonOfferDto, MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto,
-    PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto,
-    PrivacyManifestDto, ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto,
-    SeverityDto, ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    CurriculumModuleDto, DiagnosisDto, DiagnosticChainDto, DiagnosticChainStageKindDto,
+    DiagnosticStageNodeDto, DiagnosticStageStatusDto, DimensionDto, DirectionDto,
+    DetectionStateDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
+    HostNameDto, JourneyStageDto, LearningProgressDto, LessonOfferDto, MeasurementStateDto,
+    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
+    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
+    ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
 };
 use netpulse_capture::{Recording, RecordingPayloadLevel, ReplayState};
 use netpulse_core::{AttributionConfidence, Depth, EvidenceRef, FindingCategory};
@@ -93,6 +95,56 @@ pub fn monitor_dto(snap: &MonitorSnapshot) -> MonitorSnapshotDto {
         network_loss_indicators: snap.loss.network_loss_indicators,
         capture_drops: snap.loss.capture_drops,
         capture_stats: snap.capture_stats.as_ref().map(capture_stats_dto),
+        diagnostic_chain: Some(diagnostic_chain_dto(&snap.diagnostic_chain)),
+    }
+}
+
+fn diagnostic_chain_dto(dc: &crate::monitor::DiagnosticChain) -> DiagnosticChainDto {
+    DiagnosticChainDto {
+        stages: dc.stages.iter().map(diagnostic_stage_node_dto).collect(),
+    }
+}
+
+fn diagnostic_stage_node_dto(node: &crate::monitor::DiagnosticStageNode) -> DiagnosticStageNodeDto {
+    DiagnosticStageNodeDto {
+        stage: match node.stage {
+            crate::monitor::DiagnosticChainStageKind::Device => DiagnosticChainStageKindDto::Device,
+            crate::monitor::DiagnosticChainStageKind::Interface => DiagnosticChainStageKindDto::Interface,
+            crate::monitor::DiagnosticChainStageKind::Router => DiagnosticChainStageKindDto::Router,
+            crate::monitor::DiagnosticChainStageKind::Isp => DiagnosticChainStageKindDto::Isp,
+            crate::monitor::DiagnosticChainStageKind::Dns => DiagnosticChainStageKindDto::Dns,
+            crate::monitor::DiagnosticChainStageKind::Cdn => DiagnosticChainStageKindDto::Cdn,
+            crate::monitor::DiagnosticChainStageKind::Destination => DiagnosticChainStageKindDto::Destination,
+        },
+        status: match node.status {
+            crate::monitor::DiagnosticStageStatus::Healthy => DiagnosticStageStatusDto::Healthy,
+            crate::monitor::DiagnosticStageStatus::Degraded => DiagnosticStageStatusDto::Degraded,
+            crate::monitor::DiagnosticStageStatus::Investigate => DiagnosticStageStatusDto::Investigate,
+            crate::monitor::DiagnosticStageStatus::Unknown => DiagnosticStageStatusDto::Unknown,
+            crate::monitor::DiagnosticStageStatus::NotMeasurable => DiagnosticStageStatusDto::NotMeasurable,
+        },
+        measurement_state: match node.measurement_state {
+            crate::monitor::MeasurementState::Observed => MeasurementStateDto::Observed,
+            crate::monitor::MeasurementState::Inferred => MeasurementStateDto::Inferred,
+            crate::monitor::MeasurementState::Unknown => MeasurementStateDto::Unknown,
+            crate::monitor::MeasurementState::NotMeasurable => MeasurementStateDto::NotMeasurable,
+        },
+        detection_state: match node.detection_state {
+            crate::monitor::DetectionState::Detected => DetectionStateDto::Detected,
+            crate::monitor::DetectionState::NotDetected => DetectionStateDto::NotDetected,
+        },
+        label: node.label.clone(),
+        summary: node.summary.clone(),
+        detail: node.detail.clone(),
+        latency_ms: node.latency_ms,
+        evidence: node.evidence.iter().map(evidence_dto).collect(),
+        causes: node.causes.iter().map(|c| match c {
+            crate::monitor::Cause::LocalWifi => CauseDto::LocalWifi,
+            crate::monitor::Cause::DistantServer => CauseDto::DistantServer,
+            crate::monitor::Cause::SlowDns => CauseDto::SlowDns,
+            crate::monitor::Cause::Congestion => CauseDto::Congestion,
+        }).collect(),
+        affected_targets: node.affected_targets.clone(),
     }
 }
 
@@ -710,6 +762,7 @@ mod tests {
                 buffer_frames: 450,
                 buffer_capacity: 1000,
             }),
+            diagnostic_chain: crate::monitor::DiagnosticChain::default(),
         };
 
         let dto = monitor_dto(&snap);

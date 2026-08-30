@@ -1,6 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useMonitoringController } from "../hooks/useMonitoringController";
 import { CaptureHealthPanel } from "./Monitoring/CaptureHealthPanel";
+import { DiagnosticChainCard } from "./Monitoring/DiagnosticChainCard";
 import { ThroughputLineageCard } from "./Monitoring/ThroughputLineageCard";
 import { ThroughputGainsCard } from "./Monitoring/ThroughputGainsCard";
 import { ApplicationsLineageCard } from "./Monitoring/ApplicationsLineageCard";
@@ -46,7 +47,8 @@ export function Monitoring() {
           <h1 className="np-monitor-header__title">
             {t("title", "Live Monitoring & System Health")}
             <span className={`np-monitor-badge ${badgeClass}`}>
-              ● {viewModel.engineState}
+              <span className="np-health-dot" style={{ width: 6, height: 6 }} />
+              {viewModel.engineState}
             </span>
           </h1>
           <p className="np-monitor-header__subtitle">
@@ -96,6 +98,15 @@ export function Monitoring() {
           </div>
         ))}
       </div>
+
+      {/* Diagnostic Chain Card — Evidence-Grounded Hop Telemetry */}
+      {viewModel.diagnosticChain && (
+        <DiagnosticChainCard
+          chain={viewModel.diagnosticChain}
+          onSelectEvidence={actions.openEvidence}
+          onRunProbe={actions.runProbe}
+        />
+      )}
 
       {/* Capture Health Panel */}
       {captureHealth && <CaptureHealthPanel health={captureHealth} />}

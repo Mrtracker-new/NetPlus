@@ -31,5 +31,39 @@
     "sample_dissection": "Muestreo de Disección",
     "coarsen_metrics": "Métricas Simplificadas",
     "drop_packets": "Descartando Paquetes"
+  },
+  "diagnostic_chain": {
+    "title": "Cadena de Diagnóstico",
+    "subtitle": "Análisis de saltos basado en evidencia · Telemetría pasiva",
+    "stages": {
+      "device": "Dispositivo (Pila Local)",
+      "interface": "Interfaz de Red",
+      "router": "Enrutador / Puerta de Enlace",
+      "isp": "Proveedor de Servicios de Internet",
+      "dns": "Resolutor DNS",
+      "cdn": "Distribución CDN / Edge",
+      "destination": "Servidor de Destino"
+    },
+    "statuses": {
+      "nominal": "Nominal",
+      "degraded": "Degradado",
+      "investigate": "Investigar",
+      "not_measurable": "No Medible",
+      "unknown": "Desconocido"
+    },
+    "measurements": {
+      "observed": "Observado",
+      "inferred": "Inferido",
+      "not_measurable": "No Medible",
+      "unknown": "No Observado"
+    },
+    "run_active_probe": "Ejecutar Prueba Activa",
+    "drill_down": "Profundizar",
+    "measured_latency": "Latencia Medida",
+    "identified_endpoints": "Puntos de Destino Identificados",
+    "evidence_backing": "Respaldo de Evidencia",
+    "flow_sample": "{{count}} muestra de flujo",
+    "flow_samples": "{{count}} muestras de flujo",
+    "close_inspection": "Cerrar inspección de etapa"
   }
 }

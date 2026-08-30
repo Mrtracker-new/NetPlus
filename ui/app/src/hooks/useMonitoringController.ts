@@ -150,12 +150,13 @@ function buildDomainFromSnapshot(
     dropCount: monitor.capture_drops,
     networkLossCount: monitor.network_loss_indicators,
     diagnoses: monitor.diagnoses ?? [],
+    diagnosticChain: monitor.diagnostic_chain,
   };
 }
 
 export function useMonitoringController() {
   const { monitor, throughput } = useStore();
-  const { navigateToEvidence } = useEvidenceNavigation();
+  const { navigateToEvidence, setScreen } = useEvidenceNavigation();
 
   // Capture is live only when a non-empty monitor snapshot exists
   const isLive = Boolean(monitor && monitor.by_protocol.rows.length > 0);
@@ -254,6 +255,13 @@ export function useMonitoringController() {
     [navigateToEvidence]
   );
 
+  const runProbe = useCallback(
+    (_stageKind: string, _target?: string) => {
+      setScreen("diagnostics");
+    },
+    [setScreen]
+  );
+
   return {
     monitor,
     kpis,
@@ -266,6 +274,7 @@ export function useMonitoringController() {
       setTimeRange,
       setSelectedNodeId,
       openEvidence,
+      runProbe,
     },
   };
 }

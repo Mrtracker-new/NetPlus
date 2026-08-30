@@ -1,4 +1,4 @@
-import type { Diagnosis } from "@netpulse/contract";
+import type { Diagnosis, DiagnosticChain } from "@netpulse/contract";
 import type { TopologyNode, TopologyEdge } from "@netpulse/viz";
 
 export type EngineState =
@@ -93,6 +93,7 @@ export interface DomainTelemetry {
   dropCount: number;
   networkLossCount: number;
   diagnoses: Diagnosis[];
+  diagnosticChain?: DiagnosticChain;
 }
 
 export interface ViewTelemetry {
@@ -112,6 +113,7 @@ export interface ViewTelemetry {
   alerts: ActiveAlert[];
   subsystems: SubsystemStatus[];
   recommendations: IntelligentRecommendation[];
+  diagnosticChain?: DiagnosticChain;
 }
 
 export interface MonitoringEvents {

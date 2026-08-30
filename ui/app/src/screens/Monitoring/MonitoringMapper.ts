@@ -66,6 +66,7 @@ export class MonitoringMapper {
       alerts: evaluation.alerts,
       subsystems: evaluation.subsystems,
       recommendations: evaluation.recommendations,
+      diagnosticChain: domain.diagnosticChain,
     };
   }
 

@@ -31,5 +31,39 @@
     "sample_dissection": "Sample Dissection",
     "coarsen_metrics": "Coarsened Metrics",
     "drop_packets": "Dropping Packets"
+  },
+  "diagnostic_chain": {
+    "title": "Diagnostic Chain",
+    "subtitle": "Evidence-grounded hop analysis · Passive telemetry",
+    "stages": {
+      "device": "Device (Local Stack)",
+      "interface": "Network Interface",
+      "router": "Router / Gateway",
+      "isp": "Internet Service Provider",
+      "dns": "DNS Resolver",
+      "cdn": "CDN / Edge Distribution",
+      "destination": "Destination Server"
+    },
+    "statuses": {
+      "nominal": "Nominal",
+      "degraded": "Degraded",
+      "investigate": "Investigate",
+      "not_measurable": "Not Measurable",
+      "unknown": "Unknown"
+    },
+    "measurements": {
+      "observed": "Observed",
+      "inferred": "Inferred",
+      "not_measurable": "Not Measurable",
+      "unknown": "Unobserved"
+    },
+    "run_active_probe": "Run Active Probe",
+    "drill_down": "Drill Down",
+    "measured_latency": "Measured Latency",
+    "identified_endpoints": "Identified Endpoints",
+    "evidence_backing": "Evidence Backing",
+    "flow_sample": "{{count}} flow sample",
+    "flow_samples": "{{count}} flow samples",
+    "close_inspection": "Close stage inspection"
   }
 }

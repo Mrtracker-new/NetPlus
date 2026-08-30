@@ -6732,6 +6732,305 @@ button {
   outline: 2px solid var(--np-accent);
 }
 
+/* ============================ Diagnostic Chain & Live Health Flow ============================ */
+.np-diagnostic-chain {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  padding: var(--np-4);
+  box-shadow: var(--np-neu-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.np-diagnostic-chain__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-2);
+}
+
+.np-diagnostic-chain__title {
+  font-size: var(--np-fs-md);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+
+.np-diagnostic-chain__subtitle {
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+
+.np-diagnostic-chain__track {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: var(--np-2);
+  overflow-x: auto;
+  padding: var(--np-2) 0;
+  position: relative;
+  scrollbar-width: thin;
+}
+
+.np-diagnostic-chain__node {
+  flex: 1;
+  min-width: 130px;
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: var(--np-neu-control);
+  transition: all var(--np-t);
+  outline: none;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.np-diagnostic-chain__node:hover {
+  box-shadow: var(--np-neu-control-hover);
+  transform: translateY(-2px);
+}
+
+.np-diagnostic-chain__node:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+
+.np-diagnostic-chain__node--selected {
+  background: var(--np-surface-recessed);
+  border-color: var(--np-accent);
+  box-shadow: var(--np-neu-inset);
+  transform: none;
+}
+
+.np-diagnostic-chain__node-icon-wrapper {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--np-neu-control);
+  background: var(--np-surface-raised, var(--np-surface-1));
+  color: var(--np-text-dim);
+  transition: all var(--np-t);
+}
+
+.np-diagnostic-chain__node--selected .np-diagnostic-chain__node-icon-wrapper {
+  box-shadow: var(--np-neu-inset);
+}
+
+.np-diagnostic-chain__node--healthy .np-diagnostic-chain__node-icon-wrapper {
+  color: var(--np-sem-nominal, var(--np-good));
+}
+
+.np-diagnostic-chain__node--degraded .np-diagnostic-chain__node-icon-wrapper {
+  color: var(--np-sem-failure, var(--np-finding));
+}
+
+.np-diagnostic-chain__node--investigate .np-diagnostic-chain__node-icon-wrapper {
+  color: var(--np-sem-investigate, var(--np-notable));
+}
+
+.np-diagnostic-chain__node--unknown .np-diagnostic-chain__node-icon-wrapper,
+.np-diagnostic-chain__node--not_measurable .np-diagnostic-chain__node-icon-wrapper {
+  color: var(--np-text-mute);
+}
+
+.np-diagnostic-chain__node-label {
+  font-size: var(--np-fs-xs);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  line-height: 1.2;
+}
+
+.np-diagnostic-chain__node-status {
+  font-size: var(--np-fs-2xs);
+  font-weight: var(--np-fw-medium);
+  padding: 2px 8px;
+  border-radius: var(--np-radius-pill);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.np-diagnostic-chain__node-status--healthy {
+  background: var(--np-good-soft);
+  color: var(--np-sem-nominal, var(--np-good));
+}
+
+.np-diagnostic-chain__node-status--degraded {
+  background: var(--np-finding-soft);
+  color: var(--np-sem-failure, var(--np-finding));
+}
+
+.np-diagnostic-chain__node-status--investigate {
+  background: var(--np-notable-soft);
+  color: var(--np-sem-investigate, var(--np-notable));
+}
+
+.np-diagnostic-chain__node-status--unknown,
+.np-diagnostic-chain__node-status--not_measurable {
+  background: var(--np-surface-recessed);
+  color: var(--np-text-mute);
+}
+
+.np-diagnostic-chain__drawer {
+  background: var(--np-surface-elevated, var(--np-surface-overlay));
+  border: 1px solid var(--np-border-strong);
+  border-radius: var(--np-radius-sm);
+  padding: var(--np-4);
+  box-shadow: var(--np-neu-overlay);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+  animation: np-fade-in 0.2s ease-out;
+}
+
+@keyframes np-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-diagnostic-chain__drawer {
+    animation: none;
+  }
+}
+
+/* ============================ Active Diagnostics Screen ============================ */
+.np-diagnostics-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.np-diagnostics-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+}
+
+.np-diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--np-4);
+  width: 100%;
+}
+
+.np-diagnostics-card {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  padding: var(--np-4);
+  box-shadow: var(--np-neu-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+}
+
+.np-diagnostics-form {
+  display: flex;
+  gap: var(--np-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.np-diagnostics-input {
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-xs);
+  padding: 6px 12px;
+  font-size: var(--np-fs-sm);
+  font-family: var(--np-font-mono);
+  color: var(--np-text);
+  box-shadow: var(--np-neu-inset);
+  outline: none;
+  flex: 1;
+  min-width: 160px;
+  transition: border-color var(--np-t);
+}
+
+.np-diagnostics-input:focus {
+  border-color: var(--np-accent);
+}
+
+.np-diagnostics-btn {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-xs);
+  padding: 6px 14px;
+  font-size: var(--np-fs-sm);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  cursor: pointer;
+  box-shadow: var(--np-neu-control);
+  transition: all var(--np-t);
+  outline: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-2);
+}
+
+.np-diagnostics-btn:hover:not(:disabled) {
+  box-shadow: var(--np-neu-control-hover);
+  transform: translateY(-1px);
+}
+
+.np-diagnostics-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.np-diagnostics-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+
+.np-diagnostics-result-well {
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: var(--np-3);
+  box-shadow: var(--np-neu-inset);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+}
+
+.np-diagnostics-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+
+.np-diagnostics-stat-val {
+  font-family: var(--np-font-mono);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+}
+
 /* SVG Line & Edge Pulse Animation */
 svg path {
   transition: d 0.5s cubic-bezier(0.4, 0, 0.2, 1);

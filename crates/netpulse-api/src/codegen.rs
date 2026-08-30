@@ -56,6 +56,33 @@ pub fn typescript_contract() -> String {
             "drop_packets",
         ],
     ));
+    s.push_str(&union(
+        "DiagnosticChainStageKind",
+        &[
+            "device",
+            "interface",
+            "router",
+            "isp",
+            "dns",
+            "cdn",
+            "destination",
+        ],
+    ));
+    s.push_str(&union(
+        "DiagnosticStageStatus",
+        &[
+            "healthy",
+            "degraded",
+            "investigate",
+            "unknown",
+            "not_measurable",
+        ],
+    ));
+    s.push_str(&union(
+        "MeasurementState",
+        &["observed", "inferred", "unknown", "not_measurable"],
+    ));
+    s.push_str(&union("DetectionState", &["detected", "not_detected"]));
 
     // --- EvidenceRef: internally-tagged union (matches #[serde(tag,content)]) ---
     s.push_str(
@@ -114,6 +141,26 @@ pub fn typescript_contract() -> String {
         ],
     ));
     s.push_str(&iface(
+        "DiagnosticStageNode",
+        &[
+            ("stage", "DiagnosticChainStageKind"),
+            ("status", "DiagnosticStageStatus"),
+            ("measurement_state", "MeasurementState"),
+            ("detection_state", "DetectionState"),
+            ("label", "string"),
+            ("summary", "string"),
+            ("detail?", "string"),
+            ("latency_ms?", "number"),
+            ("evidence", "EvidenceRef[]"),
+            ("causes", "Cause[]"),
+            ("affected_targets", "string[]"),
+        ],
+    ));
+    s.push_str(&iface(
+        "DiagnosticChain",
+        &[("stages", "DiagnosticStageNode[]")],
+    ));
+    s.push_str(&iface(
         "MonitorSnapshot",
         &[
             ("by_protocol", "Breakdown"),
@@ -122,6 +169,7 @@ pub fn typescript_contract() -> String {
             ("network_loss_indicators", "number"),
             ("capture_drops", "number"),
             ("capture_stats?", "CaptureStats"),
+            ("diagnostic_chain?", "DiagnosticChain"),
         ],
     ));
     s.push_str(&iface(
@@ -666,6 +714,12 @@ mod tests {
             "BreakdownRow",
             "Breakdown",
             "Diagnosis",
+            "DiagnosticChainStageKind",
+            "DiagnosticStageStatus",
+            "MeasurementState",
+            "DetectionState",
+            "DiagnosticStageNode",
+            "DiagnosticChain",
             "MonitorSnapshot",
             "Attribution",
             "Interface",

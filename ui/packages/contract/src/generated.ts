@@ -19,6 +19,14 @@ export type AttributionConfidence = "high" | "low" | "unknown";
 
 export type ShedStage = "none" | "payloads_off" | "sample_dissection" | "coarsen_metrics" | "drop_packets";
 
+export type DiagnosticChainStageKind = "device" | "interface" | "router" | "isp" | "dns" | "cdn" | "destination";
+
+export type DiagnosticStageStatus = "healthy" | "degraded" | "investigate" | "unknown" | "not_measurable";
+
+export type MeasurementState = "observed" | "inferred" | "unknown" | "not_measurable";
+
+export type DetectionState = "detected" | "not_detected";
+
 export type EvidenceRef =
   | { kind: "packet"; id: number }
   | { kind: "flow"; id: number }
@@ -65,6 +73,24 @@ export interface CaptureStats {
   dropped: number;
 }
 
+export interface DiagnosticStageNode {
+  stage: DiagnosticChainStageKind;
+  status: DiagnosticStageStatus;
+  measurement_state: MeasurementState;
+  detection_state: DetectionState;
+  label: string;
+  summary: string;
+  detail?: string;
+  latency_ms?: number;
+  evidence: EvidenceRef[];
+  causes: Cause[];
+  affected_targets: string[];
+}
+
+export interface DiagnosticChain {
+  stages: DiagnosticStageNode[];
+}
+
 export interface MonitorSnapshot {
   by_protocol: Breakdown;
   by_host: Breakdown;
@@ -72,6 +98,7 @@ export interface MonitorSnapshot {
   network_loss_indicators: number;
   capture_drops: number;
   capture_stats?: CaptureStats;
+  diagnostic_chain?: DiagnosticChain;
 }
 
 export interface Attribution {

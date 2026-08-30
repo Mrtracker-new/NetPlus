@@ -165,6 +165,76 @@ pub struct CaptureStatsDto {
     pub dropped: u64,
 }
 
+/// Diagnostic chain stage kind on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DiagnosticChainStageKindDto {
+    Device,
+    Interface,
+    Router,
+    Isp,
+    Dns,
+    Cdn,
+    Destination,
+}
+
+/// Diagnostic stage status on the wire.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DiagnosticStageStatusDto {
+    Healthy,
+    Degraded,
+    Investigate,
+    Unknown,
+    NotMeasurable,
+}
+
+/// Measurement state on the wire (observed vs inferred vs unknown vs not measurable).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum MeasurementStateDto {
+    Observed,
+    Inferred,
+    Unknown,
+    NotMeasurable,
+}
+
+/// Detection state on the wire (detected vs not detected).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum DetectionStateDto {
+    Detected,
+    NotDetected,
+}
+
+/// A node/stage in the diagnostic chain wire DTO.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DiagnosticStageNodeDto {
+    pub stage: DiagnosticChainStageKindDto,
+    pub status: DiagnosticStageStatusDto,
+    pub measurement_state: MeasurementStateDto,
+    pub detection_state: DetectionStateDto,
+    pub label: String,
+    pub summary: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub latency_ms: Option<f32>,
+    pub evidence: Vec<EvidenceRefDto>,
+    pub causes: Vec<CauseDto>,
+    pub affected_targets: Vec<String>,
+}
+
+/// Complete diagnostic chain wire DTO.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct DiagnosticChainDto {
+    pub stages: Vec<DiagnosticStageNodeDto>,
+}
+
 /// A monitoring snapshot over a window. Note the two loss
 /// figures are separate fields — capture loss is never network loss
 ///
@@ -177,6 +247,8 @@ pub struct MonitorSnapshotDto {
     pub capture_drops: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub capture_stats: Option<CaptureStatsDto>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub diagnostic_chain: Option<DiagnosticChainDto>,
 }
 
 /// How confident a flow's process attribution is.
@@ -844,6 +916,21 @@ mod tests {
                 shed_stage: ShedStageDto::SampleDissection,
                 dropped: 3,
             }),
+            diagnostic_chain: Some(DiagnosticChainDto {
+                stages: vec![DiagnosticStageNodeDto {
+                    stage: DiagnosticChainStageKindDto::Device,
+                    status: DiagnosticStageStatusDto::Healthy,
+                    measurement_state: MeasurementStateDto::Observed,
+                    detection_state: DetectionStateDto::Detected,
+                    label: "Device (Local Stack)".into(),
+                    summary: "Nominal".into(),
+                    detail: None,
+                    latency_ms: None,
+                    evidence: vec![],
+                    causes: vec![],
+                    affected_targets: vec![],
+                }],
+            }),
         });
         roundtrip(&AttributionDto {
             pid: None,
@@ -1154,5 +1241,63 @@ mod tests {
             serde_json::to_string(&DirectionDto::ClientToServer).unwrap(),
             r#""client_to_server""#
         );
+    }
+
+    #[test]
+    fn diagnostic_chain_enums_use_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&DiagnosticChainStageKindDto::Device).unwrap(),
+            r#""device""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DiagnosticChainStageKindDto::Interface).unwrap(),
+            r#""interface""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DiagnosticStageStatusDto::Healthy).unwrap(),
+            r#""healthy""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DiagnosticStageStatusDto::NotMeasurable).unwrap(),
+            r#""not_measurable""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MeasurementStateDto::Observed).unwrap(),
+            r#""observed""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MeasurementStateDto::NotMeasurable).unwrap(),
+            r#""not_measurable""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DetectionStateDto::Detected).unwrap(),
+            r#""detected""#
+        );
+        assert_eq!(
+            serde_json::to_string(&DetectionStateDto::NotDetected).unwrap(),
+            r#""not_detected""#
+        );
+    }
+
+    #[test]
+    fn diagnostic_chain_dto_roundtrips() {
+        let chain = DiagnosticChainDto {
+            stages: vec![DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Device,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "Device (Local Stack)".to_string(),
+                summary: "Local Capture Pipeline Operational".to_string(),
+                detail: Some("Buffer nominal".to_string()),
+                latency_ms: None,
+                evidence: vec![EvidenceRefDto::Flow(1)],
+                causes: vec![CauseDto::LocalWifi],
+                affected_targets: vec!["1.1.1.1".to_string()],
+            }],
+        };
+        let json = serde_json::to_string(&chain).unwrap();
+        let parsed: DiagnosticChainDto = serde_json::from_str(&json).unwrap();
+        assert_eq!(chain, parsed);
     }
 }

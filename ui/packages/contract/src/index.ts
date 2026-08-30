@@ -9,6 +9,15 @@
 
 export * from "./generated";
 
+export type {
+  DiagnosticChain,
+  DiagnosticStageNode,
+  DiagnosticChainStageKind,
+  DiagnosticStageStatus,
+  MeasurementState,
+  DetectionState,
+} from "./generated";
+
 import type {
   MonitorSnapshot,
   NarrativeCard,

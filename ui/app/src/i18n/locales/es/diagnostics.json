@@ -2,24 +2,37 @@
   "title": "Diagnósticos de Red Activos",
   "desc": "Pruebas opcionales: Ping ICMP/UDP, Traceroute Multitransporte y Pruebas de Bufferbloat.",
   "target_placeholder": "Host Destino (ej. 1.1.1.1, google.com)",
+  "full_analysis_btn": "Ejecutar Análisis Completo",
   "ping_btn": "Prueba Ping",
   "traceroute_btn": "Traceroute",
   "bufferbloat_btn": "Prueba Bufferbloat",
   "empty": "Introduce un nombre de host o dirección IP (IPv4, IPv6, dominio) y elige una prueba de diagnóstico.",
   "invalid_target": "Introduce un nombre de host, IPv4, IPv6 o dirección localhost válida.",
   "clear_all": "Limpiar Resultados",
+  "quick_presets": "Preajustes Rápidos de Destino:",
+  "timeout_hop": "Sin respuesta de este salto",
+  "provenance": {
+    "live": "EN VIVO",
+    "simulated": "SIMULADO",
+    "derived": "DERIVADO",
+    "unavailable": "NO DISPONIBLE"
+  },
   "ping": {
     "title": "Resultados de Ping para {{target}}",
     "sent": "Enviados: {{sent}}",
     "received": "Recibidos: {{received}}",
+    "sent_received": "Enviados / Recibidos",
     "loss": "Pérdida: {{loss}}%",
+    "packet_loss": "Pérdida de Paquetes",
+    "avg_rtt": "RTT Promedio",
+    "jitter": "Jitter",
     "rtt_min": "RTT Mín: {{min}}ms",
     "rtt_avg": "RTT Prom: {{avg}}ms",
-    "rtt_max": "RTT Máx: {{max}}ms",
-    "jitter": "Jitter: {{jitter}}ms"
+    "rtt_max": "RTT Máx: {{max}}ms"
   },
   "traceroute": {
     "title": "Saltos de Traceroute para {{target}} ({{count}} saltos)",
+    "hops_count": "{{count}} Saltos",
     "ttl": "TTL",
     "ip": "Dirección IP",
     "hostname": "Nombre de Host",
@@ -27,7 +40,10 @@
   },
   "bufferbloat": {
     "title": "Tarjeta de Calificación Bufferbloat para {{target}}",
+    "subtitle": "Evaluación de Latencia Bajo Restricción de Ancho de Banda",
     "grade": "Calificación:",
+    "idle_baseline": "Línea Base de Latencia Inactiva",
+    "loaded_saturated": "Latencia Cargada (Bajo Tráfico Saturado)",
     "idle_rtt": "RTT Inactivo: {{idle}}ms",
     "loaded_rtt": "RTT Cargado: {{loaded}}ms",
     "delta_rtt": "Delta: +{{delta}}ms",
@@ -35,6 +51,69 @@
       "gaming": "Juegos en línea:",
       "voip": "VoIP y Llamadas:",
       "uploads": "Cargas Grandes:"
+    }
+  },
+  "capabilities": {
+    "deck_label": "Capacidades de Diagnóstico",
+    "full_analysis": {
+      "title": "Análisis Completo",
+      "subtitle": "Inferencia Multietapa",
+      "desc": "Ejecuta pruebas de Gateway, DNS, Latencia, Traceroute, Bufferbloat y HTTP para sintetizar hallazgos deterministas de causa raíz.",
+      "btn": "Ejecutar Análisis Completo",
+      "tag_root": "Inferencia de Causa Raíz",
+      "tag_remediation": "Pasos de Remediación",
+      "tag_confidence": "Puntuación de Confianza"
+    },
+    "ping": {
+      "title": "Prueba Ping",
+      "subtitle": "Telemetría ICMP / UDP",
+      "desc": "Mide el tiempo de ida y vuelta (RTT), fluctuación de latencia y porcentaje de pérdida de paquetes en ráfagas secuenciales.",
+      "btn": "Ejecutar Ping",
+      "tag_rtt": "RTT Mín/Prom/Máx",
+      "tag_jitter": "Varianza de Jitter",
+      "tag_loss": "% Pérdida"
+    },
+    "traceroute": {
+      "title": "Traceroute",
+      "subtitle": "Linaje Multitransporte",
+      "desc": "Rastrea la ruta exacta de enrutadores intermedios salto a salto hacia el destino con latencia por salto y resolución DNS inversa.",
+      "btn": "Ejecutar Traceroute",
+      "tag_ttl": "Mapa TTL de Saltos",
+      "tag_gateway": "Detección de Gateway",
+      "tag_node": "Latencia de Nodo"
+    },
+    "bufferbloat": {
+      "title": "Prueba Bufferbloat",
+      "subtitle": "Calificación de Latencia Bajo Carga",
+      "desc": "Evalúa el retraso de colas y la inflación de latencia bajo saturación simulada, asignando una tarjeta de puntuación de A+ a F.",
+      "btn": "Ejecutar Bufferbloat",
+      "tag_idle_loaded": "RTT Inactivo vs Cargado",
+      "tag_qos": "QoS Juegos / VoIP",
+      "tag_scorecard": "Puntuación A+"
+    }
+  },
+  "assessment": {
+    "title": "Evaluación Diagnóstica y Hallazgos",
+    "session_target": "Sesión #{{session}} · Destino: {{target}}",
+    "no_bottleneck_title": "No se detectó ningún cuello de botella evidente",
+    "no_bottleneck_desc": "Todas las pruebas de diagnóstico operaron dentro de parámetros nominales. La evidencia no estableció un cuello de botella activo.",
+    "confidence_score": "Puntuación de Confianza",
+    "remediations_title": "Acciones de Remediación Recomendadas",
+    "view_evidence": "Ver {{count}} Señales de Evidencia Corroborante",
+    "hide_evidence": "Ocultar Evidencia de Respaldo",
+    "weight": "peso: {{weight}}%",
+    "status": {
+      "completed": "Completado",
+      "analyzing": "Analizando",
+      "active": "Activo"
+    },
+    "stages": {
+      "gateway": "Gateway",
+      "dns": "DNS",
+      "ping": "Ping",
+      "traceroute": "Traceroute",
+      "bufferbloat": "Bufferbloat",
+      "http": "HTTP"
     }
   }
 }

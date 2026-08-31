@@ -985,6 +985,9 @@ button {
 
 /* Buttons — soft raised, press = inset. */
 .np-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: var(--np-surface-1);
   color: var(--np-text);
@@ -996,6 +999,18 @@ button {
   transition: box-shadow var(--np-t), color var(--np-t), transform var(--np-t),
     background var(--np-t);
   white-space: nowrap;
+}
+.np-btn > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--np-2);
+}
+.np-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 .np-btn:hover {
   color: var(--np-accent-strong);
@@ -5794,9 +5809,78 @@ button {
 }
 
 /* ---- Diagnostics ---- */
+.np-diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-4);
+  width: 100%;
+  box-sizing: border-box;
+}
 .np-diagnostics__desc {
   color: var(--np-text-dim);
 }
+
+/* Level 1 Raised Plate: Tactile Diagnostic Console */
+.np-diagnostics-console {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-4) var(--np-5);
+  margin-bottom: var(--np-4);
+  box-shadow: var(--np-neu-card, var(--np-neu));
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+}
+
+/* Quick Target Presets Row */
+.np-diagnostics__presets {
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+  flex-wrap: wrap;
+}
+.np-diagnostics__preset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-1);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-xs);
+  font-family: var(--np-font-mono);
+  font-weight: 550;
+  box-shadow: var(--np-neu-sm);
+  cursor: pointer;
+  transition: all var(--np-t);
+  outline: none;
+}
+.np-diagnostics__preset-btn:hover {
+  background: var(--np-surface-2);
+  color: var(--np-text);
+  box-shadow: var(--np-neu);
+  transform: translateY(-1px);
+}
+.np-diagnostics__preset-btn:active {
+  box-shadow: var(--np-neu-inset);
+  transform: translateY(1px);
+}
+.np-diagnostics__preset-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+.np-diagnostics__preset-btn--active {
+  background: var(--np-surface-2);
+  color: var(--np-accent-strong);
+  border-color: var(--np-accent-line);
+  box-shadow: var(--np-neu-inset);
+  font-weight: 700;
+}
+
+/* Level 3 Recessed Input Well & Action Buttons */
 .np-diagnostics__actions {
   display: flex;
   gap: var(--np-3);
@@ -5804,89 +5888,289 @@ button {
   align-items: center;
   justify-content: flex-start;
 }
-.np-diagnostics__presets {
+.np-diagnostics-input-well {
+  flex: 1 1 260px;
+  min-width: 220px;
   display: flex;
   align-items: center;
   gap: var(--np-2);
-  flex-wrap: wrap;
-  margin-bottom: var(--np-4);
-}
-.np-diagnostics__preset-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--np-1);
-  padding: 0.4rem 0.85rem;
+  background: var(--np-surface-recessed, var(--np-bg));
   border-radius: var(--np-radius-pill);
-  background: var(--np-surface-1);
-  border: 1px solid var(--np-border-strong);
+  padding: 2px 14px;
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+  transition: border-color var(--np-t);
+  box-sizing: border-box;
+}
+.np-diagnostics-input-well:focus-within {
+  border-color: var(--np-accent);
+}
+.np-diagnostics-input-well input {
+  flex: 1;
+  border: none;
+  background: transparent;
   color: var(--np-text);
-  font-size: var(--np-fs-xs);
+  font-size: var(--np-fs-sm);
   font-family: var(--np-font-mono);
-  font-weight: 550;
-  box-shadow: var(--np-neu-sm), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  cursor: pointer;
+  outline: none;
+  padding: 8px 0;
+}
+.np-diagnostics-input-well input::placeholder {
+  color: var(--np-text-mute);
+}
+
+.np-diagnostics-clear-btn {
+  color: var(--np-text-dim);
+  font-size: var(--np-fs-xs);
+  padding: 6px 14px;
   transition: all var(--np-t);
 }
-.np-diagnostics__preset-btn:hover {
-  background: var(--np-surface-2);
-  color: var(--np-accent);
-  border-color: var(--np-accent);
-  box-shadow: var(--np-neu), 0 0 14px var(--np-accent-soft);
-  transform: translateY(-1px);
+.np-diagnostics-clear-btn:hover {
+  color: var(--np-finding);
 }
-.np-diagnostics__preset-btn:active {
-  box-shadow: var(--np-neu-inset);
-  transform: translateY(1px) scale(0.97);
+.np-diagnostics-clear-btn svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 2.4;
+  vertical-align: middle;
 }
-.np-diagnostics__preset-btn--active {
-  background: var(--np-accent-soft);
-  color: var(--np-accent-strong);
-  border-color: var(--np-accent);
-  box-shadow: var(--np-neu-inset), 0 0 16px -2px var(--np-accent-soft);
+
+/* Provenance Badges */
+.np-diagnostics-provenance {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--np-radius-pill);
+  font-size: var(--np-fs-2xs);
   font-weight: 700;
+  text-transform: uppercase;
+  font-family: var(--np-font-mono);
+  letter-spacing: 0.5px;
+  box-shadow: var(--np-neu-sm);
+  border: 1px solid var(--np-border);
+  background: var(--np-surface-2);
+  color: var(--np-text-dim);
 }
+.np-diagnostics-provenance--live {
+  background: var(--np-good-soft);
+  color: var(--np-good);
+  border-color: var(--np-good);
+}
+.np-diagnostics-provenance--simulated {
+  background: var(--np-accent-2-soft);
+  color: var(--np-accent-2);
+  border-color: var(--np-accent-2);
+}
+.np-diagnostics-provenance--derived {
+  background: var(--np-surface-2);
+  color: var(--np-text-dim);
+  border-color: var(--np-border-strong);
+}
+.np-diagnostics-provenance--unavailable {
+  background: var(--np-finding-soft);
+  color: var(--np-finding);
+  border-color: var(--np-finding);
+}
+
+/* Empty State / Capability Overview Deck */
 .np-diagnostics__empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: var(--np-6) var(--np-4);
-  background: var(--np-surface-1);
+  padding: var(--np-5) var(--np-4);
+  background: var(--np-surface-raised, var(--np-surface-1));
   border-radius: var(--np-radius-lg);
-  border: 1px solid var(--np-border-strong);
-  box-shadow: var(--np-neu-lg);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-card, var(--np-neu));
+  margin-top: var(--np-2);
 }
 .np-diagnostics__empty-icon {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: var(--np-accent-soft);
-  color: var(--np-accent);
+  background: var(--np-surface-2);
+  color: var(--np-accent-strong);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-bottom: var(--np-3);
-  box-shadow: var(--np-neu-inset);
+  box-shadow: var(--np-neu-sm);
   padding: 10px;
 }
 .np-diagnostics__empty-icon svg {
   width: 26px;
   height: 26px;
 }
-.np-diagnostics__empty-actions {
-  display: flex;
-  gap: var(--np-3);
-  flex-wrap: wrap;
-  justify-content: center;
+.np-diagnostics__capabilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--np-4);
+  width: 100%;
   margin-top: var(--np-4);
-  margin-bottom: var(--np-4);
+  text-align: left;
 }
+.np-diagnostics__capability-card {
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius);
+  padding: var(--np-4);
+  box-shadow: var(--np-neu-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  transition: transform var(--np-t), box-shadow var(--np-t);
+}
+.np-diagnostics__capability-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu);
+}
+.np-diagnostics__capability-header {
+  display: flex;
+  align-items: center;
+  gap: var(--np-3);
+}
+.np-diagnostics__capability-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--np-surface-2);
+  color: var(--np-accent-strong);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--np-neu-inset);
+  flex-shrink: 0;
+}
+.np-diagnostics__capability-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.np-diagnostics__capability-title {
+  font-size: var(--np-fs-md);
+  font-weight: var(--np-fw-semibold);
+  color: var(--np-text);
+  margin: 0;
+}
+.np-diagnostics__capability-desc {
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+  line-height: 1.5;
+  margin: 0;
+  flex: 1;
+}
+.np-diagnostics__capability-tags {
+  display: flex;
+  gap: var(--np-1);
+  flex-wrap: wrap;
+}
+.np-diagnostics__capability-tag {
+  font-size: var(--np-fs-2xs);
+  font-family: var(--np-font-mono);
+  padding: 2px 8px;
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-recessed, var(--np-bg));
+  color: var(--np-text-mute);
+  box-shadow: var(--np-neu-inset);
+}
+.np-diagnostics__capability-btn {
+  margin-top: auto;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--np-1);
+  font-size: var(--np-fs-xs);
+  font-weight: 600;
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--np-radius-pill);
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  color: var(--np-text);
+  box-shadow: var(--np-neu-sm);
+  cursor: pointer;
+  transition: all var(--np-t);
+}
+.np-diagnostics__capability-btn:hover {
+  background: var(--np-surface-2);
+  color: var(--np-accent-strong);
+  box-shadow: var(--np-neu);
+}
+.np-diagnostics__capability-btn:active {
+  box-shadow: var(--np-neu-inset);
+  transform: translateY(1px);
+}
+.np-diagnostics__capability-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 2px;
+}
+
+/* Level 1 Raised Plate: Diagnostic Result Cards */
+.np-diagnostics__result {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-4) var(--np-5);
+  margin-bottom: var(--np-4);
+  box-shadow: var(--np-neu-card, var(--np-neu));
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-3);
+  box-sizing: border-box;
+}
+
+/* Level 3 Recessed KPI Grid & Pods */
+.np-diagnostics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: var(--np-3);
+  margin-bottom: var(--np-2);
+}
+.np-diagnostics-kpi-pod {
+  background: var(--np-surface-recessed, var(--np-bg));
+  border-radius: var(--np-radius-sm);
+  padding: var(--np-3);
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.np-diagnostics-kpi-pod__label {
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  font-weight: var(--np-fw-medium);
+  letter-spacing: var(--np-tracking-wide);
+}
+.np-diagnostics-kpi-pod__value {
+  font-size: var(--np-fs-lg);
+  font-weight: var(--np-fw-bold);
+  font-family: var(--np-font-mono);
+  color: var(--np-text);
+}
+
+/* Recessed Telemetry Strip */
+.np-diagnostics-telemetry-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+  font-family: var(--np-font-mono);
+  background: var(--np-surface-recessed, var(--np-bg));
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--np-radius-xs);
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+  flex-wrap: wrap;
+}
+
+/* Traceroute Timeline Track & Table */
 .np-diagnostics__timeline-v {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.75rem 1rem;
-  background: var(--np-bg);
+  background: var(--np-surface-recessed, var(--np-bg));
   border-radius: var(--np-radius-md);
   border: 1px solid var(--np-border);
   box-shadow: var(--np-neu-inset);
@@ -5906,11 +6190,57 @@ button {
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+  box-shadow: 0 0 4px currentColor;
+}
+.np-diagnostics-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--np-radius-sm);
+  background: var(--np-surface-recessed, var(--np-bg));
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+  padding: var(--np-2);
+  box-sizing: border-box;
+}
+.np-diagnostics-table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--np-fs-xs);
+}
+.np-diagnostics-table-wrap th {
+  padding: 8px 12px;
+  color: var(--np-text-mute);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--np-border);
+}
+.np-diagnostics-table-wrap td {
+  padding: 8px 12px;
+  color: var(--np-text);
+  border-bottom: 1px solid var(--np-hairline);
+}
+.np-diagnostics-table-wrap tr:last-child td {
+  border-bottom: none;
+}
+
+/* Bufferbloat Latency Bars & Medallion */
+.np-diagnostics__grade-medallion {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  height: 48px;
+  border-radius: var(--np-radius-sm);
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-family: var(--np-font-mono);
+  box-shadow: var(--np-neu-sm);
+  padding: 0 10px;
 }
 .np-diagnostics__latency-bar {
   height: 8px;
   width: 100%;
-  background: var(--np-surface-3);
+  background: var(--np-surface-recessed, var(--np-bg));
   border-radius: var(--np-radius-pill);
   box-shadow: var(--np-neu-inset);
   overflow: hidden;
@@ -5921,15 +6251,197 @@ button {
   border-radius: var(--np-radius-pill);
   transition: width 0.4s ease;
 }
-.np-diagnostics__result {
+.np-diagnostics__recommendations {
+  background: var(--np-surface-recessed, var(--np-bg));
+  padding: 0.75rem 1rem;
+  border-radius: var(--np-radius-md);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+}
+
+/* Deep Diagnostic Assessment & Pipeline */
+.np-diagnostics-assessment {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-lg);
+  padding: var(--np-5);
+  margin-bottom: var(--np-5);
+  box-shadow: var(--np-neu-card, var(--np-neu));
   display: flex;
   flex-direction: column;
+  gap: var(--np-4);
+  box-sizing: border-box;
+}
+
+.np-diagnostics-pipeline-stepper {
+  display: flex;
+  align-items: center;
+  gap: var(--np-2);
+  overflow-x: auto;
+  padding: var(--np-1) 0 var(--np-2) 0;
+}
+
+.np-diagnostics-step {
+  display: flex;
+  align-items: center;
+  gap: var(--np-1);
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--np-radius-pill);
+  font-size: var(--np-fs-xs);
+  font-weight: 600;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  color: var(--np-text-dim);
+  box-shadow: var(--np-neu-sm);
+  white-space: nowrap;
+}
+
+.np-diagnostics-step--running {
+  background: var(--np-accent-soft);
+  color: var(--np-accent-strong);
+  border-color: var(--np-accent);
+  box-shadow: var(--np-neu-inset);
+  animation: np-pulse 1.5s infinite;
+}
+
+.np-diagnostics-step--complete {
+  background: var(--np-good-soft);
+  color: var(--np-good);
+  border-color: var(--np-good);
+}
+
+.np-diagnostics-step--error {
+  background: var(--np-finding-soft);
+  color: var(--np-finding);
+  border-color: var(--np-finding);
+}
+
+.np-diagnostics-finding-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--np-4);
+  padding: var(--np-4);
+  border-radius: var(--np-radius-md);
+  background: var(--np-surface-recessed, var(--np-bg));
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+}
+
+.np-diagnostics-finding-title {
+  margin: 0 0 var(--np-1) 0;
+  font-size: var(--np-fs-md);
+  font-weight: 700;
+  color: var(--np-text);
+}
+
+.np-diagnostics-finding-desc {
+  margin: 0;
+  font-size: var(--np-fs-sm);
+  color: var(--np-text-dim);
+  line-height: 1.5;
+}
+
+.np-diagnostics-confidence-meter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--np-1);
+  min-width: 120px;
+}
+
+.np-diagnostics-no-bottleneck {
+  display: flex;
+  align-items: center;
+  gap: var(--np-3);
+  padding: var(--np-4);
+  border-radius: var(--np-radius-md);
+  background: var(--np-surface-recessed, var(--np-bg));
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+}
+
+.np-diagnostics-observations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--np-3);
 }
-.np-diagnostics__grade {
-  font-size: var(--np-fs-xl);
-  font-weight: var(--np-fw-bold);
-  color: var(--np-accent-strong);
+
+.np-diagnostics-observation-card {
+  padding: var(--np-3) var(--np-4);
+  background: var(--np-surface-recessed, var(--np-bg));
+  border-radius: var(--np-radius-md);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-inset);
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+}
+
+.np-diagnostics-observation-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.np-diagnostics-observation-card__title {
+  font-size: var(--np-fs-xs);
+  font-weight: 600;
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.np-diagnostics-observation-card__metric {
+  font-size: var(--np-fs-lg);
+  font-weight: 700;
+  font-family: var(--np-font-mono);
+  color: var(--np-text);
+}
+
+.np-diagnostics-remediation-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--np-2);
+  padding: var(--np-3) var(--np-4);
+  background: var(--np-surface-recessed, var(--np-bg));
+  border-radius: var(--np-radius-md);
+  box-shadow: var(--np-neu-inset);
+  border: 1px solid var(--np-border);
+}
+
+.np-diagnostics-remediation-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--np-2);
+  font-size: var(--np-fs-sm);
+  color: var(--np-text);
+  line-height: 1.4;
+}
+
+/* Diagnostics Responsive Refinements */
+@media (max-width: 768px) {
+  .np-diagnostics-console {
+    padding: var(--np-3);
+  }
+  .np-diagnostics__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .np-diagnostics__actions > * {
+    width: 100%;
+  }
+  .np-diagnostics-finding-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .np-diagnostics-confidence-meter {
+    align-items: flex-start;
+  }
 }
 
 /* ---- Fleet ---- */

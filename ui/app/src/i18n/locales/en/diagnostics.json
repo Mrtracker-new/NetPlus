@@ -2,24 +2,37 @@
   "title": "Active Network Diagnostics",
   "desc": "Opt-in probes: ICMP/UDP Ping, Multi-Transport Traceroute, and Bandwidth-Constrained Bufferbloat Testing.",
   "target_placeholder": "Target Host (e.g. 1.1.1.1, google.com)",
+  "full_analysis_btn": "Run Full Analysis",
   "ping_btn": "Ping Probe",
   "traceroute_btn": "Traceroute",
   "bufferbloat_btn": "Bufferbloat Test",
   "empty": "Enter a target hostname or IP address (IPv4, IPv6, domain) and choose a diagnostic probe.",
   "invalid_target": "Please enter a valid target hostname, IPv4, IPv6, or localhost address.",
   "clear_all": "Clear Results",
+  "quick_presets": "Quick Target Presets:",
+  "timeout_hop": "No response from this hop",
+  "provenance": {
+    "live": "LIVE",
+    "simulated": "SIMULATED",
+    "derived": "DERIVED",
+    "unavailable": "UNAVAILABLE"
+  },
   "ping": {
     "title": "Ping Results for {{target}}",
     "sent": "Sent: {{sent}}",
     "received": "Received: {{received}}",
+    "sent_received": "Sent / Received",
     "loss": "Loss: {{loss}}%",
+    "packet_loss": "Packet Loss",
+    "avg_rtt": "Avg RTT",
+    "jitter": "Jitter",
     "rtt_min": "Min RTT: {{min}}ms",
     "rtt_avg": "Avg RTT: {{avg}}ms",
-    "rtt_max": "Max RTT: {{max}}ms",
-    "jitter": "Jitter: {{jitter}}ms"
+    "rtt_max": "Max RTT: {{max}}ms"
   },
   "traceroute": {
     "title": "Traceroute Hops for {{target}} ({{count}} hops)",
+    "hops_count": "{{count}} Hops",
     "ttl": "TTL",
     "ip": "IP Address",
     "hostname": "Hostname",
@@ -27,7 +40,10 @@
   },
   "bufferbloat": {
     "title": "Bufferbloat Scorecard for {{target}}",
+    "subtitle": "Bandwidth-Constrained Latency Evaluation",
     "grade": "Grade:",
+    "idle_baseline": "Idle Latency Baseline",
+    "loaded_saturated": "Loaded Latency (Under Saturated Traffic)",
     "idle_rtt": "Idle RTT: {{idle}}ms",
     "loaded_rtt": "Loaded RTT: {{loaded}}ms",
     "delta_rtt": "Delta: +{{delta}}ms",
@@ -35,6 +51,69 @@
       "gaming": "Gaming:",
       "voip": "VoIP & Calls:",
       "uploads": "Large Uploads:"
+    }
+  },
+  "capabilities": {
+    "deck_label": "Diagnostic Capabilities",
+    "full_analysis": {
+      "title": "Full Analysis",
+      "subtitle": "Multi-Stage Inference",
+      "desc": "Executes Gateway, DNS, Latency, Traceroute, Bufferbloat, and HTTP probes to synthesize deterministic root-cause findings.",
+      "btn": "Run Full Analysis",
+      "tag_root": "Root-Cause Inference",
+      "tag_remediation": "Remediation Steps",
+      "tag_confidence": "Confidence Score"
+    },
+    "ping": {
+      "title": "Ping Probe",
+      "subtitle": "ICMP / UDP Telemetry",
+      "desc": "Measures round-trip time (RTT), latency jitter, and packet loss percentage over sequential sample bursts.",
+      "btn": "Run Ping",
+      "tag_rtt": "Min/Avg/Max RTT",
+      "tag_jitter": "Jitter Variance",
+      "tag_loss": "Loss %"
+    },
+    "traceroute": {
+      "title": "Traceroute",
+      "subtitle": "Multi-Transport Lineage",
+      "desc": "Traces the exact hop-by-hop intermediate router path to the destination with per-hop latency and reverse DNS resolution.",
+      "btn": "Run Traceroute",
+      "tag_ttl": "Hop TTL Map",
+      "tag_gateway": "Gateway Detection",
+      "tag_node": "Node Latency"
+    },
+    "bufferbloat": {
+      "title": "Bufferbloat Test",
+      "subtitle": "Loaded Latency Grading",
+      "desc": "Evaluates queueing delay and latency bloat under simulated bandwidth saturation, assigning an A+ to F performance scorecard.",
+      "btn": "Run Bufferbloat",
+      "tag_idle_loaded": "Idle vs Loaded RTT",
+      "tag_qos": "Gaming / VoIP QoS",
+      "tag_scorecard": "A+ Scorecard"
+    }
+  },
+  "assessment": {
+    "title": "Diagnostic Assessment & Findings",
+    "session_target": "Session #{{session}} · Target: {{target}}",
+    "no_bottleneck_title": "No clear bottleneck detected",
+    "no_bottleneck_desc": "All diagnostic probes operated within nominal parameters. Available evidence did not establish an active bottleneck.",
+    "confidence_score": "Confidence Score",
+    "remediations_title": "Recommended Remediation Actions",
+    "view_evidence": "View {{count}} Corroborating Evidence Signals",
+    "hide_evidence": "Hide Supporting Evidence",
+    "weight": "weight: {{weight}}%",
+    "status": {
+      "completed": "Completed",
+      "analyzing": "Analyzing",
+      "active": "Active"
+    },
+    "stages": {
+      "gateway": "Gateway",
+      "dns": "DNS",
+      "ping": "Ping",
+      "traceroute": "Traceroute",
+      "bufferbloat": "Bufferbloat",
+      "http": "HTTP"
     }
   }
 }

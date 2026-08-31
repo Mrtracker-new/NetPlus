@@ -41,6 +41,9 @@ import type {
   PingResult,
   TracerouteHop,
   BufferbloatResult,
+  GatewayResult,
+  DnsResult,
+  HttpResult,
   PacketInspection,
   SessionDiff,
   FleetHost,
@@ -90,6 +93,9 @@ export type Query =
   | { kind: "runPing"; target: string; count: number }
   | { kind: "runTraceroute"; target: string; transport: string; max_hops: number }
   | { kind: "runBufferbloatTest"; target?: string }
+  | { kind: "discoverGateway" }
+  | { kind: "runDnsProbe"; target: string }
+  | { kind: "runHttpProbe"; url: string }
   | { kind: "buildAndDecodePacket"; layers: string[] }
   | { kind: "compareSessions"; session_id_a: number; session_id_b: number }
   | { kind: "listFleetHosts" };
@@ -126,6 +132,9 @@ export type QueryResponse =
   | { kind: "pingResult"; result: PingResult }
   | { kind: "tracerouteResult"; hops: TracerouteHop[] }
   | { kind: "bufferbloatResult"; result: BufferbloatResult }
+  | { kind: "gatewayResult"; result: GatewayResult }
+  | { kind: "dnsResult"; result: DnsResult }
+  | { kind: "httpResult"; result: HttpResult }
   | { kind: "decodedPacketInspection"; inspection: PacketInspection }
   | { kind: "sessionDiff"; diff: SessionDiff }
   | { kind: "fleetHosts"; hosts: FleetHost[] };

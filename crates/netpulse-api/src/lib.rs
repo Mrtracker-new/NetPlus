@@ -248,6 +248,12 @@ pub enum Query {
     },
     /// Run a dual-phase bufferbloat latency probe.
     RunBufferbloatTest { target: Option<String> },
+    /// Discover the local default network gateway.
+    DiscoverGateway,
+    /// Run an active DNS resolution probe.
+    RunDnsProbe { target: String },
+    /// Run a bounded active HTTP probe.
+    RunHttpProbe { url: String },
     /// Safe offline packet construction and decoding inspection.
     BuildAndDecodePacket { layers: Vec<String> },
     /// Compare two capture sessions side-by-side with rule-based explanations.
@@ -366,6 +372,15 @@ pub enum QueryResponse {
     BufferbloatResult {
         result: BufferbloatResultDto,
     },
+    GatewayResult {
+        result: GatewayResultDto,
+    },
+    DnsResult {
+        result: DnsResultDto,
+    },
+    HttpResult {
+        result: HttpResultDto,
+    },
     DecodedPacketInspection {
         inspection: PacketInspectionDto,
     },
@@ -388,6 +403,8 @@ pub struct PingResultDto {
     pub avg_rtt_ms: f32,
     pub max_rtt_ms: f32,
     pub stddev_rtt_ms: f32,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -398,6 +415,8 @@ pub struct TracerouteHopDto {
     pub hostname: Option<String>,
     pub rtt_ms: f32,
     pub status: String,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -408,6 +427,42 @@ pub struct BufferbloatResultDto {
     pub loaded_rtt_ms: f32,
     pub delta_rtt_ms: f32,
     pub grade: String,
+    #[serde(default)]
+    pub source: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayResultDto {
+    pub gateway_ip: Option<String>,
+    pub interface_name: Option<String>,
+    pub status: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsResultDto {
+    pub target: String,
+    pub resolution_rtt_ms: Option<f32>,
+    pub resolved_ips: Vec<String>,
+    pub timed_out: bool,
+    pub error: Option<String>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpResultDto {
+    pub url: String,
+    pub status_code: Option<u16>,
+    pub connect_ms: Option<f32>,
+    pub ttfb_ms: Option<f32>,
+    pub transfer_ms: Option<f32>,
+    pub tls_ms: Option<f32>,
+    pub error: Option<String>,
+    pub limitation: Option<String>,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -735,12 +790,56 @@ mod tests {
                 avg_rtt_ms: 14.5,
                 max_rtt_ms: 18.0,
                 stddev_rtt_ms: 0.5,
+                source: Some("simulated".into()),
             },
         };
         let json1 = serde_json::to_string(&r1).unwrap();
         let back1: QueryResponse = serde_json::from_str(&json1).unwrap();
         assert_eq!(r1, back1);
         assert!(json1.contains("\"kind\":\"pingResult\""));
+
+        let r2 = QueryResponse::GatewayResult {
+            result: GatewayResultDto {
+                gateway_ip: Some("192.168.1.1".into()),
+                interface_name: Some("Ethernet".into()),
+                status: "discovered".into(),
+                source: "live".into(),
+            },
+        };
+        let json2 = serde_json::to_string(&r2).unwrap();
+        let back2: QueryResponse = serde_json::from_str(&json2).unwrap();
+        assert_eq!(r2, back2);
+
+        let r3 = QueryResponse::DnsResult {
+            result: DnsResultDto {
+                target: "example.com".into(),
+                resolution_rtt_ms: Some(15.2),
+                resolved_ips: vec!["93.184.216.34".into()],
+                timed_out: false,
+                error: None,
+                source: "live".into(),
+            },
+        };
+        let json3 = serde_json::to_string(&r3).unwrap();
+        let back3: QueryResponse = serde_json::from_str(&json3).unwrap();
+        assert_eq!(r3, back3);
+
+        let r4 = QueryResponse::HttpResult {
+            result: HttpResultDto {
+                url: "http://example.com".into(),
+                status_code: Some(200),
+                connect_ms: Some(8.5),
+                ttfb_ms: Some(24.2),
+                transfer_ms: Some(12.1),
+                tls_ms: None,
+                error: None,
+                limitation: Some("TLS timing unavailable".into()),
+                source: "live".into(),
+            },
+        };
+        let json4 = serde_json::to_string(&r4).unwrap();
+        let back4: QueryResponse = serde_json::from_str(&json4).unwrap();
+        assert_eq!(r4, back4);
     }
 
     #[test]
@@ -754,6 +853,7 @@ mod tests {
             avg_rtt_ms: 12.0,
             max_rtt_ms: 15.0,
             stddev_rtt_ms: 0.5,
+            source: None,
         };
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(
@@ -766,7 +866,8 @@ mod tests {
                 "minRttMs": 10.0,
                 "avgRttMs": 12.0,
                 "maxRttMs": 15.0,
-                "stddevRttMs": 0.5
+                "stddevRttMs": 0.5,
+                "source": null
             })
         );
         assert!(json.get("loss_pct").is_none());

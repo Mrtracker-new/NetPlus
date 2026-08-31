@@ -402,6 +402,7 @@ export interface PingResult {
   avgRttMs?: number;
   maxRttMs?: number;
   stddevRttMs?: number;
+  source?: string;
 }
 
 export interface TracerouteHop {
@@ -410,6 +411,7 @@ export interface TracerouteHop {
   hostname?: string | null;
   rttMs?: number;
   status?: string;
+  source?: string;
 }
 
 export interface BufferbloatResult {
@@ -418,6 +420,35 @@ export interface BufferbloatResult {
   loadedRttMs?: number;
   deltaRttMs?: number;
   grade: string;
+  source?: string;
+}
+
+export interface GatewayResult {
+  gatewayIp?: string | null;
+  interfaceName?: string | null;
+  status: string;
+  source: string;
+}
+
+export interface DnsResult {
+  target: string;
+  resolutionRttMs?: number | null;
+  resolvedIps: string[];
+  timedOut: boolean;
+  error?: string | null;
+  source: string;
+}
+
+export interface HttpResult {
+  url: string;
+  statusCode?: number | null;
+  connectMs?: number | null;
+  ttfbMs?: number | null;
+  transferMs?: number | null;
+  tlsMs?: number | null;
+  error?: string | null;
+  limitation?: string | null;
+  source: string;
 }
 
 export interface FieldDiagnostic {

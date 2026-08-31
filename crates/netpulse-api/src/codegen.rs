@@ -599,6 +599,7 @@ pub fn typescript_contract() -> String {
             ("avgRttMs?", "number"),
             ("maxRttMs?", "number"),
             ("stddevRttMs?", "number"),
+            ("source?", "string"),
         ],
     ));
     s.push_str(&iface(
@@ -609,6 +610,7 @@ pub fn typescript_contract() -> String {
             ("hostname?", "string | null"),
             ("rttMs?", "number"),
             ("status?", "string"),
+            ("source?", "string"),
         ],
     ));
     s.push_str(&iface(
@@ -619,6 +621,41 @@ pub fn typescript_contract() -> String {
             ("loadedRttMs?", "number"),
             ("deltaRttMs?", "number"),
             ("grade", "string"),
+            ("source?", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "GatewayResult",
+        &[
+            ("gatewayIp?", "string | null"),
+            ("interfaceName?", "string | null"),
+            ("status", "string"),
+            ("source", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "DnsResult",
+        &[
+            ("target", "string"),
+            ("resolutionRttMs?", "number | null"),
+            ("resolvedIps", "string[]"),
+            ("timedOut", "boolean"),
+            ("error?", "string | null"),
+            ("source", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "HttpResult",
+        &[
+            ("url", "string"),
+            ("statusCode?", "number | null"),
+            ("connectMs?", "number | null"),
+            ("ttfbMs?", "number | null"),
+            ("transferMs?", "number | null"),
+            ("tlsMs?", "number | null"),
+            ("error?", "string | null"),
+            ("limitation?", "string | null"),
+            ("source", "string"),
         ],
     ));
     s.push_str(&iface(

@@ -8,6 +8,7 @@
   "capture_health": "Capture Health",
   "buffer_usage": "Buffer Usage",
   "buffer_frames": "{{used}} / {{capacity}} frames",
+  "buffer_direct_pipeline": "Direct Pipeline (Zero Backlog)",
   "shedding_stage": "Shedding Stage",
   "drop_count": "Drop Count",
   "throughput": "Throughput",

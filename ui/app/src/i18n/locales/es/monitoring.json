@@ -8,6 +8,7 @@
   "capture_health": "Salud de Captura",
   "buffer_usage": "Uso de Búfer",
   "buffer_frames": "{{used}} / {{capacity}} tramas",
+  "buffer_direct_pipeline": "Canalización Directa (Sin Acumulación)",
   "shedding_stage": "Etapa de Descarte",
   "drop_count": "Conteo de Descartes",
   "throughput": "Rendimiento",

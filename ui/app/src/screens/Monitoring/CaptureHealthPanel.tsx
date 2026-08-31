@@ -55,7 +55,9 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
           </div>
 
           <div className="np-capture-health-well__sub">
-            {t("buffer_frames", { used: health.bufferFrames, capacity: health.bufferCapacity })}
+            {health.bufferCapacity > 0
+              ? t("buffer_frames", { used: health.bufferFrames, capacity: health.bufferCapacity })
+              : t("buffer_direct_pipeline")}
           </div>
         </div>
 

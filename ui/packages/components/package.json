@@ -27,20 +27,24 @@
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run --environment jsdom --globals"
+    "test": "vitest run src --environment jsdom --globals"
   },
   "dependencies": {
     "@netpulse/contract": "workspace:*",
     "@netpulse/design-system": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^18"
+    "react": "^18",
+    "react-dom": "^18"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
     "jsdom": "^30.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "typescript": "^5.4.0",
     "vitest": "^3.2.6"
   }

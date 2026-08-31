@@ -39,7 +39,10 @@ impl GatewayProbe {
                 let gw_ip = parts[2];
                 let iface_ip = parts[3];
                 // Ensure it's not "On-link" or 0.0.0.0
-                if gw_ip != "0.0.0.0" && gw_ip != "On-link" && gw_ip.parse::<std::net::IpAddr>().is_ok() {
+                if gw_ip != "0.0.0.0"
+                    && gw_ip != "On-link"
+                    && gw_ip.parse::<std::net::IpAddr>().is_ok()
+                {
                     return Some((gw_ip.to_string(), Some(iface_ip.to_string())));
                 }
             }
@@ -50,7 +53,10 @@ impl GatewayProbe {
     #[cfg(not(target_os = "windows"))]
     fn discover_unix() -> Option<(String, Option<String>)> {
         use std::process::Command;
-        let output = Command::new("ip").args(["route", "show", "default"]).output().ok()?;
+        let output = Command::new("ip")
+            .args(["route", "show", "default"])
+            .output()
+            .ok()?;
         if !output.status.success() {
             return None;
         }

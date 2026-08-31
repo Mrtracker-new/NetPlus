@@ -140,7 +140,9 @@ mod tests {
 
     #[test]
     fn test_dns_probe_handles_invalid_host() {
-        let probe = DnsProbe::new("this-is-a-definitely-nonexistent-domain-12345.netplus.invalid".to_string());
+        let probe = DnsProbe::new(
+            "this-is-a-definitely-nonexistent-domain-12345.netplus.invalid".to_string(),
+        );
         let cancel = AtomicBool::new(false);
         let out = probe.run(cancel).expect("dns probe run");
         assert_eq!(out.source, "live");

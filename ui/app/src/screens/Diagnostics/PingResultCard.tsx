@@ -14,115 +14,79 @@ export function PingResultCard({ result }: PingResultCardProps) {
   const maxRttStr = formatMs(result.maxRttMs ?? 0);
   const jitterStr = formatMs(result.jitterMs ?? 0);
 
-  const avgRtt = result.avgRttMs ?? 0;
-  const isHighLoss = lossPct > 10;
-
-  const statusLabel = isHighLoss
-    ? "Loss Detected"
-    : avgRtt > 100
-    ? "High Latency"
-    : avgRtt >= 30
-    ? "Normal Latency"
-    : "Optimal Latency";
-
-  const statusColorVar =
-    isHighLoss || avgRtt > 100
-      ? "var(--np-finding)"
-      : avgRtt >= 30
-      ? "var(--np-notable)"
-      : "var(--np-good)";
-
-  const statusBgVar =
-    isHighLoss || avgRtt > 100
-      ? "var(--np-finding-soft)"
-      : avgRtt >= 30
-      ? "var(--np-notable-soft)"
-      : "var(--np-good-soft)";
+  const sourceNormalized = (result.source ?? "").toLowerCase();
+  const provenanceClass =
+    sourceNormalized === "live"
+      ? "np-diagnostics-provenance--live"
+      : sourceNormalized === "simulated"
+      ? "np-diagnostics-provenance--simulated"
+      : sourceNormalized === "derived"
+      ? "np-diagnostics-provenance--derived"
+      : sourceNormalized === "unavailable"
+      ? "np-diagnostics-provenance--unavailable"
+      : "";
 
   return (
-    <div
-      className="np-diagnostics__result"
-      style={{
-        background: "var(--np-surface-1)",
-        border: "1px solid var(--np-border)",
-        borderRadius: "var(--np-radius-lg)",
-        padding: "1.25rem 1.5rem",
-        marginBottom: "1.5rem",
-        boxShadow: "var(--np-neu)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+    <article className="np-diagnostics__result" aria-label={t("ping.title", { target: result.target })}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
         <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
           {t("ping.title", { target: result.target })}
         </h3>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <span
-            style={{
-              padding: "0.2rem 0.6rem",
-              borderRadius: "var(--np-radius-pill)",
-              fontSize: "0.75rem",
-              fontWeight: 600,
-              background: statusBgVar,
-              color: statusColorVar,
-              border: `1px solid ${statusColorVar}`,
-            }}
-          >
-            {statusLabel}
-          </span>
+          {result.source && (
+            <span
+              className={`np-diagnostics-provenance ${provenanceClass}`}
+              data-provenance={result.source}
+            >
+              {result.source}
+            </span>
+          )}
         </div>
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))",
-          gap: "0.75rem",
-          marginBottom: "1rem",
-        }}
-      >
-        <div className="np-kpi">
-          <div className="np-kpi__label">Sent / Received</div>
-          <div className="np-kpi__value" style={{ fontSize: "1.1rem" }}>
+      {/* Level 3 Recessed KPI Grid */}
+      <div className="np-diagnostics-kpi-grid">
+        <div className="np-diagnostics-kpi-pod">
+          <div className="np-diagnostics-kpi-pod__label">{t("ping.sent_received")}</div>
+          <div className="np-diagnostics-kpi-pod__value">
             {result.sent} / {result.received}
           </div>
         </div>
-        <div className="np-kpi">
-          <div className="np-kpi__label">Loss</div>
-          <div className="np-kpi__value" style={{ fontSize: "1.1rem", color: isHighLoss ? "var(--np-finding)" : "var(--np-good)" }}>
+
+        <div className="np-diagnostics-kpi-pod">
+          <div className="np-diagnostics-kpi-pod__label">{t("ping.packet_loss")}</div>
+          <div
+            className="np-diagnostics-kpi-pod__value"
+            style={{ color: lossPct > 0 ? "var(--np-finding)" : "var(--np-good)" }}
+          >
             {lossPct}%
           </div>
         </div>
-        <div className="np-kpi">
-          <div className="np-kpi__label">Avg RTT</div>
-          <div className="np-kpi__value" style={{ fontSize: "1.1rem", color: "var(--np-accent)" }}>
+
+        <div className="np-diagnostics-kpi-pod">
+          <div className="np-diagnostics-kpi-pod__label">{t("ping.avg_rtt")}</div>
+          <div className="np-diagnostics-kpi-pod__value" style={{ color: "var(--np-accent-strong)" }}>
             {avgRttStr}ms
           </div>
         </div>
-        <div className="np-kpi">
-          <div className="np-kpi__label">Jitter</div>
-          <div className="np-kpi__value" style={{ fontSize: "1.1rem", color: "var(--np-notable)" }}>
+
+        <div className="np-diagnostics-kpi-pod">
+          <div className="np-diagnostics-kpi-pod__label">{t("ping.jitter")}</div>
+          <div className="np-diagnostics-kpi-pod__value" style={{ color: "var(--np-notable)" }}>
             {jitterStr}ms
           </div>
         </div>
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "0.5rem",
-          fontSize: "0.85rem",
-          color: "var(--np-subtext)",
-          fontFamily: "monospace",
-          background: "var(--np-bg)",
-          padding: "0.5rem 0.75rem",
-          borderRadius: "var(--np-radius-xs)",
-          boxShadow: "var(--np-neu-inset)",
-        }}
-      >
-        Min: {minRttStr}ms · Avg: {avgRttStr}ms · Max: {maxRttStr}ms
+      {/* Level 3 Recessed Telemetry Breakdown Strip */}
+      <div className="np-diagnostics-telemetry-strip">
+        <span>{t("ping.rtt_min", { min: minRttStr })}</span>
+        <span style={{ opacity: 0.4 }}>·</span>
+        <span>{t("ping.rtt_avg", { avg: avgRttStr })}</span>
+        <span style={{ opacity: 0.4 }}>·</span>
+        <span>{t("ping.rtt_max", { max: maxRttStr })}</span>
       </div>
-    </div>
+    </article>
   );
 }

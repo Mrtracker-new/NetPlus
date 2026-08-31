@@ -423,11 +423,9 @@ pub fn build_diagnostic_chain(
     // 1. Device (Local Machine Stack)
     let device_node = match capture_stats {
         Some(cs) => {
-            let buf_pct = if cs.buffer_capacity > 0 {
-                (cs.buffer_frames * 100) / cs.buffer_capacity
-            } else {
-                0
-            };
+            let buf_pct = (cs.buffer_frames * 100)
+                .checked_div(cs.buffer_capacity)
+                .unwrap_or(0);
             if cs.shed_stage != netpulse_capture::ShedStage::None || buf_pct > 85 {
                 DiagnosticStageNode {
                     stage: DiagnosticChainStageKind::Device,
@@ -436,7 +434,10 @@ pub fn build_diagnostic_chain(
                     detection_state: DetectionState::Detected,
                     label: DiagnosticChainStageKind::Device.label().to_string(),
                     summary: "Capture Ring Buffer Saturated".to_string(),
-                    detail: Some(format!("Buffer utilization at {}% with load shedding active", buf_pct)),
+                    detail: Some(format!(
+                        "Buffer utilization at {}% with load shedding active",
+                        buf_pct
+                    )),
                     latency_ms: None,
                     evidence: Vec::new(),
                     causes: Vec::new(),
@@ -484,7 +485,10 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::Detected,
             label: DiagnosticChainStageKind::Interface.label().to_string(),
             summary: "Capture Packet Drops Detected".to_string(),
-            detail: Some(format!("{} frames dropped by kernel/adapter buffer", loss.capture_drops)),
+            detail: Some(format!(
+                "{} frames dropped by kernel/adapter buffer",
+                loss.capture_drops
+            )),
             latency_ms: None,
             evidence: Vec::new(),
             causes: Vec::new(),
@@ -544,7 +548,10 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::Detected,
             label: DiagnosticChainStageKind::Router.label().to_string(),
             summary: "Gateway Link Jitter / Loss Inferred".to_string(),
-            detail: Some("Widespread loss across multiple destinations indicates local hop instability".to_string()),
+            detail: Some(
+                "Widespread loss across multiple destinations indicates local hop instability"
+                    .to_string(),
+            ),
             latency_ms: None,
             evidence: d.evidence.clone(),
             causes: vec![Cause::LocalWifi],
@@ -554,14 +561,12 @@ pub fn build_diagnostic_chain(
         // Look for local subnet flows to calculate local gateway RTT if available
         let local_rtts: Vec<f32> = flows
             .iter()
-            .filter(|f| {
-                match f.key.dst_ip {
-                    IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
-                    IpAddr::V6(v6) => {
-                        v6.is_loopback()
-                            || (v6.segments()[0] & 0xfe00 == 0xfc00)
-                            || (v6.segments()[0] & 0xffc0 == 0xfe80)
-                    }
+            .filter(|f| match f.key.dst_ip {
+                IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
+                IpAddr::V6(v6) => {
+                    v6.is_loopback()
+                        || (v6.segments()[0] & 0xfe00 == 0xfc00)
+                        || (v6.segments()[0] & 0xffc0 == 0xfe80)
                 }
             })
             .filter_map(|f| f.stats.rtt_estimate_nanos.map(|n| (n as f32) / 1_000_000.0))
@@ -631,7 +636,11 @@ pub fn build_diagnostic_chain(
 
     // 5. DNS
     let dns_diag = diagnoses.iter().find(|d| d.cause == Cause::SlowDns);
-    let dns_flows: Vec<&Flow> = flows.iter().filter(|f| f.l7 == L7Proto::Dns).copied().collect();
+    let dns_flows: Vec<&Flow> = flows
+        .iter()
+        .filter(|f| f.l7 == L7Proto::Dns)
+        .copied()
+        .collect();
     let dns_node = if let Some(d) = dns_diag {
         DiagnosticStageNode {
             stage: DiagnosticChainStageKind::Dns,
@@ -654,7 +663,10 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::Detected,
             label: DiagnosticChainStageKind::Dns.label().to_string(),
             summary: "DNS Resolution Nominal".to_string(),
-            detail: Some(format!("{} DNS query flows observed in window", dns_flows.len())),
+            detail: Some(format!(
+                "{} DNS query flows observed in window",
+                dns_flows.len()
+            )),
             latency_ms: None,
             evidence: dns_flows.iter().map(|f| EvidenceRef::Flow(f.id)).collect(),
             causes: Vec::new(),
@@ -683,10 +695,17 @@ pub fn build_diagnostic_chain(
         .iter()
         .filter_map(|f| {
             names.get(&f.key.dst_ip).and_then(|hn_list| {
-                hn_list.iter().find(|hn| {
-                    let n = hn.name.to_lowercase();
-                    n.contains("cdn") || n.contains("edge") || n.contains("cloudflare") || n.contains("akamai") || n.contains("fastly")
-                }).map(|hn| hn.name.clone())
+                hn_list
+                    .iter()
+                    .find(|hn| {
+                        let n = hn.name.to_lowercase();
+                        n.contains("cdn")
+                            || n.contains("edge")
+                            || n.contains("cloudflare")
+                            || n.contains("akamai")
+                            || n.contains("fastly")
+                    })
+                    .map(|hn| hn.name.clone())
             })
         })
         .collect();
@@ -727,7 +746,9 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::NotDetected,
             label: DiagnosticChainStageKind::Cdn.label().to_string(),
             summary: "No Edge Endpoints in Window".to_string(),
-            detail: Some("No CDN or edge distribution nodes identified in current active flows".to_string()),
+            detail: Some(
+                "No CDN or edge distribution nodes identified in current active flows".to_string(),
+            ),
             latency_ms: None,
             evidence: Vec::new(),
             causes: Vec::new(),
@@ -746,7 +767,9 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::NotDetected,
             label: DiagnosticChainStageKind::Destination.label().to_string(),
             summary: "No Remote Traffic Observed".to_string(),
-            detail: Some("Capture standby — start traffic to observe destination health".to_string()),
+            detail: Some(
+                "Capture standby — start traffic to observe destination health".to_string(),
+            ),
             latency_ms: None,
             evidence: Vec::new(),
             causes: Vec::new(),
@@ -798,9 +821,17 @@ pub fn build_diagnostic_chain(
             detection_state: DetectionState::Detected,
             label: DiagnosticChainStageKind::Destination.label().to_string(),
             summary: "Destination Endpoints Healthy".to_string(),
-            detail: Some(format!("{} active flows ({} bytes)", flows.len(), total_bytes)),
+            detail: Some(format!(
+                "{} active flows ({} bytes)",
+                flows.len(),
+                total_bytes
+            )),
             latency_ms: avg_rtt,
-            evidence: flows.iter().take(5).map(|f| EvidenceRef::Flow(f.id)).collect(),
+            evidence: flows
+                .iter()
+                .take(5)
+                .map(|f| EvidenceRef::Flow(f.id))
+                .collect(),
             causes: Vec::new(),
             affected_targets: Vec::new(),
         }
@@ -986,7 +1017,14 @@ mod tests {
     #[test]
     fn diagnostic_chain_builds_all_seven_stages_in_order() {
         let f1 = flow(1, ip(1, 1, 1, 1), L7Proto::Dns, 100, Some(15_000_000), 0);
-        let f2 = flow(2, ip(93, 184, 216, 34), L7Proto::Tls, 1000, Some(22_000_000), 0);
+        let f2 = flow(
+            2,
+            ip(93, 184, 216, 34),
+            L7Proto::Tls,
+            1000,
+            Some(22_000_000),
+            0,
+        );
         let cs = netpulse_capture::CaptureStats {
             received: 50,
             buffer_frames: 50,
@@ -994,13 +1032,22 @@ mod tests {
             shed_stage: netpulse_capture::ShedStage::None,
             dropped: 0,
         };
-        let snap = snapshot(&[&f1, &f2], LossAccounting::default(), None, &NameMap::new(), Some(cs));
+        let snap = snapshot(
+            &[&f1, &f2],
+            LossAccounting::default(),
+            None,
+            &NameMap::new(),
+            Some(cs),
+        );
         let chain = &snap.diagnostic_chain;
         assert_eq!(chain.stages.len(), 7);
 
         assert_eq!(chain.stages[0].stage, DiagnosticChainStageKind::Device);
         assert_eq!(chain.stages[0].status, DiagnosticStageStatus::Healthy);
-        assert_eq!(chain.stages[0].measurement_state, MeasurementState::Observed);
+        assert_eq!(
+            chain.stages[0].measurement_state,
+            MeasurementState::Observed
+        );
 
         assert_eq!(chain.stages[1].stage, DiagnosticChainStageKind::Interface);
         assert_eq!(chain.stages[1].status, DiagnosticStageStatus::Healthy);
@@ -1009,11 +1056,17 @@ mod tests {
 
         assert_eq!(chain.stages[3].stage, DiagnosticChainStageKind::Isp);
         assert_eq!(chain.stages[3].status, DiagnosticStageStatus::Unknown);
-        assert_eq!(chain.stages[3].measurement_state, MeasurementState::NotMeasurable);
+        assert_eq!(
+            chain.stages[3].measurement_state,
+            MeasurementState::NotMeasurable
+        );
 
         assert_eq!(chain.stages[4].stage, DiagnosticChainStageKind::Dns);
         assert_eq!(chain.stages[4].status, DiagnosticStageStatus::Healthy);
-        assert_eq!(chain.stages[4].measurement_state, MeasurementState::Observed);
+        assert_eq!(
+            chain.stages[4].measurement_state,
+            MeasurementState::Observed
+        );
 
         assert_eq!(chain.stages[5].stage, DiagnosticChainStageKind::Cdn);
         assert_eq!(chain.stages[5].status, DiagnosticStageStatus::NotMeasurable);
@@ -1038,18 +1091,36 @@ mod tests {
             shed_stage: netpulse_capture::ShedStage::None,
             dropped: 0,
         };
-        let snap = snapshot(&[&f1, &f2, &f3], loss, Some(500_000_000), &NameMap::new(), Some(cs));
+        let snap = snapshot(
+            &[&f1, &f2, &f3],
+            loss,
+            Some(500_000_000),
+            &NameMap::new(),
+            Some(cs),
+        );
         let chain = &snap.diagnostic_chain;
 
-        let iface = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Interface).unwrap();
+        let iface = chain
+            .stages
+            .iter()
+            .find(|s| s.stage == DiagnosticChainStageKind::Interface)
+            .unwrap();
         assert_eq!(iface.status, DiagnosticStageStatus::Degraded);
         assert_eq!(iface.measurement_state, MeasurementState::Inferred);
 
-        let router = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Router).unwrap();
+        let router = chain
+            .stages
+            .iter()
+            .find(|s| s.stage == DiagnosticChainStageKind::Router)
+            .unwrap();
         assert_eq!(router.status, DiagnosticStageStatus::Investigate);
         assert_eq!(router.measurement_state, MeasurementState::Inferred);
 
-        let dns = chain.stages.iter().find(|s| s.stage == DiagnosticChainStageKind::Dns).unwrap();
+        let dns = chain
+            .stages
+            .iter()
+            .find(|s| s.stage == DiagnosticChainStageKind::Dns)
+            .unwrap();
         assert_eq!(dns.status, DiagnosticStageStatus::Degraded);
         assert_eq!(dns.measurement_state, MeasurementState::Inferred);
     }

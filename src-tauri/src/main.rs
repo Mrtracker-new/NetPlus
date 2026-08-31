@@ -15,17 +15,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto};
 use netpulse_api::{Command, ProjectionDepth, Query, QueryResponse};
-use netpulse_capture::{
-    CaptureStats, Recording, ReplayController, ReplayState, ShedController, ShedStage,
-    ETH_IPV4_TCP_HEADERS,
-};
-use netpulse_core::traits::{CaptureSource, RawFrame, SocketTableSource};
+use netpulse_capture::{CaptureStats, Recording, ReplayController, ReplayState, ShedController};
+use netpulse_core::traits::{CaptureSource, SocketTableSource};
 use netpulse_core::Depth;
 use netpulse_engine::attribution::Correlator;
 use netpulse_engine::export::{ExportFormat, Selection};
@@ -607,14 +603,13 @@ impl LiveLoopContext {
     }
 
     /// Update capture statistics under `stats` lock.
-    fn update_stats(&self, metrics: CaptureCycleMetrics, buffer_len: usize, buffer_drops: u64) {
+    fn update_stats(&self, metrics: CaptureCycleMetrics, buffer_len: usize) {
         if let Ok(mut st) = self.stats.lock() {
-            let total_dropped = metrics.kernel_dropped_frames.saturating_add(buffer_drops);
             st.received = st.received.max(metrics.captured_frames);
-            st.dropped = st.dropped.max(total_dropped);
+            st.dropped = st.dropped.max(metrics.kernel_dropped_frames);
             st.shed_stage = self.shed_controller.current_stage();
             st.buffer_frames = buffer_len;
-            st.buffer_capacity = self.config.max_frames;
+            st.buffer_capacity = 0;
         }
     }
 
@@ -624,12 +619,11 @@ impl LiveLoopContext {
         latest_mono: u64,
         metrics: CaptureCycleMetrics,
         buffer_len: usize,
-        buffer_drops: u64,
     ) {
         self.drain_hint_channel();
         self.refresh_dns_hints();
         self.commit_pipeline(latest_mono);
-        self.update_stats(metrics, buffer_len, buffer_drops);
+        self.update_stats(metrics, buffer_len);
     }
 
     /// Final Flush on shutdown so in-flight frames are never lost. Consumes `self`
@@ -639,9 +633,8 @@ impl LiveLoopContext {
         latest_mono: u64,
         metrics: CaptureCycleMetrics,
         buffer_len: usize,
-        buffer_drops: u64,
     ) {
-        self.rebuild_and_commit(latest_mono, metrics, buffer_len, buffer_drops);
+        self.rebuild_and_commit(latest_mono, metrics, buffer_len);
         if let Ok(mut s) = self.store.lock() {
             self.pipeline.finish(&mut s);
         }
@@ -674,8 +667,8 @@ pub(crate) fn emit_live_snapshot(
 }
 
 /// The background live-capture loop. Drains frames from the backend
-/// into a bounded buffer and periodically commits incremental engine updates
-/// into the committed store via [`netpulse_engine::pipeline::LivePipeline`].
+/// and periodically commits incremental engine updates into the committed store
+/// via [`netpulse_engine::pipeline::LivePipeline`].
 /// Runs until the stop flag is set or the source closes.
 #[allow(clippy::too_many_arguments)]
 fn live_loop(
@@ -697,8 +690,6 @@ fn live_loop(
     };
 
     let mut ctx = LiveLoopContext::new(dlt, store.clone(), stats.clone(), stop.clone(), config);
-    let mut buffer: VecDeque<RawFrame> = VecDeque::with_capacity(config.max_frames);
-    let mut buffer_drops = 0u64;
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
 
@@ -711,42 +702,12 @@ fn live_loop(
             if let Some(f) = batch.last() {
                 latest_mono = latest_mono.max(f.mono_nanos);
             }
-            let fill_len = buffer.len() + batch.len();
-            let current_stage = ctx.shed_controller.update(fill_len);
-
-            // Pre-insertion eviction (Option A sliding window): drain overflow from head of ring buffer
-            if fill_len > config.max_frames {
-                let overflow = fill_len - config.max_frames;
-                let to_drop = overflow.min(buffer.len());
-                buffer.drain(0..to_drop);
-                buffer_drops = buffer_drops.saturating_add(overflow as u64);
-            }
-
             ctx.pipeline.ingest_batch(&batch);
-
-            for mut frame in batch {
-                if current_stage >= ShedStage::PayloadsOff {
-                    frame.bytes.truncate(ETH_IPV4_TCP_HEADERS);
-                }
-                if current_stage == ShedStage::SampleDissection
-                    && !ctx.shed_controller.should_sample()
-                {
-                    continue;
-                }
-                buffer.push_back(frame);
-            }
         }
 
-        if last_rebuild.elapsed().as_millis() >= 1000 && !buffer.is_empty() {
+        if last_rebuild.elapsed().as_millis() >= 1000 {
             last_rebuild = std::time::Instant::now();
-            let inflight_count = buffer.len();
-            ctx.rebuild_and_commit(
-                latest_mono,
-                capture.stats().into(),
-                inflight_count,
-                buffer_drops,
-            );
-            buffer.clear();
+            ctx.rebuild_and_commit(latest_mono, capture.stats().into(), 0);
 
             // Poll the OS socket tables and feed the correlator, timestamped in the
             // same capture-relative monotonic clock the flows use.
@@ -763,12 +724,7 @@ fn live_loop(
     }
 
     // Final Flush on shutdown so in-flight frames are never lost
-    ctx.finish(
-        latest_mono,
-        capture.stats().into(),
-        buffer.len(),
-        buffer_drops,
-    );
+    ctx.finish(latest_mono, capture.stats().into(), 0);
     emit_live_snapshot(&store, &stats, &depth, &app_handle);
     // _completion_guard drops here, signaling done_tx
 }
@@ -1077,6 +1033,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use netpulse_core::traits::RawFrame;
 
     #[test]
     fn test_completion_guard_sends_signal_on_drop() {
@@ -1109,12 +1066,13 @@ mod tests {
             },
         );
         ctx.pipeline.ingest_batch(&[frame]);
-        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 1, 0);
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0);
 
         let st = ctx.stats.lock().unwrap();
-        assert_eq!(st.buffer_frames, 1);
-        assert_eq!(st.buffer_capacity, 1000);
+        assert_eq!(st.buffer_frames, 0);
+        assert_eq!(st.buffer_capacity, 0);
         assert_eq!(st.received, 1);
+        assert_eq!(st.dropped, 0);
     }
 
     #[test]
@@ -1147,12 +1105,12 @@ mod tests {
                 captured_frames: 1,
                 kernel_dropped_frames: 0,
             },
-            1,
             0,
         );
 
         let st = stats.lock().unwrap();
         assert_eq!(st.received, 1);
+        assert_eq!(st.dropped, 0);
         let s = store.lock().unwrap();
         assert_eq!(s.policy(), PayloadPolicy::MetadataOnly);
     }
@@ -1247,7 +1205,7 @@ mod tests {
         ctx.pipeline.ingest_batch(&[frame]);
 
         // Attempt update with lower counters (e.g. out of order or transient drop)
-        ctx.rebuild_and_commit(1_000_000, (400, 5).into(), 1, 0);
+        ctx.rebuild_and_commit(1_000_000, (400, 5).into(), 0);
 
         let st = ctx.stats.lock().unwrap();
         // Assert counters remained monotonic at max values (500, 10)
@@ -1276,7 +1234,7 @@ mod tests {
         ctx.hint_in_flight.store(true, Ordering::Release);
 
         // Rebuild and commit while worker is in-flight must refuse to spawn a duplicate worker
-        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0);
 
         // Assert that the flag remains set and no channel message was queued
         assert!(
@@ -1339,7 +1297,7 @@ mod tests {
         ctx.hint_tx.send(map1).unwrap();
         ctx.hint_tx.send(map2).unwrap();
 
-        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0);
 
         assert_eq!(
             ctx.hint_cache.get(&"1.1.1.1".parse().unwrap()).unwrap()[0].name,
@@ -1378,7 +1336,7 @@ mod tests {
             },
         );
 
-        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0, 0);
+        ctx.rebuild_and_commit(1_000_000, (1, 0).into(), 0);
 
         assert!(
             !ctx.hint_in_flight.load(Ordering::Acquire),

@@ -11,9 +11,9 @@ use netpulse_ai::GroundedAnswer;
 use netpulse_api::dto::{
     AnimationKindDto, AnimationModelDto, AssistantAnswerDto, AttributionConfidenceDto,
     AttributionDto, BreakdownDto, BreakdownRowDto, CaptureStatsDto, CauseDto, CurriculumLessonDto,
-    CurriculumModuleDto, DiagnosisDto, DiagnosticChainDto, DiagnosticChainStageKindDto,
-    DiagnosticStageNodeDto, DiagnosticStageStatusDto, DimensionDto, DirectionDto,
-    DetectionStateDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
+    CurriculumModuleDto, DetectionStateDto, DiagnosisDto, DiagnosticChainDto,
+    DiagnosticChainStageKindDto, DiagnosticStageNodeDto, DiagnosticStageStatusDto, DimensionDto,
+    DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
     HostNameDto, JourneyStageDto, LearningProgressDto, LessonOfferDto, MeasurementStateDto,
     MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
@@ -109,19 +109,27 @@ fn diagnostic_stage_node_dto(node: &crate::monitor::DiagnosticStageNode) -> Diag
     DiagnosticStageNodeDto {
         stage: match node.stage {
             crate::monitor::DiagnosticChainStageKind::Device => DiagnosticChainStageKindDto::Device,
-            crate::monitor::DiagnosticChainStageKind::Interface => DiagnosticChainStageKindDto::Interface,
+            crate::monitor::DiagnosticChainStageKind::Interface => {
+                DiagnosticChainStageKindDto::Interface
+            }
             crate::monitor::DiagnosticChainStageKind::Router => DiagnosticChainStageKindDto::Router,
             crate::monitor::DiagnosticChainStageKind::Isp => DiagnosticChainStageKindDto::Isp,
             crate::monitor::DiagnosticChainStageKind::Dns => DiagnosticChainStageKindDto::Dns,
             crate::monitor::DiagnosticChainStageKind::Cdn => DiagnosticChainStageKindDto::Cdn,
-            crate::monitor::DiagnosticChainStageKind::Destination => DiagnosticChainStageKindDto::Destination,
+            crate::monitor::DiagnosticChainStageKind::Destination => {
+                DiagnosticChainStageKindDto::Destination
+            }
         },
         status: match node.status {
             crate::monitor::DiagnosticStageStatus::Healthy => DiagnosticStageStatusDto::Healthy,
             crate::monitor::DiagnosticStageStatus::Degraded => DiagnosticStageStatusDto::Degraded,
-            crate::monitor::DiagnosticStageStatus::Investigate => DiagnosticStageStatusDto::Investigate,
+            crate::monitor::DiagnosticStageStatus::Investigate => {
+                DiagnosticStageStatusDto::Investigate
+            }
             crate::monitor::DiagnosticStageStatus::Unknown => DiagnosticStageStatusDto::Unknown,
-            crate::monitor::DiagnosticStageStatus::NotMeasurable => DiagnosticStageStatusDto::NotMeasurable,
+            crate::monitor::DiagnosticStageStatus::NotMeasurable => {
+                DiagnosticStageStatusDto::NotMeasurable
+            }
         },
         measurement_state: match node.measurement_state {
             crate::monitor::MeasurementState::Observed => MeasurementStateDto::Observed,
@@ -138,12 +146,16 @@ fn diagnostic_stage_node_dto(node: &crate::monitor::DiagnosticStageNode) -> Diag
         detail: node.detail.clone(),
         latency_ms: node.latency_ms,
         evidence: node.evidence.iter().map(evidence_dto).collect(),
-        causes: node.causes.iter().map(|c| match c {
-            crate::monitor::Cause::LocalWifi => CauseDto::LocalWifi,
-            crate::monitor::Cause::DistantServer => CauseDto::DistantServer,
-            crate::monitor::Cause::SlowDns => CauseDto::SlowDns,
-            crate::monitor::Cause::Congestion => CauseDto::Congestion,
-        }).collect(),
+        causes: node
+            .causes
+            .iter()
+            .map(|c| match c {
+                crate::monitor::Cause::LocalWifi => CauseDto::LocalWifi,
+                crate::monitor::Cause::DistantServer => CauseDto::DistantServer,
+                crate::monitor::Cause::SlowDns => CauseDto::SlowDns,
+                crate::monitor::Cause::Congestion => CauseDto::Congestion,
+            })
+            .collect(),
         affected_targets: node.affected_targets.clone(),
     }
 }

@@ -187,7 +187,6 @@ fn capture_worker_loop(
     let mut batch_seq_num = 0u64;
     let mut frame_seq_num = 0u64;
     let mut last_dropped_count = 0u64;
-    let mut buffer_len = 0usize;
 
     while !stop.load(Ordering::Relaxed) {
         let raw_batch = match capture_source.next_batch() {
@@ -206,10 +205,9 @@ fn capture_worker_loop(
             continue;
         }
 
-        buffer_len = buffer_len.saturating_add(raw_batch.len()).min(capacity);
-        let current_stage = shed_controller.update(buffer_len);
+        let current_stage = shed_controller.current_stage();
 
-        let (rx_count, kernel_drops) = capture_source.stats();
+        let (_, kernel_drops) = capture_source.stats();
         let stats_changed = kernel_drops != last_dropped_count;
         last_dropped_count = kernel_drops;
 
@@ -237,8 +235,8 @@ fn capture_worker_loop(
                 batch_seq_num = batch_seq_num.saturating_add(1);
                 let stats = if stats_changed {
                     Some(TransportStats {
-                        dropped_frames: rx_count.saturating_sub(rx_count),
-                        queue_depth: buffer_len as u32,
+                        dropped_frames: kernel_drops,
+                        queue_depth: 0,
                         reserved: 0,
                     })
                 } else {
@@ -262,7 +260,7 @@ fn capture_worker_loop(
             let stats = if stats_changed {
                 Some(TransportStats {
                     dropped_frames: kernel_drops,
-                    queue_depth: buffer_len as u32,
+                    queue_depth: 0,
                     reserved: 0,
                 })
             } else {
@@ -279,7 +277,5 @@ fn capture_worker_loop(
                 return;
             }
         }
-
-        buffer_len = buffer_len.saturating_sub(max_batch_size);
     }
 }

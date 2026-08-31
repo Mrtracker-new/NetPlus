@@ -371,3 +371,81 @@ async fn test_stage6_hydrated_store_to_presentation() {
     assert_eq!(view.monitor.by_host.rows.len(), 1);
     assert_eq!(view.monitor.by_host.rows[0].bytes, 5000);
 }
+
+#[test]
+fn test_high_throughput_zero_false_drops_and_healthy_diagnostics() {
+    use netpulse_capture::ShedStage;
+    use netpulse_core::traits::RawFrame;
+    use netpulse_engine::pipeline::LivePipeline;
+
+    let mut pipeline = LivePipeline::new(1, 16); // DLT_EN10MB = 1
+    let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+
+    let raw_bytes = make_tcp_packet([10, 0, 0, 1], 12345, [10, 0, 0, 2], 80, 0x18); // PSH+ACK
+    let frames: Vec<RawFrame> = (0..1000)
+        .map(|i| RawFrame {
+            mono_nanos: i as u64 * 1_000_000,
+            iface_id: 1,
+            bytes: raw_bytes.clone(),
+        })
+        .collect();
+
+    // Ingest 100 batches of 1,000 frames = 100,000 total frames
+    for batch_idx in 0..100 {
+        pipeline.ingest_batch(&frames);
+        if batch_idx % 10 == 0 {
+            pipeline.commit_to_store(&mut store, (batch_idx as u64 + 1) * 1_000_000_000);
+        }
+    }
+    pipeline.finish(&mut store);
+
+    let stats = CaptureStats {
+        received: 100_000,
+        dropped: 0,
+        shed_stage: ShedStage::None,
+        buffer_frames: 0,
+        buffer_capacity: 0,
+    };
+
+    let view = present(&store, Depth::Expert, stats);
+
+    // Assert that capture drops remain exactly zero
+    assert_eq!(view.monitor.capture_drops, 0);
+    let cs = view
+        .monitor
+        .capture_stats
+        .as_ref()
+        .expect("capture stats present");
+    assert_eq!(cs.dropped, 0);
+    assert_eq!(cs.shed_stage, netpulse_api::dto::ShedStageDto::None);
+    assert_eq!(cs.buffer_frames, 0);
+    assert_eq!(cs.buffer_capacity, 0);
+
+    let chain = view
+        .monitor
+        .diagnostic_chain
+        .as_ref()
+        .expect("diagnostic chain present");
+
+    // Assert Device (Local Stack) is Healthy (not Degraded)
+    let device_stage = chain
+        .stages
+        .iter()
+        .find(|s| s.stage == netpulse_api::dto::DiagnosticChainStageKindDto::Device)
+        .expect("Device stage present in chain");
+    assert_eq!(
+        device_stage.status,
+        netpulse_api::dto::DiagnosticStageStatusDto::Healthy
+    );
+
+    // Assert Interface is Healthy (not Degraded)
+    let iface_stage = chain
+        .stages
+        .iter()
+        .find(|s| s.stage == netpulse_api::dto::DiagnosticChainStageKindDto::Interface)
+        .expect("Interface stage present in chain");
+    assert_eq!(
+        iface_stage.status,
+        netpulse_api::dto::DiagnosticStageStatusDto::Healthy
+    );
+}

@@ -49,6 +49,7 @@ impl DiagnosticProbe for PingProbe {
             avg_rtt_ms,
             max_rtt_ms,
             stddev_rtt_ms,
+            source: "simulated".to_string(),
         })
     }
 }

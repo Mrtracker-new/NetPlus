@@ -1,11 +1,17 @@
 //! Isolated Active Diagnostics Service Layer.
 
 pub mod bufferbloat;
+pub mod dns;
+pub mod gateway;
+pub mod http;
 pub mod models;
 pub mod ping;
 pub mod traceroute;
 
 pub use bufferbloat::BufferbloatProbe;
+pub use dns::DnsProbe;
+pub use gateway::GatewayProbe;
+pub use http::HttpProbe;
 pub use models::*;
 pub use ping::PingProbe;
 pub use traceroute::TracerouteProbe;
@@ -30,6 +36,7 @@ mod tests {
         assert_eq!(out.sent, 4);
         assert_eq!(out.received, 4);
         assert!(out.avg_rtt_ms > 0.0);
+        assert_eq!(out.source, "simulated");
     }
 
     #[test]
@@ -40,6 +47,7 @@ mod tests {
             let out = probe.run(cancel).expect("traceroute probe run");
             assert!(!out.hops.is_empty());
             assert!(out.hops.len() <= 5);
+            assert_eq!(out.source, "simulated");
         }
     }
 
@@ -50,5 +58,6 @@ mod tests {
         let out = probe.run(cancel).expect("bufferbloat probe run");
         assert!(out.delta_rtt_ms >= 0.0);
         assert!(["A+", "A", "B", "C", "F"].contains(&out.grade.as_str()));
+        assert_eq!(out.source, "simulated");
     }
 }

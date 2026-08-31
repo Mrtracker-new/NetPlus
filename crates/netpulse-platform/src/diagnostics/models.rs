@@ -12,6 +12,7 @@ pub enum DiagnosticProgressEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PingProbeOutput {
     pub target: String,
     pub sent: u32,
@@ -21,9 +22,11 @@ pub struct PingProbeOutput {
     pub avg_rtt_ms: f32,
     pub max_rtt_ms: f32,
     pub stddev_rtt_ms: f32,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TracerouteHop {
     pub ttl: u8,
     pub ip: String,
@@ -33,16 +36,54 @@ pub struct TracerouteHop {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TracerouteOutput {
     pub target: String,
     pub hops: Vec<TracerouteHop>,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BufferbloatOutput {
     pub target: String,
     pub idle_rtt_ms: f32,
     pub loaded_rtt_ms: f32,
     pub delta_rtt_ms: f32,
     pub grade: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayDiscoveryOutput {
+    pub gateway_ip: Option<String>,
+    pub interface_name: Option<String>,
+    pub status: String,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DnsProbeOutput {
+    pub target: String,
+    pub resolution_rtt_ms: Option<f32>,
+    pub resolved_ips: Vec<String>,
+    pub timed_out: bool,
+    pub error: Option<String>,
+    pub source: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HttpProbeOutput {
+    pub url: String,
+    pub status_code: Option<u16>,
+    pub connect_ms: Option<f32>,
+    pub ttfb_ms: Option<f32>,
+    pub transfer_ms: Option<f32>,
+    pub tls_ms: Option<f32>,
+    pub error: Option<String>,
+    pub limitation: Option<String>,
+    pub source: String,
 }

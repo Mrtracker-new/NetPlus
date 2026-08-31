@@ -965,7 +965,7 @@ pub(crate) fn empty_replay_state() -> ReplayState {
 /// the UI performs comes through here and is answered from the committed store.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
-fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
+async fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryResponse, String> {
     ipc::execute_query(&state, query)
 }
 
@@ -973,7 +973,7 @@ fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryRespons
 /// Observe-only: nothing here touches network traffic.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
-fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), String> {
     ipc::execute_command(&state, command)
 }
 

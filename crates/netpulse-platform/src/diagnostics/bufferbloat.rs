@@ -44,6 +44,7 @@ impl DiagnosticProbe for BufferbloatProbe {
             loaded_rtt_ms,
             delta_rtt_ms,
             grade: grade.to_string(),
+            source: "simulated".to_string(),
         })
     }
 }

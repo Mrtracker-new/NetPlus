@@ -301,6 +301,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                     avg_rtt_ms: out.avg_rtt_ms,
                     max_rtt_ms: out.max_rtt_ms,
                     stddev_rtt_ms: out.stddev_rtt_ms,
+                    source: Some(out.source),
                 },
             })
         }
@@ -322,6 +323,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                     hostname: h.hostname,
                     rtt_ms: h.rtt_ms,
                     status: h.status,
+                    source: Some(out.source.clone()),
                 })
                 .collect();
             Ok(QueryResponse::TracerouteResult { hops })
@@ -338,6 +340,56 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                     loaded_rtt_ms: out.loaded_rtt_ms,
                     delta_rtt_ms: out.delta_rtt_ms,
                     grade: out.grade,
+                    source: Some(out.source),
+                },
+            })
+        }
+        Query::DiscoverGateway => {
+            use netpulse_platform::diagnostics::{DiagnosticProbe, GatewayProbe};
+            let probe = GatewayProbe::new();
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            Ok(QueryResponse::GatewayResult {
+                result: netpulse_api::GatewayResultDto {
+                    gateway_ip: out.gateway_ip,
+                    interface_name: out.interface_name,
+                    status: out.status,
+                    source: out.source,
+                },
+            })
+        }
+        Query::RunDnsProbe { target } => {
+            use netpulse_platform::diagnostics::{DiagnosticProbe, DnsProbe};
+            let probe = DnsProbe::new(target);
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            Ok(QueryResponse::DnsResult {
+                result: netpulse_api::DnsResultDto {
+                    target: out.target,
+                    resolution_rtt_ms: out.resolution_rtt_ms,
+                    resolved_ips: out.resolved_ips,
+                    timed_out: out.timed_out,
+                    error: out.error,
+                    source: out.source,
+                },
+            })
+        }
+        Query::RunHttpProbe { url } => {
+            use netpulse_platform::diagnostics::{DiagnosticProbe, HttpProbe};
+            let probe = HttpProbe::new(url);
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let out = probe.run(cancel).map_err(|e| e.to_string())?;
+            Ok(QueryResponse::HttpResult {
+                result: netpulse_api::HttpResultDto {
+                    url: out.url,
+                    status_code: out.status_code,
+                    connect_ms: out.connect_ms,
+                    ttfb_ms: out.ttfb_ms,
+                    transfer_ms: out.transfer_ms,
+                    tls_ms: out.tls_ms,
+                    error: out.error,
+                    limitation: out.limitation,
+                    source: out.source,
                 },
             })
         }

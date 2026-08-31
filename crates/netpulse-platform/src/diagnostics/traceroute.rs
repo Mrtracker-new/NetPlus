@@ -59,6 +59,7 @@ impl DiagnosticProbe for TracerouteProbe {
         Ok(TracerouteOutput {
             target: self.target.clone(),
             hops,
+            source: "simulated".to_string(),
         })
     }
 }

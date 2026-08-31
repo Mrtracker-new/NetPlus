@@ -1357,6 +1357,7 @@ dependencies = [
 name = "netpulse-platform"
 version = "0.1.0"
 dependencies = [
+ "httparse",
  "netpulse-core",
  "netstat2",
  "pcap",

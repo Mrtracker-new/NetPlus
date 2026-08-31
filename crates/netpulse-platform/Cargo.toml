@@ -18,6 +18,7 @@ live-capture = ["dep:pcap", "dep:netstat2", "dep:sysinfo"]
 netpulse-core = { path = "../netpulse-core" }
 serde.workspace = true
 tracing.workspace = true
+httparse.workspace = true
 # The libpcap/Npcap binding — only compiled when `live-capture` is enabled, which
 # we only do on Windows. Encapsulates all the FFI `unsafe`, so this crate keeps
 # `#![forbid(unsafe_code)]`. Requires the Npcap SDK at build and Npcap at runtime.

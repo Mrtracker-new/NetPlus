@@ -110,7 +110,9 @@ pub struct BreakdownRowDto {
     pub label: String,
     pub bytes: u64,
     pub flows: u32,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hostnames: Vec<HostNameDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidenceRefDto>,
 }
 
@@ -224,8 +226,11 @@ pub struct DiagnosticStageNodeDto {
     pub detail: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub latency_ms: Option<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<EvidenceRefDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub causes: Vec<CauseDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub affected_targets: Vec<String>,
 }
 
@@ -233,6 +238,86 @@ pub struct DiagnosticStageNodeDto {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct DiagnosticChainDto {
     pub stages: Vec<DiagnosticStageNodeDto>,
+}
+
+/// Classification of a network communication endpoint or relationship.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EndpointClassificationDto {
+    LocalSubnet,
+    Gateway,
+    ExternalWan,
+    CdnEdge,
+    Multicast,
+}
+
+/// Aggregated metrics for an OS process attributed to observed network flows.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProcessMetricDto {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u64>,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exe_path: Option<String>,
+    pub bytes: u64,
+    pub packets: u64,
+    pub flows: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cpu_percent: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_bytes: Option<u64>,
+}
+
+/// An observed communicating flow lineage pair.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FlowLineageDto {
+    pub source: String,
+    pub destination: String,
+    pub protocol: String,
+    pub bytes: u64,
+    pub packets: u64,
+    pub direction: String,
+    pub flow_count: u32,
+    pub classification: EndpointClassificationDto,
+}
+
+/// Authentic health status of an engine or platform subsystem.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubsystemStatusDto {
+    pub name: String,
+    pub status: String,
+    pub detail: String,
+}
+
+/// Bucketed directional throughput sample over a discrete window interval.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThroughputSampleDto {
+    pub timestamp_mono_nanos: u64,
+    pub ingress_rate_bytes_sec: u64,
+    pub egress_rate_bytes_sec: u64,
+}
+
+/// Result status of an active stage diagnostic probe.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StageProbeStatusDto {
+    Success,
+    Degraded,
+    Timeout,
+    TargetUnavailable,
+    Error,
+}
+
+/// Grounded outcome of an active diagnostic probe executed against a stage.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StageProbeResultDto {
+    pub stage: DiagnosticChainStageKindDto,
+    pub probe_type: String,
+    pub target: Option<String>,
+    pub status: StageProbeStatusDto,
+    pub latency_ms: Option<f32>,
+    pub summary: String,
+    pub details: Vec<String>,
 }
 
 /// A monitoring snapshot over a window. Note the two loss
@@ -249,6 +334,24 @@ pub struct MonitorSnapshotDto {
     pub capture_stats: Option<CaptureStatsDto>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub diagnostic_chain: Option<DiagnosticChainDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub processes: Vec<ProcessMetricDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lineage: Vec<FlowLineageDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subsystems: Vec<SubsystemStatusDto>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub throughput_history: Vec<ThroughputSampleDto>,
+}
+
+/// Time range selection for monitoring snapshots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MonitorTimeRangeDto {
+    FiveMinutes,
+    FifteenMinutes,
+    OneHour,
+    TwentyFourHours,
 }
 
 /// How confident a flow's process attribution is.
@@ -931,6 +1034,36 @@ mod tests {
                     affected_targets: vec![],
                 }],
             }),
+            processes: vec![ProcessMetricDto {
+                pid: Some(42),
+                name: "test.exe".into(),
+                exe_path: None,
+                bytes: 1024,
+                packets: 10,
+                flows: 1,
+                cpu_percent: None,
+                memory_bytes: None,
+            }],
+            lineage: vec![FlowLineageDto {
+                source: "10.0.0.1".into(),
+                destination: "10.0.0.2".into(),
+                protocol: "TCP".into(),
+                bytes: 1024,
+                packets: 10,
+                direction: "outbound".into(),
+                flow_count: 1,
+                classification: EndpointClassificationDto::LocalSubnet,
+            }],
+            subsystems: vec![SubsystemStatusDto {
+                name: "Capture".into(),
+                status: "healthy".into(),
+                detail: "OK".into(),
+            }],
+            throughput_history: vec![ThroughputSampleDto {
+                timestamp_mono_nanos: 1000,
+                ingress_rate_bytes_sec: 500,
+                egress_rate_bytes_sec: 500,
+            }],
         });
         roundtrip(&AttributionDto {
             pid: None,
@@ -1299,5 +1432,431 @@ mod tests {
         let json = serde_json::to_string(&chain).unwrap();
         let parsed: DiagnosticChainDto = serde_json::from_str(&json).unwrap();
         assert_eq!(chain, parsed);
+    }
+
+    #[test]
+    fn monitoring_expanded_dtos_roundtrip() {
+        roundtrip(&ProcessMetricDto {
+            pid: Some(1234),
+            name: "chrome.exe".into(),
+            exe_path: Some("C:\\Program Files\\Google\\Chrome\\chrome.exe".into()),
+            bytes: 500_000,
+            packets: 450,
+            flows: 3,
+            cpu_percent: Some(2.5),
+            memory_bytes: Some(120_000_000),
+        });
+        roundtrip(&FlowLineageDto {
+            source: "192.168.1.100".into(),
+            destination: "142.250.190.46".into(),
+            protocol: "TLS".into(),
+            bytes: 1_200_000,
+            packets: 950,
+            direction: "outbound".into(),
+            flow_count: 2,
+            classification: EndpointClassificationDto::ExternalWan,
+        });
+        roundtrip(&SubsystemStatusDto {
+            name: "Capture Pipeline".into(),
+            status: "healthy".into(),
+            detail: "Buffer nominal (0% utilized)".into(),
+        });
+        roundtrip(&ThroughputSampleDto {
+            timestamp_mono_nanos: 1_000_000_000,
+            ingress_rate_bytes_sec: 150_000,
+            egress_rate_bytes_sec: 25_000,
+        });
+        roundtrip(&StageProbeResultDto {
+            stage: DiagnosticChainStageKindDto::Router,
+            probe_type: "GatewayProbe".into(),
+            target: Some("192.168.1.1".into()),
+            status: StageProbeStatusDto::Success,
+            latency_ms: Some(1.2),
+            summary: "Gateway reachable in 1.2ms".into(),
+            details: vec!["ICMP echo reply received".into()],
+        });
+    }
+
+    #[test]
+    fn monitoring_enums_use_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&EndpointClassificationDto::LocalSubnet).unwrap(),
+            r#""local_subnet""#
+        );
+        assert_eq!(
+            serde_json::to_string(&EndpointClassificationDto::Gateway).unwrap(),
+            r#""gateway""#
+        );
+        assert_eq!(
+            serde_json::to_string(&EndpointClassificationDto::ExternalWan).unwrap(),
+            r#""external_wan""#
+        );
+        assert_eq!(
+            serde_json::to_string(&StageProbeStatusDto::TargetUnavailable).unwrap(),
+            r#""target_unavailable""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MonitorTimeRangeDto::FiveMinutes).unwrap(),
+            r#""five_minutes""#
+        );
+        assert_eq!(
+            serde_json::to_string(&MonitorTimeRangeDto::TwentyFourHours).unwrap(),
+            r#""twenty_four_hours""#
+        );
+    }
+
+    fn worst_case_bounded_snapshot() -> MonitorSnapshotDto {
+        let process_fixtures = [
+            (
+                Some(4120),
+                "chrome.exe",
+                Some("C:\\Program Files\\Google\\Chrome\\chrome.exe"),
+            ),
+            (
+                Some(8842),
+                "Discord.exe",
+                Some("C:\\Users\\User\\Discord\\Discord.exe"),
+            ),
+            (
+                Some(1294),
+                "slack.exe",
+                Some("C:\\Users\\User\\slack\\slack.exe"),
+            ),
+            (
+                Some(16204),
+                "Code.exe",
+                Some("C:\\Users\\User\\Code\\Code.exe"),
+            ),
+            (
+                Some(9912),
+                "node.exe",
+                Some("C:\\Program Files\\nodejs\\node.exe"),
+            ),
+            (
+                Some(3408),
+                "Spotify.exe",
+                Some("C:\\Users\\User\\Spotify\\Spotify.exe"),
+            ),
+            (
+                Some(7120),
+                "curl.exe",
+                Some("C:\\Windows\\System32\\curl.exe"),
+            ),
+            (
+                Some(5516),
+                "git.exe",
+                Some("C:\\Program Files\\Git\\bin\\git.exe"),
+            ),
+            (
+                Some(2290),
+                "rustc.exe",
+                Some("C:\\Users\\User\\.cargo\\bin\\rustc.exe"),
+            ),
+            (None, "Unattributed Flows", None),
+        ];
+
+        let processes = process_fixtures
+            .iter()
+            .enumerate()
+            .map(|(i, (pid, name, path))| ProcessMetricDto {
+                pid: *pid,
+                name: name.to_string(),
+                exe_path: path.map(|s| s.to_string()),
+                bytes: 120_000_000 - (i as u64 * 8_000_000),
+                packets: 80_000 - (i as u64 * 4_000),
+                flows: 45 - (i as u32 * 3),
+                cpu_percent: pid.map(|_| 12.5 + (i as f32 * 1.5)),
+                memory_bytes: pid.map(|_| 1024 * 1024 * 256 + (i as u64 * 1024 * 1024 * 32)),
+            })
+            .collect();
+
+        let lineage_fixtures = [
+            (
+                "192.168.1.105",
+                "142.250.190.46",
+                "TLSv1.3",
+                EndpointClassificationDto::ExternalWan,
+            ),
+            (
+                "192.168.1.105",
+                "1.1.1.1",
+                "DNS/UDP",
+                EndpointClassificationDto::ExternalWan,
+            ),
+            (
+                "192.168.1.105",
+                "151.101.1.140",
+                "HTTPS/QUIC",
+                EndpointClassificationDto::CdnEdge,
+            ),
+            (
+                "192.168.1.105",
+                "192.168.1.1",
+                "TCP/Gateway",
+                EndpointClassificationDto::Gateway,
+            ),
+            (
+                "192.168.1.105",
+                "2607:f8b0:4005:809::200e",
+                "HTTPS/TLS1.3",
+                EndpointClassificationDto::ExternalWan,
+            ),
+            (
+                "192.168.1.105",
+                "192.168.1.200",
+                "Local/SMB",
+                EndpointClassificationDto::LocalSubnet,
+            ),
+            (
+                "192.168.1.105",
+                "224.0.0.251",
+                "mDNS/UDP",
+                EndpointClassificationDto::Multicast,
+            ),
+            (
+                "192.168.1.105",
+                "104.244.42.1",
+                "HTTPS/TLS1.3",
+                EndpointClassificationDto::ExternalWan,
+            ),
+            (
+                "192.168.1.105",
+                "52.84.125.33",
+                "CloudFront/TLS",
+                EndpointClassificationDto::CdnEdge,
+            ),
+            (
+                "192.168.1.105",
+                "192.168.1.254",
+                "Router/LLDP",
+                EndpointClassificationDto::Gateway,
+            ),
+        ];
+
+        let lineage = lineage_fixtures
+            .iter()
+            .enumerate()
+            .map(|(i, (src, dst, proto, class))| FlowLineageDto {
+                source: src.to_string(),
+                destination: dst.to_string(),
+                protocol: proto.to_string(),
+                bytes: 65_000_000 - (i as u64 * 4_000_000),
+                packets: 45_000 - (i as u64 * 2_500),
+                direction: if i % 2 == 0 {
+                    "outbound".to_string()
+                } else {
+                    "inbound".to_string()
+                },
+                flow_count: 6 + (i as u32),
+                classification: *class,
+            })
+            .collect();
+
+        let throughput_history = (0..12)
+            .map(|i| ThroughputSampleDto {
+                timestamp_mono_nanos: 1_000_000_000 * (i as u64 + 1),
+                ingress_rate_bytes_sec: 8_500_000 + (i as u64 * 400_000),
+                egress_rate_bytes_sec: 1_200_000 + (i as u64 * 80_000),
+            })
+            .collect();
+
+        let stages = vec![
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Device,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "Device (Local Stack)".to_string(),
+                summary: "Local capture pipeline operational".to_string(),
+                detail: Some("Buffer nominal, zero memory overrun".to_string()),
+                latency_ms: None,
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Interface,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "Network Interface".to_string(),
+                summary: "Adapter link healthy".to_string(),
+                detail: None,
+                latency_ms: None,
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Router,
+                status: DiagnosticStageStatusDto::Investigate,
+                measurement_state: MeasurementStateDto::Inferred,
+                detection_state: DetectionStateDto::Detected,
+                label: "Router / Gateway".to_string(),
+                summary: "Gateway link jitter / loss inferred".to_string(),
+                detail: Some("Loss & jitter across multiple destinations".to_string()),
+                latency_ms: Some(15.2),
+                evidence: vec![EvidenceRefDto::Flow(707)],
+                causes: vec![CauseDto::LocalWifi],
+                affected_targets: vec!["192.168.1.1".to_string()],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Isp,
+                status: DiagnosticStageStatusDto::Unknown,
+                measurement_state: MeasurementStateDto::NotMeasurable,
+                detection_state: DetectionStateDto::NotDetected,
+                label: "Internet Service Provider".to_string(),
+                summary: "ISP upstream hop not sampled".to_string(),
+                detail: None,
+                latency_ms: None,
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Dns,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "DNS Resolver".to_string(),
+                summary: "Resolution nominal".to_string(),
+                detail: None,
+                latency_ms: Some(18.5),
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Cdn,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "CDN / Edge Distribution".to_string(),
+                summary: "Edge routes nominal".to_string(),
+                detail: None,
+                latency_ms: Some(24.0),
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+            DiagnosticStageNodeDto {
+                stage: DiagnosticChainStageKindDto::Destination,
+                status: DiagnosticStageStatusDto::Healthy,
+                measurement_state: MeasurementStateDto::Observed,
+                detection_state: DetectionStateDto::Detected,
+                label: "Destination Server".to_string(),
+                summary: "Destination servers responsive".to_string(),
+                detail: None,
+                latency_ms: Some(38.2),
+                evidence: vec![],
+                causes: vec![],
+                affected_targets: vec![],
+            },
+        ];
+
+        let subsystems = vec![
+            SubsystemStatusDto {
+                name: "Capture Pipeline Buffer".to_string(),
+                status: "healthy".to_string(),
+                detail: "Buffer utilization 12.5%, 0 dropped frames".to_string(),
+            },
+            SubsystemStatusDto {
+                name: "Process Attribution Correlator".to_string(),
+                status: "healthy".to_string(),
+                detail: "Active table query via netpulse-platform sockets".to_string(),
+            },
+            SubsystemStatusDto {
+                name: "Storage Engine".to_string(),
+                status: "healthy".to_string(),
+                detail: "Append-only session store committing frames".to_string(),
+            },
+            SubsystemStatusDto {
+                name: "Network Driver Interface".to_string(),
+                status: "healthy".to_string(),
+                detail: "Operating with zero ring drops".to_string(),
+            },
+            SubsystemStatusDto {
+                name: "Diagnostic Reasoning Engine".to_string(),
+                status: "healthy".to_string(),
+                detail: "7/7 stages continuously monitored".to_string(),
+            },
+        ];
+
+        let by_protocol = BreakdownDto {
+            dimension: DimensionDto::Protocol,
+            rows: ["TLS", "TCP", "UDP", "DNS"]
+                .iter()
+                .enumerate()
+                .map(|(i, proto)| BreakdownRowDto {
+                    label: proto.to_string(),
+                    bytes: 85_000_000 - (i as u64 * 12_000_000),
+                    flows: 50 - (i as u32 * 5),
+                    hostnames: vec![],
+                    evidence: vec![EvidenceRefDto::Flow(i as u64 + 1)],
+                })
+                .collect(),
+        };
+
+        let by_host = BreakdownDto {
+            dimension: DimensionDto::Host,
+            rows: [
+                ("142.250.190.46", "google.com"),
+                ("151.101.1.140", "fastly.net"),
+                ("1.1.1.1", "one.one.one.one"),
+                ("192.168.1.1", "gateway.home"),
+            ]
+            .iter()
+            .enumerate()
+            .map(|(i, (ip, name))| BreakdownRowDto {
+                label: ip.to_string(),
+                bytes: 60_000_000 - (i as u64 * 10_000_000),
+                flows: 30 - (i as u32 * 4),
+                hostnames: vec![HostNameDto {
+                    name: name.to_string(),
+                    source: NameSourceDto::Dns,
+                }],
+                evidence: vec![EvidenceRefDto::Flow(100 + i as u64)],
+            })
+            .collect(),
+        };
+
+        let diagnoses = vec![DiagnosisDto {
+            cause: CauseDto::LocalWifi,
+            confidence_percent: 85,
+            explanation: "Elevated packet retransmissions observed on local Wi-Fi interface"
+                .to_string(),
+            evidence: vec![EvidenceRefDto::Flow(707)],
+        }];
+
+        MonitorSnapshotDto {
+            by_protocol,
+            by_host,
+            diagnoses,
+            network_loss_indicators: 4,
+            capture_drops: 0,
+            capture_stats: Some(CaptureStatsDto {
+                buffer_frames: 125,
+                buffer_capacity: 1000,
+                shed_stage: ShedStageDto::None,
+                dropped: 0,
+            }),
+            diagnostic_chain: Some(DiagnosticChainDto { stages }),
+            processes,
+            lineage,
+            subsystems,
+            throughput_history,
+        }
+    }
+
+    #[test]
+    fn monitor_snapshot_serialized_size_stays_under_8kb() {
+        let snapshot = worst_case_bounded_snapshot();
+        let bytes = serde_json::to_vec(&snapshot).unwrap();
+
+        assert!(
+            bytes.len() < 8 * 1024,
+            "MonitorSnapshotDto exceeded 8 KiB: {} bytes",
+            bytes.len()
+        );
     }
 }

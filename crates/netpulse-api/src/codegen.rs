@@ -83,6 +83,35 @@ pub fn typescript_contract() -> String {
         &["observed", "inferred", "unknown", "not_measurable"],
     ));
     s.push_str(&union("DetectionState", &["detected", "not_detected"]));
+    s.push_str(&union(
+        "EndpointClassification",
+        &[
+            "local_subnet",
+            "gateway",
+            "external_wan",
+            "cdn_edge",
+            "multicast",
+        ],
+    ));
+    s.push_str(&union(
+        "StageProbeStatus",
+        &[
+            "success",
+            "degraded",
+            "timeout",
+            "target_unavailable",
+            "error",
+        ],
+    ));
+    s.push_str(&union(
+        "MonitorTimeRange",
+        &[
+            "five_minutes",
+            "fifteen_minutes",
+            "one_hour",
+            "twenty_four_hours",
+        ],
+    ));
 
     // --- EvidenceRef: internally-tagged union (matches #[serde(tag,content)]) ---
     s.push_str(
@@ -161,6 +190,60 @@ pub fn typescript_contract() -> String {
         &[("stages", "DiagnosticStageNode[]")],
     ));
     s.push_str(&iface(
+        "ProcessMetric",
+        &[
+            ("pid", "number | null"),
+            ("name", "string"),
+            ("exe_path?", "string | null"),
+            ("bytes", "number"),
+            ("packets", "number"),
+            ("flows", "number"),
+            ("cpu_percent?", "number | null"),
+            ("memory_bytes?", "number | null"),
+        ],
+    ));
+    s.push_str(&iface(
+        "FlowLineage",
+        &[
+            ("source", "string"),
+            ("destination", "string"),
+            ("protocol", "string"),
+            ("bytes", "number"),
+            ("packets", "number"),
+            ("direction", "string"),
+            ("flow_count", "number"),
+            ("classification", "EndpointClassification"),
+        ],
+    ));
+    s.push_str(&iface(
+        "SubsystemStatus",
+        &[
+            ("name", "string"),
+            ("status", "string"),
+            ("detail", "string"),
+        ],
+    ));
+    s.push_str(&iface(
+        "ThroughputSample",
+        &[
+            ("timestamp_mono_nanos", "number"),
+            ("ingress_rate_bytes_sec", "number"),
+            ("egress_rate_bytes_sec", "number"),
+        ],
+    ));
+    s.push_str(&iface(
+        "StageProbeResult",
+        &[
+            ("stage", "DiagnosticChainStageKind"),
+            ("probe_type", "string"),
+            ("target?", "string | null"),
+            ("status", "StageProbeStatus"),
+            ("latency_ms?", "number | null"),
+            ("summary", "string"),
+            ("details", "string[]"),
+        ],
+    ));
+    s.push_str(&iface(
         "MonitorSnapshot",
         &[
             ("by_protocol", "Breakdown"),
@@ -170,6 +253,10 @@ pub fn typescript_contract() -> String {
             ("capture_drops", "number"),
             ("capture_stats?", "CaptureStats"),
             ("diagnostic_chain?", "DiagnosticChain"),
+            ("processes?", "ProcessMetric[]"),
+            ("lineage?", "FlowLineage[]"),
+            ("subsystems?", "SubsystemStatus[]"),
+            ("throughput_history?", "ThroughputSample[]"),
         ],
     ));
     s.push_str(&iface(
@@ -758,6 +845,7 @@ mod tests {
             "DiagnosticStageNode",
             "DiagnosticChain",
             "MonitorSnapshot",
+            "MonitorTimeRange",
             "Attribution",
             "Interface",
             "ExerciseKind",
@@ -799,6 +887,13 @@ mod tests {
             "PacketInspection",
             "SessionDiff",
             "FleetHost",
+            "EndpointClassification",
+            "ProcessMetric",
+            "FlowLineage",
+            "SubsystemStatus",
+            "ThroughputSample",
+            "StageProbeStatus",
+            "StageProbeResult",
         ] {
             assert!(ts.contains(expected), "TS contract missing {expected}");
         }

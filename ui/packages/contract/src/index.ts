@@ -16,10 +16,13 @@ export type {
   DiagnosticStageStatus,
   MeasurementState,
   DetectionState,
+  MonitorTimeRange,
 } from "./generated";
 
 import type {
+  DiagnosticChainStageKind,
   MonitorSnapshot,
+  MonitorTimeRange,
   NarrativeCard,
   Attribution,
   ProjectionDepth,
@@ -51,6 +54,7 @@ import type {
   LessonDetail,
   LearningProgress,
   ExerciseValidationOutcome,
+  StageProbeResult,
 } from "./generated";
 
 /** Live channels the UI subscribes to (mirrors `netpulse_api::StreamChannel`). */
@@ -61,12 +65,12 @@ export type StreamChannel = "flows" | "metrics" | "findings" | "narratives";
 export type Query =
   | {
       kind: "narrativeFeed";
-      from_mono_nanos: number;
-      to_mono_nanos: number;
+      from_mono_nanos?: number;
+      to_mono_nanos?: number;
       depth: ProjectionDepth;
     }
   | { kind: "journeyOfSession"; session_id: number; depth: ProjectionDepth }
-  | { kind: "monitorSnapshot"; from_mono_nanos: number; to_mono_nanos: number }
+  | { kind: "monitorSnapshot"; from_mono_nanos?: number; to_mono_nanos?: number; time_range?: MonitorTimeRange }
   | { kind: "attributionOfFlow"; flow_id: number }
   | { kind: "packetsOfFlow"; flow_id: number }
   // Phase 3 education queries.
@@ -98,7 +102,8 @@ export type Query =
   | { kind: "runHttpProbe"; url: string }
   | { kind: "buildAndDecodePacket"; layers: string[] }
   | { kind: "compareSessions"; session_id_a: number; session_id_b: number }
-  | { kind: "listFleetHosts" };
+  | { kind: "listFleetHosts" }
+  | { kind: "runStageProbe"; stage: DiagnosticChainStageKind; target?: string | null };
 
 export type FleetHostStatus = "Online" | "Offline" | "Degraded" | "Healthy" | "Unknown";
 
@@ -137,7 +142,8 @@ export type QueryResponse =
   | { kind: "httpResult"; result: HttpResult }
   | { kind: "decodedPacketInspection"; inspection: PacketInspection }
   | { kind: "sessionDiff"; diff: SessionDiff }
-  | { kind: "fleetHosts"; hosts: FleetHost[] };
+  | { kind: "fleetHosts"; hosts: FleetHost[] }
+  | { kind: "stageProbeResult"; result: StageProbeResult };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic. */

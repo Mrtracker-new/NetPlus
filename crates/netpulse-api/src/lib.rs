@@ -28,15 +28,18 @@ pub use dto::{
     handshake_codes, handshake_error_codes, AnimationKindDto, AnimationModelDto,
     AssistantAnswerDto, AttributionConfidenceDto, AttributionDto, BreakdownDto, BreakdownRowDto,
     CaptureStatsDto, CauseDto, ComponentCheckDto, CurriculumLessonDto, CurriculumModuleDto,
-    DiagnosisDto, DimensionDto, DirectionDto, EvidenceRefDto, ExerciseChoiceDto, ExerciseKindDto,
+    DiagnosisDto, DiagnosticChainStageKindDto, DimensionDto, DirectionDto,
+    EndpointClassificationDto, EvidenceRefDto, ExerciseChoiceDto, ExerciseKindDto,
     ExerciseValidationOutcomeDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto,
-    ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
-    HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto, JourneyStageDto,
-    LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto, LessonStepDto,
-    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
-    PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
-    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
-    ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
+    ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, FlowLineageDto,
+    GroundedExerciseDto, HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto,
+    JourneyStageDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
+    LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto, NarrativeCardDto,
+    PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto,
+    PluginTypeDto, PrivacyManifestDto, ProcessMetricDto, ProjectionDepth, RecordingSummaryDto,
+    ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto,
+    StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto, ThroughputSampleDto,
+    VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
@@ -160,8 +163,10 @@ pub enum StreamChannel {
 pub enum Query {
     /// The narrative feed for a time window, newest first.
     NarrativeFeed {
-        from_mono_nanos: u64,
-        to_mono_nanos: u64,
+        #[serde(default)]
+        from_mono_nanos: Option<u64>,
+        #[serde(default)]
+        to_mono_nanos: Option<u64>,
         depth: ProjectionDepth,
     },
     /// The narrative journey for one session.
@@ -171,8 +176,12 @@ pub enum Query {
     },
     /// A monitoring snapshot over a window.
     MonitorSnapshot {
-        from_mono_nanos: u64,
-        to_mono_nanos: u64,
+        #[serde(default)]
+        from_mono_nanos: Option<u64>,
+        #[serde(default)]
+        to_mono_nanos: Option<u64>,
+        #[serde(default)]
+        time_range: Option<MonitorTimeRangeDto>,
     },
     /// The process attribution for a flow.
     AttributionOfFlow { flow_id: u64 },
@@ -263,6 +272,11 @@ pub enum Query {
     },
     /// List remote fleet observation hosts.
     ListFleetHosts,
+    /// Execute an active diagnostic probe for a specific diagnostic chain stage.
+    RunStageProbe {
+        stage: DiagnosticChainStageKindDto,
+        target: Option<String>,
+    },
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -389,6 +403,10 @@ pub enum QueryResponse {
     },
     FleetHosts {
         hosts: Vec<HostIdentityDto>,
+    },
+    /// Result of an active stage diagnostic probe.
+    StageProbeResult {
+        result: StageProbeResultDto,
     },
 }
 
@@ -607,13 +625,25 @@ mod tests {
         // TS contract (`ui/packages/contract`) sends/reads. A regression here is
         // what silently broke every query/command before (externally tagged).
         let q = serde_json::to_string(&Query::NarrativeFeed {
-            from_mono_nanos: 0,
-            to_mono_nanos: 1,
+            from_mono_nanos: Some(0),
+            to_mono_nanos: Some(1),
             depth: ProjectionDepth::Beginner,
         })
         .unwrap();
         assert!(q.contains("\"kind\":\"narrativeFeed\""), "{q}");
         assert!(q.contains("\"from_mono_nanos\":0"), "{q}");
+
+        // Omitting from_mono_nanos and to_mono_nanos deserializes cleanly with None
+        let omitted: Query =
+            serde_json::from_str(r#"{"kind":"narrativeFeed","depth":"beginner"}"#).unwrap();
+        assert_eq!(
+            omitted,
+            Query::NarrativeFeed {
+                from_mono_nanos: None,
+                to_mono_nanos: None,
+                depth: ProjectionDepth::Beginner,
+            }
+        );
 
         let c = serde_json::to_string(&Command::StartCapture { iface_id: 0 }).unwrap();
         assert_eq!(c, r#"{"kind":"startCapture","iface_id":0}"#);
@@ -669,8 +699,8 @@ mod tests {
     fn query_carries_projection_depth() {
         // A narrative-feed query round-trips with its depth.
         let q = Query::NarrativeFeed {
-            from_mono_nanos: 0,
-            to_mono_nanos: 1_000,
+            from_mono_nanos: Some(0),
+            to_mono_nanos: Some(1_000),
             depth: ProjectionDepth::Beginner,
         };
         let json = serde_json::to_string(&q).unwrap();

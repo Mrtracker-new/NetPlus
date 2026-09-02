@@ -27,6 +27,12 @@ export type MeasurementState = "observed" | "inferred" | "unknown" | "not_measur
 
 export type DetectionState = "detected" | "not_detected";
 
+export type EndpointClassification = "local_subnet" | "gateway" | "external_wan" | "cdn_edge" | "multicast";
+
+export type StageProbeStatus = "success" | "degraded" | "timeout" | "target_unavailable" | "error";
+
+export type MonitorTimeRange = "five_minutes" | "fifteen_minutes" | "one_hour" | "twenty_four_hours";
+
 export type EvidenceRef =
   | { kind: "packet"; id: number }
   | { kind: "flow"; id: number }
@@ -91,6 +97,50 @@ export interface DiagnosticChain {
   stages: DiagnosticStageNode[];
 }
 
+export interface ProcessMetric {
+  pid: number | null;
+  name: string;
+  exe_path?: string | null;
+  bytes: number;
+  packets: number;
+  flows: number;
+  cpu_percent?: number | null;
+  memory_bytes?: number | null;
+}
+
+export interface FlowLineage {
+  source: string;
+  destination: string;
+  protocol: string;
+  bytes: number;
+  packets: number;
+  direction: string;
+  flow_count: number;
+  classification: EndpointClassification;
+}
+
+export interface SubsystemStatus {
+  name: string;
+  status: string;
+  detail: string;
+}
+
+export interface ThroughputSample {
+  timestamp_mono_nanos: number;
+  ingress_rate_bytes_sec: number;
+  egress_rate_bytes_sec: number;
+}
+
+export interface StageProbeResult {
+  stage: DiagnosticChainStageKind;
+  probe_type: string;
+  target?: string | null;
+  status: StageProbeStatus;
+  latency_ms?: number | null;
+  summary: string;
+  details: string[];
+}
+
 export interface MonitorSnapshot {
   by_protocol: Breakdown;
   by_host: Breakdown;
@@ -99,6 +149,10 @@ export interface MonitorSnapshot {
   capture_drops: number;
   capture_stats?: CaptureStats;
   diagnostic_chain?: DiagnosticChain;
+  processes?: ProcessMetric[];
+  lineage?: FlowLineage[];
+  subsystems?: SubsystemStatus[];
+  throughput_history?: ThroughputSample[];
 }
 
 export interface Attribution {

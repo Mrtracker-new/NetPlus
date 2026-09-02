@@ -116,7 +116,7 @@ pub struct Journey {
 }
 
 /// The attributed application behind a flow.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Process {
     pub pid: u64,
     pub name: String,
@@ -127,6 +127,12 @@ pub struct Process {
     /// the original process. `0` when the OS did not expose it.
     #[serde(default)]
     pub start_mono_nanos: u64,
+    /// Measured CPU utilization percentage from the OS, if available.
+    #[serde(default)]
+    pub cpu_percent: Option<f32>,
+    /// Resident memory bytes from the OS, if available.
+    #[serde(default)]
+    pub memory_bytes: Option<u64>,
 }
 
 /// A snapshot row mapping one socket (its 5-tuple) to its owning process, as read

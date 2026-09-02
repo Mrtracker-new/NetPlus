@@ -277,6 +277,8 @@ mod tests {
                 exe_path: "/usr/bin/curl".into(),
                 signer: None,
                 start_mono_nanos: 0,
+                cpu_percent: None,
+                memory_bytes: None,
             },
         );
 
@@ -341,6 +343,8 @@ mod tests {
                 exe_path: "/usr/bin/curl".into(),
                 signer: None,
                 start_mono_nanos: 0,
+                cpu_percent: None,
+                memory_bytes: None,
             },
         );
 

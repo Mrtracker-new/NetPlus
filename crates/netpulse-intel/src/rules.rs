@@ -415,6 +415,8 @@ mod tests {
                 exe_path: "/tmp/mystery.exe".into(),
                 signer: None,
                 start_mono_nanos: 0,
+                cpu_percent: None,
+                memory_bytes: None,
             },
         );
         let f = unexpected_egress(&view(&flows, &[], &procs));
@@ -431,6 +433,8 @@ mod tests {
                 exe_path: "/usr/bin/chrome".into(),
                 signer: Some("Google LLC".into()),
                 start_mono_nanos: 0,
+                cpu_percent: None,
+                memory_bytes: None,
             },
         );
         assert!(unexpected_egress(&view(&flows, &[], &signed)).is_empty());

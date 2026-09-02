@@ -18,7 +18,7 @@ use netpulse_core::traits::SocketTableSource;
 use netpulse_core::Result;
 
 use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 /// A live [`SocketTableSource`] over the OS socket tables. Holds a `sysinfo`
 /// system behind a `Mutex` for interior-mutable lazy process lookups (the trait
@@ -97,7 +97,10 @@ impl SocketTableSource for WindowsSockets {
         system.refresh_processes_specifics(
             ProcessesToUpdate::Some(&[sys_pid]),
             true,
-            ProcessRefreshKind::nothing(),
+            ProcessRefreshKind::nothing()
+                .with_cpu()
+                .with_memory()
+                .with_exe(UpdateKind::OnlyIfNotSet),
         );
         let Some(proc_) = system.process(sys_pid) else {
             return Ok(None);
@@ -107,6 +110,13 @@ impl SocketTableSource for WindowsSockets {
             .exe()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();
+        let cpu_usage = proc_.cpu_usage();
+        let cpu_percent = if cpu_usage > 0.0 {
+            Some(cpu_usage)
+        } else {
+            None
+        };
+        let memory_bytes = Some(proc_.memory());
         Ok(Some(Process {
             pid,
             name,
@@ -115,6 +125,8 @@ impl SocketTableSource for WindowsSockets {
             // sysinfo reports start time in seconds since epoch; store as ns so
             // the field's unit is consistent, even though it's a wall clock here.
             start_mono_nanos: proc_.start_time().saturating_mul(1_000_000_000),
+            cpu_percent,
+            memory_bytes,
         }))
     }
 }

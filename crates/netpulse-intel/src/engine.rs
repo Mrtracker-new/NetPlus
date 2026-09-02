@@ -244,6 +244,8 @@ mod tests {
                     exe_path: "/tmp/agent.bin".into(),
                     signer: None, // unsigned
                     start_mono_nanos: 0,
+                    cpu_percent: None,
+                    memory_bytes: None,
                 },
             );
         }

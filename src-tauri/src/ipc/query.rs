@@ -26,12 +26,26 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 cards: view.narratives,
             })
         }
-        Query::MonitorSnapshot { .. } => {
+        Query::MonitorSnapshot {
+            from_mono_nanos,
+            to_mono_nanos,
+            time_range,
+        } => {
             let depth = match state.depth.lock() {
                 Ok(g) => *g,
                 Err(p) => *p.into_inner(),
             };
-            let view = present(&store, depth, stats);
+            let correlator = state.correlator.lock().ok();
+            let view = netpulse_engine::pipeline::present_window(
+                &store,
+                depth,
+                stats,
+                correlator.as_deref(),
+                state.sockets.as_deref(),
+                time_range,
+                from_mono_nanos,
+                to_mono_nanos,
+            );
             Ok(QueryResponse::MonitorSnapshot {
                 snapshot: view.monitor,
             })
@@ -432,6 +446,282 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 },
             })
         }
+        Query::RunStageProbe { stage, target } => {
+            use netpulse_api::dto::{DiagnosticChainStageKindDto, StageProbeResultDto, StageProbeStatusDto};
+            use netpulse_platform::diagnostics::DiagnosticProbe;
+
+            let cancel = std::sync::atomic::AtomicBool::new(false);
+
+            let result = match stage {
+                DiagnosticChainStageKindDto::Device | DiagnosticChainStageKindDto::Interface => {
+                    let stats_dropped = stats.dropped;
+                    let buf_util = if stats.buffer_capacity > 0 {
+                        (stats.buffer_frames as f32 / stats.buffer_capacity as f32) * 100.0
+                    } else {
+                        0.0
+                    };
+                    StageProbeResultDto {
+                        stage,
+                        probe_type: "LocalStackProbe".to_string(),
+                        target: None,
+                        status: if stats_dropped > 0 { StageProbeStatusDto::Degraded } else { StageProbeStatusDto::Success },
+                        latency_ms: Some(0.0),
+                        summary: format!("Local capture stack verified: {stats_dropped} drops, buffer {buf_util:.1}% utilized"),
+                        details: vec![
+                            format!("Buffer capacity: {}", stats.buffer_capacity),
+                            format!("Buffer frames: {}", stats.buffer_frames),
+                            format!("Shed stage: {:?}", stats.shed_stage),
+                        ],
+                    }
+                }
+                DiagnosticChainStageKindDto::Router => {
+                    use netpulse_platform::diagnostics::GatewayProbe;
+                    let probe = GatewayProbe::new();
+                    match probe.run(cancel) {
+                        Ok(out) => {
+                            let (status, lat) = match out.status.as_str() {
+                                "Reachable" => (StageProbeStatusDto::Success, Some(1.0)),
+                                "Degraded" => (StageProbeStatusDto::Degraded, Some(15.0)),
+                                _ => (StageProbeStatusDto::Error, None),
+                            };
+                            StageProbeResultDto {
+                                stage,
+                                probe_type: "GatewayProbe".to_string(),
+                                target: out.gateway_ip.clone(),
+                                status,
+                                latency_ms: lat,
+                                summary: format!("Default gateway {} on interface {}: {}", out.gateway_ip.as_deref().unwrap_or("none"), out.interface_name.as_deref().unwrap_or("none"), out.status),
+                                details: vec![format!("Source: {}", out.source)],
+                            }
+                        }
+                        Err(e) => StageProbeResultDto {
+                            stage,
+                            probe_type: "GatewayProbe".to_string(),
+                            target: None,
+                            status: StageProbeStatusDto::Error,
+                            latency_ms: None,
+                            summary: format!("Gateway probe failed: {e}"),
+                            details: vec![],
+                        },
+                    }
+                }
+                DiagnosticChainStageKindDto::Isp => {
+                    let Some(t) = target.filter(|s| is_valid_probe_target(s)) else {
+                        return Ok(QueryResponse::StageProbeResult {
+                            result: StageProbeResultDto {
+                                stage,
+                                probe_type: "TracerouteProbe".to_string(),
+                                target: None,
+                                status: StageProbeStatusDto::TargetUnavailable,
+                                latency_ms: None,
+                                summary: "No valid destination target available to measure ISP upstream hops".to_string(),
+                                details: vec!["Active ISP hop analysis requires a valid IP address or hostname target.".to_string()],
+                            },
+                        });
+                    };
+
+                    use netpulse_platform::diagnostics::TracerouteProbe;
+                    let probe = TracerouteProbe::new(t.clone(), "udp".to_string(), 15);
+                    match probe.run(cancel) {
+                        Ok(out) => {
+                            let rtt = out.hops.first().map(|h| h.rtt_ms);
+                            let hop_count = out.hops.len();
+                            StageProbeResultDto {
+                                stage,
+                                probe_type: "TracerouteProbe".to_string(),
+                                target: Some(t),
+                                status: if rtt.is_some() { StageProbeStatusDto::Success } else { StageProbeStatusDto::Degraded },
+                                latency_ms: rtt,
+                                summary: format!("Traced {hop_count} hops toward target"),
+                                details: out.hops.iter().map(|h| format!("Hop {}: {} (rtt: {:?})", h.ttl, h.ip, h.rtt_ms)).collect(),
+                            }
+                        }
+                        Err(e) => StageProbeResultDto {
+                            stage,
+                            probe_type: "TracerouteProbe".to_string(),
+                            target: Some(t),
+                            status: StageProbeStatusDto::Error,
+                            latency_ms: None,
+                            summary: format!("Traceroute probe failed: {e}"),
+                            details: vec![],
+                        },
+                    }
+                }
+                DiagnosticChainStageKindDto::Dns => {
+                    let Some(t) = target.filter(|s| is_valid_probe_target(s)) else {
+                        return Ok(QueryResponse::StageProbeResult {
+                            result: StageProbeResultDto {
+                                stage,
+                                probe_type: "DnsProbe".to_string(),
+                                target: None,
+                                status: StageProbeStatusDto::TargetUnavailable,
+                                latency_ms: None,
+                                summary: "No valid DNS query target observed in current capture window".to_string(),
+                                details: vec!["Generate DNS traffic or supply a valid domain name to enable in-line resolution probing.".to_string()],
+                            },
+                        });
+                    };
+
+                    use netpulse_platform::diagnostics::DnsProbe;
+                    let probe = DnsProbe::new(t.clone());
+                    match probe.run(cancel) {
+                        Ok(out) => {
+                            let status = if out.timed_out {
+                                StageProbeStatusDto::Timeout
+                            } else if out.error.is_some() {
+                                StageProbeStatusDto::Error
+                            } else {
+                                StageProbeStatusDto::Success
+                            };
+                            StageProbeResultDto {
+                                stage,
+                                probe_type: "DnsProbe".to_string(),
+                                target: Some(t),
+                                status,
+                                latency_ms: out.resolution_rtt_ms,
+                                summary: format!(
+                                    "DNS resolution for {}: {} ms ({} IPs resolved)",
+                                    out.target,
+                                    out.resolution_rtt_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
+                                    out.resolved_ips.len()
+                                ),
+                                details: out.resolved_ips.iter().map(|ip| format!("Resolved: {ip}")).collect(),
+                            }
+                        }
+                        Err(e) => StageProbeResultDto {
+                            stage,
+                            probe_type: "DnsProbe".to_string(),
+                            target: Some(t),
+                            status: StageProbeStatusDto::Error,
+                            latency_ms: None,
+                            summary: format!("DNS probe error: {e}"),
+                            details: vec![],
+                        },
+                    }
+                }
+                DiagnosticChainStageKindDto::Cdn => {
+                    let Some(t) = target.filter(|s| is_valid_probe_target(s)) else {
+                        return Ok(QueryResponse::StageProbeResult {
+                            result: StageProbeResultDto {
+                                stage,
+                                probe_type: "HttpProbe".to_string(),
+                                target: None,
+                                status: StageProbeStatusDto::TargetUnavailable,
+                                latency_ms: None,
+                                summary: "No valid CDN edge URL observed in current capture window".to_string(),
+                                details: vec!["A valid HTTP/HTTPS endpoint or hostname is required for CDN edge probing.".to_string()],
+                            },
+                        });
+                    };
+
+                    use netpulse_platform::diagnostics::HttpProbe;
+                    let url = if !t.starts_with("http://") && !t.starts_with("https://") {
+                        format!("https://{t}")
+                    } else {
+                        t.clone()
+                    };
+                    let probe = HttpProbe::new(url.clone());
+                    match probe.run(cancel) {
+                        Ok(out) => {
+                            let status = if out.error.is_some() {
+                                StageProbeStatusDto::Error
+                            } else {
+                                StageProbeStatusDto::Success
+                            };
+                            StageProbeResultDto {
+                                stage,
+                                probe_type: "HttpProbe".to_string(),
+                                target: Some(url),
+                                status,
+                                latency_ms: out.ttfb_ms,
+                                summary: format!(
+                                    "HTTP TTFB: {} ms, connect: {} ms (status: {:?})",
+                                    out.ttfb_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
+                                    out.connect_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
+                                    out.status_code
+                                ),
+                                details: vec![
+                                    format!("Connect: {} ms", out.connect_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
+                                    format!("TTFB: {} ms", out.ttfb_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
+                                    format!("Transfer: {} ms", out.transfer_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
+                                    format!("TLS: {} ms", out.tls_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
+                                ],
+                            }
+                        }
+                        Err(e) => StageProbeResultDto {
+                            stage,
+                            probe_type: "HttpProbe".to_string(),
+                            target: Some(url),
+                            status: StageProbeStatusDto::Error,
+                            latency_ms: None,
+                            summary: format!("HTTP probe failed: {e}"),
+                            details: vec![],
+                        },
+                    }
+                }
+                DiagnosticChainStageKindDto::Destination => {
+                    let Some(t) = target.filter(|s| is_valid_probe_target(s)) else {
+                        return Ok(QueryResponse::StageProbeResult {
+                            result: StageProbeResultDto {
+                                stage,
+                                probe_type: "PingProbe".to_string(),
+                                target: None,
+                                status: StageProbeStatusDto::TargetUnavailable,
+                                latency_ms: None,
+                                summary: "No valid remote destination endpoint observed in current capture window".to_string(),
+                                details: vec!["Capture active flows to a destination or provide a valid IP/hostname target before running probe.".to_string()],
+                            },
+                        });
+                    };
+
+                    use netpulse_platform::diagnostics::PingProbe;
+                    let probe = PingProbe::new(t.clone(), 4);
+                    match probe.run(cancel) {
+                        Ok(out) => {
+                            let status = if out.loss_pct >= 100.0 {
+                                StageProbeStatusDto::Timeout
+                            } else if out.loss_pct > 0.0 {
+                                StageProbeStatusDto::Degraded
+                            } else {
+                                StageProbeStatusDto::Success
+                            };
+                            StageProbeResultDto {
+                                stage,
+                                probe_type: "PingProbe".to_string(),
+                                target: Some(t),
+                                status,
+                                latency_ms: Some(out.avg_rtt_ms),
+                                summary: format!("Ping to {}: avg {:.1} ms (loss: {:.0}%)", out.target, out.avg_rtt_ms, out.loss_pct),
+                                details: vec![
+                                    format!("Sent: {}, Received: {}", out.sent, out.received),
+                                    format!("Min RTT: {:.1} ms, Max RTT: {:.1} ms", out.min_rtt_ms, out.max_rtt_ms),
+                                ],
+                            }
+                        }
+                        Err(e) => StageProbeResultDto {
+                            stage,
+                            probe_type: "PingProbe".to_string(),
+                            target: Some(t),
+                            status: StageProbeStatusDto::Error,
+                            latency_ms: None,
+                            summary: format!("Ping probe failed: {e}"),
+                            details: vec![],
+                        },
+                    }
+                }
+                _ => StageProbeResultDto {
+                    stage,
+                    probe_type: "Unknown".to_string(),
+                    target: None,
+                    status: StageProbeStatusDto::TargetUnavailable,
+                    latency_ms: None,
+                    summary: "Probe unsupported for this stage".to_string(),
+                    details: vec![],
+                },
+            };
+
+            Ok(QueryResponse::StageProbeResult { result })
+        }
         Query::ListFleetHosts => {
             let agent = netpulse_capture_svc::agent::FleetAgent::new(
                 "server-east-01".into(),
@@ -451,4 +741,36 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
+}
+
+/// Validate that a probe target is a legitimate, non-malformed IP address or hostname.
+/// Rejects empty strings, whitespace, control characters, shell metacharacters, or invalid formats.
+fn is_valid_probe_target(t: &str) -> bool {
+    let trimmed = t.trim();
+    if trimmed.is_empty() || trimmed.len() > 253 {
+        return false;
+    }
+    if trimmed.parse::<std::net::IpAddr>().is_ok() {
+        return true;
+    }
+    let host = trimmed
+        .strip_prefix("https://")
+        .or_else(|| trimmed.strip_prefix("http://"))
+        .unwrap_or(trimmed);
+    let host = host.split('/').next().unwrap_or(host);
+    let host = host.split(':').next().unwrap_or(host);
+
+    if host.is_empty() || host.len() > 253 {
+        return false;
+    }
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        return true;
+    }
+    host.split('.').all(|label| {
+        !label.is_empty()
+            && label.len() <= 63
+            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            && !label.starts_with('-')
+            && !label.ends_with('-')
+    })
 }

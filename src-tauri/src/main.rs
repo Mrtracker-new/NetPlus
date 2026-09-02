@@ -645,6 +645,8 @@ pub(crate) fn emit_live_snapshot(
     store: &Arc<Mutex<CaptureStore>>,
     stats: &Arc<Mutex<CaptureStats>>,
     depth: &Arc<Mutex<Depth>>,
+    correlator: &Arc<Mutex<Correlator>>,
+    sockets: &Option<Arc<dyn SocketTableSource + Send + Sync>>,
     app_handle: &Option<tauri::AppHandle>,
 ) {
     if let Some(handle) = app_handle {
@@ -660,7 +662,17 @@ pub(crate) fn emit_live_snapshot(
             Ok(g) => *g,
             Err(p) => *p.into_inner(),
         };
-        let view = netpulse_engine::pipeline::present(&store_guard, depth_guard, stats_guard);
+        let corr_guard = correlator.lock().ok();
+        let view = netpulse_engine::pipeline::present_window(
+            &store_guard,
+            depth_guard,
+            stats_guard,
+            corr_guard.as_deref(),
+            sockets.as_ref().map(|s| s.as_ref() as &(dyn SocketTableSource + Send + Sync)),
+            None,
+            None,
+            None,
+        );
         let _ = handle.emit("feed-delta", &view.narratives);
         let _ = handle.emit("monitor-snapshot", &view.monitor);
     }
@@ -719,13 +731,13 @@ fn live_loop(
                 }
             }
 
-            emit_live_snapshot(&store, &stats, &depth, &app_handle);
+            emit_live_snapshot(&store, &stats, &depth, &correlator, &sockets, &app_handle);
         }
     }
 
     // Final Flush on shutdown so in-flight frames are never lost
     ctx.finish(latest_mono, capture.stats().into(), 0);
-    emit_live_snapshot(&store, &stats, &depth, &app_handle);
+    emit_live_snapshot(&store, &stats, &depth, &correlator, &sockets, &app_handle);
     // _completion_guard drops here, signaling done_tx
 }
 

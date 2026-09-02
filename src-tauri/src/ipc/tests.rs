@@ -232,13 +232,25 @@ fn test_query_narrative_feed() {
     let res = execute_query(
         &state,
         Query::NarrativeFeed {
-            from_mono_nanos: 0,
-            to_mono_nanos: 1_000_000,
+            from_mono_nanos: Some(0),
+            to_mono_nanos: Some(1_000_000),
             depth: ProjectionDepth::Beginner,
         },
     )
     .unwrap();
     assert!(matches!(res, QueryResponse::NarrativeFeed { .. }));
+
+    // Unbounded / server-default query
+    let res_unbounded = execute_query(
+        &state,
+        Query::NarrativeFeed {
+            from_mono_nanos: None,
+            to_mono_nanos: None,
+            depth: ProjectionDepth::Beginner,
+        },
+    )
+    .unwrap();
+    assert!(matches!(res_unbounded, QueryResponse::NarrativeFeed { .. }));
 }
 
 #[test]
@@ -247,8 +259,9 @@ fn test_query_monitor_snapshot() {
     let res = execute_query(
         &state,
         Query::MonitorSnapshot {
-            from_mono_nanos: 0,
-            to_mono_nanos: 1_000_000,
+            from_mono_nanos: None,
+            to_mono_nanos: None,
+            time_range: Some(netpulse_api::MonitorTimeRangeDto::FiveMinutes),
         },
     )
     .unwrap();
@@ -855,4 +868,99 @@ fn test_learning_progress_disk_persistence_across_app_restart() {
 
     // Clean up
     let _ = std::fs::remove_dir_all(&temp_dir);
+}
+
+#[test]
+fn test_stage_probe_target_validation_and_rejection() {
+    use netpulse_api::dto::{DiagnosticChainStageKindDto, StageProbeStatusDto};
+
+    let state = seeded_state();
+
+    // 1. Device stage is local stack; succeeds without any target
+    let res = execute_query(
+        &state,
+        Query::RunStageProbe {
+            stage: DiagnosticChainStageKindDto::Device,
+            target: None,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::StageProbeResult { result } = res {
+        assert_eq!(result.stage, DiagnosticChainStageKindDto::Device);
+        assert_eq!(result.probe_type, "LocalStackProbe");
+        assert!(result.status == StageProbeStatusDto::Success || result.status == StageProbeStatusDto::Degraded);
+    } else {
+        panic!("expected StageProbeResult");
+    }
+
+    // 2. Destination stage with invalid/missing targets must strictly return TargetUnavailable
+    let invalid_targets = [
+        None,
+        Some("".to_string()),
+        Some("   ".to_string()),
+        Some("not-an-ip!#$".to_string()),
+        Some("not an ip with spaces".to_string()),
+        Some("malicious;cmd.exe".to_string()),
+        Some("http://invalid target name/".to_string()),
+    ];
+
+    for target in invalid_targets {
+        let res = execute_query(
+            &state,
+            Query::RunStageProbe {
+                stage: DiagnosticChainStageKindDto::Destination,
+                target: target.clone(),
+            },
+        )
+        .unwrap();
+
+        if let QueryResponse::StageProbeResult { result } = res {
+            assert_eq!(
+                result.status,
+                StageProbeStatusDto::TargetUnavailable,
+                "Target '{target:?}' must be rejected with TargetUnavailable"
+            );
+            assert_eq!(result.target, None);
+        } else {
+            panic!("expected StageProbeResult");
+        }
+    }
+
+    // 3. DNS stage with missing or malformed targets must also return TargetUnavailable
+    let bad_dns_targets = [None, Some("".to_string()), Some("bad dns host!".to_string())];
+    for target in bad_dns_targets {
+        let res = execute_query(
+            &state,
+            Query::RunStageProbe {
+                stage: DiagnosticChainStageKindDto::Dns,
+                target: target.clone(),
+            },
+        )
+        .unwrap();
+
+        if let QueryResponse::StageProbeResult { result } = res {
+            assert_eq!(
+                result.status,
+                StageProbeStatusDto::TargetUnavailable,
+                "DNS target '{target:?}' must be rejected with TargetUnavailable"
+            );
+        } else {
+            panic!("expected StageProbeResult");
+        }
+    }
+
+    // 4. ISP stage with missing target must return TargetUnavailable
+    let res = execute_query(
+        &state,
+        Query::RunStageProbe {
+            stage: DiagnosticChainStageKindDto::Isp,
+            target: None,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::StageProbeResult { result } = res {
+        assert_eq!(result.status, StageProbeStatusDto::TargetUnavailable);
+    } else {
+        panic!("expected StageProbeResult");
+    }
 }

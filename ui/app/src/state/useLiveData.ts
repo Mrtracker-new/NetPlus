@@ -12,16 +12,15 @@
 //    deltas. Absent Tauri, this is simply skipped.
 
 import { useEffect } from "react";
-import type { NarrativeCard, MonitorSnapshot, ProjectionDepth } from "@netpulse/contract";
+import type { NarrativeCard, MonitorSnapshot, ProjectionDepth, MonitorTimeRange } from "@netpulse/contract";
 import { query } from "../ipc";
 import { setFeed, pushCards, setMonitor, setError } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
 
-// Whole-history window; the engine bounds what it returns.
-const FROM = 0;
-const TO = Number.MAX_SAFE_INTEGER;
+import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
+
 // A calm cadence — fast enough to feel live, slow enough to stay at 60 fps
-//Event deltas cover the gaps when capture is active.
+// Event deltas cover the gaps when capture is active.
 const POLL_MS = 1500;
 
 /** True when running inside the Tauri webview (vs. the plain browser preview),
@@ -31,12 +30,18 @@ function inTauri(): boolean {
 }
 
 let isRefreshing = false;
+let activeDepth: ProjectionDepth = "beginner";
+
+export function triggerLiveRefresh(): void {
+  refresh(activeDepth, () => false);
+}
 
 async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promise<void> {
+  activeDepth = depth;
   if (isRefreshing || cancelled()) return;
   isRefreshing = true;
   try {
-    const res = await query({ kind: "narrativeFeed", from_mono_nanos: FROM, to_mono_nanos: TO, depth });
+    const res = await query({ kind: "narrativeFeed", depth });
     if (!cancelled() && res.kind === "narrativeFeed") {
       setFeed(res.cards);
       setError(null);
@@ -47,7 +52,13 @@ async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promis
     }
   }
   try {
-    const res = await query({ kind: "monitorSnapshot", from_mono_nanos: FROM, to_mono_nanos: TO });
+    const timeRangePref = preferencesManager.getPreferences().timeRange;
+    let time_range: MonitorTimeRange = "five_minutes";
+    if (timeRangePref === "15m") time_range = "fifteen_minutes";
+    else if (timeRangePref === "1h") time_range = "one_hour";
+    else if (timeRangePref === "24h") time_range = "twenty_four_hours";
+
+    const res = await query({ kind: "monitorSnapshot", time_range });
     if (!cancelled() && res.kind === "monitorSnapshot") {
       setMonitor(res.snapshot);
       setError(null);

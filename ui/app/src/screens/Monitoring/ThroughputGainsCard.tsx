@@ -11,6 +11,8 @@ export function ThroughputGainsCard({
   timestamps,
   peakBadgeText,
 }: ThroughputGainsCardProps) {
+  const hasGains = series.some((s) => s.data && s.data.some((d) => d > 0));
+
   return (
     <div className="np-monitor-card" aria-label="Throughput Gains Chart">
       <div className="np-monitor-card__header">
@@ -21,7 +23,9 @@ export function ThroughputGainsCard({
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-accent, #2fe0d6)" }} />
             <span>Flow Spikes (Burst Rate)</span>
           </div>
-          <span className="np-monitor-badge np-monitor-badge--live">Good / Balanced</span>
+          <span className={`np-monitor-badge ${hasGains ? "np-monitor-badge--live" : "np-monitor-badge--idle"}`}>
+            {hasGains ? peakBadgeText : "Standby"}
+          </span>
         </div>
       </div>
       <Chart

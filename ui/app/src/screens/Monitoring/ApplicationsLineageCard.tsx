@@ -9,15 +9,20 @@ export interface ApplicationsLineageCardProps {
   onSelectNode?: (id: string | null) => void;
 }
 
+export type LineageFilterMode =
+  | "All Endpoints"
+  | "External WAN"
+  | "Local Subnet"
+  | "CDN Edge"
+  | "Multicast";
+
 export function ApplicationsLineageCard({
   nodes = [],
   edges = [],
   selectedNodeId,
   onSelectNode,
 }: ApplicationsLineageCardProps) {
-  const [filterMode, setFilterMode] = useState<
-    "Custom Rules" | "All Traffic" | "High Bandwidth" | "Critical Path"
-  >("Custom Rules");
+  const [filterMode, setFilterMode] = useState<LineageFilterMode>("All Endpoints");
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -45,27 +50,32 @@ export function ApplicationsLineageCard({
     };
   }, [showDropdown]);
 
-  // Filter nodes & edges based on active filter mode
+  // Filter nodes & edges based on classification
   let filteredNodes = nodes;
   let filteredEdges = edges;
 
-  if (filterMode === "High Bandwidth") {
-    filteredNodes = nodes.filter(
-      (n) => n.sublabel?.includes("MB/s") && parseFloat(n.sublabel) >= 3.0
+  if (filterMode === "External WAN") {
+    const wanNodes = new Set(nodes.filter((n) => n.sublabel === "EXTERNAL_WAN").map((n) => n.id));
+    filteredEdges = edges.filter((e) => wanNodes.has(e.source) || wanNodes.has(e.target));
+    const activeIds = new Set(filteredEdges.flatMap((e) => [e.source, e.target]));
+    filteredNodes = nodes.filter((n) => activeIds.has(n.id) || wanNodes.has(n.id));
+  } else if (filterMode === "Local Subnet") {
+    const localNodes = new Set(
+      nodes.filter((n) => n.sublabel === "LOCAL" || n.sublabel === "LOCAL_SUBNET").map((n) => n.id)
     );
-    const nodeIds = new Set(filteredNodes.map((n) => n.id));
-    filteredEdges = edges.filter(
-      (e) => nodeIds.has(e.source) && nodeIds.has(e.target)
-    );
-  } else if (filterMode === "Critical Path") {
-    const criticalIds = new Set(["enc", "engine", "orch"]);
-    filteredNodes = nodes.map((n) => ({
-      ...n,
-      status: criticalIds.has(n.id) ? "healthy" : "warning",
-    }));
-    filteredEdges = edges.filter(
-      (e) => criticalIds.has(e.source) && criticalIds.has(e.target)
-    );
+    filteredEdges = edges.filter((e) => localNodes.has(e.source) || localNodes.has(e.target));
+    const activeIds = new Set(filteredEdges.flatMap((e) => [e.source, e.target]));
+    filteredNodes = nodes.filter((n) => activeIds.has(n.id) || localNodes.has(n.id));
+  } else if (filterMode === "CDN Edge") {
+    const cdnNodes = new Set(nodes.filter((n) => n.sublabel === "CDN_EDGE").map((n) => n.id));
+    filteredEdges = edges.filter((e) => cdnNodes.has(e.source) || cdnNodes.has(e.target));
+    const activeIds = new Set(filteredEdges.flatMap((e) => [e.source, e.target]));
+    filteredNodes = nodes.filter((n) => activeIds.has(n.id) || cdnNodes.has(n.id));
+  } else if (filterMode === "Multicast") {
+    const mcNodes = new Set(nodes.filter((n) => n.sublabel === "MULTICAST").map((n) => n.id));
+    filteredEdges = edges.filter((e) => mcNodes.has(e.source) || mcNodes.has(e.target));
+    const activeIds = new Set(filteredEdges.flatMap((e) => [e.source, e.target]));
+    filteredNodes = nodes.filter((n) => activeIds.has(n.id) || mcNodes.has(n.id));
   }
 
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
@@ -121,23 +131,30 @@ export function ApplicationsLineageCard({
                 backdropFilter: "var(--np-glass-blur)",
               }}
             >
-              {(["Custom Rules", "All Traffic", "High Bandwidth", "Critical Path"] as const).map(
-                (mode) => {
-                  const isSelected = filterMode === mode;
-                  return (
-                    <button
-                      key={mode}
-                      type="button"
-                      aria-pressed={isSelected}
-                      style={{
-                        background: isSelected ? "var(--np-surface-2)" : "transparent",
-                        color: isSelected ? "var(--np-accent-strong, var(--np-text))" : "var(--np-text)",
-                        border: "none",
-                        padding: "6px 12px",
-                        borderRadius: "var(--np-radius-xs)",
-                        fontSize: "0.78rem",
-                        textAlign: "left",
-                        cursor: "pointer",
+              {(
+                [
+                  "All Endpoints",
+                  "External WAN",
+                  "Local Subnet",
+                  "CDN Edge",
+                  "Multicast",
+                ] as const
+              ).map((mode) => {
+                const isSelected = filterMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    aria-pressed={isSelected}
+                    style={{
+                      background: isSelected ? "var(--np-surface-2)" : "transparent",
+                      color: isSelected ? "var(--np-accent-strong, var(--np-text))" : "var(--np-text)",
+                      border: "none",
+                      padding: "6px 12px",
+                      borderRadius: "var(--np-radius-xs)",
+                      fontSize: "0.78rem",
+                      textAlign: "left",
+                      cursor: "pointer",
                         fontWeight: isSelected ? 600 : 400,
                         outline: "none",
                         transition: "all var(--np-t)",

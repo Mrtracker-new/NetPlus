@@ -1,13 +1,71 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import type { DiagnosticChain, DiagnosticStageNode, EvidenceRef } from "@netpulse/contract";
+import type { DiagnosticChain, DiagnosticStageNode, EvidenceRef, StageProbeResult } from "@netpulse/contract";
 import { Icon, type IconName } from "../../icons";
 
 interface DiagnosticChainCardProps {
   chain?: DiagnosticChain;
   onSelectEvidence?: (evidence: EvidenceRef) => void;
   onRunProbe?: (stageKind: string, target?: string) => void;
+  probeState?: {
+    running: boolean;
+    result: StageProbeResult | null;
+  };
 }
+
+const isProbeableStage = (stageKind: string): boolean => {
+  return ["destination", "dns", "cdn", "isp", "router"].includes(stageKind.toLowerCase());
+};
+
+const validateProbeTarget = (target: string): { valid: boolean; error?: string } => {
+  const trimmed = target.trim();
+  if (!trimmed) {
+    return { valid: false, error: "Target address cannot be empty" };
+  }
+  if (trimmed.length > 253) {
+    return { valid: false, error: "Target exceeds maximum length of 253 characters" };
+  }
+
+  // Check IPv4 (4 octets, 0-255)
+  const ipv4Parts = trimmed.split(".");
+  if (ipv4Parts.length === 4) {
+    const allOctetsValid = ipv4Parts.every((part) => {
+      if (!/^\d+$/.test(part)) return false;
+      const num = parseInt(part, 10);
+      return num >= 0 && num <= 255 && String(num) === part;
+    });
+    if (allOctetsValid) {
+      return { valid: true };
+    }
+  }
+
+  // Check IPv6
+  if (trimmed.includes(":")) {
+    const isIpv6 = /^([0-9a-fA-F]{1,4}:){1,7}:?([0-9a-fA-F]{1,4})?$/.test(trimmed) || trimmed === "::1" || trimmed === "::";
+    if (isIpv6) {
+      return { valid: true };
+    }
+  }
+
+  // Check RFC 1123 Hostname
+  const labels = trimmed.split(".");
+  const validHostname = labels.every((label) => {
+    return (
+      label.length >= 1 &&
+      label.length <= 63 &&
+      /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(label)
+    );
+  });
+
+  if (validHostname) {
+    return { valid: true };
+  }
+
+  return {
+    valid: false,
+    error: "Target must be a valid IPv4 address, IPv6 address, or RFC 1123 hostname",
+  };
+};
 
 const STAGE_ICONS: Record<string, IconName> = {
   device: "cpu",
@@ -23,9 +81,18 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
   chain,
   onSelectEvidence,
   onRunProbe,
+  probeState,
 }) => {
   const { t } = useTranslation(["monitoring", "common"]);
   const [selectedStage, setSelectedStage] = useState<DiagnosticStageNode | null>(null);
+  const [customTarget, setCustomTarget] = useState<string>("");
+  const [targetError, setTargetError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const defaultTarget = selectedStage?.affected_targets?.[0] ?? "";
+    setCustomTarget(defaultTarget);
+    setTargetError(null);
+  }, [selectedStage]);
 
   const stages = chain?.stages ?? [];
 
@@ -243,6 +310,152 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                   <span>{t("diagnostic_chain.drill_down", "Drill Down")}</span>
                   <Icon name="arrowRight" style={{ width: 12, height: 12, marginLeft: 4 }} />
                 </button>
+              </div>
+            )}
+
+            {/* Active Stage Probe Runner */}
+            {onRunProbe && (
+              <div
+                style={{
+                  background: "var(--np-surface-recessed)",
+                  padding: "12px 14px",
+                  borderRadius: "var(--np-radius-xs)",
+                  border: "1px solid var(--np-border)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "10px",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: "var(--np-fs-2xs)", textTransform: "uppercase", color: "var(--np-text-mute)", fontWeight: "var(--np-fw-semibold)" }}>
+                      Active Stage Probe
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.7rem",
+                        padding: "2px 6px",
+                        borderRadius: "var(--np-radius-xs)",
+                        background: isProbeableStage(selectedStage.stage) ? "var(--np-surface-raised)" : "rgba(255,255,255,0.05)",
+                        color: isProbeableStage(selectedStage.stage) ? "var(--np-accent)" : "var(--np-text-mute)",
+                        fontFamily: "var(--np-font-mono)",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {isProbeableStage(selectedStage.stage) ? "PROBEABLE" : "NON-PROBEABLE"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "var(--np-fs-xs)", color: "var(--np-text-dim)", marginTop: "2px" }}>
+                    {isProbeableStage(selectedStage.stage)
+                      ? "Execute on-demand diagnostic probe against this stage target"
+                      : "Local host OS and physical interface stages are evaluated from local kernel state and cannot be queried via network probes."}
+                  </div>
+                </div>
+
+                {isProbeableStage(selectedStage.stage) && (
+                  <>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <div style={{ fontSize: "0.72rem", color: "var(--np-text-mute)", display: "flex", justifyContent: "space-between" }}>
+                        <span>Probe Target (Default or Override):</span>
+                        {targetError && (
+                          <span style={{ color: "var(--np-sem-failure, #ef4444)", fontWeight: 500 }}>
+                            {targetError}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input
+                          type="text"
+                          value={customTarget}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setCustomTarget(val);
+                            if (!val.trim()) {
+                              setTargetError(null);
+                            } else {
+                              const v = validateProbeTarget(val);
+                              setTargetError(v.valid ? null : (v.error ?? "Invalid target"));
+                            }
+                          }}
+                          placeholder={selectedStage.affected_targets?.[0] || "e.g. 1.1.1.1, router IP, or domain"}
+                          style={{
+                            flex: 1,
+                            background: "var(--np-surface-raised, var(--np-surface-1))",
+                            color: "var(--np-text)",
+                            border: targetError ? "1px solid var(--np-sem-failure, #ef4444)" : "1px solid var(--np-border)",
+                            borderRadius: "var(--np-radius-xs)",
+                            padding: "6px 10px",
+                            fontSize: "0.8rem",
+                            fontFamily: "var(--np-font-mono)",
+                            outline: "none",
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="np-monitor-time-btn"
+                          disabled={probeState?.running || Boolean(targetError) || (!customTarget.trim() && !selectedStage.affected_targets?.[0])}
+                          onClick={() => {
+                            const effectiveTarget = customTarget.trim() || selectedStage.affected_targets?.[0];
+                            if (effectiveTarget) {
+                              const v = validateProbeTarget(effectiveTarget);
+                              if (!v.valid) {
+                                setTargetError(v.error ?? "Invalid target");
+                                return;
+                              }
+                            }
+                            onRunProbe(selectedStage.stage, effectiveTarget);
+                          }}
+                          style={{
+                            fontSize: "0.75rem",
+                            padding: "6px 12px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "6px",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <Icon name="zap" style={{ width: 12, height: 12 }} />
+                          <span>{probeState?.running ? "Probing..." : "Run Stage Probe"}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {probeState?.result && probeState.result.stage === selectedStage.stage && (
+                      <div
+                        style={{
+                          marginTop: "4px",
+                          padding: "8px 10px",
+                          borderRadius: "var(--np-radius-xs)",
+                          background: "var(--np-surface-raised, var(--np-surface-1))",
+                          border: "1px solid var(--np-border)",
+                          fontSize: "0.78rem",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "4px",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <span style={{ fontWeight: 600, color: "var(--np-text)" }}>
+                            {probeState.result.probe_type} ({probeState.result.status.toUpperCase()})
+                          </span>
+                          {probeState.result.latency_ms != null && (
+                            <span style={{ fontFamily: "var(--np-font-mono)", color: "var(--np-accent)" }}>
+                              {probeState.result.latency_ms.toFixed(1)} ms
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ color: "var(--np-text-dim)" }}>{probeState.result.summary}</div>
+                        {probeState.result.details && probeState.result.details.length > 0 && (
+                          <div style={{ marginTop: "4px", display: "flex", flexDirection: "column", gap: "2px", fontSize: "0.72rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)" }}>
+                            {probeState.result.details.map((d, i) => (
+                              <div key={i}>{d}</div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

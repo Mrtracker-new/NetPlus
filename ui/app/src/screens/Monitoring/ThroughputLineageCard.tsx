@@ -9,6 +9,8 @@ export function ThroughputLineageCard({
   series,
   timestamps,
 }: ThroughputLineageCardProps) {
+  const hasTraffic = series.some((s) => s.data && s.data.some((d) => d > 0));
+
   return (
     <div className="np-monitor-card" aria-label="Throughput & Lineage Chart">
       <div className="np-monitor-card__header">
@@ -23,7 +25,9 @@ export function ThroughputLineageCard({
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-accent-2, #7c83f7)" }} />
             <span>Egress (Upload)</span>
           </div>
-          <span className="np-monitor-badge np-monitor-badge--live">Good / Balanced</span>
+          <span className={`np-monitor-badge ${hasTraffic ? "np-monitor-badge--live" : "np-monitor-badge--idle"}`}>
+            {hasTraffic ? "Active Telemetry" : "Standby"}
+          </span>
         </div>
       </div>
       <Chart

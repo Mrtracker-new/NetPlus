@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom";
 import { I18nextProvider } from "react-i18next";
 import { protocolColor } from "@netpulse/viz";
@@ -217,15 +217,15 @@ describe("Monitoring Screen & useMonitoringController", () => {
     const { fireEvent } = await import("@testing-library/react");
     render(<MonitoringTestWrapper />);
 
-    // Open topology rules dropdown and select "High Bandwidth"
+    // Open topology rules dropdown and select "External WAN"
     const rulesBtn = screen.getByRole("button", { name: "Filter lineage topology rules" });
     fireEvent.click(rulesBtn);
 
-    const highBwRule = screen.getByRole("button", { name: "High Bandwidth" });
-    fireEvent.click(highBwRule);
+    const wanRule = screen.getByRole("button", { name: "External WAN" });
+    fireEvent.click(wanRule);
 
     expect(screen.getByRole("button", { name: "Filter lineage topology rules" })).toHaveTextContent(
-      "High Bandwidth ▾"
+      "External WAN ▾"
     );
 
     // Toggle time range to 15m
@@ -235,7 +235,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
     // Verify time range changed while active topology rule state was preserved
     expect(btn15m).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Filter lineage topology rules" })).toHaveTextContent(
-      "High Bandwidth ▾"
+      "External WAN ▾"
     );
   });
 
@@ -267,5 +267,137 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
     // Verify Drill Down action button exists
     expect(screen.getByRole("button", { name: "Drill Down" })).toBeTruthy();
+  });
+
+  it("renders authentic OS process attribution and null fallbacks without fabrication", () => {
+    const snapshotWithProcesses: MonitorSnapshot = {
+      ...mockMonitorSnapshot,
+      processes: [
+        {
+          pid: 4321,
+          name: "curl.exe",
+          exe_path: "C:\\Windows\\System32\\curl.exe",
+          bytes: 800000,
+          packets: 600,
+          flows: 2,
+          cpu_percent: 3.5,
+          memory_bytes: 16 * 1024 * 1024,
+        },
+        {
+          pid: null,
+          name: "Unattributed Flows",
+          exe_path: null,
+          bytes: 200000,
+          packets: 150,
+          flows: 1,
+          cpu_percent: null,
+          memory_bytes: null,
+        },
+      ],
+    };
+    setMonitor(snapshotWithProcesses);
+    render(<MonitoringTestWrapper />);
+
+    // Verify authenticated process
+    expect(screen.getByText("curl.exe")).toBeTruthy();
+    expect(screen.getByText("PID 4321")).toBeTruthy();
+    expect(screen.getByText("3.5%")).toBeTruthy();
+    expect(screen.getByText("16 MB")).toBeTruthy();
+
+    // Verify unattributed process renders honest dashes without fabricated numbers
+    expect(screen.getByText("Unattributed Flows")).toBeTruthy();
+    expect(screen.getByText("Unattributed")).toBeTruthy();
+    const dashes = screen.getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(2); // CPU and RAM both dash
+  });
+
+  it("renders authentic backend subsystem health statuses and never fabricates mock statuses", () => {
+    const snapshotWithSubsystems: MonitorSnapshot = {
+      ...mockMonitorSnapshot,
+      subsystems: [
+        {
+          name: "Capture Pipeline Buffer",
+          status: "healthy",
+          detail: "20.0% buffer utilization, 0 dropped frames",
+        },
+        {
+          name: "Process Attribution Correlator",
+          status: "healthy",
+          detail: "Active table query via netpulse-platform sockets",
+        },
+      ],
+    };
+    setMonitor(snapshotWithSubsystems);
+    render(<MonitoringTestWrapper />);
+
+    // Authentic backend subsystems are rendered
+    expect(screen.getByText("Capture Pipeline Buffer")).toBeTruthy();
+    expect(screen.getByText("20.0% buffer utilization, 0 dropped frames")).toBeTruthy();
+    expect(screen.getByText("Process Attribution Correlator")).toBeTruthy();
+
+    // Fabricated mock strings must NEVER appear
+    expect(screen.queryByText("eBPF active")).toBeNull();
+    expect(screen.queryByText("12.4 GB free")).toBeNull();
+    expect(screen.queryByText("240 MB RSS")).toBeNull();
+  });
+
+  it("dispatches on-demand stage probe and renders live probe result in inspection drawer", async () => {
+    const { fireEvent, waitFor } = await import("@testing-library/react");
+    const ipc = await import("../ipc");
+    const querySpy = vi.spyOn(ipc, "query").mockResolvedValueOnce({
+      kind: "stageProbeResult",
+      result: {
+        stage: "router",
+        probe_type: "GatewayProbe",
+        target: "192.168.1.1",
+        status: "success",
+        latency_ms: 1.8,
+        summary: "Default gateway 192.168.1.1 reachable (1.8ms RTT)",
+        details: ["Gateway interface reachable"],
+      },
+    } as any);
+
+    setMonitor({
+      ...mockMonitorSnapshot,
+      diagnostic_chain: {
+        stages: [
+          {
+            stage: "router",
+            status: "investigate",
+            measurement_state: "inferred",
+            detection_state: "detected",
+            label: "Router / Gateway",
+            summary: "Gateway Link Jitter / Loss Inferred",
+            detail: "Loss & jitter across multiple destinations",
+            evidence: [],
+            causes: ["local_wifi"],
+            affected_targets: ["192.168.1.1"],
+          },
+        ],
+      },
+    });
+
+    render(<MonitoringTestWrapper />);
+
+    // Open router stage drawer
+    const routerNode = screen.getByRole("tab", { name: /Router \/ Gateway/i });
+    fireEvent.click(routerNode);
+
+    // Click "Run Stage Probe"
+    const probeBtn = screen.getByRole("button", { name: /Run Stage Probe/i });
+    fireEvent.click(probeBtn);
+
+    expect(querySpy).toHaveBeenCalledWith({
+      kind: "runStageProbe",
+      stage: "router",
+      target: "192.168.1.1",
+    });
+
+    // Wait for live probe results to appear in drawer
+    await waitFor(() => {
+      expect(screen.getByText(/GatewayProbe \(SUCCESS\)/i)).toBeTruthy();
+      expect(screen.getByText("1.8 ms")).toBeTruthy();
+      expect(screen.getByText("Default gateway 192.168.1.1 reachable (1.8ms RTT)")).toBeTruthy();
+    });
   });
 });

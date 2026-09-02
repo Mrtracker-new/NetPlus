@@ -23,20 +23,32 @@ export interface StructuredError {
 export type DashboardZone = "Header" | "MainLeft" | "MainRight" | "Bottom" | "Sidebar" | "Footer";
 export type DashboardTimeRange = "5m" | "15m" | "1h" | "24h";
 
-export interface MonitoringWidget {
-  id: string;
-  title: string;
-  priority: number;
-  placement: DashboardZone;
-  loader: () => Promise<{ default: React.ComponentType<any> }>;
-  onInit?: () => Promise<void>;
-  onCleanup?: () => void;
-  onRefresh?: () => void;
-  settingsSchema?: Record<string, any>;
-  permissions?: string[];
-  minWidth?: number;
-  supportsFullscreen?: boolean;
-}
+export type TopologySublabel =
+  | "LOCAL"
+  | "LOCAL_SUBNET"
+  | "EXTERNAL_WAN"
+  | "CDN_EDGE"
+  | "MULTICAST"
+  | "SRC";
+
+export const normalizeTopologySublabel = (value?: string): TopologySublabel | undefined => {
+  switch (value?.trim().toUpperCase().replace(/\s+/g, "_")) {
+    case "LOCAL":
+      return "LOCAL";
+    case "LOCAL_SUBNET":
+      return "LOCAL_SUBNET";
+    case "EXTERNAL_WAN":
+      return "EXTERNAL_WAN";
+    case "CDN_EDGE":
+      return "CDN_EDGE";
+    case "MULTICAST":
+      return "MULTICAST";
+    case "SRC":
+      return "SRC";
+    default:
+      return undefined;
+  }
+};
 
 export interface ActiveAlert {
   id: string;
@@ -48,7 +60,7 @@ export interface ActiveAlert {
 
 export interface SubsystemStatus {
   name: string;
-  status: "healthy" | "warning" | "critical";
+  status: "healthy" | "warning" | "degraded" | "critical" | "unknown";
   detail?: string;
 }
 
@@ -61,14 +73,18 @@ export interface IntelligentRecommendation {
 
 export interface ProcessMetricRow {
   id: string;
+  pid: number | null;
   name: string;
+  exePath: string | null;
   type: string;
   bandwidthBytes: number;
   formattedBandwidth: string;
   utilizationPercent: number;
-  cpuPercent: number;
-  memoryMB: number;
+  cpuPercent: number | null;
+  memoryMB: number | null;
   packetsPerSec: number;
+  packets: number;
+  flows: number;
   rttMs: number;
   errors: number;
   color: string;
@@ -87,6 +103,7 @@ export interface DomainTelemetry {
   nodes: TopologyNode[];
   edges: TopologyEdge[];
   processes: ProcessMetricRow[];
+  subsystems: SubsystemStatus[];
   bufferPercent: number;
   bufferFrames: number;
   bufferCapacity: number;
@@ -114,13 +131,4 @@ export interface ViewTelemetry {
   subsystems: SubsystemStatus[];
   recommendations: IntelligentRecommendation[];
   diagnosticChain?: DiagnosticChain;
-}
-
-export interface MonitoringEvents {
-  telemetryUpdated: DomainTelemetry;
-  alertRaised: ActiveAlert;
-  captureStarted: void;
-  captureStopped: void;
-  engineStateChanged: { state: EngineState; error?: StructuredError };
-  widgetRegistered: MonitoringWidget;
 }

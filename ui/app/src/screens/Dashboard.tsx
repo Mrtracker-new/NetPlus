@@ -163,8 +163,8 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
       onRetry();
     } else {
       Promise.all([
-        query({ kind: "narrativeFeed", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER, depth }),
-        query({ kind: "monitorSnapshot", from_mono_nanos: 0, to_mono_nanos: Number.MAX_SAFE_INTEGER }),
+        query({ kind: "narrativeFeed", depth }),
+        query({ kind: "monitorSnapshot" }),
       ])
         .then(([feedRes, monRes]) => {
           if (feedRes.kind === "narrativeFeed") {

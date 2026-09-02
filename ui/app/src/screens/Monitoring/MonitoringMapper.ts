@@ -64,7 +64,7 @@ export class MonitoringMapper {
       edges: domain.edges,
       processes: domain.processes,
       alerts: evaluation.alerts,
-      subsystems: evaluation.subsystems,
+      subsystems: domain.subsystems && domain.subsystems.length > 0 ? domain.subsystems : evaluation.subsystems,
       recommendations: evaluation.recommendations,
       diagnosticChain: domain.diagnosticChain,
     };

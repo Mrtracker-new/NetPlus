@@ -31,11 +31,6 @@ export function evaluateDiagnosticsRules(
       message: `Ring buffer is at ${telemetry.bufferPercent}% capacity. Dropped frames: ${telemetry.dropCount}`,
       timestamp: now,
     });
-    subsystems.push({
-      name: "Capture",
-      status: "critical",
-      detail: `Shedding active (${telemetry.dropCount} dropped)`,
-    });
     recommendations.push({
       id: "rec-buf-expand",
       title: "Expand Buffer Allocation",
@@ -50,31 +45,15 @@ export function evaluateDiagnosticsRules(
       message: `Ring buffer saturation at ${telemetry.bufferPercent}%.`,
       timestamp: now,
     });
-    subsystems.push({
-      name: "Capture",
-      status: "warning",
-      detail: `${telemetry.bufferPercent}% capacity`,
-    });
-  } else {
-    subsystems.push({
-      name: "Capture",
-      status: "healthy",
-      detail: "Optimal fidelity",
-    });
   }
 
-  // 2. Subsystem Health Checks (Driver, Kernel, Storage, Memory, CPU, Export Queue)
-  subsystems.push({ name: "Driver", status: "healthy", detail: "eBPF active" });
-  subsystems.push({ name: "Kernel", status: "healthy", detail: "Zero ring overruns" });
-  subsystems.push({ name: "Storage", status: "healthy", detail: "12.4 GB free" });
+  // 2. Subsystem Health Checks (Authoritative from Rust Backend)
+  if (telemetry.subsystems && telemetry.subsystems.length > 0) {
+    subsystems.push(...telemetry.subsystems);
+  }
 
-  const highCpuProc = telemetry.processes.find((p) => p.cpuPercent > 80);
+  const highCpuProc = telemetry.processes.find((p) => p.cpuPercent != null && p.cpuPercent > 80);
   if (highCpuProc) {
-    subsystems.push({
-      name: "CPU",
-      status: "warning",
-      detail: `${highCpuProc.name} using ${highCpuProc.cpuPercent}% CPU`,
-    });
     alerts.push({
       id: "alert-cpu-high",
       severity: "warning",
@@ -88,12 +67,7 @@ export function evaluateDiagnosticsRules(
       action: "Turn off deep payload parsing for non-critical flows to reduce CPU overhead.",
       category: "performance",
     });
-  } else {
-    subsystems.push({ name: "CPU", status: "healthy", detail: "Nominal load" });
   }
-
-  subsystems.push({ name: "Memory", status: "healthy", detail: "240 MB RSS" });
-  subsystems.push({ name: "Export Queue", status: "healthy", detail: "0 pending" });
 
   // 3. Loss Indicator Rules
   if (telemetry.networkLossCount > 0) {

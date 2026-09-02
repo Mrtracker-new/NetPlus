@@ -17,6 +17,7 @@ export function Monitoring() {
     diagnoses,
     viewModel,
     preferences,
+    probeState,
     actions,
   } = useMonitoringController();
 
@@ -105,6 +106,7 @@ export function Monitoring() {
           chain={viewModel.diagnosticChain}
           onSelectEvidence={actions.openEvidence}
           onRunProbe={actions.runProbe}
+          probeState={probeState}
         />
       )}
 

@@ -218,6 +218,15 @@ impl<R: CaptureRepository> CaptureStore<R> {
         self.sessions.len()
     }
 
+    /// The latest monotonic timestamp observed across all retained flows, or 0.
+    pub fn latest_mono_nanos(&self) -> u64 {
+        self.flows
+            .values()
+            .map(|f| f.last_ts.mono_nanos)
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Synchronous insert flow.
     pub fn insert_flow(&mut self, flow: Flow, mut events: Vec<ProtoEvent>) {
         if self.config.max_events_per_flow > 0 && events.len() > self.config.max_events_per_flow {

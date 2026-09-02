@@ -377,19 +377,66 @@ pub struct PresentationView {
     pub monitor: MonitorSnapshotDto,
 }
 
-/// Build the presentation view from a committed store at the given disclosure
-/// depth. `capture_stats` carries the honest capture-drop count
-/// so the monitor snapshot can keep capture loss distinct from network loss
-///pass [`CaptureStats::default`] for a lossless offline run.
-pub fn present<R: CaptureRepository>(
+/// Build the presentation view from a committed store with explicit time-windowing and attribution sources.
+#[allow(clippy::too_many_arguments)]
+pub fn present_window<R: CaptureRepository>(
     store: &CaptureStore<R>,
     depth: Depth,
     capture_stats: CaptureStats,
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
+    time_range: Option<netpulse_api::MonitorTimeRangeDto>,
+    from_mono_nanos: Option<u64>,
+    to_mono_nanos: Option<u64>,
 ) -> PresentationView {
-    // --- Narrative feed: one card per session, over the store query surface ---
-    // Own the flow/event clones so the borrowed SessionViews can reference them
-    // for the duration of card building (: narrative is a projection
-    // fed by the caller, which gathers from storage per .
+    // --- Monotonic Clock Authority ---
+    // Invariant: from_mono_nanos and to_mono_nanos must remain in the same monotonic-clock domain
+    // as CaptureStore timestamps.
+    // Semantics:
+    // 1. time_range = Some(...) -> Rust calculates the window against store.latest_mono_nanos().
+    // 2. explicit from/to -> Rust validates and uses them.
+    // 3. neither -> documented default window (FiveMinutes against store.latest_mono_nanos()).
+    let (effective_from, effective_to) = match time_range {
+        Some(range) => {
+            let d = match range {
+                netpulse_api::MonitorTimeRangeDto::FiveMinutes => 5 * 60 * 1_000_000_000,
+                netpulse_api::MonitorTimeRangeDto::FifteenMinutes => 15 * 60 * 1_000_000_000,
+                netpulse_api::MonitorTimeRangeDto::OneHour => 60 * 60 * 1_000_000_000,
+                netpulse_api::MonitorTimeRangeDto::TwentyFourHours => 24 * 60 * 60 * 1_000_000_000,
+            };
+            let latest = store.latest_mono_nanos();
+            (
+                latest.saturating_sub(d),
+                if latest == 0 {
+                    u64::MAX
+                } else {
+                    latest.saturating_add(1)
+                },
+            )
+        }
+        None => match (from_mono_nanos, to_mono_nanos) {
+            (Some(from), Some(to)) => {
+                let validated_from = from.min(to);
+                (validated_from, to)
+            }
+            (Some(from), None) => (from, u64::MAX),
+            (None, Some(to)) => (0, to),
+            (None, None) => {
+                // Documented default window: FiveMinutes against store.latest_mono_nanos()
+                let d = 5 * 60 * 1_000_000_000;
+                let latest = store.latest_mono_nanos();
+                (
+                    latest.saturating_sub(d),
+                    if latest == 0 {
+                        u64::MAX
+                    } else {
+                        latest.saturating_add(1)
+                    },
+                )
+            }
+        },
+    };
+
     let session_ids = store.session_ids();
     let mut owned: Vec<(
         Session,
@@ -419,25 +466,50 @@ pub fn present<R: CaptureRepository>(
         .map(|c| project::card_dto(c, depth))
         .collect();
 
-    // --- Monitoring snapshot over the full window ---
-    let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(0, u64::MAX);
+    // --- Monitoring snapshot over the window ---
+    let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(effective_from, effective_to);
     let network_loss: u32 = all_flows.iter().map(|f| f.stats.loss_indicators).sum();
     let loss = LossAccounting {
         network_loss_indicators: network_loss,
         capture_drops: capture_stats.dropped,
     };
-    let snap = monitor::snapshot(
+    let snap = monitor::snapshot_window(
         &all_flows,
         loss,
         None,
         store.resolutions(),
         Some(capture_stats),
+        correlator,
+        sockets,
+        effective_from,
+        effective_to,
     );
 
     PresentationView {
         narratives,
         monitor: project::monitor_dto(&snap),
     }
+}
+
+/// Build the presentation view from a committed store at the given disclosure
+/// depth. `capture_stats` carries the honest capture-drop count
+/// so the monitor snapshot can keep capture loss distinct from network loss
+///pass [`CaptureStats::default`] for a lossless offline run.
+pub fn present<R: CaptureRepository>(
+    store: &CaptureStore<R>,
+    depth: Depth,
+    capture_stats: CaptureStats,
+) -> PresentationView {
+    present_window(
+        store,
+        depth,
+        capture_stats,
+        None,
+        None,
+        None,
+        Some(0),
+        Some(u64::MAX),
+    )
 }
 
 #[cfg(test)]
@@ -540,5 +612,46 @@ mod tests {
         let (store_offline, _) = analyze_frames(1, &[f1, f2], 8).unwrap();
         assert_eq!(store.flow_count(), store_offline.flow_count());
         assert_eq!(store.session_count(), store_offline.session_count());
+    }
+
+    #[test]
+    fn present_window_u64_max_boundary_does_not_overflow() {
+        use netpulse_core::net::{FiveTuple, L4Proto, L7Proto};
+        use netpulse_core::{Flow, FlowMetrics, FlowState};
+        use std::net::{IpAddr, Ipv4Addr};
+
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let flow = Flow {
+            id: 1,
+            key: FiveTuple::new(
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+                1234,
+                IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+                80,
+                L4Proto::Tcp,
+            ),
+            first_ts: Timestamp::new(u64::MAX, u64::MAX),
+            last_ts: Timestamp::new(u64::MAX, u64::MAX),
+            l4: L4Proto::Tcp,
+            l7: L7Proto::Unknown,
+            stats: FlowMetrics::default(),
+            state: FlowState::Established,
+        };
+        store.insert_flow(flow, Vec::new());
+
+        let view = present_window(
+            &store,
+            netpulse_core::Depth::Beginner,
+            CaptureStats::default(),
+            None,
+            None,
+            Some(netpulse_api::MonitorTimeRangeDto::FiveMinutes),
+            None,
+            None,
+        );
+
+        // Must not panic, must not overflow
+        assert_eq!(store.latest_mono_nanos(), u64::MAX);
+        assert_eq!(view.monitor.capture_drops, 0);
     }
 }

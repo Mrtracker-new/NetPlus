@@ -20,9 +20,18 @@
 //! [`AttributionConfidence::Unknown`], never a guess.
 
 use std::collections::HashMap;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-use netpulse_core::net::FiveTuple;
+use netpulse_core::net::{FiveTuple, L4Proto};
 use netpulse_core::{AttributionConfidence, SocketOwner};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum CandidateRank {
+    WildcardUdp = 1,
+    SpecificUdp = 2,
+    ReversedExact = 3,
+    DirectExact = 4,
+}
 
 /// How long a cached socket→PID mapping stays valid after the snapshot that
 /// observed it (: the table snapshot may arrive slightly after a
@@ -113,38 +122,130 @@ impl Correlator {
     /// - **Unknown** when no mapping fits, e.g. a flow too brief to ever appear
     ///   in a snapshot. Never a guessed PID.
     pub fn attribute(&self, tuple: &FiveTuple, flow_start: u64) -> Attribution {
-        let Some(m) = self.cache.get(tuple) else {
+        // 1. Generate Candidate Socket Keys preserving address family
+        struct Candidate {
+            tuple: FiveTuple,
+            rank: CandidateRank,
+        }
+
+        let mut candidates = Vec::with_capacity(6);
+
+        // Direct Exact Match
+        candidates.push(Candidate {
+            tuple: *tuple,
+            rank: CandidateRank::DirectExact,
+        });
+
+        // Reversed Exact Match
+        candidates.push(Candidate {
+            tuple: FiveTuple::new(
+                tuple.dst_ip,
+                tuple.dst_port,
+                tuple.src_ip,
+                tuple.src_port,
+                tuple.l4,
+            ),
+            rank: CandidateRank::ReversedExact,
+        });
+
+        // UDP Local & Wildcard Listeners (preserves address family strictly)
+        if tuple.l4 == L4Proto::Udp {
+            // Source Endpoint Candidates:
+            candidates.push(Candidate {
+                tuple: FiveTuple::new(tuple.src_ip, tuple.src_port, tuple.src_ip, 0, L4Proto::Udp),
+                rank: CandidateRank::SpecificUdp,
+            });
+            let wildcard_src = match tuple.src_ip {
+                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            };
+            candidates.push(Candidate {
+                tuple: FiveTuple::new(wildcard_src, tuple.src_port, wildcard_src, 0, L4Proto::Udp),
+                rank: CandidateRank::WildcardUdp,
+            });
+
+            // Destination Endpoint Candidates:
+            candidates.push(Candidate {
+                tuple: FiveTuple::new(tuple.dst_ip, tuple.dst_port, tuple.dst_ip, 0, L4Proto::Udp),
+                rank: CandidateRank::SpecificUdp,
+            });
+            let wildcard_dst = match tuple.dst_ip {
+                IpAddr::V4(_) => IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                IpAddr::V6(_) => IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+            };
+            candidates.push(Candidate {
+                tuple: FiveTuple::new(wildcard_dst, tuple.dst_port, wildcard_dst, 0, L4Proto::Udp),
+                rank: CandidateRank::WildcardUdp,
+            });
+        }
+
+        // 2. Temporal Validity Filtering
+        struct ValidMatch {
+            rank: CandidateRank,
+            pid: u64,
+            start_mono_nanos: u64,
+            confidence: AttributionConfidence,
+        }
+
+        let mut valid_matches = Vec::new();
+        for cand in candidates {
+            let Some(m) = self.cache.get(&cand.tuple) else {
+                continue;
+            };
+
+            let valid_from = m.observed_at.saturating_sub(RETRO_MATCH_NANOS);
+            let valid_to = m.observed_at + MAPPING_VALIDITY_NANOS;
+
+            if flow_start >= valid_from && flow_start < valid_to {
+                let is_direct_window = flow_start >= m.observed_at;
+                let confidence = match cand.rank {
+                    CandidateRank::DirectExact
+                    | CandidateRank::ReversedExact
+                    | CandidateRank::SpecificUdp => {
+                        if is_direct_window {
+                            AttributionConfidence::High
+                        } else {
+                            AttributionConfidence::Low
+                        }
+                    }
+                    CandidateRank::WildcardUdp => AttributionConfidence::Low,
+                };
+
+                valid_matches.push(ValidMatch {
+                    rank: cand.rank,
+                    pid: m.pid,
+                    start_mono_nanos: m.start_mono_nanos,
+                    confidence,
+                });
+            }
+        }
+
+        if valid_matches.is_empty() {
             return Attribution::unknown();
-        };
-
-        // Direct match: the flow started within the mapping's validity window,
-        // i.e. at or after the socket was observed, and not so long after that
-        // the mapping has expired.
-        let valid_from = m.observed_at.saturating_sub(RETRO_MATCH_NANOS);
-        let valid_to = m.observed_at + MAPPING_VALIDITY_NANOS;
-
-        if flow_start >= m.observed_at && flow_start < valid_to {
-            return Attribution {
-                pid: Some(m.pid),
-                start_mono_nanos: m.start_mono_nanos,
-                confidence: AttributionConfidence::High,
-            };
         }
 
-        // Retro-match: the flow started just *before* the snapshot that observed
-        // the socket (the poll-miss window . Lower confidence.
-        if flow_start >= valid_from && flow_start < m.observed_at {
-            return Attribution {
-                pid: Some(m.pid),
-                start_mono_nanos: m.start_mono_nanos,
-                confidence: AttributionConfidence::Low,
-            };
+        // 3. Rank Valid Candidates by Specificity (DirectExact > ReversedExact > SpecificUdp > WildcardUdp)
+        let max_rank = valid_matches.iter().map(|m| m.rank).max().unwrap();
+        let top_candidates: Vec<&ValidMatch> = valid_matches
+            .iter()
+            .filter(|m| m.rank == max_rank)
+            .collect();
+
+        // 4. Ambiguity Guard: Evaluated strictly among candidates at the same highest specificity rank
+        let first = top_candidates[0];
+        let all_agree = top_candidates
+            .iter()
+            .all(|c| c.pid == first.pid && c.start_mono_nanos == first.start_mono_nanos);
+
+        if !all_agree {
+            return Attribution::unknown();
         }
 
-        // The mapping exists but does not temporally fit this flow — the socket
-        // was reused for a different connection than the one we are attributing.
-        // Honest unknown rather than a wrong PID.
-        Attribution::unknown()
+        Attribution {
+            pid: Some(first.pid),
+            start_mono_nanos: first.start_mono_nanos,
+            confidence: first.confidence,
+        }
     }
 
     /// Whether a cached mapping for `tuple` describes the *same* process instance
@@ -177,7 +278,7 @@ mod tests {
     use netpulse_core::net::L4Proto;
     use netpulse_core::traits::SocketTableSource;
     use netpulse_core::{Process, Result};
-    use std::net::{IpAddr, Ipv4Addr};
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
     fn tuple(port: u16) -> FiveTuple {
         let c = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 10));
@@ -281,6 +382,8 @@ mod tests {
                 exe_path: format!("/usr/bin/proc{pid}"),
                 signer: None,
                 start_mono_nanos: 100,
+                cpu_percent: None,
+                memory_bytes: None,
             }))
         }
     }
@@ -297,5 +400,232 @@ mod tests {
         // The source can enrich identity for an attributed PID.
         let info = src.process_info(55).unwrap().unwrap();
         assert_eq!(info.name, "proc55");
+    }
+
+    #[test]
+    fn attribute_reverse_tcp_flow() {
+        let mut c = Correlator::new();
+        c.ingest_snapshot(1_000, &[owner(50010, 42, 500)]);
+        // Reverse direction: server to client flow
+        let rev = FiveTuple::new(
+            IpAddr::V4(Ipv4Addr::new(93, 184, 216, 34)),
+            443,
+            IpAddr::V4(Ipv4Addr::new(192, 168, 0, 10)),
+            50010,
+            L4Proto::Tcp,
+        );
+        let a = c.attribute(&rev, 1_000);
+        assert_eq!(a.pid, Some(42));
+        assert_eq!(a.confidence, AttributionConfidence::High);
+    }
+
+    #[test]
+    fn attribute_local_bound_udp_socket() {
+        let mut c = Correlator::new();
+        let local_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 10));
+        let udp_listener = FiveTuple::new(local_ip, 5353, local_ip, 0, L4Proto::Udp);
+        c.ingest_snapshot(
+            1_000,
+            &[SocketOwner {
+                tuple: udp_listener,
+                pid: 77,
+                start_mono_nanos: 100,
+            }],
+        );
+
+        // Outbound UDP packet from local bound port to multicast
+        let flow = FiveTuple::new(
+            local_ip,
+            5353,
+            IpAddr::V4(Ipv4Addr::new(224, 0, 0, 251)),
+            5353,
+            L4Proto::Udp,
+        );
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(a.pid, Some(77));
+        assert_eq!(a.confidence, AttributionConfidence::High);
+
+        // Inbound UDP packet to local bound port
+        let inbound = FiveTuple::new(
+            IpAddr::V4(Ipv4Addr::new(192, 168, 0, 20)),
+            40000,
+            local_ip,
+            5353,
+            L4Proto::Udp,
+        );
+        let a_in = c.attribute(&inbound, 1_000);
+        assert_eq!(a_in.pid, Some(77));
+        assert_eq!(a_in.confidence, AttributionConfidence::High);
+    }
+
+    #[test]
+    fn attribute_wildcard_ipv4_udp_listener() {
+        let mut c = Correlator::new();
+        let wildcard = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+        let udp_listener = FiveTuple::new(wildcard, 8080, wildcard, 0, L4Proto::Udp);
+        c.ingest_snapshot(
+            1_000,
+            &[SocketOwner {
+                tuple: udp_listener,
+                pid: 88,
+                start_mono_nanos: 100,
+            }],
+        );
+
+        let flow = FiveTuple::new(
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 5)),
+            8080,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            53,
+            L4Proto::Udp,
+        );
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(a.pid, Some(88));
+        assert_eq!(a.confidence, AttributionConfidence::Low);
+    }
+
+    #[test]
+    fn attribute_wildcard_ipv6_udp_listener() {
+        let mut c = Correlator::new();
+        let wildcard = IpAddr::V6(Ipv6Addr::UNSPECIFIED);
+        let udp_listener = FiveTuple::new(wildcard, 9090, wildcard, 0, L4Proto::Udp);
+        c.ingest_snapshot(
+            1_000,
+            &[SocketOwner {
+                tuple: udp_listener,
+                pid: 99,
+                start_mono_nanos: 100,
+            }],
+        );
+
+        let client_ip = IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1));
+        let server_ip = IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 2));
+        let flow = FiveTuple::new(client_ip, 9090, server_ip, 53, L4Proto::Udp);
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(a.pid, Some(99));
+        assert_eq!(a.confidence, AttributionConfidence::Low);
+    }
+
+    #[test]
+    fn specific_listener_takes_precedence_over_wildcard() {
+        let mut c = Correlator::new();
+        let specific_ip = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 10));
+        let specific = FiveTuple::new(specific_ip, 53, specific_ip, 0, L4Proto::Udp);
+        let wildcard_ip = IpAddr::V4(Ipv4Addr::UNSPECIFIED);
+        let wildcard = FiveTuple::new(wildcard_ip, 53, wildcard_ip, 0, L4Proto::Udp);
+
+        c.ingest_snapshot(
+            1_000,
+            &[
+                SocketOwner {
+                    tuple: specific,
+                    pid: 100,
+                    start_mono_nanos: 100,
+                },
+                SocketOwner {
+                    tuple: wildcard,
+                    pid: 200,
+                    start_mono_nanos: 100,
+                },
+            ],
+        );
+
+        let flow = FiveTuple::new(
+            specific_ip,
+            53,
+            IpAddr::V4(Ipv4Addr::new(8, 8, 8, 8)),
+            53,
+            L4Proto::Udp,
+        );
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(
+            a.pid,
+            Some(100),
+            "Specific listener PID 100 must outrank wildcard listener PID 200"
+        );
+    }
+
+    #[test]
+    fn competing_ambiguous_listeners_return_unknown() {
+        let mut c = Correlator::new();
+        let ip1 = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 10));
+        let ip2 = IpAddr::V4(Ipv4Addr::new(192, 168, 0, 20));
+        // Both src and dst match specific UDP listeners of differing PIDs
+        let listener_src = FiveTuple::new(ip1, 6000, ip1, 0, L4Proto::Udp);
+        let listener_dst = FiveTuple::new(ip2, 7000, ip2, 0, L4Proto::Udp);
+
+        c.ingest_snapshot(
+            1_000,
+            &[
+                SocketOwner {
+                    tuple: listener_src,
+                    pid: 111,
+                    start_mono_nanos: 100,
+                },
+                SocketOwner {
+                    tuple: listener_dst,
+                    pid: 222,
+                    start_mono_nanos: 100,
+                },
+            ],
+        );
+
+        // Flow connecting ip1:6000 to ip2:7000 - both are equally specific UDP listeners with differing PIDs
+        let flow = FiveTuple::new(ip1, 6000, ip2, 7000, L4Proto::Udp);
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(
+            a.pid, None,
+            "Equally ranked competing listeners with differing PIDs must return unknown"
+        );
+        assert_eq!(a.confidence, AttributionConfidence::Unknown);
+    }
+
+    #[test]
+    fn unobserved_udp_returns_unknown() {
+        let c = Correlator::new();
+        let flow = FiveTuple::new(
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)),
+            12345,
+            IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2)),
+            53,
+            L4Proto::Udp,
+        );
+        let a = c.attribute(&flow, 1_000);
+        assert_eq!(a.pid, None);
+        assert_eq!(a.confidence, AttributionConfidence::Unknown);
+    }
+
+    #[test]
+    fn address_family_mismatch_never_resolves() {
+        let mut c = Correlator::new();
+        let ipv4_wildcard = FiveTuple::new(
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            53,
+            IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+            0,
+            L4Proto::Udp,
+        );
+        c.ingest_snapshot(
+            1_000,
+            &[SocketOwner {
+                tuple: ipv4_wildcard,
+                pid: 333,
+                start_mono_nanos: 100,
+            }],
+        );
+
+        // IPv6 flow on port 53 must NOT match the IPv4 wildcard
+        let ipv6_flow = FiveTuple::new(
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 1)),
+            53,
+            IpAddr::V6(Ipv6Addr::new(0x2001, 0xdb8, 0, 0, 0, 0, 0, 2)),
+            53,
+            L4Proto::Udp,
+        );
+        let a = c.attribute(&ipv6_flow, 1_000);
+        assert_eq!(
+            a.pid, None,
+            "IPv6 traffic must not resolve against IPv4 socket keys"
+        );
     }
 }

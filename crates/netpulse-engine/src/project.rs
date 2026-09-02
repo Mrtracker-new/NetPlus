@@ -96,6 +96,10 @@ pub fn monitor_dto(snap: &MonitorSnapshot) -> MonitorSnapshotDto {
         capture_drops: snap.loss.capture_drops,
         capture_stats: snap.capture_stats.as_ref().map(capture_stats_dto),
         diagnostic_chain: Some(diagnostic_chain_dto(&snap.diagnostic_chain)),
+        processes: snap.processes.clone(),
+        lineage: snap.lineage.clone(),
+        subsystems: snap.subsystems.clone(),
+        throughput_history: snap.throughput_history.clone(),
     }
 }
 
@@ -775,6 +779,10 @@ mod tests {
                 buffer_capacity: 1000,
             }),
             diagnostic_chain: crate::monitor::DiagnosticChain::default(),
+            processes: Vec::new(),
+            lineage: Vec::new(),
+            subsystems: Vec::new(),
+            throughput_history: Vec::new(),
         };
 
         let dto = monitor_dto(&snap);

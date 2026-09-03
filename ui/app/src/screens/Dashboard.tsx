@@ -6,7 +6,7 @@ import { Constellation, GlobalTrafficMap, type SelectedEntity } from "@netpulse/
 
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
 import { useDisclosure } from "../modes/DisclosureContext";
-import { useStore, setMonitor, setFeed, setError } from "../state/store";
+import { useStore, setSnapshotBatch, setError } from "../state/store";
 import { query } from "../ipc";
 import { useDashboardController, cardMatchesCategory } from "./Dashboard/useDashboardController";
 import type { RecommendationItem } from "./Dashboard/viewModels";
@@ -299,13 +299,13 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         query({ kind: "monitorSnapshot" }),
       ])
         .then(([feedRes, monRes]) => {
-          if (feedRes.kind === "narrativeFeed") {
-            setFeed(feedRes.cards);
+          const cards = feedRes.kind === "narrativeFeed" ? feedRes.cards : null;
+          const snapshot = monRes.kind === "monitorSnapshot" ? monRes.snapshot : null;
+          if (cards != null || snapshot != null) {
+            setSnapshotBatch(cards, snapshot, null);
+          } else {
+            setError(null);
           }
-          if (monRes.kind === "monitorSnapshot") {
-            setMonitor(monRes.snapshot);
-          }
-          setError(null);
         })
         .catch((e) => {
           setError(String(e));

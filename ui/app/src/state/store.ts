@@ -50,7 +50,7 @@ function emit() {
   for (const l of listeners) l();
 }
 
-function subscribe(listener: () => void): () => void {
+export function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
 }
@@ -89,45 +89,72 @@ export function pushCards(cards: NarrativeCard[]): void {
   emit();
 }
 
+/** Atomically updates both feed cards and monitor snapshot in a single state
+ *  transition, invoking emit() exactly once. Prevents redundant render cascades
+ *  during polling cycles. */
+export function setSnapshotBatch(
+  cards?: NarrativeCard[] | null,
+  monitor?: MonitorSnapshot | null,
+  error?: string | null
+): void {
+  let hasChanges = false;
+  let next = { ...state };
+
+  if (cards != null) {
+    const feed = cards.slice(0, MAX_FEED);
+    const cardsHistory = [...next.cardsHistory, feed.length].slice(-MAX_SAMPLES);
+    next = { ...next, feed, cardsHistory };
+    hasChanges = true;
+  }
+
+  if (monitor != null) {
+    const total = monitor.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
+    const hosts = monitor.by_host.rows.length;
+    const flows = monitor.by_host.rows.reduce((s, r) => s + r.flows, 0);
+
+    const throughput = [...next.throughput, total].slice(-MAX_SAMPLES);
+    const hostsHistory = [...next.hostsHistory, hosts].slice(-MAX_SAMPLES);
+    const flowsHistory = [...next.flowsHistory, flows].slice(-MAX_SAMPLES);
+
+    next = {
+      ...next,
+      monitor,
+      snapshotSequence: next.snapshotSequence + 1,
+      throughput,
+      hostsHistory,
+      flowsHistory,
+    };
+    hasChanges = true;
+  }
+
+  if (error !== undefined && next.error !== error) {
+    next = { ...next, error };
+    hasChanges = true;
+  }
+
+  if (hasChanges) {
+    state = next;
+    emit();
+  }
+}
+
 /** Replace the whole feed with a fresh snapshot. The pull query
  *  returns the full current feed newest-first, so a poll *replaces* rather than
  *  prepends — otherwise re-polling would duplicate every card. */
 export function setFeed(cards: NarrativeCard[]): void {
-  const feed = cards.slice(0, MAX_FEED);
-  const cardsHistory = [...state.cardsHistory, feed.length].slice(-MAX_SAMPLES);
-  state = { ...state, feed, cardsHistory };
-  emit();
+  setSnapshotBatch(cards, null);
 }
 
 /** Replace the current monitoring snapshot and append samples
  *  (total bytes, hosts count, flows count) to bounded trend histories.
  *  Assigns authoritative snapshotSequence exactly once upon ingestion. */
 export function setMonitor(snapshot: MonitorSnapshot): void {
-  const total = snapshot.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
-  const hosts = snapshot.by_host.rows.length;
-  const flows = snapshot.by_host.rows.reduce((s, r) => s + r.flows, 0);
-
-  const throughput = [...state.throughput, total].slice(-MAX_SAMPLES);
-  const hostsHistory = [...state.hostsHistory, hosts].slice(-MAX_SAMPLES);
-  const flowsHistory = [...state.flowsHistory, flows].slice(-MAX_SAMPLES);
-
-  state = {
-    ...state,
-    monitor: snapshot,
-    snapshotSequence: state.snapshotSequence + 1,
-    throughput,
-    hostsHistory,
-    flowsHistory,
-  };
-  emit();
+  setSnapshotBatch(null, snapshot);
 }
 
 /** Set or clear connection/engine error state. */
 export function setError(error: string | null): void {
-  if (state.error !== error) {
-    state = { ...state, error };
-    emit();
-  }
+  setSnapshotBatch(null, null, error);
 }
 
 function getSnapshot(): State {
@@ -141,6 +168,7 @@ export function useStore(): State {
 
 // Test-only reset; not used by the app at runtime.
 export function __resetForTest(): void {
+  listeners.clear();
   state = {
     feed: [],
     monitor: null,

@@ -14,7 +14,7 @@
 import { useEffect } from "react";
 import type { NarrativeCard, MonitorSnapshot, ProjectionDepth, MonitorTimeRange } from "@netpulse/contract";
 import { query } from "../ipc";
-import { setFeed, pushCards, setMonitor, setError } from "./store";
+import { setSnapshotBatch, pushCards, setMonitor, setError } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
 
 import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
@@ -30,6 +30,7 @@ function inTauri(): boolean {
 }
 
 let isRefreshing = false;
+let pendingRefresh = false;
 let activeDepth: ProjectionDepth = "beginner";
 
 export function triggerLiveRefresh(): void {
@@ -38,30 +39,47 @@ export function triggerLiveRefresh(): void {
 
 async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promise<void> {
   activeDepth = depth;
-  if (isRefreshing || cancelled()) return;
-  isRefreshing = true;
-  try {
-    const res = await query({ kind: "narrativeFeed", depth });
-    if (!cancelled() && res.kind === "narrativeFeed") {
-      setFeed(res.cards);
-      setError(null);
-    }
-  } catch (e) {
-    if (!cancelled() && inTauri()) {
-      setError(String(e));
-    }
+  if (cancelled()) return;
+  if (isRefreshing) {
+    pendingRefresh = true;
+    return;
   }
-  try {
-    const timeRangePref = preferencesManager.getPreferences().timeRange;
-    let time_range: MonitorTimeRange = "five_minutes";
-    if (timeRangePref === "15m") time_range = "fifteen_minutes";
-    else if (timeRangePref === "1h") time_range = "one_hour";
-    else if (timeRangePref === "24h") time_range = "twenty_four_hours";
+  isRefreshing = true;
 
-    const res = await query({ kind: "monitorSnapshot", time_range });
-    if (!cancelled() && res.kind === "monitorSnapshot") {
-      setMonitor(res.snapshot);
-      setError(null);
+  const timeRangePref = preferencesManager.getPreferences().timeRange;
+  let time_range: MonitorTimeRange = "five_minutes";
+  if (timeRangePref === "15m") time_range = "fifteen_minutes";
+  else if (timeRangePref === "1h") time_range = "one_hour";
+  else if (timeRangePref === "24h") time_range = "twenty_four_hours";
+
+  try {
+    const [feedResult, monitorResult] = await Promise.allSettled([
+      query({ kind: "narrativeFeed", depth }),
+      query({ kind: "monitorSnapshot", time_range }),
+    ]);
+
+    if (cancelled()) return;
+
+    let cards: NarrativeCard[] | null = null;
+    let snapshot: MonitorSnapshot | null = null;
+    let caughtError: string | null = null;
+
+    if (feedResult.status === "fulfilled" && feedResult.value.kind === "narrativeFeed") {
+      cards = feedResult.value.cards;
+    } else if (feedResult.status === "rejected" && inTauri()) {
+      caughtError = String(feedResult.reason);
+    }
+
+    if (monitorResult.status === "fulfilled" && monitorResult.value.kind === "monitorSnapshot") {
+      snapshot = monitorResult.value.snapshot;
+    } else if (monitorResult.status === "rejected" && inTauri()) {
+      caughtError = String(monitorResult.reason);
+    }
+
+    if (cards != null || snapshot != null) {
+      setSnapshotBatch(cards, snapshot, caughtError ?? null);
+    } else if (caughtError != null) {
+      setError(caughtError);
     }
   } catch (e) {
     if (!cancelled() && inTauri()) {
@@ -69,6 +87,10 @@ async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promis
     }
   } finally {
     isRefreshing = false;
+    if (pendingRefresh && !cancelled()) {
+      pendingRefresh = false;
+      refresh(activeDepth, cancelled);
+    }
   }
 }
 

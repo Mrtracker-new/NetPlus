@@ -1,16 +1,19 @@
 import { memo } from "react";
+import type { EvidenceRef } from "@netpulse/contract";
 import type { HeroViewModel, SituationSummaryModel, NarrativeCategory } from "./viewModels";
 
 interface SituationSummaryProps {
   hero: HeroViewModel;
   summary: SituationSummaryModel;
   onSelectCategory?: (category: NarrativeCategory) => void;
+  onNavigateToEvidence?: (ref: EvidenceRef) => void;
 }
 
 export const SituationSummary = memo(function SituationSummary({
   hero,
   summary,
   onSelectCategory,
+  onNavigateToEvidence,
 }: SituationSummaryProps) {
   const rec = summary.recommendations[0];
   const recText = rec?.text ?? "";
@@ -20,6 +23,17 @@ export const SituationSummary = memo(function SituationSummary({
       : hero.state === "finding"
       ? "np-rec-tag--investigate"
       : "np-rec-tag--caution";
+
+  const handleRecClick = () => {
+    if (rec?.evidenceRef && onNavigateToEvidence) {
+      onNavigateToEvidence(rec.evidenceRef);
+    }
+    if (rec?.type === "investigate") {
+      onSelectCategory?.("findings");
+    } else if (rec?.type === "monitor") {
+      onSelectCategory?.("all");
+    }
+  };
 
   return (
     <section className={`np-situation-card np-situation-card--${hero.state}`} aria-label="Situation Summary">
@@ -37,7 +51,7 @@ export const SituationSummary = memo(function SituationSummary({
               <button
                 type="button"
                 className={`np-rec-tag ${recClass} np-rec-btn`}
-                onClick={() => onSelectCategory?.("findings")}
+                onClick={handleRecClick}
                 aria-label={`Recommendation: ${rec.text}`}
               >
                 <span className="np-rec-tag__prefix">Recommendation:</span> {rec.text}
@@ -46,7 +60,7 @@ export const SituationSummary = memo(function SituationSummary({
               <button
                 type="button"
                 className={`np-rec-tag ${recClass} np-rec-btn`}
-                onClick={() => onSelectCategory?.("all")}
+                onClick={handleRecClick}
                 aria-label={`Action: ${rec.text}`}
               >
                 <span className="np-rec-tag__prefix">Action:</span> {rec.text}

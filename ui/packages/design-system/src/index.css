@@ -7576,30 +7576,32 @@ svg path {
 .np-health-strip {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--np-2);
-  padding: 4px var(--np-4);
+  gap: var(--np-3);
+  padding: 6px 16px;
   background: var(--np-surface-recessed);
   border: 1px solid var(--np-border);
   border-radius: var(--np-radius-pill);
   font-size: var(--np-fs-xs);
   color: var(--np-text-dim);
   margin-bottom: var(--np-3);
-  overflow-x: auto;
-  white-space: nowrap;
   box-shadow: var(--np-neu-inset);
+  white-space: nowrap;
+  overflow-x: auto;
   scrollbar-width: none;
-  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  min-height: 32px;
 }
 .np-health-strip::-webkit-scrollbar {
   display: none;
 }
 
 .np-health-strip__item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   flex-shrink: 0;
+  white-space: nowrap;
+  max-width: 280px;
 }
 
 .np-health-dot {
@@ -7630,12 +7632,16 @@ svg path {
 .np-health-strip__label {
   font-weight: var(--np-fw-medium);
   color: var(--np-text-mute);
+  flex-shrink: 0;
 }
 
 .np-health-strip__val {
   font-family: var(--np-font-mono);
   color: var(--np-text);
   font-weight: var(--np-fw-semibold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .np-health-strip__val--warning {
@@ -7737,7 +7743,8 @@ svg path {
   display: flex;
   gap: var(--np-2);
   flex-wrap: wrap;
-  flex-shrink: 0;
+  flex: 1 1 auto;
+  max-width: 100%;
 }
 
 .np-situation-chip {
@@ -7749,6 +7756,8 @@ svg path {
   border-radius: var(--np-radius-xs);
   border: 1px solid var(--np-border);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.35);
+  max-width: 100%;
+  word-break: break-word;
 }
 
 .np-rec-tag {
@@ -7861,9 +7870,10 @@ svg path {
 
 .np-kpi-card__main {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--np-2);
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
 }
 
 .np-kpi-card__val {
@@ -7871,16 +7881,21 @@ svg path {
   font-weight: var(--np-fw-bold);
   color: var(--np-text);
   font-family: var(--np-font-mono);
-  line-height: 1;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .np-kpi-card__rates {
   display: flex;
-  gap: var(--np-2);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.45rem;
   font-family: var(--np-font-mono);
-  font-size: var(--np-fs-xs);
-  white-space: nowrap;
-  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 1.2;
 }
 
 .np-kpi-rate {
@@ -7904,6 +7919,12 @@ svg path {
   padding: 2px 6px;
   border: 1px solid var(--np-border);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+.np-kpi-card__spark .np-viz-spark {
+  width: 100%;
+  height: 100%;
+  flex: 1 1 auto;
 }
 
 .np-kpi-card__spark--empty {
@@ -7941,6 +7962,25 @@ svg path {
   white-space: nowrap;
   box-shadow: var(--np-neu-lg);
   z-index: var(--np-z-tooltip);
+  min-width: 170px;
+}
+
+.np-kpi-card__tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--np-3);
+  line-height: 1.5;
+}
+
+.np-kpi-card__tooltip-label {
+  color: var(--np-text-muted);
+}
+
+.np-kpi-card__tooltip-val {
+  color: var(--np-text);
+  font-weight: 500;
+  text-align: right;
 }
 
 .np-kpi-card:hover .np-kpi-card__tooltip,
@@ -8362,61 +8402,242 @@ svg path {
   background: var(--np-surface-3);
 }
 
-/* In-Card Collapsible Explanation Box */
-.np-explain-box {
-  margin-top: var(--np-3);
-  margin-bottom: var(--np-3);
-  padding: var(--np-4);
-  background: var(--np-bg);
-  border: 1px solid var(--np-accent-line);
-  border-radius: var(--np-radius-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--np-3);
-  animation: np-fade-in 180ms ease-out;
+/* ==========================================================================
+   Diagnostic Telemetry Chain (7-Stage Tactile Flow Strip)
+   ========================================================================== */
+
+.np-diag-chain {
+  margin-bottom: var(--np-4);
+  width: 100%;
 }
 
-.np-explain-box__header {
+.np-diag-chain__track {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.35rem 0.15rem;
+  scrollbar-width: thin;
+  width: 100%;
+}
+
+.np-diag-chain__track::-webkit-scrollbar {
+  height: 4px;
+}
+
+.np-diag-chain__track::-webkit-scrollbar-thumb {
+  background: var(--np-surface-2);
+  border-radius: 2px;
+}
+
+.np-diag-chain__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.np-diag-chain__connector {
+  color: var(--np-text-mute, #6b7280);
+  font-size: 0.75rem;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.np-diag-chain__node {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: var(--np-radius-sm, 6px);
+  border: 1px solid var(--np-hairline, rgba(255, 255, 255, 0.08));
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-sm);
+  cursor: pointer;
+  transition: transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease;
+  font-family: inherit;
+  color: var(--np-text);
+  text-align: left;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.np-diag-chain__node:focus-visible {
+  outline: 2px solid var(--np-accent-strong, #6366f1);
+  outline-offset: 2px;
+}
+
+.np-diag-chain__node:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-md);
+}
+
+.np-diag-chain__node:disabled {
+  cursor: default;
+}
+
+.np-diag-chain__node--healthy {
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.np-diag-chain__node--warning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.03);
+}
+
+.np-diag-chain__node--finding {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.np-diag-chain__node--muted {
+  opacity: 0.65;
+}
+
+.np-diag-chain__glyph {
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.np-diag-chain__node--healthy .np-diag-chain__glyph {
+  color: var(--np-sem-nominal, #22c55e);
+}
+
+.np-diag-chain__node--warning .np-diag-chain__glyph {
+  color: var(--np-sem-investigate, #f59e0b);
+}
+
+.np-diag-chain__node--finding .np-diag-chain__glyph {
+  color: var(--np-sem-failure, #ef4444);
+}
+
+.np-diag-chain__node--muted .np-diag-chain__glyph {
+  color: var(--np-text-mute, #6b7280);
+}
+
+.np-diag-chain__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.np-diag-chain__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--np-text);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-diag-chain__status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-diag-chain__status-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.np-diag-chain__status-badge--healthy {
+  color: var(--np-sem-nominal, #22c55e);
+}
+
+.np-diag-chain__status-badge--warning {
+  color: var(--np-sem-investigate, #f59e0b);
+}
+
+.np-diag-chain__status-badge--finding {
+  color: var(--np-sem-failure, #ef4444);
+}
+
+.np-diag-chain__status-badge--muted {
+  color: var(--np-text-mute, #6b7280);
+}
+
+.np-diag-chain__latency {
+  font-family: var(--np-font-mono, monospace);
+  color: var(--np-text-dim, #94a3b8);
+  font-size: 0.68rem;
+}
+
+.np-diag-chain__node--active {
+  border-color: var(--np-accent-strong, #6366f1);
+  box-shadow: var(--np-neu-inset), 0 0 0 1px var(--np-accent-strong, #6366f1);
+}
+
+/* Recessed tactile inspector chamber for selected diagnostic chain node */
+.np-diag-chain__inspector {
+  margin-top: var(--np-3);
+  padding: var(--np-3) var(--np-4);
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-hairline);
+  border-radius: var(--np-radius);
+  box-shadow: var(--np-neu-inset);
+  animation: np-fade-in 160ms ease-out;
+}
+
+.np-diag-chain__inspector-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.np-explain-box__tag {
-  font-family: var(--np-font-mono);
-  font-size: var(--np-fs-xs);
-  font-weight: var(--np-fw-bold);
-  color: var(--np-accent-strong);
-  text-transform: uppercase;
-  letter-spacing: var(--np-tracking-wide);
+@media (max-width: 1024px) {
+  .np-diag-chain__track {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+  .np-diag-chain__item {
+    flex: 1 1 calc(25% - 0.4rem);
+    min-width: 110px;
+  }
+  .np-diag-chain__connector {
+    display: none;
+  }
 }
 
-.np-explain-box__close {
-  background: transparent;
-  border: none;
-  color: var(--np-text-mute);
-  cursor: pointer;
-  font-size: 14px;
+/* Narrative Card Highlight Pulse */
+@keyframes np-card-highlight-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6), var(--np-neu-raised);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.25), var(--np-neu-raised);
+    border-color: var(--np-accent-strong, #6366f1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0), var(--np-neu-raised);
+  }
 }
 
-.np-explain-box__label {
-  font-size: var(--np-fs-xs);
-  font-weight: var(--np-fw-semibold);
-  color: var(--np-text);
-  margin-bottom: 2px;
+.np-card--highlight-pulse {
+  animation: np-card-highlight-pulse 1.2s ease-in-out 2;
 }
 
-.np-explain-box__text {
-  font-size: var(--np-fs-sm);
-  color: var(--np-text-dim);
-  line-height: 1.5;
-  margin: 0;
+/* Degraded Subsystem Health Indicators */
+.np-health-dot--degraded {
+  background: var(--np-sem-failure, #ef4444);
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
 }
 
-.np-explain-box__footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--np-1);
+.np-health-strip__val--degraded {
+  color: var(--np-sem-failure, #ef4444);
 }
 
 /* ==========================================================================

@@ -1,7 +1,6 @@
 import { memo, useState, useEffect } from "react";
 import type { NarrativeCard, EvidenceRef } from "@netpulse/contract";
 import { formatEvidenceLabel } from "@netpulse/components";
-import { ConfidenceMeter } from "@netpulse/viz";
 import { Icon } from "../../icons";
 
 interface CardExplainBoxProps {
@@ -77,7 +76,6 @@ export const CardExplainBox = memo(function CardExplainBox({
 
   const evidenceRef = card.evidence && card.evidence.length > 0 ? card.evidence[0] : null;
   const label = evidenceRef ? formatEvidenceLabel(evidenceRef) : "Evidence Ref";
-  const confidencePct = card.severity === "finding" ? 92 : card.severity === "notable" ? 78 : 65;
 
   return (
     <div className="np-explain-box" role="region" aria-label="Explanation details">
@@ -124,8 +122,30 @@ export const CardExplainBox = memo(function CardExplainBox({
 
           <div className="np-inline-drawer__grid">
             <div className="np-inline-drawer__col">
-              <h5 className="np-inline-drawer__sub">Evidence Confidence</h5>
-              <ConfidenceMeter percent={confidencePct} qualitative={card.severity} />
+              <h5 className="np-inline-drawer__sub">Observation Grounding</h5>
+              <div
+                className="np-direct-observation-badge"
+                style={{
+                  padding: "0.5rem 0.75rem",
+                  background: "var(--np-surface-2, rgba(255,255,255,0.04))",
+                  borderRadius: "var(--np-radius-sm, 6px)",
+                  border: "1px solid var(--np-border, rgba(255,255,255,0.06))",
+                }}
+              >
+                <span className="np-badge np-badge--healthy" style={{ fontSize: "0.75rem" }}>
+                  ● Direct Observation
+                </span>
+                <p
+                  style={{
+                    margin: "0.35rem 0 0 0",
+                    fontSize: "0.75rem",
+                    color: "var(--np-text-mute, #a0aec0)",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Direct wire capture. Telemetry grounded in reconstructed packet and flow headers.
+                </p>
+              </div>
             </div>
 
             <div className="np-inline-drawer__col">
@@ -187,7 +207,7 @@ export const CardExplainBox = memo(function CardExplainBox({
             {showInlineDrawer ? "Hide Quick Peek Drawer" : "Quick Peek Drawer"}
           </button>
         )}
-        {onNavigateToScreen && evidenceRef && (
+        {!showInlineDrawer && onNavigateToScreen && evidenceRef && (
           <button
             type="button"
             className="np-btn np-btn--primary np-btn--sm"

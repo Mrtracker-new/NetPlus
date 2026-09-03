@@ -14,6 +14,7 @@ import { SituationSummary } from "./Dashboard/SituationSummary";
 import { NarrativeFilterBar } from "./Dashboard/NarrativeFilterBar";
 import { KpiCards } from "./Dashboard/KpiCards";
 import { CardExplainBox } from "./Dashboard/CardExplainBox";
+import { DiagnosticChainStrip } from "./Dashboard/DiagnosticChainStrip";
 import { Icon } from "../icons";
 
 export class WidgetErrorBoundary extends Component<
@@ -79,7 +80,11 @@ function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
   );
 
   return (
-    <article className={`np-card np-card--${card.severity}`}>
+    <article
+      id={`card-${card.at_mono_nanos}`}
+      data-evidence-id={card.evidence[0]?.id}
+      className={`np-card np-card--${card.severity}`}
+    >
       <header className="np-card__headline">
         <span aria-hidden="true" className="np-card__severity-icon">
           {SEVERITY_ICON[card.severity]}
@@ -123,9 +128,8 @@ export interface DashboardProps {
 export function Dashboard({ loading = false, error: propsError = null, onRetry }: DashboardProps) {
   const { t } = useTranslation("dashboard");
   const { depth } = useDisclosure();
-  const { monitor, error: storeError } = useStore();
+  const { error: storeError } = useStore();
   const { navigateToEvidence } = useEvidenceNavigation();
-  const hostRows = monitor?.by_host.rows ?? [];
   const error = propsError ?? storeError;
 
   const {
@@ -139,10 +143,45 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     selectedEntity,
     captureSessionId,
     snapshotSequence,
+    monitor,
+    feed,
     feedCount,
     filteredNarratives,
     dispatchEvent,
   } = useDashboardController();
+
+  const hostRows = monitor?.by_host.rows ?? [];
+  const [evidenceNotice, setEvidenceNotice] = useState<string | null>(null);
+
+  const handleNavigateToEvidence = useCallback(
+    (ref: EvidenceRef) => {
+      const targetCard = feed.find((c) =>
+        c.evidence.some((e) => e.kind === ref.kind && e.id === ref.id)
+      );
+
+      if (targetCard) {
+        setEvidenceNotice(null);
+        dispatchEvent({ type: "SET_CATEGORY", category: "all" });
+        dispatchEvent({ type: "SET_SEARCH", search: "" });
+
+        setTimeout(() => {
+          const cardElem =
+            document.getElementById(`card-${targetCard.at_mono_nanos}`) ||
+            document.querySelector(`[data-evidence-id="${ref.id}"]`);
+          if (cardElem) {
+            cardElem.scrollIntoView({ behavior: "smooth", block: "center" });
+            cardElem.classList.remove("np-card--highlight-pulse");
+            void (cardElem as HTMLElement).offsetWidth;
+            cardElem.classList.add("np-card--highlight-pulse");
+          }
+        }, 60);
+      } else {
+        setEvidenceNotice(`Evidence flow #${ref.id} is outside the active visible feed window.`);
+        setTimeout(() => setEvidenceNotice(null), 6000);
+      }
+    },
+    [feed, dispatchEvent]
+  );
 
   const handleConstellationNavigate = useCallback(
     (ref: EvidenceRef) => {
@@ -194,8 +233,34 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
           hero={heroViewModel}
           summary={situationSummaryModel}
           onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
+          onNavigateToEvidence={handleNavigateToEvidence}
         />
       </WidgetErrorBoundary>
+
+      {/* 2.5 7-Stage Diagnostic Telemetry Chain */}
+      <WidgetErrorBoundary title="Diagnostic Chain">
+        <DiagnosticChainStrip
+          chain={monitor?.diagnostic_chain}
+          onNavigateToEvidence={handleNavigateToEvidence}
+        />
+      </WidgetErrorBoundary>
+
+      {evidenceNotice && (
+        <div style={{ marginBottom: "var(--np-4)" }} role="alert">
+          <Notice>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+              <span>{evidenceNotice}</span>
+              <button
+                type="button"
+                className="np-btn np-btn--ghost np-btn--sm"
+                onClick={() => setEvidenceNotice(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </Notice>
+        </div>
+      )}
 
       {error && (
         <div style={{ marginBottom: "var(--np-4)" }}>

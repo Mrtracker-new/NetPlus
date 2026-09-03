@@ -4,7 +4,7 @@ import type { ReactElement } from "react";
 export interface SparklineProps {
   values?: number[];
   data?: number[];
-  width?: number;
+  width?: number | string;
   height?: number;
   color?: string;
 }
@@ -13,7 +13,7 @@ export interface SparklineProps {
 export const Sparkline = memo(function Sparkline({
   values,
   data,
-  width = 120,
+  width = "100%",
   height = 28,
   color = "var(--np-accent)",
 }: SparklineProps): ReactElement | null {
@@ -26,7 +26,8 @@ export const Sparkline = memo(function Sparkline({
   const max = Math.max(...chartValues, 1);
   const min = Math.min(...chartValues, 0);
   const span = max - min || 1;
-  const step = width / (chartValues.length - 1);
+  const viewBoxWidth = 100;
+  const step = viewBoxWidth / (chartValues.length - 1);
 
   const pts = chartValues
     .map((v, i) => {
@@ -40,9 +41,11 @@ export const Sparkline = memo(function Sparkline({
     <svg
       width={width}
       height={height}
-      viewBox={`0 0 ${width} ${height}`}
+      viewBox={`0 0 ${viewBoxWidth} ${height}`}
+      preserveAspectRatio="none"
       className="np-viz-spark"
       aria-hidden="true"
+      style={{ width: typeof width === "number" ? `${width}px` : width, height: `${height}px`, display: "block" }}
     >
       <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
     </svg>

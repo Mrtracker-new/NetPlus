@@ -15,7 +15,7 @@ import type {
 } from "./viewModels";
 
 export function useDashboardController() {
-  const { monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
+  const { monitor, feed, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
   const { depth, shows } = useDisclosure();
   const sidebar = useOptionalSidebar();
 
@@ -32,26 +32,23 @@ export function useDashboardController() {
     return generateSituationSummary(monitor, feed);
   }, [monitor, feed]);
 
-  // 2. Hero View Model (State Machine)
+  // 2. Hero View Model (State Machine directly synchronized with authoritative Situation Summary)
   const heroViewModel: HeroViewModel = useMemo(() => {
-    const findings = feed.filter((c) => c.severity === "finding");
-    const notables = feed.filter((c) => c.severity === "notable");
-
-    if (findings.length > 0) {
+    if (situationSummaryModel.overallHealth === "finding") {
       return {
         state: "finding",
         badgeText: "Attention",
-        title: "Security & Performance Findings Detected",
-        subtitle: `${findings.length} finding${findings.length > 1 ? "s" : ""} require your review.`,
+        title: situationSummaryModel.headline,
+        subtitle: situationSummaryModel.explanation,
       };
     }
 
-    if (notables.length > 0) {
+    if (situationSummaryModel.overallHealth === "notable") {
       return {
         state: "spike",
         badgeText: "Notable",
-        title: "Notable Network Activity",
-        subtitle: `${notables.length} notable event${notables.length > 1 ? "s" : ""} recorded across local connection.`,
+        title: situationSummaryModel.headline,
+        subtitle: situationSummaryModel.explanation,
       };
     }
 
@@ -61,49 +58,136 @@ export function useDashboardController() {
       title: "Network Operating Normally",
       subtitle: "Passive telemetry active. No critical anomalies detected.",
     };
-  }, [feed]);
+  }, [situationSummaryModel]);
 
-  // 3. KPI View Models
+  // 3. KPI View Models (Strict Authoritative Rates from throughput_history & telemetry_state)
   const kpiViewModels: KpiViewModel[] = useMemo(() => {
     const hosts = monitor?.by_host.rows.length ?? 0;
     const flows = monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0;
     const bytes = monitor?.by_protocol.rows.reduce((s, r) => s + r.bytes, 0) ?? 0;
 
-    let currentRateBps = 0;
-    const throughputDeltas: number[] = [];
-    if (throughput && throughput.length >= 2) {
-      for (let i = 1; i < throughput.length; i++) {
-        const delta = Math.max(0, (throughput[i] ?? 0) - (throughput[i - 1] ?? 0));
-        throughputDeltas.push(delta);
-      }
-      currentRateBps = throughputDeltas[throughputDeltas.length - 1] ?? 0;
+    const history = monitor?.throughput_history ?? [];
+    const latestSample = history.length > 0 ? history[history.length - 1] : null;
+    const telemetryState = monitor?.telemetry_state ?? "standby";
+
+    const ingressBps = telemetryState === "active" && latestSample ? latestSample.ingress_rate_bytes_sec : 0;
+    const egressBps = telemetryState === "active" && latestSample ? latestSample.egress_rate_bytes_sec : 0;
+
+    // Truthful 4-State Telemetry Rate Mapping:
+    // Active      -> live measured rate (or 0 B/s if measured zero traffic)
+    // Stale       -> rate unknown due to expired telemetry: ▼ — /s (Stale)
+    // Standby     -> capture not active:                   ▼ 0 B/s (Standby)
+    // Unavailable -> telemetry offline / unmeasured:       ▼ — (Unavailable)
+    let rateDown: string;
+    let rateUp: string;
+    let activityBadgeText = "Standby";
+    let activityBadgeVariant: "healthy" | "quiet" | "congested" | "spike" = "quiet";
+
+    switch (telemetryState) {
+      case "active":
+        rateDown = ingressBps > 0 ? `▼ ${humanBytes(ingressBps)}/s` : "▼ 0 B/s";
+        rateUp = egressBps > 0 ? `▲ ${humanBytes(egressBps)}/s` : "▲ 0 B/s";
+        activityBadgeText = ingressBps > 10_000_000 ? "Active" : "Nominal";
+        activityBadgeVariant = "healthy";
+        break;
+      case "stale":
+        rateDown = "▼ — /s (Stale)";
+        rateUp = "▲ — /s (Stale)";
+        activityBadgeText = "Stale";
+        activityBadgeVariant = "congested";
+        break;
+      case "standby":
+        rateDown = "▼ 0 B/s (Standby)";
+        rateUp = "▲ 0 B/s (Standby)";
+        activityBadgeText = "Standby";
+        activityBadgeVariant = "quiet";
+        break;
+      case "unavailable":
+      default:
+        rateDown = "▼ — (Unavailable)";
+        rateUp = "▲ — (Unavailable)";
+        activityBadgeText = "Unavailable";
+        activityBadgeVariant = "quiet";
+        break;
     }
-    const rateFormatted = currentRateBps > 0 ? `${humanBytes(currentRateBps)}/s` : "0 B/s (Idle)";
+
+    const totalBps = ingressBps + egressBps;
+
     const sparklineActivity =
-      throughputDeltas.length > 1
-        ? throughputDeltas.slice(-8)
+      history.length > 1
+        ? history.map((s) => s.ingress_rate_bytes_sec + s.egress_rate_bytes_sec).slice(-8)
         : [];
     const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [];
     const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [];
     const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [];
+
+    const peakActivityBps = sparklineActivity.length > 0 ? Math.max(...sparklineActivity, totalBps) : totalBps;
+    const avgActivityBps =
+      sparklineActivity.length > 0
+        ? Math.round(sparklineActivity.reduce((sum, v) => sum + v, 0) / sparklineActivity.length)
+        : totalBps;
+
+    const inboundRate =
+      telemetryState === "active"
+        ? `${humanBytes(ingressBps)}/s`
+        : telemetryState === "standby"
+        ? "0 B/s"
+        : "—";
+
+    const outboundRate =
+      telemetryState === "active"
+        ? `${humanBytes(egressBps)}/s`
+        : telemetryState === "standby"
+        ? "0 B/s"
+        : "—";
+
+    const peakRate =
+      telemetryState === "active"
+        ? `${humanBytes(peakActivityBps)}/s`
+        : telemetryState === "standby"
+        ? "0 B/s"
+        : "—";
+
+    const avgRate =
+      telemetryState === "active"
+        ? `${humanBytes(avgActivityBps)}/s`
+        : telemetryState === "standby"
+        ? "0 B/s"
+        : "—";
 
     return [
       {
         id: "activity",
         label: "Network Activity",
         value: humanBytes(bytes),
-        rateDown: currentRateBps > 0 ? `▼ ${rateFormatted}` : "▼ 0 B/s (Idle)",
-        rateUp: undefined,
+        rateDown,
+        rateUp,
         statusBadge: {
-          text: currentRateBps > 10_000_000 ? "Active" : "Nominal",
-          variant: "healthy",
+          text: activityBadgeText,
+          variant: activityBadgeVariant,
         },
         sparklineData: sparklineActivity,
+        tooltipRows: [
+          { label: "Inbound", value: inboundRate },
+          { label: "Outbound", value: outboundRate },
+          { label: "Peak Rate", value: peakRate },
+          { label: "Avg Rate", value: avgRate },
+          { label: "Total Volume", value: humanBytes(bytes) },
+          {
+            label: "Status",
+            value:
+              telemetryState === "active"
+                ? totalBps > 0
+                  ? "Active Traffic"
+                  : "Nominal Traffic"
+                : `${activityBadgeText} Mode`,
+          },
+        ],
         tooltip: {
-          peak: `${humanBytes(Math.max(...sparklineActivity, currentRateBps))}/s`,
-          avg: `${humanBytes(bytes)} total`,
-          percentile: `${hosts} hosts`,
-          trend: currentRateBps > 0 ? "Active" : "Standby",
+          peak: peakRate,
+          avg: avgRate,
+          percentile: humanBytes(bytes),
+          trend: telemetryState === "active" ? (totalBps > 0 ? "Active" : "Nominal") : activityBadgeText,
         },
       },
       {
@@ -115,8 +199,14 @@ export function useDashboardController() {
           variant: hosts > 0 ? "healthy" : "quiet",
         },
         sparklineData: sparklineHosts,
+        tooltipRows: [
+          { label: "Current", value: `${hosts} endpoints` },
+          { label: "Peak", value: `${Math.max(...sparklineHosts, hosts)} endpoints` },
+          { label: "Scope", value: "Local & remote hosts" },
+          { label: "Trend", value: hosts > 0 ? "Observed" : "Standby" },
+        ],
         tooltip: {
-          peak: `${hosts} hosts`,
+          peak: `${Math.max(...sparklineHosts, hosts)} hosts`,
           avg: `${hosts} active`,
           percentile: "Local and remote hosts",
           trend: hosts > 0 ? "Observed" : "Standby",
@@ -131,9 +221,15 @@ export function useDashboardController() {
           variant: flows > 0 ? "healthy" : "quiet",
         },
         sparklineData: sparklineFlows,
+        tooltipRows: [
+          { label: "Current", value: `${flows} active flows` },
+          { label: "Peak", value: `${Math.max(...sparklineFlows, flows)} flows` },
+          { label: "Scope", value: "Active TCP/UDP sockets" },
+          { label: "Trend", value: flows > 0 ? "Active" : "Standby" },
+        ],
         tooltip: {
-          peak: `${flows} flows`,
-          avg: "Concurrent network streams",
+          peak: `${Math.max(...sparklineFlows, flows)} flows`,
+          avg: `${flows} active`,
           percentile: "Active TCP/UDP sockets",
           trend: flows > 0 ? "Active" : "Standby",
         },
@@ -147,44 +243,29 @@ export function useDashboardController() {
           variant: feed.some((f) => f.severity === "finding") ? "spike" : feed.length > 0 ? "healthy" : "learning",
         },
         sparklineData: sparklineCards,
+        tooltipRows: [
+          { label: "Current", value: `${feed.length} narrative cards` },
+          { label: "Peak", value: `${Math.max(...sparklineCards, feed.length)} cards` },
+          { label: "Feed", value: "All evidence linked" },
+          { label: "Trend", value: feed.length > 0 ? "Active" : "Empty" },
+        ],
         tooltip: {
-          peak: `${feed.length} cards`,
-          avg: "Real-time feed",
+          peak: `${Math.max(...sparklineCards, feed.length)} cards`,
+          avg: `${feed.length} cards`,
           percentile: "All evidence linked",
           trend: feed.length > 0 ? "Active" : "Empty",
         },
       },
     ];
-  }, [monitor, feed, throughput, hostsHistory, flowsHistory, cardsHistory]);
+  }, [monitor, feed, hostsHistory, flowsHistory, cardsHistory]);
 
-  // 4. Health Telemetry View Model
+  // 4. Health Telemetry View Model (Direct mapping of backend subsystems)
+  // ARCHITECTURAL INVARIANT: Rust backend owns SubsystemStatus evaluation.
+  // capture_drops is an independent authoritative observation and MUST NOT
+  // modify, override, or reinterpret SubsystemStatus.status.
   const healthViewModel: HealthViewModel = useMemo(() => {
-    const isCapturing = (monitor?.by_protocol.rows.length ?? 0) > 0 || (monitor?.capture_stats?.buffer_frames ?? 0) > 0;
-    const shedStage = monitor?.capture_stats?.shed_stage;
-    const isDropping = shedStage === "drop_packets";
-    const isDegraded = shedStage === "payloads_off" || shedStage === "sample_dissection" || shedStage === "coarsen_metrics";
-
     return {
-      capture: {
-        connected: isCapturing,
-        label: isCapturing ? "Active" : "Standby",
-      },
-      flowEngine: {
-        healthy: !isDropping,
-        label: isDropping ? "Dropping" : isDegraded ? "Degraded" : isCapturing ? "Healthy" : "Standby",
-      },
-      storage: {
-        healthy: true,
-        label: "Active (Ring Buffer)",
-      },
-      ai: {
-        ready: true,
-        label: "Local Heuristics",
-      },
-      npcap: {
-        connected: isCapturing,
-        label: isCapturing ? "Capturing" : "Standby",
-      },
+      subsystems: monitor?.subsystems ?? [],
       drops: monitor?.capture_drops ?? 0,
     };
   }, [monitor]);
@@ -320,6 +401,8 @@ export function useDashboardController() {
     selectedEntity,
     captureSessionId,
     snapshotSequence,
+    monitor,
+    feed,
     feedCount: feed.length,
     filteredNarratives,
     dispatchEvent,

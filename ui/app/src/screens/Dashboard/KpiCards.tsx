@@ -36,9 +36,14 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
           <div className="np-kpi-card__main">
             <div className="np-kpi-card__val">{kpi.value}</div>
             {(kpi.rateDown || kpi.rateUp) && (
-              <div className="np-kpi-card__rates">
-                {kpi.rateDown && <span className="np-kpi-rate np-kpi-rate--down">▼ {kpi.rateDown.replace("▼", "").trim()}</span>}
-                {kpi.rateUp && <span className="np-kpi-rate np-kpi-rate--up">▲ {kpi.rateUp.replace("▲", "").trim()}</span>}
+              <div
+                className="np-kpi-card__rates"
+                aria-label={`Current rates: ${kpi.rateDown ? `Ingress ${kpi.rateDown}` : ""}${
+                  kpi.rateUp ? `, Egress ${kpi.rateUp}` : ""
+                }`}
+              >
+                {kpi.rateDown && <span className="np-kpi-rate np-kpi-rate--down">{kpi.rateDown}</span>}
+                {kpi.rateUp && <span className="np-kpi-rate np-kpi-rate--up">{kpi.rateUp}</span>}
               </div>
             )}
           </div>
@@ -47,8 +52,8 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
             <div className="np-kpi-card__spark">
               <Sparkline
                 data={kpi.sparklineData}
-                width={110}
-                height={28}
+                width="100%"
+                height={24}
                 color={
                   kpi.statusBadge.variant === "spike"
                     ? "var(--np-sem-failure, var(--np-finding))"
@@ -66,10 +71,21 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
           )}
 
           <div className="np-kpi-card__tooltip" id={`kpi-tooltip-${kpi.id}`} role="tooltip">
-            <div>Peak: {kpi.tooltip.peak}</div>
-            <div>Avg: {kpi.tooltip.avg}</div>
-            <div>{kpi.tooltip.percentile}</div>
-            <div>Trend: {kpi.tooltip.trend}</div>
+            {kpi.tooltipRows ? (
+              kpi.tooltipRows.map((row, idx) => (
+                <div key={idx} className="np-kpi-card__tooltip-row">
+                  <span className="np-kpi-card__tooltip-label">{row.label}:</span>
+                  <span className="np-kpi-card__tooltip-val">{row.value}</span>
+                </div>
+              ))
+            ) : (
+              <>
+                {kpi.tooltip?.peak && <div>Peak: {kpi.tooltip.peak}</div>}
+                {kpi.tooltip?.avg && <div>Avg: {kpi.tooltip.avg}</div>}
+                {kpi.tooltip?.percentile && <div>{kpi.tooltip.percentile}</div>}
+                {kpi.tooltip?.trend && <div>Trend: {kpi.tooltip.trend}</div>}
+              </>
+            )}
           </div>
         </div>
       ))}

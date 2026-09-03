@@ -15,10 +15,13 @@ export interface HeroViewModel {
   subtitle: string;
 }
 
+import type { EvidenceRef, SubsystemStatus } from "@netpulse/contract";
+
 export interface RecommendationItem {
   type: "investigate" | "ignore" | "monitor";
   text: string;
   actionText?: string;
+  evidenceRef?: EvidenceRef;
 }
 
 export interface SituationSummaryModel {
@@ -27,6 +30,11 @@ export interface SituationSummaryModel {
   explanation: string;
   highlights: string[];
   recommendations: RecommendationItem[];
+}
+
+export interface KpiTooltipRow {
+  label: string;
+  value: string;
 }
 
 export interface KpiViewModel {
@@ -40,7 +48,8 @@ export interface KpiViewModel {
     variant: "healthy" | "learning" | "spike" | "quiet" | "congested";
   };
   sparklineData: number[];
-  tooltip: {
+  tooltipRows: KpiTooltipRow[];
+  tooltip?: {
     peak: string;
     avg: string;
     percentile: string;
@@ -49,11 +58,7 @@ export interface KpiViewModel {
 }
 
 export interface HealthViewModel {
-  capture: { connected: boolean; label: string };
-  flowEngine: { healthy: boolean; label: string };
-  storage: { healthy: boolean; label: string };
-  ai: { ready: boolean; label: string };
-  npcap: { connected: boolean; label: string };
+  subsystems: SubsystemStatus[];
   drops: number;
 }
 

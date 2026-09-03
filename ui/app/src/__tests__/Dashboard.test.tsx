@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Dashboard } from "../screens/Dashboard";
@@ -1232,6 +1232,75 @@ describe("Dashboard Screen", () => {
       expect(screen.getByTestId("nav-screen")).toHaveTextContent("journey");
       expect(screen.getByTestId("nav-target")).toHaveTextContent(JSON.stringify({ screen: "journey", sessionId: 333 }));
     });
+
+    it("displays measurement_state, affected_targets, and executes stage probe from Dashboard", async () => {
+      const ipc = await import("../ipc");
+      const querySpy = vi.spyOn(ipc, "query").mockResolvedValueOnce({
+        kind: "stageProbeResult",
+        result: {
+          stage: "router",
+          probe_type: "GatewayProbe",
+          target: "192.168.1.1",
+          status: "degraded",
+          latency_ms: 24.5,
+          summary: "Default gateway reachable with jitter (24.5ms RTT)",
+          details: ["Gateway ping jitter observed", "Packet loss: 0%"],
+        },
+      } as any);
+
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        diagnostic_chain: {
+          stages: [
+            {
+              stage: "router",
+              label: "Local Gateway",
+              status: "degraded",
+              measurement_state: "inferred",
+              detection_state: "detected",
+              causes: ["congestion"],
+              affected_targets: ["192.168.1.1"],
+              latency_ms: 24.5,
+              summary: "Bufferbloat under burst",
+              detail: "Session buffer saturation",
+              evidence: [],
+            },
+          ],
+        },
+      });
+
+      render(<DashboardTestWrapper />);
+
+      // Click on degraded stage node
+      const routerNode = screen.getByRole("button", { name: /Local Gateway — Status: Degraded/i });
+      fireEvent.click(routerNode);
+
+      // Verify measurement_state badge and affected_targets
+      expect(screen.getByTestId("stage-measurement-badge")).toHaveTextContent("Inferred");
+      expect(screen.getByTestId("stage-affected-targets")).toHaveTextContent("192.168.1.1");
+
+      // Click Run Stage Probe
+      const probeBtn = screen.getByRole("button", { name: /Run Stage Probe/i });
+      fireEvent.click(probeBtn);
+
+      expect(querySpy).toHaveBeenCalledWith({
+        kind: "runStageProbe",
+        stage: "router",
+        target: "192.168.1.1",
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("stage-probe-result")).toBeInTheDocument();
+        expect(screen.getByText(/GatewayProbe/i)).toBeInTheDocument();
+        expect(screen.getByText(/24.5 ms/i)).toBeInTheDocument();
+        expect(screen.getByText(/Default gateway reachable with jitter/i)).toBeInTheDocument();
+      });
+    });
   });
 });
+
 

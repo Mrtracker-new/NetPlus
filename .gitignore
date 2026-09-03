@@ -36,6 +36,7 @@ yarn-error.log*
 !.env.example
 *.pem
 *.key
+docs_ignore/
 
 # ── Editor / IDE ──────────────────────────────────────────────────
 .vscode/*

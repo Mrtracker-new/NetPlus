@@ -8,7 +8,8 @@ import { useEvidenceNavigation, type NavigationSource } from "../context/Evidenc
 import { useDisclosure } from "../modes/DisclosureContext";
 import { useStore, setMonitor, setFeed, setError } from "../state/store";
 import { query } from "../ipc";
-import { useDashboardController } from "./Dashboard/useDashboardController";
+import { useDashboardController, cardMatchesCategory } from "./Dashboard/useDashboardController";
+import type { RecommendationItem } from "./Dashboard/viewModels";
 import { HealthStrip } from "./Dashboard/HealthStrip";
 import { SituationSummary } from "./Dashboard/SituationSummary";
 import { NarrativeFilterBar } from "./Dashboard/NarrativeFilterBar";
@@ -149,6 +150,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     feedCount,
     filteredNarratives,
     dispatchEvent,
+    navigateToRecommendation,
   } = useDashboardController();
 
   const hostRows = monitor?.by_host.rows ?? [];
@@ -186,7 +188,12 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
 
       if (targetCard) {
         dismissEvidenceNotice();
-        dispatchEvent({ type: "SET_CATEGORY", category: "all" });
+        if (!cardMatchesCategory(targetCard, category)) {
+          dispatchEvent({
+            type: "SET_CATEGORY",
+            category: targetCard.severity === "finding" ? "findings" : "all",
+          });
+        }
         dispatchEvent({ type: "SET_SEARCH", search: "" });
 
         if (scrollTimerRef.current) {
@@ -197,7 +204,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
             document.getElementById(`card-${targetCard.at_mono_nanos}`) ||
             document.querySelector(`[data-evidence-id="${ref.id}"]`);
           if (cardElem) {
-            cardElem.scrollIntoView({ behavior: "smooth", block: "center" });
+            cardElem.scrollIntoView?.({ behavior: "smooth", block: "center" });
             cardElem.classList.remove("np-card--highlight-pulse");
             void (cardElem as HTMLElement).offsetWidth;
             cardElem.classList.add("np-card--highlight-pulse");
@@ -218,7 +225,46 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         }, 6000);
       }
     },
-    [feed, dispatchEvent, dismissEvidenceNotice]
+    [feed, category, dispatchEvent, dismissEvidenceNotice]
+  );
+
+  const handleRecommendationClick = useCallback(
+    (rec: RecommendationItem) => {
+      const { targetCard } = navigateToRecommendation(rec);
+
+      if (targetCard) {
+        dismissEvidenceNotice();
+
+        if (scrollTimerRef.current) {
+          clearTimeout(scrollTimerRef.current);
+        }
+        scrollTimerRef.current = setTimeout(() => {
+          const cardElem =
+            document.getElementById(`card-${targetCard.at_mono_nanos}`) ||
+            (rec.evidenceRef ? document.querySelector(`[data-evidence-id="${rec.evidenceRef.id}"]`) : null);
+          if (cardElem) {
+            cardElem.scrollIntoView?.({ behavior: "smooth", block: "center" });
+            cardElem.classList.remove("np-card--highlight-pulse");
+            void (cardElem as HTMLElement).offsetWidth;
+            cardElem.classList.add("np-card--highlight-pulse");
+          }
+          scrollTimerRef.current = null;
+        }, 60);
+      } else if (rec.evidenceRef) {
+        if (noticeTimerRef.current) {
+          clearTimeout(noticeTimerRef.current);
+        }
+        setEvidenceNotice({
+          message: `Evidence ${rec.evidenceRef.kind === "flow" ? "flow" : rec.evidenceRef.kind} #${rec.evidenceRef.id} is outside the active visible feed window.`,
+          ref: rec.evidenceRef,
+        });
+        noticeTimerRef.current = setTimeout(() => {
+          setEvidenceNotice(null);
+          noticeTimerRef.current = null;
+        }, 6000);
+      }
+    },
+    [navigateToRecommendation, dismissEvidenceNotice]
   );
 
   const handleNoticeNavigate = useCallback(() => {
@@ -277,7 +323,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         <SituationSummary
           hero={heroViewModel}
           summary={situationSummaryModel}
-          onSelectCategory={(cat) => dispatchEvent({ type: "SET_CATEGORY", category: cat })}
+          onRecommendationClick={handleRecommendationClick}
           onNavigateToEvidence={handleNavigateToEvidence}
         />
       </WidgetErrorBoundary>

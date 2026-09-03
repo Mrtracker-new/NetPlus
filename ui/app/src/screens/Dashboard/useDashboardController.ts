@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import type { NarrativeCard } from "@netpulse/contract";
 import { useStore } from "../../state/store";
 import { useDisclosure } from "../../modes/DisclosureContext";
 import { useOptionalSidebar } from "../../components/RightRail";
@@ -12,7 +13,88 @@ import type {
   HealthViewModel,
   DashboardEvent,
   VizMode,
+  RecommendationItem,
 } from "./viewModels";
+
+export function cardMatchesCategory(card: NarrativeCard, category: NarrativeCategory): boolean {
+  if (category === "all") return true;
+  if (category === "findings") return card.severity === "finding";
+
+  const head = (card.headline || "").toLowerCase();
+  const sum = (card.summary || "").toLowerCase();
+  const lines = (card.lines || []).map((l) => (l || "").toLowerCase());
+  const allText = [head, sum, ...lines].join(" ");
+
+  if (category === "performance") {
+    return (
+      allText.includes("latency") ||
+      allText.includes("rtt") ||
+      allText.includes("loss") ||
+      allText.includes("delay") ||
+      allText.includes("jitter") ||
+      allText.includes("slow") ||
+      allText.includes("retransmit") ||
+      allText.includes(" ms") ||
+      allText.includes("ms ")
+    );
+  }
+  if (category === "dns") {
+    return (
+      allText.includes("dns") ||
+      allText.includes("domain") ||
+      allText.includes("lookup") ||
+      allText.includes("resolve")
+    );
+  }
+  if (category === "tls") {
+    return (
+      allText.includes("tls") ||
+      allText.includes("https") ||
+      allText.includes("ssl") ||
+      allText.includes("quic") ||
+      allText.includes("encrypt") ||
+      allText.includes("certificate") ||
+      allText.includes("cipher")
+    );
+  }
+  if (category === "applications") {
+    return (
+      allText.includes("app") ||
+      allText.includes("process") ||
+      allText.includes("chrome") ||
+      allText.includes("spotify") ||
+      allText.includes(".exe") ||
+      (card.evidence || []).some((e) => e.kind === "session")
+    );
+  }
+  if (category === "security") {
+    return (
+      card.severity === "finding" ||
+      card.severity === "notable" ||
+      allText.includes("security") ||
+      allText.includes("anomal") ||
+      allText.includes("scan") ||
+      allText.includes("tunnel") ||
+      allText.includes("threat")
+    );
+  }
+  if (category === "network") {
+    return (
+      allText.includes("flow") ||
+      allText.includes("packet") ||
+      allText.includes("traffic") ||
+      allText.includes("port") ||
+      allText.includes("tcp") ||
+      allText.includes("udp") ||
+      allText.includes("ip") ||
+      allText.includes("server") ||
+      allText.includes("connect") ||
+      (card.evidence || []).some((e) => e.kind === "flow" || e.kind === "packet")
+    );
+  }
+
+  return true;
+}
 
 export function useDashboardController() {
   const { monitor, feed, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
@@ -283,93 +365,17 @@ export function useDashboardController() {
   // 5. Filtered Narrative Cards (Comprehensive Category & Search Filter)
   const filteredNarratives = useMemo(() => {
     return feed.filter((card) => {
-      const head = card.headline.toLowerCase();
-      const sum = (card.summary || "").toLowerCase();
-      const lines = card.lines.map((l) => l.toLowerCase());
-      const allText = [head, sum, ...lines].join(" ");
-
-      // Category Filter
-      if (category === "findings" && card.severity !== "finding") return false;
-      if (
-        category === "performance" &&
-        !allText.includes("latency") &&
-        !allText.includes("rtt") &&
-        !allText.includes("loss") &&
-        !allText.includes("delay") &&
-        !allText.includes("jitter") &&
-        !allText.includes("slow") &&
-        !allText.includes("retransmit") &&
-        !allText.includes(" ms") &&
-        !allText.includes("ms ")
-      ) {
-        return false;
-      }
-      if (
-        category === "dns" &&
-        !allText.includes("dns") &&
-        !allText.includes("domain") &&
-        !allText.includes("lookup") &&
-        !allText.includes("resolve")
-      ) {
-        return false;
-      }
-      if (
-        category === "tls" &&
-        !allText.includes("tls") &&
-        !allText.includes("https") &&
-        !allText.includes("ssl") &&
-        !allText.includes("quic") &&
-        !allText.includes("encrypt") &&
-        !allText.includes("certificate") &&
-        !allText.includes("cipher")
-      ) {
-        return false;
-      }
-      if (
-        category === "applications" &&
-        !allText.includes("app") &&
-        !allText.includes("process") &&
-        !allText.includes("chrome") &&
-        !allText.includes("spotify") &&
-        !allText.includes(".exe") &&
-        !card.evidence.some((e) => e.kind === "session")
-      ) {
-        return false;
-      }
-      if (
-        category === "security" &&
-        card.severity !== "finding" &&
-        card.severity !== "notable" &&
-        !allText.includes("security") &&
-        !allText.includes("anomal") &&
-        !allText.includes("scan") &&
-        !allText.includes("tunnel") &&
-        !allText.includes("threat")
-      ) {
-        return false;
-      }
-      if (
-        category === "network" &&
-        !allText.includes("flow") &&
-        !allText.includes("packet") &&
-        !allText.includes("traffic") &&
-        !allText.includes("port") &&
-        !allText.includes("tcp") &&
-        !allText.includes("udp") &&
-        !allText.includes("ip") &&
-        !allText.includes("server") &&
-        !allText.includes("connect") &&
-        !card.evidence.some((e) => e.kind === "flow" || e.kind === "packet")
-      ) {
-        return false;
-      }
+      if (!cardMatchesCategory(card, category)) return false;
 
       // Search Query Filter
       if (search.trim()) {
         const q = search.toLowerCase();
+        const head = card.headline.toLowerCase();
+        const sum = (card.summary || "").toLowerCase();
+        const lines = card.lines.map((l) => l.toLowerCase());
         const matchesHeadline = head.includes(q);
         const matchesSummary = sum.includes(q);
-        const matchesLines = card.lines.some((l) => l.toLowerCase().includes(q));
+        const matchesLines = lines.some((l) => l.includes(q));
         if (!matchesHeadline && !matchesSummary && !matchesLines) return false;
       }
 
@@ -377,7 +383,57 @@ export function useDashboardController() {
     });
   }, [feed, category, search]);
 
-  // 6. Central Event Dispatcher
+  // 6. Navigate to Recommendation (Coordinated Controller Action)
+  const navigateToRecommendation = useCallback(
+    (rec: RecommendationItem): {
+      targetCard: NarrativeCard | undefined;
+      categoryToSet: NarrativeCategory | null;
+    } => {
+      if (!rec.evidenceRef) {
+        if (rec.type === "investigate") {
+          setCategory("findings");
+          return { targetCard: undefined, categoryToSet: "findings" };
+        }
+        if (rec.type === "monitor") {
+          setCategory("all");
+          return { targetCard: undefined, categoryToSet: "all" };
+        }
+        return { targetCard: undefined, categoryToSet: null };
+      }
+
+      const ref = rec.evidenceRef;
+      const targetCard = feed.find((c) =>
+        c.evidence?.some((e) => e.kind === ref.kind && e.id === ref.id)
+      );
+
+      if (!targetCard) {
+        return { targetCard: undefined, categoryToSet: null };
+      }
+
+      // Expected Behavior: Category filter should only be modified if it matches the evidence
+      // card's severity, or the navigation routine should preserve the category needed to view the target card.
+      let nextCategory: NarrativeCategory;
+      if (rec.type === "investigate" && targetCard.severity === "finding") {
+        nextCategory = "findings";
+      } else if (cardMatchesCategory(targetCard, category)) {
+        nextCategory = category;
+      } else if (cardMatchesCategory(targetCard, "performance")) {
+        nextCategory = "performance";
+      } else {
+        nextCategory = "all";
+      }
+
+      if (nextCategory !== category) {
+        setCategory(nextCategory);
+      }
+      setSearch("");
+
+      return { targetCard, categoryToSet: nextCategory };
+    },
+    [feed, category]
+  );
+
+  // 7. Central Event Dispatcher
   const dispatchEvent = useCallback((event: DashboardEvent) => {
     switch (event.type) {
       case "SET_CATEGORY":
@@ -395,8 +451,11 @@ export function useDashboardController() {
         }
         setLocalSelectedEntity(event.entity);
         break;
+      case "NAVIGATE_TO_RECOMMENDATION":
+        navigateToRecommendation(event.recommendation);
+        break;
     }
-  }, [sidebar]);
+  }, [sidebar, navigateToRecommendation]);
 
   return {
     depth,
@@ -417,6 +476,7 @@ export function useDashboardController() {
     feedCount: feed.length,
     filteredNarratives,
     dispatchEvent,
+    navigateToRecommendation,
   };
 }
 

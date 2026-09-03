@@ -70,5 +70,6 @@ export type DashboardEvent =
   | { type: "SET_CATEGORY"; category: NarrativeCategory }
   | { type: "SET_SEARCH"; search: string }
   | { type: "SET_VIZ_MODE"; mode: VizMode }
-  | { type: "SET_SELECTED_ENTITY"; entity: SelectedEntity | null };
+  | { type: "SET_SELECTED_ENTITY"; entity: SelectedEntity | null }
+  | { type: "NAVIGATE_TO_RECOMMENDATION"; recommendation: RecommendationItem };
 

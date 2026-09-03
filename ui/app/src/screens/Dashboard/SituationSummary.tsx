@@ -1,12 +1,13 @@
 import { memo } from "react";
 import type { EvidenceRef } from "@netpulse/contract";
-import type { HeroViewModel, SituationSummaryModel, NarrativeCategory } from "./viewModels";
+import type { HeroViewModel, SituationSummaryModel, NarrativeCategory, RecommendationItem } from "./viewModels";
 
 interface SituationSummaryProps {
   hero: HeroViewModel;
   summary: SituationSummaryModel;
   onSelectCategory?: (category: NarrativeCategory) => void;
   onNavigateToEvidence?: (ref: EvidenceRef) => void;
+  onRecommendationClick?: (rec: RecommendationItem) => void;
 }
 
 export const SituationSummary = memo(function SituationSummary({
@@ -14,6 +15,7 @@ export const SituationSummary = memo(function SituationSummary({
   summary,
   onSelectCategory,
   onNavigateToEvidence,
+  onRecommendationClick,
 }: SituationSummaryProps) {
   const rec = summary.recommendations[0];
   const recText = rec?.text ?? "";
@@ -25,12 +27,18 @@ export const SituationSummary = memo(function SituationSummary({
       : "np-rec-tag--caution";
 
   const handleRecClick = () => {
-    if (rec?.evidenceRef && onNavigateToEvidence) {
-      onNavigateToEvidence(rec.evidenceRef);
+    if (!rec) return;
+    if (onRecommendationClick) {
+      onRecommendationClick(rec);
+      return;
     }
-    if (rec?.type === "investigate") {
+    // Fallback if onRecommendationClick not provided:
+    // Dispatches either evidence navigation or category filter, avoiding conflicting parallel dispatches.
+    if (rec.evidenceRef && onNavigateToEvidence) {
+      onNavigateToEvidence(rec.evidenceRef);
+    } else if (rec.type === "investigate") {
       onSelectCategory?.("findings");
-    } else if (rec?.type === "monitor") {
+    } else if (rec.type === "monitor") {
       onSelectCategory?.("all");
     }
   };

@@ -268,6 +268,87 @@ describe("Dashboard Screen", () => {
     expect(screen.queryByText("Normal HTTPS connection")).not.toBeInTheDocument();
   });
 
+  it("handles recommendation click for notable event transitioning category to performance and preserving card visibility", () => {
+    setFeed([
+      {
+        headline: "High latency RTT spike on WAN link",
+        summary: "Average latency 320 ms observed to remote server",
+        lines: ["Round trip delay 320 ms", "Packet loss detected"],
+        severity: "notable",
+        evidence: [{ kind: "flow", id: 88 }],
+        at_mono_nanos: 1000,
+      },
+      {
+        headline: "Normal HTTPS connection",
+        summary: "Browsing netpulse.dev",
+        lines: ["TLS 1.3"],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 200 }],
+        at_mono_nanos: 2000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    // Switch to Security Findings category first to simulate notable card being filtered out
+    const findingsTab = screen.getByRole("tab", { name: "Security Findings" });
+    fireEvent.click(findingsTab);
+    expect(screen.queryByText("High latency RTT spike on WAN link")).not.toBeInTheDocument();
+
+    const recButton = screen.getByRole("button", { name: /Action: Monitor High latency RTT spike on WAN link/i });
+    expect(recButton).toBeInTheDocument();
+
+    fireEvent.click(recButton);
+
+    // Target notable card must now be visible (not hidden by category conflict)
+    expect(screen.getByText("High latency RTT spike on WAN link")).toBeInTheDocument();
+
+    // Category transitions to Performance & Latency (or All Activity)
+    const perfTab = screen.getByRole("tab", { name: "Performance & Latency" });
+    expect(perfTab).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("handles investigate recommendation when target card has notable severity without incorrectly filtering it out", () => {
+    setMonitor({
+      by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+      by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+      network_loss_indicators: 0,
+      capture_drops: 0,
+      diagnoses: [
+        {
+          cause: "distant_server",
+          confidence_percent: 88,
+          severity: "finding",
+          explanation: "High RTT latency observed on distant hop",
+          evidence: [{ kind: "flow", id: 77 }],
+        },
+      ],
+    });
+    setFeed([
+      {
+        headline: "High RTT latency to server",
+        summary: "Round trip delay 250 ms observed",
+        lines: ["delay 250 ms", "latency spike"],
+        severity: "notable",
+        evidence: [{ kind: "flow", id: 77 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    // Recommendation comes from primary diagnosis (investigate), but evidence belongs to a notable card
+    const recButton = screen.getByRole("button", { name: /Recommendation: Investigate Distant Server hypothesis/i });
+    expect(recButton).toBeInTheDocument();
+
+    fireEvent.click(recButton);
+
+    // Card must remain visible because controller does not force "findings" category on a non-finding card
+    expect(screen.getByText("High RTT latency to server")).toBeInTheDocument();
+    const findingsTab = screen.getByRole("tab", { name: "Security Findings" });
+    expect(findingsTab).toHaveAttribute("aria-selected", "false");
+  });
+
   it("calculates throughput sparkline and rates with single and multiple delta updates", () => {
     setMonitor({
       by_protocol: {

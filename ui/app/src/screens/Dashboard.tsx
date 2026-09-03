@@ -144,6 +144,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     captureSessionId,
     snapshotSequence,
     monitor,
+    telemetryState,
     feed,
     feedCount,
     filteredNarratives,
@@ -291,10 +292,24 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
               <h2 id="dashboard-live-title" className="np-dash__section-title">
                 {vizMode === "map" ? "Global Traffic Map" : t("live_traffic")}
               </h2>
-              <span className="np-telemetry-badge" aria-label="Live Telemetry Active">
-                <span className="np-pulse-dot" aria-hidden="true" />
-                <span>LIVE TELEMETRY</span>
-              </span>
+              {telemetryState === "standby" ? (
+                <span className="np-telemetry-badge np-telemetry-badge--standby np-telemetry-badge--quiet" aria-label="Telemetry Standby">
+                  <span>STANDBY</span>
+                </span>
+              ) : telemetryState === "stale" ? (
+                <span className="np-telemetry-badge np-telemetry-badge--stale" aria-label="Telemetry Stale">
+                  <span>STALE</span>
+                </span>
+              ) : telemetryState === "unavailable" ? (
+                <span className="np-telemetry-badge np-telemetry-badge--unavailable np-telemetry-badge--quiet" aria-label="Telemetry Unavailable">
+                  <span>UNAVAILABLE</span>
+                </span>
+              ) : (
+                <span className="np-telemetry-badge np-telemetry-badge--active" aria-label="Live Telemetry Active">
+                  <span className="np-pulse-dot" aria-hidden="true" />
+                  <span>LIVE TELEMETRY</span>
+                </span>
+              )}
             </div>
             <div className="np-viz-mode-toggle" role="group" aria-label="Traffic visualization mode">
               <button

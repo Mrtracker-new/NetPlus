@@ -18,7 +18,7 @@ export const SituationSummary = memo(function SituationSummary({
   const rec = summary.recommendations[0];
   const recText = rec?.text ?? "";
   const recClass =
-    hero.state === "healthy" || recText.toLowerCase().includes("no action required")
+    hero.state === "healthy" || hero.state === "idle" || recText.toLowerCase().includes("no action required")
       ? "np-rec-tag--normal"
       : hero.state === "finding"
       ? "np-rec-tag--investigate"
@@ -42,10 +42,10 @@ export const SituationSummary = memo(function SituationSummary({
           <span className={`np-badge np-badge--${hero.state}`}>
             ● {hero.badgeText}
           </span>
-          <h1 className="np-situation-card__headline">{summary.headline}</h1>
+          <h1 className="np-situation-card__headline">{hero.title || summary.headline}</h1>
         </div>
 
-        {rec && (
+        {rec && hero.state !== "idle" && (
           <div className="np-situation-card__rec">
             {rec.type === "investigate" ? (
               <button
@@ -75,7 +75,7 @@ export const SituationSummary = memo(function SituationSummary({
       </div>
 
       <div className="np-situation-card__bottom">
-        <p className="np-situation-card__paragraph">{summary.explanation}</p>
+        <p className="np-situation-card__paragraph">{hero.subtitle || summary.explanation}</p>
         <div className="np-situation-card__highlights">
           {summary.highlights.map((item, idx) => (
             <span key={idx} className="np-situation-chip">

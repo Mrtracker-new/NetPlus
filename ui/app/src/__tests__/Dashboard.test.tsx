@@ -883,6 +883,70 @@ describe("Dashboard Screen", () => {
       // Verify that "Avg: X total" is NOT in the tooltip
       expect(tooltip!.textContent).not.toMatch(/Avg:.*total/i);
     });
+
+    it("Invariant 17: When telemetry_state is standby, Hero card displays idle Standby and visualizer badge is quiet STANDBY without pulsing", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        telemetry_state: "standby",
+        throughput_history: [],
+      });
+
+      render(<DashboardTestWrapper />);
+
+      // Hero card assertions
+      expect(screen.getByText("● Standby")).toBeInTheDocument();
+      expect(screen.getByText("Passive Capture Standby")).toBeInTheDocument();
+      expect(
+        screen.getByText("Start packet capture in the header bar to observe network telemetry.")
+      ).toBeInTheDocument();
+
+      // Ensure false claim is not present
+      expect(screen.queryByText("Network Operating Normally")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Passive telemetry active/i)).not.toBeInTheDocument();
+
+      // Visualizer badge assertions
+      const standbyBadge = screen.getByText("STANDBY");
+      expect(standbyBadge).toBeInTheDocument();
+      expect(screen.queryByText("LIVE TELEMETRY")).not.toBeInTheDocument();
+
+      // Badge must be quiet without pulsing dot
+      expect(document.querySelector(".np-telemetry-badge--standby")).toBeInTheDocument();
+      expect(document.querySelector(".np-pulse-dot")).not.toBeInTheDocument();
+    });
+
+    it("Invariant 18: When telemetry_state is active, Hero card displays normal telemetry and visualizer badge displays pulsing LIVE TELEMETRY", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1024, flows: 1, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        telemetry_state: "active",
+        throughput_history: [
+          {
+            timestamp_mono_nanos: 1_000_000,
+            ingress_rate_bytes_sec: 1048576,
+            egress_rate_bytes_sec: 524288,
+          },
+        ],
+      });
+
+      render(<DashboardTestWrapper />);
+
+      // Hero card assertions
+      expect(screen.getByText("● Nominal")).toBeInTheDocument();
+      expect(screen.getByText("Network Operating Normally")).toBeInTheDocument();
+      expect(screen.getByText(/1 host and 1 active flow observed across passive capture/i)).toBeInTheDocument();
+
+      // Visualizer badge assertions
+      expect(screen.getByText("LIVE TELEMETRY")).toBeInTheDocument();
+      expect(document.querySelector(".np-pulse-dot")).toBeInTheDocument();
+      expect(document.querySelector(".np-telemetry-badge--active")).toBeInTheDocument();
+    });
   });
 });
 

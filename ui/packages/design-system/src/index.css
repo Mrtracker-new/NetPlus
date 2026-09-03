@@ -4971,6 +4971,22 @@ button {
   user-select: none;
 }
 
+.np-telemetry-badge--standby,
+.np-telemetry-badge--quiet,
+.np-telemetry-badge--unavailable {
+  color: var(--np-text-dim);
+  border-color: var(--np-border);
+}
+
+.np-telemetry-badge--stale {
+  color: var(--np-notable);
+  border-color: rgba(184, 122, 31, 0.3);
+}
+
+.np-telemetry-badge--active {
+  color: var(--np-accent-strong);
+}
+
 .np-pulse-dot {
   width: 6px;
   height: 6px;
@@ -7671,6 +7687,22 @@ svg path {
   transition: border-color var(--np-t), box-shadow var(--np-t);
 }
 
+.np-situation-card--idle {
+  border-color: var(--np-border);
+}
+
+.np-situation-card--healthy {
+  border-color: rgba(40, 146, 109, 0.25);
+}
+
+.np-situation-card--spike {
+  border-color: rgba(184, 122, 31, 0.25);
+}
+
+.np-situation-card--finding {
+  border-color: rgba(196, 77, 83, 0.25);
+}
+
 .np-situation-card__top {
   display: flex;
   justify-content: space-between;
@@ -7713,6 +7745,12 @@ svg path {
   background: var(--np-notable-soft);
   color: var(--np-sem-investigate, var(--np-notable));
   border: 1px solid rgba(184, 122, 31, 0.25);
+}
+
+.np-badge--idle {
+  background: var(--np-surface-2);
+  color: var(--np-text-dim);
+  border: 1px solid var(--np-border);
 }
 
 .np-situation-card__headline {

@@ -52,13 +52,23 @@ export function useDashboardController() {
       };
     }
 
+    const isStandby = !monitor || monitor.telemetry_state === "standby";
+    if (isStandby) {
+      return {
+        state: "idle",
+        badgeText: "Standby",
+        title: "Passive Capture Standby",
+        subtitle: "Start packet capture in the header bar to observe network telemetry.",
+      };
+    }
+
     return {
       state: "healthy",
       badgeText: "Nominal",
-      title: "Network Operating Normally",
-      subtitle: "Passive telemetry active. No critical anomalies detected.",
+      title: situationSummaryModel.headline,
+      subtitle: situationSummaryModel.explanation,
     };
-  }, [situationSummaryModel]);
+  }, [situationSummaryModel, monitor]);
 
   // 3. KPI View Models (Strict Authoritative Rates from throughput_history & telemetry_state)
   const kpiViewModels: KpiViewModel[] = useMemo(() => {
@@ -402,6 +412,7 @@ export function useDashboardController() {
     captureSessionId,
     snapshotSequence,
     monitor,
+    telemetryState: monitor?.telemetry_state ?? (monitor ? "active" : "standby"),
     feed,
     feedCount: feed.length,
     filteredNarratives,

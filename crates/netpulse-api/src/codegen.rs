@@ -116,6 +116,18 @@ pub fn typescript_contract() -> String {
         "TelemetryState",
         &["standby", "active", "stale", "unavailable"],
     ));
+    s.push_str(&union(
+        "NarrativeCategory",
+        &[
+            "general",
+            "network",
+            "performance",
+            "dns",
+            "tls",
+            "applications",
+            "security",
+        ],
+    ));
 
     // --- EvidenceRef: internally-tagged union (matches #[serde(tag,content)]) ---
     s.push_str(
@@ -133,6 +145,8 @@ pub fn typescript_contract() -> String {
             ("summary", "string"),
             ("lines", "string[]"),
             ("severity", "Severity"),
+            ("category?", "NarrativeCategory"),
+            ("protocol?", "string"),
             ("evidence", "EvidenceRef[]"),
             ("at_mono_nanos", "number"),
         ],
@@ -841,6 +855,7 @@ mod tests {
             "AttributionConfidence",
             "EvidenceRef",
             "NarrativeCard",
+            "NarrativeCategory",
             "BreakdownRow",
             "Breakdown",
             "Diagnosis",

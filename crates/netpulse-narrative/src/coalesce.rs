@@ -7,7 +7,7 @@
 //! *preserving every card's evidence* — the count is real and each reference is
 //! carried through, so drill-down still reaches all of it.
 
-use crate::card::{NarrativeCard, Severity};
+use crate::card::{CardCategory, NarrativeCard, Severity};
 
 /// Collapse runs of cards that share a headline and fall within
 /// `window_nanos` of each other into one summary card. Input is assumed
@@ -61,13 +61,33 @@ fn merge_run(seed: NarrativeCard, mut rest: Vec<NarrativeCard>) -> NarrativeCard
         .max_by_key(|s| severity_rank(*s))
         .unwrap_or(Severity::Neutral);
 
-    NarrativeCard::new(
+    let category = if rest.iter().any(|c| c.category == CardCategory::Security) || severity == Severity::Finding {
+        CardCategory::Security
+    } else {
+        rest.iter()
+            .map(|c| c.category)
+            .find(|&cat| cat != CardCategory::General)
+            .unwrap_or(newest.category)
+    };
+
+    let protocol = rest
+        .iter()
+        .find_map(|c| c.protocol.as_deref())
+        .or(newest.protocol.as_deref());
+
+    let mut card = NarrativeCard::new(
         format!("{} ×{count}", newest.headline),
         newest.at_mono_nanos,
         evidence,
     )
     .with_severity(severity)
-    .line(
+    .with_category(category);
+
+    if let Some(proto) = protocol {
+        card = card.with_protocol(proto);
+    }
+
+    card.line(
         netpulse_core::Depth::Beginner,
         format!("{count} similar events coalesced"),
     )
@@ -142,5 +162,31 @@ mod tests {
             Severity::Finding,
             "a finding is not buried"
         );
+    }
+
+    #[test]
+    fn coalescing_preserves_specific_category_and_protocol() {
+        let mut c1 = card("DNS lookup", 3_000, 3);
+        c1.category = CardCategory::Dns;
+        c1.protocol = Some("DNS".to_string());
+
+        let c2 = card("DNS lookup", 2_900, 2); // Category::General, protocol None
+        let cards = vec![c1, c2];
+        let out = coalesce(cards, 2_000);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].category, CardCategory::Dns);
+        assert_eq!(out[0].protocol, Some("DNS".to_string()));
+    }
+
+    #[test]
+    fn finding_upgrades_category_to_security() {
+        let mut c1 = card("Port scan", 3_000, 3);
+        c1.severity = Severity::Finding;
+
+        let c2 = card("Port scan", 2_900, 2);
+        let cards = vec![c1, c2];
+        let out = coalesce(cards, 2_000);
+        assert_eq!(out.len(), 1);
+        assert_eq!(out[0].category, CardCategory::Security);
     }
 }

@@ -16,7 +16,7 @@ use netpulse_api::dto::{
     DirectionDto, EvidenceRefDto, ExerciseKindDto, ExplorerEntryDto, ExportFormatDto,
     ExportPreviewDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, GroundedExerciseDto,
     HostNameDto, JourneyStageDto, LearningProgressDto, LessonOfferDto, MeasurementStateDto,
-    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, PageJourneyDto, PayloadLevelDto,
+    MonitorSnapshotDto, NameSourceDto, NarrativeCardDto, NarrativeCategoryDto, PageJourneyDto, PayloadLevelDto,
     PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto,
     ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
     ShedStageDto, StageKindDto, VersionPinsDto, VisualEventDto,
@@ -33,7 +33,7 @@ use netpulse_learn::anim::{AnimationKind, AnimationModel, Direction, VisualEvent
 use netpulse_learn::content::{ExerciseKind, Level};
 use netpulse_learn::{ExplorerEntry, GroundedExercise, LessonOffer};
 use netpulse_narrative::{
-    FanoutNode, JourneyStage, NarrativeCard, PageJourney, Severity, StageKind,
+    CardCategory, FanoutNode, JourneyStage, NarrativeCard, PageJourney, Severity, StageKind,
 };
 
 use crate::attribution::Attribution;
@@ -56,8 +56,22 @@ pub fn card_dto(card: &NarrativeCard, depth: Depth) -> NarrativeCardDto {
         summary: card.summary(depth),
         lines,
         severity: severity_dto(card.severity),
+        category: category_dto(card.category),
+        protocol: card.protocol.clone(),
         evidence: card.evidence().iter().map(evidence_dto).collect(),
         at_mono_nanos: card.at_mono_nanos,
+    }
+}
+
+fn category_dto(c: CardCategory) -> NarrativeCategoryDto {
+    match c {
+        CardCategory::General => NarrativeCategoryDto::General,
+        CardCategory::Network => NarrativeCategoryDto::Network,
+        CardCategory::Performance => NarrativeCategoryDto::Performance,
+        CardCategory::Dns => NarrativeCategoryDto::Dns,
+        CardCategory::Tls => NarrativeCategoryDto::Tls,
+        CardCategory::Applications => NarrativeCategoryDto::Applications,
+        CardCategory::Security => NarrativeCategoryDto::Security,
     }
 }
 

@@ -210,6 +210,180 @@ describe("Dashboard Screen", () => {
     expect(screen.getByText("Metadata-Only Capture (Payload bytes omitted by design for zero-leak privacy)")).toBeInTheDocument();
   });
 
+  it("does not falsely classify card with IP containing 53 as DNS", () => {
+    setFeed([
+      {
+        headline: "Connected to 192.168.1.53",
+        summary: "Transferred 45 KB over port 8080",
+        lines: ["Local port 52341"],
+        severity: "neutral",
+        evidence: [{ kind: "flow", id: 153 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    // Initially visible under All Activity
+    expect(screen.getByText("Connected to 192.168.1.53")).toBeInTheDocument();
+
+    // Switch to DNS Queries category tab
+    const dnsTab = screen.getByRole("tab", { name: "DNS Queries" });
+    fireEvent.click(dnsTab);
+
+    // Card MUST NOT be falsely classified as DNS
+    expect(screen.queryByText("Connected to 192.168.1.53")).not.toBeInTheDocument();
+
+    // Switch to Network Flows category tab
+    const networkTab = screen.getByRole("tab", { name: "Network Flows" });
+    fireEvent.click(networkTab);
+
+    // Card should appear under Network Flows
+    expect(screen.getByText("Connected to 192.168.1.53")).toBeInTheDocument();
+
+    // Open explain box and drawer to check protocol label
+    const explainBtn = screen.getByRole("button", { name: "Explain Connected to 192.168.1.53" });
+    fireEvent.click(explainBtn);
+
+    const drawerBtn = screen.getByRole("button", { name: /Quick Peek Drawer/i });
+    fireEvent.click(drawerBtn);
+
+    // Protocol label MUST be TCP Stream, NOT DNS (Port 53)
+    expect(screen.getByText("TCP Stream")).toBeInTheDocument();
+    expect(screen.queryByText("DNS (Port 53)")).not.toBeInTheDocument();
+  });
+
+  it("authoritative category and protocol tags override substring ambiguity", () => {
+    setFeed([
+      {
+        headline: "Application app.exe resolved internal host 10.0.0.53",
+        summary: "DNS query succeeded",
+        lines: ["Latency 8ms"],
+        severity: "neutral",
+        category: "dns",
+        protocol: "DNS",
+        evidence: [{ kind: "flow", id: 53 }],
+        at_mono_nanos: 2000,
+      },
+      {
+        headline: "Application updater downloaded payload from 10.0.0.80",
+        summary: "TLS connection to secure host",
+        lines: ["Encrypted 2 MB"],
+        severity: "neutral",
+        category: "tls",
+        protocol: "TLS",
+        evidence: [{ kind: "flow", id: 80 }],
+        at_mono_nanos: 3000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    // Click DNS Queries tab
+    const dnsTab = screen.getByRole("tab", { name: "DNS Queries" });
+    fireEvent.click(dnsTab);
+    expect(screen.getByText("Application app.exe resolved internal host 10.0.0.53")).toBeInTheDocument();
+    expect(screen.queryByText("Application updater downloaded payload from 10.0.0.80")).not.toBeInTheDocument();
+
+    // Click TLS & HTTPS tab
+    const tlsTab = screen.getByRole("tab", { name: "TLS & HTTPS" });
+    fireEvent.click(tlsTab);
+    expect(screen.queryByText("Application app.exe resolved internal host 10.0.0.53")).not.toBeInTheDocument();
+    expect(screen.getByText("Application updater downloaded payload from 10.0.0.80")).toBeInTheDocument();
+  });
+
+  it("does not falsely classify unencrypted or cleartext cards as TLS", () => {
+    setFeed([
+      {
+        headline: "Cleartext HTTP stream to dev-server",
+        summary: "Not encrypted · 120 KB",
+        lines: ["Not encrypted", "Port 8000"],
+        severity: "neutral",
+        evidence: [{ kind: "flow", id: 1080 }],
+        at_mono_nanos: 1500,
+      },
+      {
+        headline: "Secure connection to api.service.com",
+        summary: "Encrypted · 45 KB",
+        lines: ["Encrypted"],
+        severity: "neutral",
+        category: "tls",
+        protocol: "TLS",
+        evidence: [{ kind: "flow", id: 1081 }],
+        at_mono_nanos: 1600,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    // Switch to TLS & HTTPS tab
+    const tlsTab = screen.getByRole("tab", { name: "TLS & HTTPS" });
+    fireEvent.click(tlsTab);
+
+    // Secure connection MUST be visible
+    expect(screen.getByText("Secure connection to api.service.com")).toBeInTheDocument();
+
+    // Cleartext stream with 'Not encrypted' MUST NOT be classified as TLS
+    expect(screen.queryByText("Cleartext HTTP stream to dev-server")).not.toBeInTheDocument();
+  });
+
+  it("renders custom protocol label in technical drawer without defaulting to TCP Stream", () => {
+    setFeed([
+      {
+        headline: "Remote administrative session",
+        summary: "Secure shell terminal access",
+        lines: ["Authenticated"],
+        severity: "neutral",
+        protocol: "SSH",
+        evidence: [{ kind: "flow", id: 222 }],
+        at_mono_nanos: 4000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    const explainBtn = screen.getByRole("button", { name: "Explain Remote administrative session" });
+    fireEvent.click(explainBtn);
+
+    const drawerBtn = screen.getByRole("button", { name: /Quick Peek Drawer/i });
+    fireEvent.click(drawerBtn);
+
+    // Protocol context MUST show SSH, NOT TCP Stream
+    expect(screen.getByText("SSH")).toBeInTheDocument();
+    expect(screen.queryByText("TCP Stream")).not.toBeInTheDocument();
+  });
+
+  it("matches search query against card category and protocol tags", () => {
+    setFeed([
+      {
+        headline: "Telemetry feed card without keywords in title",
+        summary: "Transferred 10 KB",
+        lines: ["Normal throughput"],
+        severity: "neutral",
+        category: "tls",
+        protocol: "QUIC",
+        evidence: [{ kind: "flow", id: 999 }],
+        at_mono_nanos: 5000,
+      },
+    ]);
+
+    render(<DashboardTestWrapper />);
+
+    const searchInput = screen.getByLabelText("Search narrative feed");
+
+    // Search by protocol 'QUIC' which is not in headline or summary
+    fireEvent.change(searchInput, { target: { value: "quic" } });
+    expect(screen.getByText("Telemetry feed card without keywords in title")).toBeInTheDocument();
+
+    // Search by category 'tls' which is not in headline or summary
+    fireEvent.change(searchInput, { target: { value: "tls" } });
+    expect(screen.getByText("Telemetry feed card without keywords in title")).toBeInTheDocument();
+
+    // Search by non-matching query
+    fireEvent.change(searchInput, { target: { value: "nonexistent" } });
+    expect(screen.queryByText("Telemetry feed card without keywords in title")).not.toBeInTheDocument();
+  });
+
   it("resets category and search filters when Reset Filters button is clicked in empty state", () => {
     setFeed([
       {

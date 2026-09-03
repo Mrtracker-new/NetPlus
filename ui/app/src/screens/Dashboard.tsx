@@ -191,7 +191,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         if (!cardMatchesCategory(targetCard, category)) {
           dispatchEvent({
             type: "SET_CATEGORY",
-            category: targetCard.severity === "finding" ? "findings" : "all",
+            category: targetCard.severity === "finding" ? "findings" : (targetCard.category ?? "all"),
           });
         }
         dispatchEvent({ type: "SET_SEARCH", search: "" });

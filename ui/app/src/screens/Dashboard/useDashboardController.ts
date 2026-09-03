@@ -18,78 +18,112 @@ import type {
 
 export function cardMatchesCategory(card: NarrativeCard, category: NarrativeCategory): boolean {
   if (category === "all") return true;
-  if (category === "findings") return card.severity === "finding";
+  if (category === "findings") return card.severity === "finding" || card.category === "security";
 
-  const head = (card.headline || "").toLowerCase();
-  const sum = (card.summary || "").toLowerCase();
-  const lines = (card.lines || []).map((l) => (l || "").toLowerCase());
+  // 1. Authoritative category discriminator from narrative contract
+  if (card.category) {
+    if (category === "security") {
+      return card.category === "security" || card.severity === "finding" || card.severity === "notable";
+    }
+    if (category === "network") {
+      return (
+        card.category === "network" ||
+        card.category === "tls" ||
+        card.category === "dns" ||
+        (card.evidence || []).some((e) => e.kind === "flow" || e.kind === "packet")
+      );
+    }
+    return card.category === category;
+  }
+
+  // 2. Structured protocol check (if category discriminator is absent)
+  if (card.protocol) {
+    const proto = card.protocol.toUpperCase();
+    if (category === "dns") {
+      return proto === "DNS";
+    }
+    if (category === "tls") {
+      return proto === "TLS" || proto === "QUIC" || proto === "HTTP/3" || proto === "HTTPS";
+    }
+    if (category === "network") {
+      return (
+        proto === "TCP" ||
+        proto === "UDP" ||
+        proto === "HTTP" ||
+        proto === "TLS" ||
+        proto === "DNS" ||
+        proto === "QUIC"
+      );
+    }
+    if (category === "applications") {
+      return (card.evidence || []).some((e) => e.kind === "session");
+    }
+    if (category === "security") {
+      return card.severity === "finding" || card.severity === "notable";
+    }
+  }
+
+  // 3. Structured evidence metadata
+  const hasSessionEvidence = (card.evidence || []).some((e) => e.kind === "session");
+  const hasFlowEvidence = (card.evidence || []).some((e) => e.kind === "flow" || e.kind === "packet");
+
+  if (category === "applications" && hasSessionEvidence) {
+    return true;
+  }
+  if (category === "network" && hasFlowEvidence) {
+    return true;
+  }
+
+  // 4. Safe fallback using word boundaries (strictly avoiding pseudo-substring matches like "53", "80", "ip", "app")
+  const head = card.headline || "";
+  const sum = card.summary || "";
+  const lines = card.lines || [];
   const allText = [head, sum, ...lines].join(" ");
 
   if (category === "performance") {
     return (
-      allText.includes("latency") ||
-      allText.includes("rtt") ||
-      allText.includes("loss") ||
-      allText.includes("delay") ||
-      allText.includes("jitter") ||
-      allText.includes("slow") ||
-      allText.includes("retransmit") ||
-      allText.includes(" ms") ||
-      allText.includes("ms ")
+      /\b(latency|rtt|loss|delay|jitter|slow|retransmit|retransmits|retransmission)\b/i.test(allText) ||
+      /\b\d+\s*ms\b/i.test(allText)
     );
   }
   if (category === "dns") {
+    // Strictly require word boundary matching for DNS terms or explicit port 53.
+    // IP ending in .53 (e.g. 192.168.1.53) will NOT match.
     return (
-      allText.includes("dns") ||
-      allText.includes("domain") ||
-      allText.includes("lookup") ||
-      allText.includes("resolve")
+      /\b(dns|domain name|dns query|dns lookup|dns response)\b/i.test(allText) ||
+      /\bport\s+53\b/i.test(allText) ||
+      /\b:53\b/.test(allText)
     );
   }
   if (category === "tls") {
+    const isExplicitlyUnencrypted = /\b(not encrypted|unencrypted|cleartext)\b/i.test(allText);
     return (
-      allText.includes("tls") ||
-      allText.includes("https") ||
-      allText.includes("ssl") ||
-      allText.includes("quic") ||
-      allText.includes("encrypt") ||
-      allText.includes("certificate") ||
-      allText.includes("cipher")
+      !isExplicitlyUnencrypted && (
+        /\b(tls|https|ssl|quic|certificate|cipher)\b/i.test(allText) ||
+        /\bport\s+443\b/i.test(allText) ||
+        /\b:443\b/.test(allText) ||
+        (/\b(encrypt|encrypted)\b/i.test(allText) && !isExplicitlyUnencrypted)
+      )
     );
   }
   if (category === "applications") {
     return (
-      allText.includes("app") ||
-      allText.includes("process") ||
-      allText.includes("chrome") ||
-      allText.includes("spotify") ||
-      allText.includes(".exe") ||
-      (card.evidence || []).some((e) => e.kind === "session")
+      hasSessionEvidence ||
+      /\b(process|pid\s+\d+|\.exe|application)\b/i.test(allText)
     );
   }
   if (category === "security") {
     return (
       card.severity === "finding" ||
       card.severity === "notable" ||
-      allText.includes("security") ||
-      allText.includes("anomal") ||
-      allText.includes("scan") ||
-      allText.includes("tunnel") ||
-      allText.includes("threat")
+      /\b(security|anomal\w*|scan|threat|breach|malicious|unauthorized)\b/i.test(allText)
     );
   }
   if (category === "network") {
     return (
-      allText.includes("flow") ||
-      allText.includes("packet") ||
-      allText.includes("traffic") ||
-      allText.includes("port") ||
-      allText.includes("tcp") ||
-      allText.includes("udp") ||
-      allText.includes("ip") ||
-      allText.includes("server") ||
-      allText.includes("connect") ||
-      (card.evidence || []).some((e) => e.kind === "flow" || e.kind === "packet")
+      hasFlowEvidence ||
+      /\b(flow|packet|traffic|tcp|udp|socket)\b/i.test(allText) ||
+      /\bport\s+\d+\b/i.test(allText)
     );
   }
 
@@ -376,7 +410,9 @@ export function useDashboardController() {
         const matchesHeadline = head.includes(q);
         const matchesSummary = sum.includes(q);
         const matchesLines = lines.some((l) => l.includes(q));
-        if (!matchesHeadline && !matchesSummary && !matchesLines) return false;
+        const matchesCategory = (card.category || "").toLowerCase().includes(q);
+        const matchesProtocol = (card.protocol || "").toLowerCase().includes(q);
+        if (!matchesHeadline && !matchesSummary && !matchesLines && !matchesCategory && !matchesProtocol) return false;
       }
 
       return true;
@@ -417,6 +453,8 @@ export function useDashboardController() {
         nextCategory = "findings";
       } else if (cardMatchesCategory(targetCard, category)) {
         nextCategory = category;
+      } else if (targetCard.category) {
+        nextCategory = targetCard.category;
       } else if (cardMatchesCategory(targetCard, "performance")) {
         nextCategory = "performance";
       } else {

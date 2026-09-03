@@ -31,7 +31,7 @@ mod coalesce;
 mod journey;
 mod render;
 
-pub use card::{NarrativeCard, Severity};
+pub use card::{CardCategory, NarrativeCard, Severity};
 pub use coalesce::coalesce;
 pub use journey::{
     build_page_journey, build_page_journey_with_hosts, FanoutNode, JourneyStage, PageJourney,

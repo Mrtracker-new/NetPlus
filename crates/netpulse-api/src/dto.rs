@@ -51,6 +51,21 @@ pub enum SeverityDto {
     Finding,
 }
 
+/// Category discriminator for narrative cards to replace heuristic text matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum NarrativeCategoryDto {
+    #[default]
+    General,
+    Network,
+    Performance,
+    Dns,
+    Tls,
+    Applications,
+    Security,
+}
+
 /// One narrative feed card, already rendered at the query's depth.
 /// `lines` is the depth-appropriate detail; `summary` is those lines joined for
 /// the one-line under-headline view.
@@ -60,6 +75,10 @@ pub struct NarrativeCardDto {
     pub summary: String,
     pub lines: Vec<String>,
     pub severity: SeverityDto,
+    #[serde(default)]
+    pub category: NarrativeCategoryDto,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
     pub evidence: Vec<EvidenceRefDto>,
     pub at_mono_nanos: u64,
 }
@@ -992,6 +1011,8 @@ mod tests {
             summary: "Encrypted · 240 KB".into(),
             lines: vec!["Encrypted".into(), "240 KB from 6 servers".into()],
             severity: SeverityDto::Neutral,
+            category: NarrativeCategoryDto::Tls,
+            protocol: Some("TLS".into()),
             evidence: vec![EvidenceRefDto::Session(1), EvidenceRefDto::Flow(2)],
             at_mono_nanos: 1_000,
         });

@@ -26,33 +26,59 @@ export const CardExplainBox = memo(function CardExplainBox({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Grounded explanations based on severity, headline, and detail lines
-  let whyText = "This card represents observed passive network telemetry on your local adapter.";
-  let actionText = "No immediate action required. NetPulse continues listening passively.";
-
   const lowerHead = card.headline.toLowerCase();
   const lowerSum = (card.summary || "").toLowerCase();
   const allCardText = [lowerHead, lowerSum, ...card.lines.map((l) => l.toLowerCase())].join(" ");
 
-  if (allCardText.includes("dns") || allCardText.includes("domain")) {
+  const protoUpper = (card.protocol || "").toUpperCase();
+  const cat = card.category;
+
+  // 1. Authoritative protocol resolution
+  let isDns = protoUpper === "DNS" || cat === "dns";
+  let isQuic = protoUpper === "QUIC" || protoUpper === "HTTP/3";
+  let isTls = protoUpper === "TLS" || protoUpper === "HTTPS" || cat === "tls";
+  let isHttp = protoUpper === "HTTP";
+  let isUdp = protoUpper === "UDP";
+
+  // 2. Safe word-boundary fallback if protocol and category are not set
+  if (!protoUpper && !cat) {
+    const isExplicitlyUnencrypted = /\b(not encrypted|unencrypted|cleartext)\b/i.test(allCardText);
+    isDns = /\b(dns|domain name|dns query|dns lookup|dns response)\b/i.test(allCardText) ||
+            /\bport\s+53\b/i.test(allCardText) ||
+            /\b:53\b/.test(allCardText);
+    isQuic = /\b(quic|http\/3)\b/i.test(allCardText) ||
+             /\bport\s+443\/udp\b/i.test(allCardText);
+    isTls = !isExplicitlyUnencrypted && (
+      /\b(tls|https|ssl)\b/i.test(allCardText) ||
+      /\bport\s+443\b/i.test(allCardText) ||
+      /\b:443\b/.test(allCardText) ||
+      (/\b(encrypt|encrypted)\b/i.test(allCardText) && !isExplicitlyUnencrypted)
+    );
+    isHttp = !isTls && !isQuic && (
+      /\b(http|http\/1\.\d|http\/2)\b/i.test(allCardText) ||
+      /\bport\s+80\b/i.test(allCardText) ||
+      /\b:80\b/.test(allCardText)
+    );
+    isUdp = /\budp\b/i.test(allCardText) || isDns || isQuic;
+  }
+
+  // Grounded explanations based on authoritative protocol/category and severity
+  let whyText = "This card represents observed passive network telemetry on your local adapter.";
+  let actionText = "No immediate action required. NetPulse continues listening passively.";
+
+  if (isDns) {
     whyText = "DNS queries resolve domain names (like github.com) to IP addresses. Higher latency usually happens when your configured DNS server responds slowly or over a congested Wi-Fi link.";
     actionText = "If web pages load slowly, consider switching to a fast DNS resolver (like 1.1.1.1 or 8.8.8.8) or run a diagnostic test in the Diagnostics tab.";
-  } else if (allCardText.includes("tls") || allCardText.includes("https") || allCardText.includes("quic") || allCardText.includes("encrypt")) {
+  } else if (isTls || isQuic) {
     whyText = "TLS handshakes establish encrypted connections to remote web servers. Spikes in TLS traffic indicate secure web browsing, streaming, or API requests.";
     actionText = "Your connection is encrypted and private. No action needed.";
-  } else if (card.severity === "finding") {
+  } else if (card.severity === "finding" || cat === "security") {
     whyText = "This finding was flagged because the network behavior deviated from typical local baselines (e.g., unexpected ports, retry bursts, or protocol anomalies).";
     actionText = "Review the process owning this flow in the Apps tab, or inspect raw packet headers below.";
   } else if (card.severity === "notable") {
     whyText = "This notable event recorded a transient change in throughput, host connectivity, or response timing.";
     actionText = "Monitor your active connections if performance degrades.";
   }
-
-  const isDns = allCardText.includes("dns") || allCardText.includes("port 53");
-  const isQuic = allCardText.includes("quic") || allCardText.includes("http/3");
-  const isTls = allCardText.includes("tls") || allCardText.includes("https") || allCardText.includes("encrypt") || allCardText.includes("ssl");
-  const isHttp = allCardText.includes("http") && !isTls && !isQuic;
-  const isUdp = allCardText.includes("udp") || isDns || isQuic;
 
   const protocolLabel = isDns
     ? "DNS (Port 53)"
@@ -64,6 +90,8 @@ export const CardExplainBox = memo(function CardExplainBox({
     ? "HTTP (Port 80)"
     : isUdp
     ? "UDP Datagram"
+    : card.protocol
+    ? `${card.protocol} ${card.protocol.toUpperCase() === "TCP" ? "Stream" : ""}`.trim()
     : "TCP Stream";
 
   const transportSecurity = isQuic

@@ -8,10 +8,10 @@
 //! dependency: the caller (the engine, over the query surface of
 //!  gathers the pieces and hands them in.
 
-use netpulse_core::net::L7Proto;
+use netpulse_core::net::{L4Proto, L7Proto};
 use netpulse_core::{EvidenceRef, Flow, Journey, ProtoEvent, ProtoEventKind, Session};
 
-use crate::card::{NarrativeCard, Severity};
+use crate::card::{CardCategory, NarrativeCard, Severity};
 
 /// A session together with the flows it groups and their protocol events — the
 /// input the card/journey rules need, gathered by the caller from storage
@@ -91,7 +91,14 @@ pub fn build_card(view: &SessionView) -> NarrativeCard {
         card = card.line(netpulse_core::Depth::Expert, events);
     }
 
-    card.with_severity(Severity::Neutral)
+    let (protocol, category) = detect_protocol_and_category(view);
+    let mut card = card
+        .with_severity(Severity::Neutral)
+        .with_category(category);
+    if let Some(proto) = protocol {
+        card = card.with_protocol(proto);
+    }
+    card
 }
 
 /// Build cards for many sessions, feed-ordered newest-first.
@@ -226,6 +233,54 @@ fn human_bytes(bytes: u64) -> String {
     }
 }
 
+/// Detect authoritative protocol and category from structured flows and protocol events.
+fn detect_protocol_and_category(view: &SessionView) -> (Option<String>, CardCategory) {
+    let s = view.session;
+
+    let has_tls = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Tls) || f.key.dst_port == 443 || f.key.src_port == 443)
+        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::TlsClientHello | ProtoEventKind::TlsServerHello));
+    let has_quic = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Quic | L7Proto::Http3))
+        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::QuicHandshakeComplete));
+    let has_http = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Http1 | L7Proto::Http2) || f.key.dst_port == 80 || f.key.src_port == 80)
+        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::HttpRequest | ProtoEventKind::HttpResponse));
+    let has_dns = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Dns) || f.key.dst_port == 53 || f.key.src_port == 53)
+        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::DnsQuery | ProtoEventKind::DnsResponse));
+    let has_udp = view.flows.iter().any(|f| matches!(f.l4, L4Proto::Udp));
+    let has_tcp = view.flows.iter().any(|f| matches!(f.l4, L4Proto::Tcp));
+
+    let protocol = if has_quic {
+        Some("QUIC".to_string())
+    } else if has_tls {
+        Some("TLS".to_string())
+    } else if has_http {
+        Some("HTTP".to_string())
+    } else if has_dns {
+        Some("DNS".to_string())
+    } else if has_udp {
+        Some("UDP".to_string())
+    } else if has_tcp {
+        Some("TCP".to_string())
+    } else {
+        None
+    };
+
+    let category = if s.process_id > 0 {
+        CardCategory::Applications
+    } else if view.flows.iter().any(|f| f.stats.loss_indicators > 0 || f.stats.retransmits > 5) {
+        CardCategory::Performance
+    } else if has_quic || has_tls {
+        CardCategory::Tls
+    } else if has_dns && !has_tls && !has_quic && !has_http {
+        CardCategory::Dns
+    } else if !view.flows.is_empty() {
+        CardCategory::Network
+    } else {
+        CardCategory::General
+    };
+
+    (protocol, category)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -343,5 +398,25 @@ mod tests {
         assert!(!lines
             .iter()
             .any(|l| l.contains("Encrypted") && l != "Not encrypted"));
+    }
+
+    #[test]
+    fn ip_ending_in_53_is_not_classified_as_dns() {
+        let s = session(1_000, vec![10]);
+        let f = Flow {
+            id: 10,
+            key: FiveTuple::new(ip(192, 168, 0, 1), 50000, ip(192, 168, 1, 53), 50000, L4Proto::Tcp),
+            first_ts: Timestamp::new(1_000, 1_000),
+            last_ts: Timestamp::new(1_001, 1_001),
+            l4: L4Proto::Tcp,
+            l7: L7Proto::Unknown,
+            stats: FlowMetrics::default(),
+            state: FlowState::Established,
+        };
+        let view = SessionView::new(&s, vec![&f], vec![]);
+        let card = build_card(&view);
+        assert_eq!(card.category, CardCategory::Network);
+        assert_eq!(card.protocol, Some("TCP".to_string()));
+        assert_ne!(card.category, CardCategory::Dns);
     }
 }

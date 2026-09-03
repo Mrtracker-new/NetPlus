@@ -27,6 +27,20 @@ pub enum Severity {
     Finding,
 }
 
+/// Category discriminator for narrative cards to replace heuristic text matching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum CardCategory {
+    #[default]
+    General,
+    Network,
+    Performance,
+    Dns,
+    Tls,
+    Applications,
+    Security,
+}
+
 /// One card in the narrative feed.
 ///
 /// Construct via [`NarrativeCard::new`], which requires the provenance up front
@@ -43,6 +57,10 @@ pub struct NarrativeCard {
     /// Everything this card asserts is justified by these.
     evidence: Vec<EvidenceRef>,
     pub severity: Severity,
+    /// Authoritative category classification for dashboard feed filtering.
+    pub category: CardCategory,
+    /// Authoritative application/transport protocol label (e.g. DNS, TLS, QUIC, HTTP, TCP, UDP).
+    pub protocol: Option<String>,
     /// Monotonic capture time of the summarized event, for feed ordering.
     pub at_mono_nanos: u64,
 }
@@ -72,6 +90,8 @@ impl NarrativeCard {
             lines: Vec::new(),
             evidence,
             severity: Severity::Neutral,
+            category: CardCategory::General,
+            protocol: None,
             at_mono_nanos,
         }
     }
@@ -79,6 +99,18 @@ impl NarrativeCard {
     /// Set severity (builder style).
     pub fn with_severity(mut self, severity: Severity) -> Self {
         self.severity = severity;
+        self
+    }
+
+    /// Set category (builder style).
+    pub fn with_category(mut self, category: CardCategory) -> Self {
+        self.category = category;
+        self
+    }
+
+    /// Set protocol label (builder style).
+    pub fn with_protocol(mut self, protocol: impl Into<String>) -> Self {
+        self.protocol = Some(protocol.into());
         self
     }
 

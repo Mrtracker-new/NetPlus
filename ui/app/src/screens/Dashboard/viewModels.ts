@@ -1,12 +1,9 @@
+import type { EvidenceRef, SubsystemStatus, NarrativeCategory as ContractNarrativeCategory } from "@netpulse/contract";
+
 export type NarrativeCategory =
   | "all"
   | "findings"
-  | "network"
-  | "performance"
-  | "dns"
-  | "tls"
-  | "applications"
-  | "security";
+  | ContractNarrativeCategory;
 
 export interface HeroViewModel {
   state: "healthy" | "spike" | "new_device" | "finding" | "idle";
@@ -14,8 +11,6 @@ export interface HeroViewModel {
   title: string;
   subtitle: string;
 }
-
-import type { EvidenceRef, SubsystemStatus } from "@netpulse/contract";
 
 export interface RecommendationItem {
   type: "investigate" | "ignore" | "monitor";

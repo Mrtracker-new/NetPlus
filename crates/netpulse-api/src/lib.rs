@@ -35,6 +35,7 @@ pub use dto::{
     GroundedExerciseDto, HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto,
     JourneyStageDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
     LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto, NarrativeCardDto,
+    NarrativeCategoryDto,
     PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto,
     PluginTypeDto, PrivacyManifestDto, ProcessMetricDto, ProjectionDepth, RecordingSummaryDto,
     ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto,

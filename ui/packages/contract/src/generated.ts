@@ -35,6 +35,8 @@ export type MonitorTimeRange = "five_minutes" | "fifteen_minutes" | "one_hour" |
 
 export type TelemetryState = "standby" | "active" | "stale" | "unavailable";
 
+export type NarrativeCategory = "general" | "network" | "performance" | "dns" | "tls" | "applications" | "security";
+
 export type EvidenceRef =
   | { kind: "packet"; id: number }
   | { kind: "flow"; id: number }
@@ -45,6 +47,8 @@ export interface NarrativeCard {
   summary: string;
   lines: string[];
   severity: Severity;
+  category?: NarrativeCategory;
+  protocol?: string;
   evidence: EvidenceRef[];
   at_mono_nanos: number;
 }

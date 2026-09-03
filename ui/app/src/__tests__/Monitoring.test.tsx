@@ -47,6 +47,7 @@ const mockMonitorSnapshot: MonitorSnapshot = {
   diagnoses: [
     {
       cause: "local_wifi",
+      severity: "finding",
       explanation: "Loss and jitter affecting several servers at once",
       confidence_percent: 85,
       evidence: [{ kind: "flow" as const, id: 707 }],

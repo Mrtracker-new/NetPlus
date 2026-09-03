@@ -4,7 +4,7 @@
 //Light neumorphic is the default look; a theme toggle flips to
 // the original deep-observatory dark (tokens.css [data-theme="dark"]).
 
-import { Component, useEffect, useState } from "react";
+import { Component, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Interface as InterfaceDto } from "@netpulse/contract";
@@ -12,7 +12,7 @@ import { changeLanguage, type Language } from "./i18n";
 import { DisclosureProvider, useDisclosure } from "./modes/DisclosureContext";
 import { useTheme } from "./modes/useTheme";
 import { useLiveData } from "./state/useLiveData";
-import { command, query } from "./ipc";
+import { checkBackendHealth, command, query } from "./ipc";
 import { Icon, type IconName } from "./icons";
 import { Dashboard } from "./screens/Dashboard";
 import { Timeline } from "./screens/Timeline";
@@ -96,12 +96,13 @@ function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) 
   const { t } = useTranslation("common");
   const [running, setRunning] = useState(false);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [interfaces, setInterfaces] = useState<InterfaceDto[]>([]);
   const [ifaceId, setIfaceId] = useState(0);
 
-  // Enumerate adapters once on mount. Absent a backend the list is empty and only
-  // "Default adapter" is offered — the real error surfaces on Start.
+  // Enumerate adapters once on mount and check authoritative capture status.
+  // Absent a backend the list is empty and only "Default adapter" is offered.
   useEffect(() => {
     let cancelled = false;
     query({ kind: "interfaces" })
@@ -111,28 +112,43 @@ function CaptureControl({ onAnnounce }: { onAnnounce?: (msg: string) => void }) 
       .catch(() => {
         /* no backend (browser preview / Npcap absent) — keep the default option */
       });
+
+    checkBackendHealth()
+      .then((health) => {
+        if (!cancelled && health) {
+          setRunning(health.capture_running);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
   }, []);
 
   async function toggle() {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
       if (running) {
-        onAnnounce?.(t("capture.stopped_announcement"));
         await command({ kind: "stopCapture", iface_id: ifaceId });
         setRunning(false);
+        onAnnounce?.(t("capture.stopped_announcement"));
       } else {
-        onAnnounce?.(t("capture.capturing_announcement"));
         await command({ kind: "startCapture", iface_id: ifaceId });
         setRunning(true);
+        onAnnounce?.(t("capture.capturing_announcement"));
       }
     } catch (e) {
-      // Fail honestly — Npcap missing, no admin, or browser preview.
-      setError(String(e));
+      // Fail honestly — Npcap missing, no admin, or browser preview without backend.
+      if (!running) {
+        setRunning(false);
+      }
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }

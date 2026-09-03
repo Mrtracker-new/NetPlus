@@ -42,4 +42,55 @@ describe("CaptureControl Component", () => {
       expect(commandSpy).toHaveBeenCalledWith({ kind: "stopCapture", iface_id: 0 });
     });
   });
+
+  it("fails honestly and stays idle when backend is unavailable (Mode C)", async () => {
+    vi.spyOn(ipc, "command").mockRejectedValue(
+      new ipc.IpcError("NetPulse backend unavailable at /api/command", "BACKEND_UNAVAILABLE")
+    );
+
+    render(<App />);
+
+    const startBtn = screen.getByRole("button", { name: "Start capture" });
+    fireEvent.click(startBtn);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("NetPulse backend unavailable at /api/command")
+      ).toBeInTheDocument();
+    });
+
+    // Must never transition to Capturing / Stop capture
+    expect(startBtn).toHaveTextContent("Start capture");
+    expect(startBtn).toHaveAttribute("aria-pressed", "false");
+    expect(screen.queryByRole("button", { name: "Stop capture" })).not.toBeInTheDocument();
+  });
+
+  it("prevents double execution on rapid consecutive clicks (in-flight guard)", async () => {
+    let resolveCommand: () => void = () => {};
+    const commandPromise = new Promise<void>((resolve) => {
+      resolveCommand = resolve;
+    });
+    const commandSpy = vi.spyOn(ipc, "command").mockImplementation(async (c) => {
+      if (c.kind === "startCapture") {
+        return commandPromise;
+      }
+      return Promise.resolve();
+    });
+
+    render(<App />);
+
+    const startBtn = screen.getByRole("button", { name: "Start capture" });
+    fireEvent.click(startBtn);
+    fireEvent.click(startBtn); // Second rapid click while busy
+
+    const startCaptureCalls = commandSpy.mock.calls.filter(
+      ([c]) => c.kind === "startCapture"
+    );
+    expect(startCaptureCalls).toHaveLength(1);
+
+    resolveCommand();
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Stop capture" })).toBeInTheDocument();
+    });
+  });
 });

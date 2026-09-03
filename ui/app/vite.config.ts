@@ -10,6 +10,28 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      // Browser development transport -> local Rust engine HTTP bridge
+      "/api": {
+        target: "http://127.0.0.1:4040",
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on("error", (_err, _req, res) => {
+            if ("writeHead" in res && !res.headersSent) {
+              res.writeHead(503, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  error: {
+                    code: "BACKEND_UNAVAILABLE",
+                    message: "NetPulse backend engine is not running on 127.0.0.1:4040",
+                  },
+                })
+              );
+            }
+          });
+        },
+      },
+    },
   },
   build: {
     target: "es2022",

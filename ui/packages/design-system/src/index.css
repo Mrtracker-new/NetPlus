@@ -525,6 +525,33 @@ button {
   width: 18px;
   height: 18px;
 }
+.np-iconbtn--sm {
+  width: 28px;
+  height: 28px;
+}
+.np-iconbtn--sm svg {
+  width: 14px;
+  height: 14px;
+}
+.np-iconbtn--xs {
+  width: 22px;
+  height: 22px;
+}
+.np-iconbtn--xs svg {
+  width: 12px;
+  height: 12px;
+}
+.np-iconbtn--active {
+  box-shadow: var(--np-neu-inset);
+  color: var(--np-accent-strong);
+}
+.np-iconbtn:disabled {
+  opacity: var(--np-opacity-disabled);
+  cursor: default;
+  box-shadow: var(--np-neu-inset);
+  pointer-events: none;
+}
+
 
 /* ---- Live capture control (mandatory visible indicator ---- */
 .np-capture {
@@ -1037,6 +1064,75 @@ button {
   cursor: default;
   box-shadow: var(--np-neu-inset);
 }
+.np-btn--ghost {
+  background: transparent;
+  border: none;
+  color: var(--np-text-dim);
+  box-shadow: none;
+}
+.np-btn--ghost:hover {
+  background: var(--np-surface-2);
+  color: var(--np-accent-strong);
+  box-shadow: none;
+}
+.np-btn--ghost:active,
+.np-btn--ghost.np-btn--active {
+  background: var(--np-surface-3);
+  color: var(--np-accent-strong);
+  box-shadow: none;
+  transform: translateY(1px);
+}
+.np-btn--ghost:disabled {
+  background: transparent;
+  box-shadow: none;
+  opacity: var(--np-opacity-disabled);
+  cursor: default;
+  pointer-events: none;
+}
+.np-btn--secondary {
+  background: var(--np-surface-2);
+  color: var(--np-text);
+  box-shadow: var(--np-neu-sm);
+}
+.np-btn--secondary:hover {
+  background: var(--np-surface-3);
+  color: var(--np-accent-strong);
+}
+.np-btn--secondary:active,
+.np-btn--secondary.np-btn--active {
+  background: var(--np-surface-3);
+  box-shadow: var(--np-neu-inset);
+  transform: translateY(1px);
+}
+
+/* Button size modifiers */
+.np-btn--sm {
+  padding: 3px 10px;
+  font-size: var(--np-fs-xs);
+  border-radius: var(--np-radius-pill);
+}
+.np-btn--sm > span {
+  gap: var(--np-1);
+}
+.np-btn--sm svg {
+  width: 12px;
+  height: 12px;
+}
+.np-btn--xs {
+  padding: 2px 6px;
+  font-size: var(--np-fs-2xs, 0.6875rem);
+  line-height: 1.2;
+  border-radius: var(--np-radius-pill);
+}
+.np-btn--xs > span {
+  gap: 3px;
+}
+.np-btn--xs svg {
+  width: 11px;
+  height: 11px;
+}
+
+
 
 /* Confidence & evidence chips — used across findings, journeys, diagnoses. */
 .np-confidence,
@@ -1381,6 +1477,36 @@ button {
   outline: 2px solid var(--np-accent-strong);
   outline-offset: 2px;
 }
+
+.np-card__foot .np-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  color: var(--np-text-dim);
+}
+
+.np-card__foot .np-btn--ghost:hover {
+  background: var(--np-surface-2);
+  border-color: var(--np-hairline);
+  color: var(--np-accent-strong);
+  box-shadow: none;
+}
+
+.np-card__foot .np-btn--ghost:active {
+  background: var(--np-surface-3);
+  border-color: var(--np-hairline);
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.np-card__foot .np-btn--sm {
+  padding: 3px 10px;
+}
+
+.np-card__foot .np-btn--xs {
+  padding: 2px 6px;
+}
+
 
 /* In-Card Collapsible Explanation Box — Recessed Chamber */
 .np-explain-box {

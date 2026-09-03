@@ -3,10 +3,19 @@ import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { Spinner } from "../Spinner";
 import { cn } from "../utils/cn";
 
-export type ButtonVariant = "standard" | "primary" | "icon" | "danger";
+export type ButtonVariant =
+  | "standard"
+  | "primary"
+  | "icon"
+  | "danger"
+  | "ghost"
+  | "secondary";
+
+export type ButtonSize = "standard" | "sm" | "xs";
 
 export interface ButtonProps extends ComponentPropsWithoutRef<"button"> {
   variant?: ButtonVariant;
+  size?: ButtonSize;
   active?: boolean;
   busy?: boolean;
   children?: ReactNode;
@@ -16,6 +25,7 @@ export const Button = memo(
   forwardRef<HTMLButtonElement, ButtonProps>(function Button(
     {
       variant = "standard",
+      size = "standard",
       active,
       busy,
       disabled,
@@ -40,9 +50,16 @@ export const Button = memo(
         aria-busy={busy || undefined}
         className={cn(
           baseClass,
-          variant === "primary" && "np-btn--primary",
-          variant === "danger" && "np-btn--danger",
-          active && "np-btn--active",
+          !isIcon && variant === "primary" && "np-btn--primary",
+          !isIcon && variant === "danger" && "np-btn--danger",
+          !isIcon && variant === "ghost" && "np-btn--ghost",
+          !isIcon && variant === "secondary" && "np-btn--secondary",
+          !isIcon && size === "sm" && "np-btn--sm",
+          !isIcon && size === "xs" && "np-btn--xs",
+          !isIcon && active && "np-btn--active",
+          isIcon && size === "sm" && "np-iconbtn--sm",
+          isIcon && size === "xs" && "np-iconbtn--xs",
+          isIcon && active && "np-iconbtn--active",
           className
         )}
       >

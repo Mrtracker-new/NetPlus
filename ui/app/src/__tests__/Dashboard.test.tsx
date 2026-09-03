@@ -4,7 +4,7 @@ import "@testing-library/jest-dom";
 import "../i18n";
 import { Dashboard } from "../screens/Dashboard";
 import { DisclosureProvider } from "../modes/DisclosureContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setFeed, setMonitor, resetSession, __resetForTest } from "../state/store";
 
 afterEach(() => {
@@ -23,6 +23,35 @@ function DashboardTestWrapper({
   return (
     <DisclosureProvider>
       <EvidenceNavigationProvider>
+        <Dashboard loading={loading} error={error} onRetry={onRetry} />
+      </EvidenceNavigationProvider>
+    </DisclosureProvider>
+  );
+}
+
+function DashboardWithNavWatcher({
+  loading = false,
+  error = null,
+  onRetry,
+}: {
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+}) {
+  function NavWatcher() {
+    const { screen: currentScreen, navigationTarget } = useEvidenceNavigation();
+    return (
+      <div data-testid="nav-debug">
+        <span data-testid="nav-screen">{currentScreen}</span>
+        <span data-testid="nav-target">{JSON.stringify(navigationTarget)}</span>
+      </div>
+    );
+  }
+
+  return (
+    <DisclosureProvider>
+      <EvidenceNavigationProvider>
+        <NavWatcher />
         <Dashboard loading={loading} error={error} onRetry={onRetry} />
       </EvidenceNavigationProvider>
     </DisclosureProvider>
@@ -581,6 +610,7 @@ describe("Dashboard Screen", () => {
       fireEvent.click(recBtn);
 
       expect(screen.getByText(/Evidence flow #99999 is outside the active visible feed window/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "View in Apps / Timeline →" })).toBeInTheDocument();
     });
 
     it("Invariant 10: Unavailable telemetry state explicitly renders ▼ — (Unavailable) and ▲ — (Unavailable)", () => {
@@ -670,6 +700,7 @@ describe("Dashboard Screen", () => {
       // Click evidence button -> triggers evidence navigation
       fireEvent.click(evidenceBtn);
       expect(screen.getByText(/Evidence flow #404 is outside the active visible feed window/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "View in Apps / Timeline →" })).toBeInTheDocument();
     });
 
     it("Invariant 13: SummaryEngine respects the explicit precedence hierarchy", () => {
@@ -946,6 +977,179 @@ describe("Dashboard Screen", () => {
       expect(screen.getByText("LIVE TELEMETRY")).toBeInTheDocument();
       expect(document.querySelector(".np-pulse-dot")).toBeInTheDocument();
       expect(document.querySelector(".np-telemetry-badge--active")).toBeInTheDocument();
+    });
+
+    it("Invariant 19: When evidence card is outside visible feed window, fallback action button 'View in Apps / Timeline →' routes to target screen", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [
+          {
+            cause: "local_wifi",
+            severity: "finding",
+            confidence_percent: 85,
+            explanation: "Frame drops on channel 6",
+            evidence: [{ kind: "flow", id: 777 }],
+          },
+        ],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+      setFeed([]);
+
+      render(<DashboardWithNavWatcher />);
+
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("dashboard");
+
+      // 1. Trigger evidence navigation for flow 777 not in feed
+      const recBtn = screen.getByRole("button", { name: /Investigate Local Wi-Fi \/ Link hypothesis/i });
+      fireEvent.click(recBtn);
+
+      // Notice with message and action button appears
+      expect(screen.getByText(/Evidence flow #777 is outside the active visible feed window/i)).toBeInTheDocument();
+      const viewBtn = screen.getByRole("button", { name: "View in Apps / Timeline →" });
+      expect(viewBtn).toBeInTheDocument();
+
+      // 2. Click fallback action button
+      fireEvent.click(viewBtn);
+
+      // Navigates to Apps screen with flowId 777
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("apps");
+      expect(screen.getByTestId("nav-target")).toHaveTextContent(JSON.stringify({ screen: "apps", flowId: 777 }));
+
+      // Ephemeral notice is dismissed upon navigation
+      expect(screen.queryByText(/Evidence flow #777 is outside the active visible feed window/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "View in Apps / Timeline →" })).not.toBeInTheDocument();
+    });
+
+    it("Invariant 20: When evidence is a packet outside feed, fallback action routes to Timeline screen", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        diagnostic_chain: {
+          stages: [
+            {
+              stage: "destination",
+              label: "Destination Server",
+              status: "degraded",
+              measurement_state: "inferred",
+              detection_state: "detected",
+              causes: ["distant_server"],
+              affected_targets: [],
+              latency_ms: 120,
+              summary: "TCP RST received",
+              detail: "Packet reset sequence",
+              evidence: [{ kind: "packet", id: 888 }],
+            },
+          ],
+        },
+      });
+      setFeed([]);
+
+      render(<DashboardWithNavWatcher />);
+
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("dashboard");
+
+      // Open diagnostic stage drawer
+      const destNode = screen.getByRole("button", { name: /Destination Server — Status: Degraded/i });
+      fireEvent.click(destNode);
+
+      const inspectEvidenceBtn = screen.getByRole("button", { name: /Inspect Stage Evidence \(packet #888\) →/i });
+      fireEvent.click(inspectEvidenceBtn);
+
+      expect(screen.getByText(/Evidence packet #888 is outside the active visible feed window/i)).toBeInTheDocument();
+      const viewBtn = screen.getByRole("button", { name: "View in Apps / Timeline →" });
+      expect(viewBtn).toBeInTheDocument();
+
+      // Click fallback action button
+      fireEvent.click(viewBtn);
+
+      // Navigates to Timeline screen with packetId 888
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("timeline");
+      expect(screen.getByTestId("nav-target")).toHaveTextContent(JSON.stringify({ screen: "timeline", packetId: 888 }));
+    });
+
+    it("Invariant 21: Dismissing the evidence notice clears it without navigating or altering screen state", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [
+          {
+            cause: "local_wifi",
+            severity: "finding",
+            confidence_percent: 75,
+            explanation: "High noise floor",
+            evidence: [{ kind: "flow", id: 505 }],
+          },
+        ],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+      setFeed([]);
+
+      render(<DashboardWithNavWatcher />);
+
+      const recBtn = screen.getByRole("button", { name: /Investigate Local Wi-Fi \/ Link hypothesis/i });
+      fireEvent.click(recBtn);
+
+      expect(screen.getByText(/Evidence flow #505 is outside the active visible feed window/i)).toBeInTheDocument();
+      const dismissBtn = screen.getByRole("button", { name: "Dismiss" });
+      expect(dismissBtn).toBeInTheDocument();
+
+      fireEvent.click(dismissBtn);
+
+      expect(screen.queryByText(/Evidence flow #505 is outside the active visible feed window/i)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "View in Apps / Timeline →" })).not.toBeInTheDocument();
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("dashboard");
+      expect(screen.getByTestId("nav-target")).toHaveTextContent("null");
+    });
+
+    it("Invariant 22: When evidence is a session outside feed, fallback action routes to Journey screen", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        diagnostic_chain: {
+          stages: [
+            {
+              stage: "router",
+              label: "Local Gateway",
+              status: "degraded",
+              measurement_state: "inferred",
+              detection_state: "detected",
+              causes: ["congestion"],
+              affected_targets: [],
+              latency_ms: 85,
+              summary: "Bufferbloat under burst",
+              detail: "Session buffer saturation",
+              evidence: [{ kind: "session", id: 333 }],
+            },
+          ],
+        },
+      });
+      setFeed([]);
+
+      render(<DashboardWithNavWatcher />);
+
+      const routerNode = screen.getByRole("button", { name: /Local Gateway — Status: Degraded/i });
+      fireEvent.click(routerNode);
+
+      const inspectEvidenceBtn = screen.getByRole("button", { name: /Inspect Stage Evidence \(session #333\) →/i });
+      fireEvent.click(inspectEvidenceBtn);
+
+      expect(screen.getByText(/Evidence session #333 is outside the active visible feed window/i)).toBeInTheDocument();
+      const viewBtn = screen.getByRole("button", { name: "View in Apps / Timeline →" });
+      expect(viewBtn).toBeInTheDocument();
+
+      fireEvent.click(viewBtn);
+
+      expect(screen.getByTestId("nav-screen")).toHaveTextContent("journey");
+      expect(screen.getByTestId("nav-target")).toHaveTextContent(JSON.stringify({ screen: "journey", sessionId: 333 }));
     });
   });
 });

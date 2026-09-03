@@ -1,4 +1,4 @@
-import { Component, type ReactNode, useCallback, useState } from "react";
+import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity, EvidenceRef } from "@netpulse/contract";
 import { EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
@@ -152,20 +152,47 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
   } = useDashboardController();
 
   const hostRows = monitor?.by_host.rows ?? [];
-  const [evidenceNotice, setEvidenceNotice] = useState<string | null>(null);
+  const [evidenceNotice, setEvidenceNotice] = useState<{
+    message: string;
+    ref?: EvidenceRef;
+  } | null>(null);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (noticeTimerRef.current) {
+        clearTimeout(noticeTimerRef.current);
+      }
+      if (scrollTimerRef.current) {
+        clearTimeout(scrollTimerRef.current);
+      }
+    };
+  }, []);
+
+  const dismissEvidenceNotice = useCallback(() => {
+    if (noticeTimerRef.current) {
+      clearTimeout(noticeTimerRef.current);
+      noticeTimerRef.current = null;
+    }
+    setEvidenceNotice(null);
+  }, []);
 
   const handleNavigateToEvidence = useCallback(
     (ref: EvidenceRef) => {
       const targetCard = feed.find((c) =>
-        c.evidence.some((e) => e.kind === ref.kind && e.id === ref.id)
+        c.evidence?.some((e) => e.kind === ref.kind && e.id === ref.id)
       );
 
       if (targetCard) {
-        setEvidenceNotice(null);
+        dismissEvidenceNotice();
         dispatchEvent({ type: "SET_CATEGORY", category: "all" });
         dispatchEvent({ type: "SET_SEARCH", search: "" });
 
-        setTimeout(() => {
+        if (scrollTimerRef.current) {
+          clearTimeout(scrollTimerRef.current);
+        }
+        scrollTimerRef.current = setTimeout(() => {
           const cardElem =
             document.getElementById(`card-${targetCard.at_mono_nanos}`) ||
             document.querySelector(`[data-evidence-id="${ref.id}"]`);
@@ -175,14 +202,31 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
             void (cardElem as HTMLElement).offsetWidth;
             cardElem.classList.add("np-card--highlight-pulse");
           }
+          scrollTimerRef.current = null;
         }, 60);
       } else {
-        setEvidenceNotice(`Evidence flow #${ref.id} is outside the active visible feed window.`);
-        setTimeout(() => setEvidenceNotice(null), 6000);
+        if (noticeTimerRef.current) {
+          clearTimeout(noticeTimerRef.current);
+        }
+        setEvidenceNotice({
+          message: `Evidence ${ref.kind === "flow" ? "flow" : ref.kind} #${ref.id} is outside the active visible feed window.`,
+          ref,
+        });
+        noticeTimerRef.current = setTimeout(() => {
+          setEvidenceNotice(null);
+          noticeTimerRef.current = null;
+        }, 6000);
       }
     },
-    [feed, dispatchEvent]
+    [feed, dispatchEvent, dismissEvidenceNotice]
   );
+
+  const handleNoticeNavigate = useCallback(() => {
+    if (evidenceNotice?.ref) {
+      navigateToEvidence(evidenceNotice.ref, "dashboard");
+      dismissEvidenceNotice();
+    }
+  }, [evidenceNotice, navigateToEvidence, dismissEvidenceNotice]);
 
   const handleConstellationNavigate = useCallback(
     (ref: EvidenceRef) => {
@@ -247,17 +291,28 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
       </WidgetErrorBoundary>
 
       {evidenceNotice && (
-        <div style={{ marginBottom: "var(--np-4)" }} role="alert">
+        <div style={{ marginBottom: "var(--np-4)" }}>
           <Notice>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
-              <span>{evidenceNotice}</span>
-              <button
-                type="button"
-                className="np-btn np-btn--ghost np-btn--sm"
-                onClick={() => setEvidenceNotice(null)}
-              >
-                Dismiss
-              </button>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+              <span>{evidenceNotice.message}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                {evidenceNotice.ref && (
+                  <button
+                    type="button"
+                    className="np-btn np-btn--primary np-btn--sm"
+                    onClick={handleNoticeNavigate}
+                  >
+                    View in Apps / Timeline →
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="np-btn np-btn--ghost np-btn--sm"
+                  onClick={dismissEvidenceNotice}
+                >
+                  Dismiss
+                </button>
+              </div>
             </div>
           </Notice>
         </div>

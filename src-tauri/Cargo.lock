@@ -2319,6 +2319,7 @@ name = "netpulse-shell"
 version = "0.1.0"
 dependencies = [
  "directories",
+ "httparse",
  "netpulse-api",
  "netpulse-capture",
  "netpulse-capture-svc",

@@ -35,17 +35,32 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 Ok(g) => *g,
                 Err(p) => *p.into_inner(),
             };
+            let capture_running = state.capture.lock().map(|g| g.is_some()).unwrap_or(false);
+            let active_stats = if capture_running {
+                stats
+            } else {
+                netpulse_capture::CaptureStats::default()
+            };
             let correlator = state.correlator.lock().ok();
-            let view = netpulse_engine::pipeline::present_window(
+            let mut view = netpulse_engine::pipeline::present_window(
                 &store,
                 depth,
-                stats,
+                active_stats,
                 correlator.as_deref(),
                 state.sockets.as_deref(),
                 time_range,
                 from_mono_nanos,
                 to_mono_nanos,
             );
+            // Capture lifecycle strictly dominates: if capture is not running,
+            // telemetry_state is Standby, regardless of historical flows in store.
+            if !capture_running {
+                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
+            } else if active_stats.received > 0 || !store.session_ids().is_empty() {
+                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Active;
+            } else {
+                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
+            }
             Ok(QueryResponse::MonitorSnapshot {
                 snapshot: view.monitor,
             })
@@ -447,7 +462,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             })
         }
         Query::RunStageProbe { stage, target } => {
-            use netpulse_api::dto::{DiagnosticChainStageKindDto, StageProbeResultDto, StageProbeStatusDto};
+            use netpulse_api::dto::{
+                DiagnosticChainStageKindDto, StageProbeResultDto, StageProbeStatusDto,
+            };
             use netpulse_platform::diagnostics::DiagnosticProbe;
 
             let cancel = std::sync::atomic::AtomicBool::new(false);
@@ -490,7 +507,12 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                                 target: out.gateway_ip.clone(),
                                 status,
                                 latency_ms: lat,
-                                summary: format!("Default gateway {} on interface {}: {}", out.gateway_ip.as_deref().unwrap_or("none"), out.interface_name.as_deref().unwrap_or("none"), out.status),
+                                summary: format!(
+                                    "Default gateway {} on interface {}: {}",
+                                    out.gateway_ip.as_deref().unwrap_or("none"),
+                                    out.interface_name.as_deref().unwrap_or("none"),
+                                    out.status
+                                ),
                                 details: vec![format!("Source: {}", out.source)],
                             }
                         }
@@ -530,10 +552,20 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                                 stage,
                                 probe_type: "TracerouteProbe".to_string(),
                                 target: Some(t),
-                                status: if rtt.is_some() { StageProbeStatusDto::Success } else { StageProbeStatusDto::Degraded },
+                                status: if rtt.is_some() {
+                                    StageProbeStatusDto::Success
+                                } else {
+                                    StageProbeStatusDto::Degraded
+                                },
                                 latency_ms: rtt,
                                 summary: format!("Traced {hop_count} hops toward target"),
-                                details: out.hops.iter().map(|h| format!("Hop {}: {} (rtt: {:?})", h.ttl, h.ip, h.rtt_ms)).collect(),
+                                details: out
+                                    .hops
+                                    .iter()
+                                    .map(|h| {
+                                        format!("Hop {}: {} (rtt: {:?})", h.ttl, h.ip, h.rtt_ms)
+                                    })
+                                    .collect(),
                             }
                         }
                         Err(e) => StageProbeResultDto {
@@ -582,10 +614,16 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                                 summary: format!(
                                     "DNS resolution for {}: {} ms ({} IPs resolved)",
                                     out.target,
-                                    out.resolution_rtt_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
+                                    out.resolution_rtt_ms
+                                        .map(|r| format!("{r:.1}"))
+                                        .unwrap_or_else(|| "—".into()),
                                     out.resolved_ips.len()
                                 ),
-                                details: out.resolved_ips.iter().map(|ip| format!("Resolved: {ip}")).collect(),
+                                details: out
+                                    .resolved_ips
+                                    .iter()
+                                    .map(|ip| format!("Resolved: {ip}"))
+                                    .collect(),
                             }
                         }
                         Err(e) => StageProbeResultDto {
@@ -636,15 +674,39 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                                 latency_ms: out.ttfb_ms,
                                 summary: format!(
                                     "HTTP TTFB: {} ms, connect: {} ms (status: {:?})",
-                                    out.ttfb_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
-                                    out.connect_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into()),
+                                    out.ttfb_ms
+                                        .map(|r| format!("{r:.1}"))
+                                        .unwrap_or_else(|| "—".into()),
+                                    out.connect_ms
+                                        .map(|r| format!("{r:.1}"))
+                                        .unwrap_or_else(|| "—".into()),
                                     out.status_code
                                 ),
                                 details: vec![
-                                    format!("Connect: {} ms", out.connect_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
-                                    format!("TTFB: {} ms", out.ttfb_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
-                                    format!("Transfer: {} ms", out.transfer_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
-                                    format!("TLS: {} ms", out.tls_ms.map(|r| format!("{r:.1}")).unwrap_or_else(|| "—".into())),
+                                    format!(
+                                        "Connect: {} ms",
+                                        out.connect_ms
+                                            .map(|r| format!("{r:.1}"))
+                                            .unwrap_or_else(|| "—".into())
+                                    ),
+                                    format!(
+                                        "TTFB: {} ms",
+                                        out.ttfb_ms
+                                            .map(|r| format!("{r:.1}"))
+                                            .unwrap_or_else(|| "—".into())
+                                    ),
+                                    format!(
+                                        "Transfer: {} ms",
+                                        out.transfer_ms
+                                            .map(|r| format!("{r:.1}"))
+                                            .unwrap_or_else(|| "—".into())
+                                    ),
+                                    format!(
+                                        "TLS: {} ms",
+                                        out.tls_ms
+                                            .map(|r| format!("{r:.1}"))
+                                            .unwrap_or_else(|| "—".into())
+                                    ),
                                 ],
                             }
                         }
@@ -691,10 +753,16 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                                 target: Some(t),
                                 status,
                                 latency_ms: Some(out.avg_rtt_ms),
-                                summary: format!("Ping to {}: avg {:.1} ms (loss: {:.0}%)", out.target, out.avg_rtt_ms, out.loss_pct),
+                                summary: format!(
+                                    "Ping to {}: avg {:.1} ms (loss: {:.0}%)",
+                                    out.target, out.avg_rtt_ms, out.loss_pct
+                                ),
                                 details: vec![
                                     format!("Sent: {}, Received: {}", out.sent, out.received),
-                                    format!("Min RTT: {:.1} ms, Max RTT: {:.1} ms", out.min_rtt_ms, out.max_rtt_ms),
+                                    format!(
+                                        "Min RTT: {:.1} ms, Max RTT: {:.1} ms",
+                                        out.min_rtt_ms, out.max_rtt_ms
+                                    ),
                                 ],
                             }
                         }
@@ -769,7 +837,9 @@ fn is_valid_probe_target(t: &str) -> bool {
     host.split('.').all(|label| {
         !label.is_empty()
             && label.len() <= 63
-            && label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+            && label
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
             && !label.starts_with('-')
             && !label.ends_with('-')
     })

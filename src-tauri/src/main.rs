@@ -31,6 +31,7 @@ use netpulse_plugin::{
 use netpulse_storage::{CaptureStore, PayloadPolicy};
 use tauri::{Emitter, Manager};
 
+pub(crate) mod http_bridge;
 pub(crate) mod ipc;
 
 /// Typed errors returned during shell application shutdown.
@@ -68,21 +69,35 @@ impl ShutdownReport {
     }
 }
 
+impl Default for ShutdownReport {
+    fn default() -> Self {
+        Self {
+            already_shutdown: false,
+            health_signaled: false,
+            capture_stopped: false,
+            store_flushed: false,
+            store_flush_duration: std::time::Duration::ZERO,
+            errors: Vec::new(),
+        }
+    }
+}
+
 /// Shell state: the committed reconstruction store, the current disclosure depth,
 /// and the Phase 5 lifecycle state — recordings, an optional replay controller,
 /// and the plugin registry (seeded with the first-party reference plugins). Behind
 /// `Mutex`es so Tauri can share it across command invocations.
+#[derive(Clone)]
 pub(crate) struct AppState {
     // `Arc` so the background live-capture thread can share the same store/stats
     // the query handler reads (the thread swaps in fresh reconstructions).
     pub(crate) store: Arc<Mutex<CaptureStore>>,
     pub(crate) depth: Arc<Mutex<Depth>>,
     pub(crate) stats: Arc<Mutex<CaptureStats>>,
-    pub(crate) recordings: Mutex<Vec<Recording>>,
-    pub(crate) replay: Mutex<Option<ReplayController>>,
-    pub(crate) registry: Mutex<PluginRegistry>,
+    pub(crate) recordings: Arc<Mutex<Vec<Recording>>>,
+    pub(crate) replay: Arc<Mutex<Option<ReplayController>>>,
+    pub(crate) registry: Arc<Mutex<PluginRegistry>>,
     /// Handle to the running live capture, if any. `None` when idle.
-    pub(crate) capture: Mutex<Option<CaptureControl>>,
+    pub(crate) capture: Arc<Mutex<Option<CaptureControl>>>,
     /// The time-indexed flow→process correlator, fed socket-table
     /// snapshots by the capture loop and queried by `AttributionOfFlow`.
     pub(crate) correlator: Arc<Mutex<Correlator>>,
@@ -91,14 +106,16 @@ pub(crate) struct AppState {
     pub(crate) sockets: Option<Arc<dyn SocketTableSource + Send + Sync>>,
     /// Stop flag for the background HTTP health probe server.
     pub(crate) health_stop: Arc<AtomicBool>,
+    /// Stop flag for the background HTTP development bridge.
+    pub(crate) http_stop: Arc<AtomicBool>,
     /// Optional Tauri application handle for emitting live events.
-    pub(crate) app_handle: Mutex<Option<tauri::AppHandle>>,
+    pub(crate) app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
     /// Local-first persistent learning progress and mastery store.
     pub(crate) progress_store: Arc<Mutex<netpulse_learn::ProgressStore>>,
     /// Custom path override for progress persistence (e.g. for deterministic isolated unit tests).
     pub(crate) progress_path: Option<std::path::PathBuf>,
     /// Atomic once-guard guaranteeing shutdown sequence executes exactly once.
-    pub(crate) shutting_down: AtomicBool,
+    pub(crate) shutting_down: Arc<AtomicBool>,
 }
 
 impl AppState {
@@ -193,17 +210,18 @@ impl Default for AppState {
             store: Arc::new(Mutex::new(store)),
             depth: Arc::new(Mutex::new(Depth::Beginner)),
             stats: Arc::new(Mutex::new(stats)),
-            recordings: Mutex::new(Vec::new()),
-            replay: Mutex::new(None),
-            registry: Mutex::new(seed_registry()),
-            capture: Mutex::new(None),
+            recordings: Arc::new(Mutex::new(Vec::new())),
+            replay: Arc::new(Mutex::new(None)),
+            registry: Arc::new(Mutex::new(seed_registry())),
+            capture: Arc::new(Mutex::new(None)),
             correlator: Arc::new(Mutex::new(Correlator::new())),
             sockets: netpulse_platform::socket_table(),
             health_stop: Arc::new(AtomicBool::new(false)),
-            app_handle: Mutex::new(None),
+            http_stop: Arc::new(AtomicBool::new(false)),
+            app_handle: Arc::new(Mutex::new(None)),
             progress_store: Arc::new(Mutex::new(load_progress_store(None))),
             progress_path: None,
-            shutting_down: AtomicBool::new(false),
+            shutting_down: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -279,9 +297,10 @@ impl AppState {
     fn shutdown_health(&self) -> bool {
         tracing::info!(
             event = "health.stopping",
-            "Signaling health probe HTTP server to stop"
+            "Signaling health probe and HTTP bridge servers to stop"
         );
         self.health_stop.store(true, Ordering::Release);
+        self.http_stop.store(true, Ordering::Release);
         true
     }
 
@@ -428,7 +447,7 @@ pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
     match ctrl_guard {
         Some(ctrl) => {
             ctrl.stop.store(true, Ordering::Relaxed);
-            match ctrl.done_rx.recv_timeout(std::time::Duration::from_secs(3)) {
+            let join_res = match ctrl.done_rx.recv_timeout(std::time::Duration::from_secs(3)) {
                 Ok(()) | Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
                     match ctrl.handle.join() {
                         Ok(()) => Ok(()),
@@ -441,9 +460,45 @@ pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
                         Ok(mut g) => *g = Some(ctrl),
                         Err(p) => *p.into_inner() = Some(ctrl),
                     }
-                    Err("capture thread did not terminate within 3 seconds".into())
+                    return Err("capture thread did not terminate within 3 seconds".into());
+                }
+            };
+            if join_res.is_ok() {
+                if let Ok(handle_guard) = state.app_handle.lock() {
+                    if let Some(handle) = handle_guard.as_ref() {
+                        if let Ok(store_guard) = state.store.lock() {
+                            if let Ok(stats_guard) = state.stats.lock() {
+                                if let Ok(depth_guard) = state.depth.lock() {
+                                    let capture_running =
+                                        state.capture.lock().map(|g| g.is_some()).unwrap_or(false);
+                                    let active_stats = if capture_running {
+                                        *stats_guard
+                                    } else {
+                                        netpulse_capture::CaptureStats::default()
+                                    };
+                                    let corr_guard = state.correlator.lock().ok();
+                                    let mut view = netpulse_engine::pipeline::present_window(
+                                        &store_guard,
+                                        *depth_guard,
+                                        active_stats,
+                                        corr_guard.as_deref(),
+                                        state.sockets.as_ref().map(|s| {
+                                            s.as_ref() as &(dyn SocketTableSource + Send + Sync)
+                                        }),
+                                        None,
+                                        None,
+                                        None,
+                                    );
+                                    view.monitor.telemetry_state =
+                                        netpulse_api::dto::TelemetryStateDto::Standby;
+                                    let _ = handle.emit("monitor-snapshot", &view.monitor);
+                                }
+                            }
+                        }
+                    }
                 }
             }
+            join_res
         }
         None => Err("no capture is running".into()),
     }
@@ -641,6 +696,7 @@ impl LiveLoopContext {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn emit_live_snapshot(
     store: &Arc<Mutex<CaptureStore>>,
     stats: &Arc<Mutex<CaptureStats>>,
@@ -648,6 +704,8 @@ pub(crate) fn emit_live_snapshot(
     correlator: &Arc<Mutex<Correlator>>,
     sockets: &Option<Arc<dyn SocketTableSource + Send + Sync>>,
     app_handle: &Option<tauri::AppHandle>,
+    capture_running: bool,
+    last_non_empty_batch: Option<std::time::Instant>,
 ) {
     if let Some(handle) = app_handle {
         let store_guard = match store.lock() {
@@ -663,18 +721,31 @@ pub(crate) fn emit_live_snapshot(
             Err(p) => *p.into_inner(),
         };
         let corr_guard = correlator.lock().ok();
+        let active_stats = if capture_running {
+            stats_guard
+        } else {
+            netpulse_capture::CaptureStats::default()
+        };
         let view = netpulse_engine::pipeline::present_window(
             &store_guard,
             depth_guard,
-            stats_guard,
+            active_stats,
             corr_guard.as_deref(),
-            sockets.as_ref().map(|s| s.as_ref() as &(dyn SocketTableSource + Send + Sync)),
+            sockets
+                .as_ref()
+                .map(|s| s.as_ref() as &(dyn SocketTableSource + Send + Sync)),
             None,
             None,
             None,
         );
+        let mut monitor = view.monitor;
+        monitor.telemetry_state = netpulse_engine::monitor::evaluate_telemetry_state(
+            capture_running,
+            last_non_empty_batch,
+            std::time::Instant::now(),
+        );
         let _ = handle.emit("feed-delta", &view.narratives);
-        let _ = handle.emit("monitor-snapshot", &view.monitor);
+        let _ = handle.emit("monitor-snapshot", &monitor);
     }
 }
 
@@ -704,6 +775,7 @@ fn live_loop(
     let mut ctx = LiveLoopContext::new(dlt, store.clone(), stats.clone(), stop.clone(), config);
     let mut latest_mono = 0u64;
     let mut last_rebuild = std::time::Instant::now();
+    let mut last_non_empty_batch: Option<std::time::Instant> = None;
 
     while !stop.load(Ordering::Relaxed) {
         let batch = match capture.next_batch() {
@@ -714,6 +786,7 @@ fn live_loop(
             if let Some(f) = batch.last() {
                 latest_mono = latest_mono.max(f.mono_nanos);
             }
+            last_non_empty_batch = Some(std::time::Instant::now());
             ctx.pipeline.ingest_batch(&batch);
         }
 
@@ -731,13 +804,31 @@ fn live_loop(
                 }
             }
 
-            emit_live_snapshot(&store, &stats, &depth, &correlator, &sockets, &app_handle);
+            emit_live_snapshot(
+                &store,
+                &stats,
+                &depth,
+                &correlator,
+                &sockets,
+                &app_handle,
+                true,
+                last_non_empty_batch,
+            );
         }
     }
 
     // Final Flush on shutdown so in-flight frames are never lost
     ctx.finish(latest_mono, capture.stats().into(), 0);
-    emit_live_snapshot(&store, &stats, &depth, &correlator, &sockets, &app_handle);
+    emit_live_snapshot(
+        &store,
+        &stats,
+        &depth,
+        &correlator,
+        &sockets,
+        &app_handle,
+        false,
+        None,
+    );
     // _completion_guard drops here, signaling done_tx
 }
 
@@ -1019,6 +1110,12 @@ fn main() {
         )
         .ok();
     }
+
+    let _http_bridge_thread = http_bridge::spawn_http_bridge(
+        Arc::new(app_state.clone()),
+        http_bridge::DEFAULT_HTTP_BRIDGE_PORT,
+        app_state.http_stop.clone(),
+    );
 
     let app = tauri::Builder::default()
         .setup(|app| {

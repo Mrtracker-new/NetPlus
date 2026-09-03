@@ -888,7 +888,10 @@ fn test_stage_probe_target_validation_and_rejection() {
     if let QueryResponse::StageProbeResult { result } = res {
         assert_eq!(result.stage, DiagnosticChainStageKindDto::Device);
         assert_eq!(result.probe_type, "LocalStackProbe");
-        assert!(result.status == StageProbeStatusDto::Success || result.status == StageProbeStatusDto::Degraded);
+        assert!(
+            result.status == StageProbeStatusDto::Success
+                || result.status == StageProbeStatusDto::Degraded
+        );
     } else {
         panic!("expected StageProbeResult");
     }
@@ -927,7 +930,11 @@ fn test_stage_probe_target_validation_and_rejection() {
     }
 
     // 3. DNS stage with missing or malformed targets must also return TargetUnavailable
-    let bad_dns_targets = [None, Some("".to_string()), Some("bad dns host!".to_string())];
+    let bad_dns_targets = [
+        None,
+        Some("".to_string()),
+        Some("bad dns host!".to_string()),
+    ];
     for target in bad_dns_targets {
         let res = execute_query(
             &state,
@@ -962,5 +969,51 @@ fn test_stage_probe_target_validation_and_rejection() {
         assert_eq!(result.status, StageProbeStatusDto::TargetUnavailable);
     } else {
         panic!("expected StageProbeResult");
+    }
+}
+
+#[test]
+fn test_monitor_snapshot_query_enforces_standby_when_capture_inactive() {
+    let state = seeded_state();
+
+    // Confirm capture is not actively running (capture is None)
+    {
+        let ctrl = state.capture.lock().unwrap();
+        assert!(ctrl.is_none());
+    }
+
+    // Execute on-demand Query::MonitorSnapshot
+    let res = execute_query(
+        &state,
+        Query::MonitorSnapshot {
+            from_mono_nanos: None,
+            to_mono_nanos: None,
+            time_range: None,
+        },
+    )
+    .unwrap();
+
+    if let QueryResponse::MonitorSnapshot { snapshot } = res {
+        // Even with store queries, telemetry_state must be Standby
+        // because capture lifecycle strictly dominates.
+        assert_eq!(
+            snapshot.telemetry_state,
+            netpulse_api::dto::TelemetryStateDto::Standby,
+            "On-demand monitor snapshot with inactive capture must return Standby"
+        );
+
+        // Verify that subsystems truthfully report Standby (not Capturing or 7 Hops Grounded)
+        let subs = &snapshot.subsystems;
+        if let Some(cap) = subs.iter().find(|s| s.name == "Capture Pipeline") {
+            assert_eq!(cap.detail, "Standby", "Capture Pipeline must be Standby when inactive");
+        }
+        if let Some(driver) = subs.iter().find(|s| s.name == "Network Driver") {
+            assert_eq!(driver.detail, "Standby", "Network Driver must be Standby when inactive");
+        }
+        if let Some(diag) = subs.iter().find(|s| s.name == "Diagnostic Engine") {
+            assert_eq!(diag.detail, "Standby", "Diagnostic Engine must be Standby when inactive and 0 flows");
+        }
+    } else {
+        panic!("expected MonitorSnapshot response");
     }
 }

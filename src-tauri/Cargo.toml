@@ -29,6 +29,7 @@ netpulse-learn = { path = "../crates/netpulse-learn" }
 netpulse-flow = { path = "../crates/netpulse-flow" }
 netpulse-capture-svc = { path = "../crates/netpulse-capture-svc" }
 directories = "6"
+httparse = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time"] }
 

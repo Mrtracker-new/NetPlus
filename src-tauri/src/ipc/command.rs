@@ -11,7 +11,17 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
                 Ok(g) => g.clone(),
                 Err(p) => p.into_inner().clone(),
             };
-            crate::emit_live_snapshot(&state.store, &state.stats, &state.depth, &state.correlator, &state.sockets, &handle);
+            let capture_running = state.capture.lock().map(|g| g.is_some()).unwrap_or(false);
+            crate::emit_live_snapshot(
+                &state.store,
+                &state.stats,
+                &state.depth,
+                &state.correlator,
+                &state.sockets,
+                &handle,
+                capture_running,
+                None,
+            );
             Ok(())
         }
         Command::StartLesson { lesson_id } => {

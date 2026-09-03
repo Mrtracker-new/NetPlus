@@ -38,8 +38,8 @@ pub use dto::{
     PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto,
     PluginTypeDto, PrivacyManifestDto, ProcessMetricDto, ProjectionDepth, RecordingSummaryDto,
     ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto,
-    StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto, ThroughputSampleDto,
-    VersionPinsDto, VisualEventDto,
+    StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto, TelemetryStateDto,
+    ThroughputSampleDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI

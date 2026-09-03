@@ -134,12 +134,24 @@ pub enum CauseDto {
     Congestion,
 }
 
+/// Telemetry freshness and capture activity state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TelemetryStateDto {
+    #[default]
+    Standby,
+    Active,
+    Stale,
+    Unavailable,
+}
+
 /// A "why is it slow?" diagnosis. `confidence_percent` is the
 /// calibrated confidence as a 0–100 integer for display; `explanation` is the
 /// ready-to-show "looks like …" text (never a verdict .
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DiagnosisDto {
     pub cause: CauseDto,
+    pub severity: SeverityDto,
     pub confidence_percent: u8,
     pub explanation: String,
     pub evidence: Vec<EvidenceRefDto>,
@@ -342,6 +354,8 @@ pub struct MonitorSnapshotDto {
     pub subsystems: Vec<SubsystemStatusDto>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub throughput_history: Vec<ThroughputSampleDto>,
+    #[serde(default)]
+    pub telemetry_state: TelemetryStateDto,
 }
 
 /// Time range selection for monitoring snapshots.
@@ -1002,11 +1016,12 @@ mod tests {
                         name: "example.com".into(),
                         source: NameSourceDto::Dns,
                     }],
-                    evidence: vec![EvidenceRefDto::Flow(2)],
+                    evidence: vec![EvidenceRefDto::Flow(1)],
                 }],
             },
             diagnoses: vec![DiagnosisDto {
                 cause: CauseDto::SlowDns,
+                severity: SeverityDto::Finding,
                 confidence_percent: 70,
                 explanation: "looks like slow DNS".into(),
                 evidence: vec![EvidenceRefDto::Flow(1)],
@@ -1035,8 +1050,8 @@ mod tests {
                 }],
             }),
             processes: vec![ProcessMetricDto {
-                pid: Some(42),
-                name: "test.exe".into(),
+                pid: Some(1234),
+                name: "browser".into(),
                 exe_path: None,
                 bytes: 1024,
                 packets: 10,
@@ -1064,6 +1079,7 @@ mod tests {
                 ingress_rate_bytes_sec: 500,
                 egress_rate_bytes_sec: 500,
             }],
+            telemetry_state: TelemetryStateDto::Active,
         });
         roundtrip(&AttributionDto {
             pid: None,
@@ -1822,6 +1838,7 @@ mod tests {
 
         let diagnoses = vec![DiagnosisDto {
             cause: CauseDto::LocalWifi,
+            severity: SeverityDto::Finding,
             confidence_percent: 85,
             explanation: "Elevated packet retransmissions observed on local Wi-Fi interface"
                 .to_string(),
@@ -1845,6 +1862,7 @@ mod tests {
             lineage,
             subsystems,
             throughput_history,
+            telemetry_state: TelemetryStateDto::Active,
         }
     }
 

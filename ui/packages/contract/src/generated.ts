@@ -33,6 +33,8 @@ export type StageProbeStatus = "success" | "degraded" | "timeout" | "target_unav
 
 export type MonitorTimeRange = "five_minutes" | "fifteen_minutes" | "one_hour" | "twenty_four_hours";
 
+export type TelemetryState = "standby" | "active" | "stale" | "unavailable";
+
 export type EvidenceRef =
   | { kind: "packet"; id: number }
   | { kind: "flow"; id: number }
@@ -67,6 +69,7 @@ export interface Breakdown {
 
 export interface Diagnosis {
   cause: Cause;
+  severity: Severity;
   confidence_percent: number;
   explanation: string;
   evidence: EvidenceRef[];
@@ -153,6 +156,7 @@ export interface MonitorSnapshot {
   lineage?: FlowLineage[];
   subsystems?: SubsystemStatus[];
   throughput_history?: ThroughputSample[];
+  telemetry_state?: TelemetryState;
 }
 
 export interface Attribution {

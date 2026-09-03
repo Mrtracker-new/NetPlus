@@ -112,6 +112,10 @@ pub fn typescript_contract() -> String {
             "twenty_four_hours",
         ],
     ));
+    s.push_str(&union(
+        "TelemetryState",
+        &["standby", "active", "stale", "unavailable"],
+    ));
 
     // --- EvidenceRef: internally-tagged union (matches #[serde(tag,content)]) ---
     s.push_str(
@@ -155,6 +159,7 @@ pub fn typescript_contract() -> String {
         "Diagnosis",
         &[
             ("cause", "Cause"),
+            ("severity", "Severity"),
             ("confidence_percent", "number"),
             ("explanation", "string"),
             ("evidence", "EvidenceRef[]"),
@@ -257,6 +262,7 @@ pub fn typescript_contract() -> String {
             ("lineage?", "FlowLineage[]"),
             ("subsystems?", "SubsystemStatus[]"),
             ("throughput_history?", "ThroughputSample[]"),
+            ("telemetry_state?", "TelemetryState"),
         ],
     ));
     s.push_str(&iface(

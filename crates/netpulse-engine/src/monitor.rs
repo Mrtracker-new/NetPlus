@@ -21,10 +21,11 @@ use std::net::IpAddr;
 
 use netpulse_api::dto::{
     EndpointClassificationDto, FlowLineageDto, ProcessMetricDto, SubsystemStatusDto,
-    ThroughputSampleDto,
+    TelemetryStateDto, ThroughputSampleDto,
 };
 use netpulse_core::net::L7Proto;
 use netpulse_core::{Confidence, EvidenceRef, Flow, HostName};
+use netpulse_narrative::Severity;
 
 /// The passively-observed `IP → names` map the host breakdown joins against
 ///Owned by the store; borrowed here read-only for the join.
@@ -138,7 +139,7 @@ fn l7_label(l7: L7Proto) -> &'static str {
 
 /// The likely cause of degradation the diagnostic classifier settles on
 ///Each is a *hypothesis*, surfaced with confidence + evidence.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum Cause {
     /// Loss/jitter across many hosts at once → likely the local link
@@ -187,6 +188,23 @@ pub struct Diagnosis {
     pub evidence: Vec<EvidenceRef>,
     /// The "looks like …" explanation, ready to show.
     pub explanation: String,
+}
+
+impl Diagnosis {
+    /// Domain severity policy:
+    /// High confidence (>= 70%) or systemic causes (LocalWifi / Congestion) are Findings.
+    /// Otherwise Notable.
+    /// This rule is authoritative domain logic and covered by exhaustive unit tests;
+    /// React must never replicate or reinterpret it.
+    pub fn severity(&self) -> Severity {
+        if self.confidence.value() >= 0.70
+            || matches!(self.cause, Cause::LocalWifi | Cause::Congestion)
+        {
+            Severity::Finding
+        } else {
+            Severity::Notable
+        }
+    }
 }
 
 /// Capture-vs-network loss, kept strictly separate. Summing
@@ -296,12 +314,14 @@ pub fn diagnose(
         });
     }
 
-    // Most-confident first; ties keep insertion order (stable sort).
+    // Deterministic ordering contract: descending calibrated confidence,
+    // with deterministic tie-breaking on cause enum order.
     out.sort_by(|a, b| {
         b.confidence
             .value()
             .partial_cmp(&a.confidence.value())
             .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.cause.cmp(&b.cause))
     });
     out
 }
@@ -425,45 +445,48 @@ pub fn build_diagnostic_chain(
     let mut stages = Vec::with_capacity(7);
 
     // 1. Device (Local Machine Stack)
-    let device_node = match capture_stats {
-        Some(cs) => {
-            let buf_pct = (cs.buffer_frames * 100)
-                .checked_div(cs.buffer_capacity)
-                .unwrap_or(0);
-            if cs.shed_stage != netpulse_capture::ShedStage::None || buf_pct > 85 {
-                DiagnosticStageNode {
-                    stage: DiagnosticChainStageKind::Device,
-                    status: DiagnosticStageStatus::Degraded,
-                    measurement_state: MeasurementState::Observed,
-                    detection_state: DetectionState::Detected,
-                    label: DiagnosticChainStageKind::Device.label().to_string(),
-                    summary: "Capture Ring Buffer Saturated".to_string(),
-                    detail: Some(format!(
-                        "Buffer utilization at {}% with load shedding active",
-                        buf_pct
-                    )),
-                    latency_ms: None,
-                    evidence: Vec::new(),
-                    causes: Vec::new(),
-                    affected_targets: Vec::new(),
-                }
-            } else {
-                DiagnosticStageNode {
-                    stage: DiagnosticChainStageKind::Device,
-                    status: DiagnosticStageStatus::Healthy,
-                    measurement_state: MeasurementState::Observed,
-                    detection_state: DetectionState::Detected,
-                    label: DiagnosticChainStageKind::Device.label().to_string(),
-                    summary: "Local Capture Pipeline Operational".to_string(),
-                    detail: Some("Buffer nominal, zero memory overrun".to_string()),
-                    latency_ms: None,
-                    evidence: Vec::new(),
-                    causes: Vec::new(),
-                    affected_targets: Vec::new(),
-                }
+    let is_capturing = capture_stats
+        .map(|cs| cs.buffer_capacity > 0 || cs.received > 0)
+        .unwrap_or(false);
+    let device_node = if is_capturing {
+        let cs = capture_stats.unwrap();
+        let buf_pct = (cs.buffer_frames * 100)
+            .checked_div(cs.buffer_capacity)
+            .unwrap_or(0);
+        if cs.shed_stage != netpulse_capture::ShedStage::None || buf_pct > 85 {
+            DiagnosticStageNode {
+                stage: DiagnosticChainStageKind::Device,
+                status: DiagnosticStageStatus::Degraded,
+                measurement_state: MeasurementState::Observed,
+                detection_state: DetectionState::Detected,
+                label: DiagnosticChainStageKind::Device.label().to_string(),
+                summary: "Capture Ring Buffer Saturated".to_string(),
+                detail: Some(format!(
+                    "Buffer utilization at {}% with load shedding active",
+                    buf_pct
+                )),
+                latency_ms: None,
+                evidence: Vec::new(),
+                causes: Vec::new(),
+                affected_targets: Vec::new(),
+            }
+        } else {
+            DiagnosticStageNode {
+                stage: DiagnosticChainStageKind::Device,
+                status: DiagnosticStageStatus::Healthy,
+                measurement_state: MeasurementState::Observed,
+                detection_state: DetectionState::Detected,
+                label: DiagnosticChainStageKind::Device.label().to_string(),
+                summary: "Local Capture Pipeline Operational".to_string(),
+                detail: Some("Buffer nominal, zero memory overrun".to_string()),
+                latency_ms: None,
+                evidence: Vec::new(),
+                causes: Vec::new(),
+                affected_targets: Vec::new(),
             }
         }
-        None => DiagnosticStageNode {
+    } else {
+        DiagnosticStageNode {
             stage: DiagnosticChainStageKind::Device,
             status: DiagnosticStageStatus::Unknown,
             measurement_state: MeasurementState::Unknown,
@@ -475,7 +498,7 @@ pub fn build_diagnostic_chain(
             evidence: Vec::new(),
             causes: Vec::new(),
             affected_targets: Vec::new(),
-        },
+        }
     };
     stages.push(device_node);
 
@@ -512,7 +535,7 @@ pub fn build_diagnostic_chain(
             causes: vec![Cause::LocalWifi],
             affected_targets: Vec::new(),
         }
-    } else if capture_stats.is_some() {
+    } else if is_capturing {
         DiagnosticStageNode {
             stage: DiagnosticChainStageKind::Interface,
             status: DiagnosticStageStatus::Healthy,
@@ -859,6 +882,7 @@ pub struct MonitorSnapshot {
     pub lineage: Vec<FlowLineageDto>,
     pub subsystems: Vec<SubsystemStatusDto>,
     pub throughput_history: Vec<ThroughputSampleDto>,
+    pub telemetry_state: TelemetryStateDto,
 }
 
 /// Classify an IP address into an endpoint category.
@@ -1119,30 +1143,27 @@ pub fn evaluate_subsystems(
     flows: &[&Flow],
     capture_stats: Option<&netpulse_capture::CaptureStats>,
     correlator: Option<&crate::attribution::Correlator>,
+    diagnostic_chain: Option<&DiagnosticChain>,
 ) -> Vec<SubsystemStatusDto> {
     let mut subsystems = Vec::new();
 
     // 1. Capture Pipeline
     let (cap_status, cap_detail) = if let Some(stats) = capture_stats {
         if stats.dropped > 0 {
-            (
-                "warning",
-                format!(
-                    "Active ({} drops recorded, stage: {:?})",
-                    stats.dropped, stats.shed_stage
-                ),
-            )
-        } else {
+            ("warning", format!("Active ({} drops)", stats.dropped))
+        } else if stats.buffer_capacity > 0 || stats.received > 0 {
             (
                 "healthy",
                 format!(
-                    "Nominal (buffer: {}/{})",
+                    "Nominal ({}/{})",
                     stats.buffer_frames, stats.buffer_capacity
                 ),
             )
+        } else {
+            ("healthy", "Standby".to_string())
         }
     } else {
-        ("healthy", "Idle / Standby".to_string())
+        ("healthy", "Standby".to_string())
     };
     subsystems.push(SubsystemStatusDto {
         name: "Capture Pipeline".to_string(),
@@ -1154,14 +1175,14 @@ pub fn evaluate_subsystems(
     subsystems.push(SubsystemStatusDto {
         name: "Storage Engine".to_string(),
         status: "healthy".to_string(),
-        detail: format!("Active ({} flows retained)", flows.len()),
+        detail: format!("Active ({} flows)", flows.len()),
     });
 
     // 3. Process Correlator
     let (corr_status, corr_detail) = if correlator.is_some() {
-        ("healthy", "OS Socket Table Sampling Active".to_string())
+        ("healthy", "Active".to_string())
     } else {
-        ("unknown", "OS Socket Table Sampling Inactive".to_string())
+        ("unknown", "Inactive".to_string())
     };
     subsystems.push(SubsystemStatusDto {
         name: "Process Correlator".to_string(),
@@ -1170,10 +1191,14 @@ pub fn evaluate_subsystems(
     });
 
     // 4. Network Adapter Driver
-    let driver_detail = if capture_stats.is_some() {
-        "Packet Driver Attached & Capturing"
+    let driver_detail = if let Some(stats) = capture_stats {
+        if stats.buffer_capacity > 0 || stats.received > 0 {
+            "Attached & Capturing"
+        } else {
+            "Standby"
+        }
     } else {
-        "Standby / Awaiting Interface Selection"
+        "Standby"
     };
     subsystems.push(SubsystemStatusDto {
         name: "Network Driver".to_string(),
@@ -1182,13 +1207,56 @@ pub fn evaluate_subsystems(
     });
 
     // 5. Diagnostic Engine
+    let diag_detail = if let Some(chain) = diagnostic_chain {
+        let grounded = chain
+            .stages
+            .iter()
+            .filter(|s| {
+                matches!(
+                    s.measurement_state,
+                    MeasurementState::Observed | MeasurementState::Inferred
+                )
+            })
+            .count();
+        if grounded == 0 {
+            "Standby".to_string()
+        } else {
+            format!("{grounded}/7 Hops Grounded")
+        }
+    } else if flows.is_empty() && capture_stats.is_none() {
+        "Standby".to_string()
+    } else {
+        "0/7 Hops Grounded".to_string()
+    };
     subsystems.push(SubsystemStatusDto {
         name: "Diagnostic Engine".to_string(),
         status: "healthy".to_string(),
-        detail: "7 Hops Verified Grounded".to_string(),
+        detail: diag_detail,
     });
 
     subsystems
+}
+
+/// Pure deterministic evaluation of telemetry freshness state.
+///
+/// Lifecycle invariant: `!capture_running => Standby`.
+/// Freshness invariant: If capture is running, telemetry is `Standby` until the first packet arrives,
+/// `Active` while the latest batch is <= 3s old, and `Stale` when > 3s have elapsed without data.
+pub fn evaluate_telemetry_state(
+    capture_running: bool,
+    last_non_empty_batch: Option<std::time::Instant>,
+    now: std::time::Instant,
+) -> TelemetryStateDto {
+    match (capture_running, last_non_empty_batch) {
+        (false, _) => TelemetryStateDto::Standby,
+        (true, None) => TelemetryStateDto::Standby,
+        (true, Some(last))
+            if now.saturating_duration_since(last) > std::time::Duration::from_secs(3) =>
+        {
+            TelemetryStateDto::Stale
+        }
+        (true, Some(_)) => TelemetryStateDto::Active,
+    }
 }
 
 /// Build a full monitoring snapshot from a window's flows, loss split, and window bounds.
@@ -1215,7 +1283,12 @@ pub fn snapshot_window(
     );
     let processes = aggregate_processes(flows, correlator, sockets);
     let lineage = aggregate_lineage(flows, names);
-    let subsystems = evaluate_subsystems(flows, capture_stats.as_ref(), correlator);
+    let subsystems = evaluate_subsystems(
+        flows,
+        capture_stats.as_ref(),
+        correlator,
+        Some(&diagnostic_chain),
+    );
     let throughput_history = bucket_throughput_series(flows, from_mono_nanos, to_mono_nanos);
 
     MonitorSnapshot {
@@ -1229,6 +1302,7 @@ pub fn snapshot_window(
         lineage,
         subsystems,
         throughput_history,
+        telemetry_state: TelemetryStateDto::Standby,
     }
 }
 
@@ -1629,12 +1703,177 @@ mod tests {
             buffer_frames: 10,
             buffer_capacity: 1000,
         };
-        let subsystems = evaluate_subsystems(&[], Some(&cs), None);
+        let subsystems = evaluate_subsystems(&[], Some(&cs), None, None);
         assert_eq!(subsystems.len(), 5);
         assert_eq!(subsystems[0].name, "Capture Pipeline");
         assert_eq!(subsystems[0].status, "healthy");
         assert!(subsystems[0].detail.contains("10/1000"));
         assert_eq!(subsystems[2].name, "Process Correlator");
         assert_eq!(subsystems[2].status, "unknown"); // None correlator passed
+        assert_eq!(subsystems[3].name, "Network Driver");
+        assert_eq!(subsystems[3].detail, "Attached & Capturing");
+
+        // When idle/standby without capture stats or flows:
+        let idle_subsystems = evaluate_subsystems(&[], None, None, None);
+        assert_eq!(idle_subsystems[0].detail, "Standby");
+        assert_eq!(idle_subsystems[3].detail, "Standby");
+        assert_eq!(idle_subsystems[4].detail, "Standby");
+    }
+
+    #[test]
+    fn diagnosis_severity_domain_policy() {
+        // Parameterized boundary tests across all Cause variants:
+        let test_confidences = [0.0, 0.10, 0.19, 0.20, 0.50, 0.69, 0.70, 0.71, 0.95, 1.0];
+
+        for &conf in &test_confidences {
+            // LocalWifi is a systemic link cause: always Finding regardless of confidence
+            let d_wifi = Diagnosis {
+                cause: Cause::LocalWifi,
+                confidence: Confidence::new(conf),
+                evidence: vec![],
+                explanation: "test".into(),
+            };
+            assert_eq!(
+                d_wifi.severity(),
+                Severity::Finding,
+                "LocalWifi at conf {} must be Finding",
+                conf
+            );
+
+            // Congestion is a systemic bottleneck cause: always Finding regardless of confidence
+            let d_cong = Diagnosis {
+                cause: Cause::Congestion,
+                confidence: Confidence::new(conf),
+                evidence: vec![],
+                explanation: "test".into(),
+            };
+            assert_eq!(
+                d_cong.severity(),
+                Severity::Finding,
+                "Congestion at conf {} must be Finding",
+                conf
+            );
+
+            // SlowDns: Notable if < 0.70, Finding if >= 0.70
+            let d_dns = Diagnosis {
+                cause: Cause::SlowDns,
+                confidence: Confidence::new(conf),
+                evidence: vec![],
+                explanation: "test".into(),
+            };
+            let expected_dns = if conf >= 0.70 {
+                Severity::Finding
+            } else {
+                Severity::Notable
+            };
+            assert_eq!(
+                d_dns.severity(),
+                expected_dns,
+                "SlowDns at conf {} must be {:?}",
+                conf,
+                expected_dns
+            );
+
+            // DistantServer: Notable if < 0.70, Finding if >= 0.70
+            let d_distant = Diagnosis {
+                cause: Cause::DistantServer,
+                confidence: Confidence::new(conf),
+                evidence: vec![],
+                explanation: "test".into(),
+            };
+            let expected_distant = if conf >= 0.70 {
+                Severity::Finding
+            } else {
+                Severity::Notable
+            };
+            assert_eq!(
+                d_distant.severity(),
+                expected_distant,
+                "DistantServer at conf {} must be {:?}",
+                conf,
+                expected_distant
+            );
+        }
+    }
+
+    #[test]
+    fn diagnose_deterministic_sorting_and_tie_breaking() {
+        let mut diagnoses = [
+            Diagnosis {
+                cause: Cause::SlowDns,
+                confidence: Confidence::new(0.70),
+                evidence: vec![],
+                explanation: "DNS".into(),
+            },
+            Diagnosis {
+                cause: Cause::LocalWifi,
+                confidence: Confidence::new(0.70),
+                evidence: vec![],
+                explanation: "WiFi".into(),
+            },
+            Diagnosis {
+                cause: Cause::DistantServer,
+                confidence: Confidence::new(0.85),
+                evidence: vec![],
+                explanation: "Distant".into(),
+            },
+        ];
+
+        diagnoses.sort_by(|a, b| {
+            b.confidence
+                .value()
+                .partial_cmp(&a.confidence.value())
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.cause.cmp(&b.cause))
+        });
+
+        // 1st: highest confidence (0.85) -> DistantServer
+        assert_eq!(diagnoses[0].cause, Cause::DistantServer);
+        // 2nd and 3rd tie at 0.70: LocalWifi (order 0) before SlowDns (order 2)
+        assert_eq!(diagnoses[1].cause, Cause::LocalWifi);
+        assert_eq!(diagnoses[2].cause, Cause::SlowDns);
+    }
+
+    #[test]
+    fn test_evaluate_telemetry_state_deterministic() {
+        use std::time::{Duration, Instant};
+
+        let now = Instant::now();
+
+        // 1. Capture stopped, no batches -> Standby
+        assert_eq!(
+            evaluate_telemetry_state(false, None, now),
+            TelemetryStateDto::Standby
+        );
+
+        // 2. Capture stopped, even with recent batch -> Standby (lifecycle dominates)
+        assert_eq!(
+            evaluate_telemetry_state(false, Some(now - Duration::from_secs(1)), now),
+            TelemetryStateDto::Standby
+        );
+
+        // 3. Capture running, awaiting initial packets -> Standby
+        assert_eq!(
+            evaluate_telemetry_state(true, None, now),
+            TelemetryStateDto::Standby
+        );
+
+        // 4. Capture running, fresh packet batch (1s ago <= 3s) -> Active
+        assert_eq!(
+            evaluate_telemetry_state(true, Some(now - Duration::from_secs(1)), now),
+            TelemetryStateDto::Active
+        );
+
+        // 5. Capture running, stalled packet stream (4s ago > 3s) -> Stale
+        assert_eq!(
+            evaluate_telemetry_state(true, Some(now - Duration::from_secs(4)), now),
+            TelemetryStateDto::Stale
+        );
+
+        // 6. Capture running, packets resumed (0s ago <= 3s) -> Active
+        assert_eq!(
+            evaluate_telemetry_state(true, Some(now), now),
+            TelemetryStateDto::Active
+        );
     }
 }

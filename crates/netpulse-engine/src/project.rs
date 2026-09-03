@@ -100,6 +100,7 @@ pub fn monitor_dto(snap: &MonitorSnapshot) -> MonitorSnapshotDto {
         lineage: snap.lineage.clone(),
         subsystems: snap.subsystems.clone(),
         throughput_history: snap.throughput_history.clone(),
+        telemetry_state: snap.telemetry_state,
     }
 }
 
@@ -224,8 +225,9 @@ fn diagnosis_dto(d: &Diagnosis) -> DiagnosisDto {
             Cause::SlowDns => CauseDto::SlowDns,
             Cause::Congestion => CauseDto::Congestion,
         },
+        severity: severity_dto(d.severity()),
         // Confidence is 0.0..=1.0; present it as a 0–100 integer for display
-        //Rounded, not truncated.
+        // Rounded, not truncated.
         confidence_percent: (d.confidence.value() * 100.0).round() as u8,
         explanation: d.explanation.clone(),
         evidence: d.evidence.iter().map(evidence_dto).collect(),
@@ -783,6 +785,7 @@ mod tests {
             lineage: Vec::new(),
             subsystems: Vec::new(),
             throughput_history: Vec::new(),
+            telemetry_state: netpulse_api::dto::TelemetryStateDto::Standby,
         };
 
         let dto = monitor_dto(&snap);

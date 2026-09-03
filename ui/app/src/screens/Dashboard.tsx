@@ -153,6 +153,8 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     navigateToRecommendation,
   } = useDashboardController();
 
+  const isLoading = loading || (monitor === null && !error);
+
   const hostRows = monitor?.by_host.rows ?? [];
   const [evidenceNotice, setEvidenceNotice] = useState<{
     message: string;
@@ -382,7 +384,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
 
       {/* 3. Dynamic KPI Cards with Micro-Sparklines & Status Badges */}
       <WidgetErrorBoundary title="KPI Metrics">
-        <KpiCards kpis={kpiViewModels} loading={loading} />
+        <KpiCards kpis={kpiViewModels} loading={isLoading} />
       </WidgetErrorBoundary>
 
       {/* 4. Live Global Traffic Map / Constellation Topology Switcher */}
@@ -465,7 +467,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
               </button>
             </div>
           </div>
-          {loading ? (
+          {isLoading ? (
             <div
               style={{
                 display: "flex",

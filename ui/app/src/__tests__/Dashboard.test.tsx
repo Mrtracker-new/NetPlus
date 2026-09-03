@@ -64,6 +64,20 @@ describe("Dashboard Screen", () => {
   });
 
   it("renders zero state KPIs when monitor snapshot is empty", () => {
+    setMonitor({
+      by_protocol: {
+        dimension: "protocol",
+        rows: [],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 0,
+    });
+
     render(<DashboardTestWrapper />);
 
     expect(screen.getByText("Hosts Observed")).toBeInTheDocument();
@@ -73,6 +87,42 @@ describe("Dashboard Screen", () => {
 
     const zeros = screen.getAllByText("0");
     expect(zeros.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("renders skeleton loading states across KPIs and visualizer when monitor is null and no error exists", () => {
+    render(<DashboardTestWrapper />);
+
+    expect(screen.getByRole("region", { name: "Loading statistics" })).toBeInTheDocument();
+    expect(screen.queryByText("Hosts Observed")).not.toBeInTheDocument();
+  });
+
+  it("transitions from skeleton loading to populated state once monitor snapshot arrives", async () => {
+    render(<DashboardTestWrapper />);
+
+    expect(screen.getByRole("region", { name: "Loading statistics" })).toBeInTheDocument();
+    expect(screen.queryByText("Hosts Observed")).not.toBeInTheDocument();
+
+    setMonitor({
+      by_protocol: {
+        dimension: "protocol",
+        rows: [{ label: "HTTPS", bytes: 1048576, flows: 4, hostnames: [], evidence: [] }],
+      },
+      by_host: {
+        dimension: "host",
+        rows: [
+          { label: "1.1.1.1", bytes: 524288, flows: 2, hostnames: [], evidence: [] },
+          { label: "8.8.8.8", bytes: 524288, flows: 2, hostnames: [], evidence: [] },
+        ],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 0,
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "Loading statistics" })).not.toBeInTheDocument();
+      expect(screen.getByText("Hosts Observed")).toBeInTheDocument();
+    });
   });
 
   it("renders populated KPI metrics when monitor snapshot is populated", () => {
@@ -746,6 +796,14 @@ describe("Dashboard Screen", () => {
     });
 
     it("Invariant 5: Missing or insufficient sparkline history renders honest NO HISTORY label", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [{ label: "HTTPS", bytes: 1000, flows: 1, hostnames: [], evidence: [] }] },
+        by_host: { dimension: "host", rows: [{ label: "1.1.1.1", bytes: 1000, flows: 1, hostnames: [], evidence: [] }] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+
       render(<DashboardTestWrapper />);
       const noHistoryLabels = screen.getAllByText("NO HISTORY");
       expect(noHistoryLabels.length).toBeGreaterThanOrEqual(1);

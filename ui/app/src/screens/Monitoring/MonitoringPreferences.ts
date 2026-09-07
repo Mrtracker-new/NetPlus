@@ -1,4 +1,5 @@
 import type { DashboardTimeRange } from "./monitoringTypes";
+import type { MonitorTimeRange } from "@netpulse/contract";
 
 export interface UserPreferences {
   timeRange: DashboardTimeRange;
@@ -25,6 +26,11 @@ export class MonitoringPreferencesManager {
 
   public getPreferences(): UserPreferences {
     return { ...this.preferences };
+  }
+
+  public reset(): void {
+    this.preferences = { ...DEFAULT_PREFERENCES };
+    this.save();
   }
 
   public setTimeRange(timeRange: DashboardTimeRange): void {
@@ -72,3 +78,21 @@ export class MonitoringPreferencesManager {
 }
 
 export const preferencesManager = new MonitoringPreferencesManager();
+
+export function toMonitorTimeRange(timeRange: DashboardTimeRange): MonitorTimeRange {
+  switch (timeRange) {
+    case "15m":
+      return "fifteen_minutes";
+    case "1h":
+      return "one_hour";
+    case "24h":
+      return "twenty_four_hours";
+    case "5m":
+    default:
+      return "five_minutes";
+  }
+}
+
+export function getActiveMonitorTimeRange(): MonitorTimeRange {
+  return toMonitorTimeRange(preferencesManager.getPreferences().timeRange);
+}

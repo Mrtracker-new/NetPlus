@@ -12,12 +12,11 @@
 //    deltas. Absent Tauri, this is simply skipped.
 
 import { useEffect } from "react";
-import type { NarrativeCard, MonitorSnapshot, ProjectionDepth, MonitorTimeRange } from "@netpulse/contract";
+import type { NarrativeCard, MonitorSnapshot, ProjectionDepth } from "@netpulse/contract";
 import { query } from "../ipc";
 import { setSnapshotBatch, pushCards, setMonitor, setError } from "./store";
 import { useDisclosure } from "../modes/DisclosureContext";
-
-import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
+import { getActiveMonitorTimeRange } from "../screens/Monitoring/MonitoringPreferences";
 
 // A calm cadence — fast enough to feel live, slow enough to stay at 60 fps
 // Event deltas cover the gaps when capture is active.
@@ -46,11 +45,7 @@ async function refresh(depth: ProjectionDepth, cancelled: () => boolean): Promis
   }
   isRefreshing = true;
 
-  const timeRangePref = preferencesManager.getPreferences().timeRange;
-  let time_range: MonitorTimeRange = "five_minutes";
-  if (timeRangePref === "15m") time_range = "fifteen_minutes";
-  else if (timeRangePref === "1h") time_range = "one_hour";
-  else if (timeRangePref === "24h") time_range = "twenty_four_hours";
+  const time_range = getActiveMonitorTimeRange();
 
   try {
     const [feedResult, monitorResult] = await Promise.allSettled([

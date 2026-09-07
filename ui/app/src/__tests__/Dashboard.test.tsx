@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { Dashboard } from "../screens/Dashboard";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-import { setFeed, setMonitor, resetSession, __resetForTest } from "../state/store";
+import { setFeed, setMonitor, setError, resetSession, __resetForTest } from "../state/store";
+import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
+import * as ipc from "../ipc";
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 function DashboardTestWrapper({
@@ -61,6 +64,7 @@ function DashboardWithNavWatcher({
 describe("Dashboard Screen", () => {
   beforeEach(() => {
     __resetForTest();
+    preferencesManager.reset();
   });
 
   it("renders zero state KPIs when monitor snapshot is empty", () => {
@@ -171,6 +175,105 @@ describe("Dashboard Screen", () => {
 
     fireEvent.click(retryBtn);
     expect(handleRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("handleRetry passes active time range preference and shows busy spinner while querying", async () => {
+    preferencesManager.setTimeRange("1h");
+
+    let resolveFeed!: (value: any) => void;
+    let resolveMonitor!: (value: any) => void;
+    const feedPromise = new Promise((resolve) => {
+      resolveFeed = resolve;
+    });
+    const monitorPromise = new Promise((resolve) => {
+      resolveMonitor = resolve;
+    });
+
+    const querySpy = vi.spyOn(ipc, "query").mockImplementation(async (q): Promise<any> => {
+      if (q.kind === "narrativeFeed") return feedPromise;
+      if (q.kind === "monitorSnapshot") return monitorPromise;
+      return null;
+    });
+
+    setError("Unable to communicate with the NetPulse engine daemon.");
+    render(<DashboardTestWrapper />);
+
+    const retryBtn = screen.getByRole("button", { name: "Retry Connection" });
+    expect(retryBtn).toBeInTheDocument();
+    expect(retryBtn).not.toHaveAttribute("aria-busy");
+    expect(retryBtn).not.toBeDisabled();
+
+    // Trigger retry
+    fireEvent.click(retryBtn);
+
+    // Verify busy state while queries are in-flight
+    expect(retryBtn).toHaveAttribute("aria-busy", "true");
+    expect(retryBtn).toBeDisabled();
+    expect(within(retryBtn).getByRole("status")).toBeInTheDocument();
+    expect(within(retryBtn).getByText("Loading…")).toBeInTheDocument();
+
+    // Verify active time range "1h" was mapped to "one_hour" and passed to monitorSnapshot query
+    expect(querySpy).toHaveBeenCalledWith({
+      kind: "monitorSnapshot",
+      time_range: "one_hour",
+    });
+    expect(querySpy).toHaveBeenCalledWith(expect.objectContaining({
+      kind: "narrativeFeed",
+    }));
+
+    // Resolve queries
+    await act(async () => {
+      resolveFeed({ kind: "narrativeFeed", cards: [] });
+      resolveMonitor({
+        kind: "monitorSnapshot",
+        snapshot: {
+          by_protocol: { dimension: "protocol", rows: [] },
+          by_host: { dimension: "host", rows: [] },
+          diagnoses: [],
+          network_loss_indicators: 0,
+          capture_drops: 0,
+        },
+      });
+    });
+
+    // Verify error banner is dismissed after successful recovery
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /Retry Connection/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("handleRetry passes updated time range preferences (e.g. 24h, 15m)", async () => {
+    preferencesManager.setTimeRange("24h");
+
+    const querySpy = vi.spyOn(ipc, "query").mockImplementation(async (q): Promise<any> => {
+      if (q.kind === "narrativeFeed") return { kind: "narrativeFeed", cards: [] };
+      if (q.kind === "monitorSnapshot") {
+        return {
+          kind: "monitorSnapshot",
+          snapshot: {
+            by_protocol: { dimension: "protocol", rows: [] },
+            by_host: { dimension: "host", rows: [] },
+            diagnoses: [],
+            network_loss_indicators: 0,
+            capture_drops: 0,
+          },
+        };
+      }
+      return null;
+    });
+
+    setError("Unable to communicate with the NetPulse engine daemon.");
+    render(<DashboardTestWrapper />);
+
+    const retryBtn = screen.getByRole("button", { name: "Retry Connection" });
+    await act(async () => {
+      fireEvent.click(retryBtn);
+    });
+
+    expect(querySpy).toHaveBeenCalledWith({
+      kind: "monitorSnapshot",
+      time_range: "twenty_four_hours",
+    });
   });
 
   it("renders narrative cards and evidence navigation chips", () => {

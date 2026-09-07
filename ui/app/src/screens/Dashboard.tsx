@@ -1,7 +1,7 @@
 import { Component, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { NarrativeCard, Severity, EvidenceRef } from "@netpulse/contract";
-import { EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
+import { Button, EmptyState, EvidenceChips, Notice, Skeleton } from "@netpulse/components";
 import { Constellation, GlobalTrafficMap, type SelectedEntity } from "@netpulse/viz";
 
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
@@ -16,6 +16,7 @@ import { NarrativeFilterBar } from "./Dashboard/NarrativeFilterBar";
 import { KpiCards } from "./Dashboard/KpiCards";
 import { CardExplainBox } from "./Dashboard/CardExplainBox";
 import { DiagnosticChainStrip } from "./Dashboard/DiagnosticChainStrip";
+import { getActiveMonitorTimeRange } from "./Monitoring/MonitoringPreferences";
 import { Icon } from "../icons";
 
 export class WidgetErrorBoundary extends Component<
@@ -160,11 +161,16 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     message: string;
     ref?: EvidenceRef;
   } | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const isRetryingRef = useRef(false);
+  const isMountedRef = useRef(true);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (noticeTimerRef.current) {
         clearTimeout(noticeTimerRef.current);
       }
@@ -290,26 +296,34 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
     [navigateToEvidence]
   );
 
-  const handleRetry = useCallback(() => {
-    if (onRetry) {
-      onRetry();
-    } else {
-      Promise.all([
-        query({ kind: "narrativeFeed", depth }),
-        query({ kind: "monitorSnapshot" }),
-      ])
-        .then(([feedRes, monRes]) => {
-          const cards = feedRes.kind === "narrativeFeed" ? feedRes.cards : null;
-          const snapshot = monRes.kind === "monitorSnapshot" ? monRes.snapshot : null;
-          if (cards != null || snapshot != null) {
-            setSnapshotBatch(cards, snapshot, null);
-          } else {
-            setError(null);
-          }
-        })
-        .catch((e) => {
-          setError(String(e));
-        });
+  const handleRetry = useCallback(async () => {
+    if (isRetryingRef.current) return;
+    isRetryingRef.current = true;
+    setIsRetrying(true);
+    try {
+      if (onRetry) {
+        await onRetry();
+      } else {
+        const time_range = getActiveMonitorTimeRange();
+        const [feedRes, monRes] = await Promise.all([
+          query({ kind: "narrativeFeed", depth }),
+          query({ kind: "monitorSnapshot", time_range }),
+        ]);
+        const cards = feedRes.kind === "narrativeFeed" ? feedRes.cards : null;
+        const snapshot = monRes.kind === "monitorSnapshot" ? monRes.snapshot : null;
+        if (cards != null || snapshot != null) {
+          setSnapshotBatch(cards, snapshot, null);
+        } else {
+          setError(null);
+        }
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      isRetryingRef.current = false;
+      if (isMountedRef.current) {
+        setIsRetrying(false);
+      }
     }
   }, [onRetry, depth]);
 
@@ -374,9 +388,15 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                 <strong>{t("error_backend_disconnected_title")}:</strong>{" "}
                 {error || t("error_backend_disconnected_desc")}
               </div>
-              <button type="button" className="np-btn np-btn--ghost" onClick={handleRetry}>
+              <Button
+                type="button"
+                variant="ghost"
+                busy={isRetrying}
+                disabled={isRetrying}
+                onClick={handleRetry}
+              >
                 {t("retry_connection")}
-              </button>
+              </Button>
             </div>
           </Notice>
         </div>

@@ -1105,6 +1105,56 @@ describe("Dashboard Screen", () => {
       expect(closedCtas).toHaveLength(1);
     });
 
+    it("Invariant 14b: CardExplainBox inline drawers render unique IDs and matching aria-controls on multi-card expansion", () => {
+      setFeed([
+        {
+          at_mono_nanos: 10_000_000,
+          severity: "finding",
+          headline: "Cleartext Protocol Detected",
+          summary: "Unencrypted traffic observed on port 80.",
+          lines: ["Observed GET request without TLS"],
+          evidence: [{ kind: "flow", id: 42 }],
+        },
+        {
+          at_mono_nanos: 20_000_000,
+          severity: "notable",
+          headline: "DNS Latency Spike",
+          summary: "DNS queries exceeding latency threshold.",
+          lines: ["Observed slow response from resolver"],
+          evidence: [{ kind: "flow", id: 43 }],
+        },
+      ]);
+
+      render(<DashboardTestWrapper />);
+
+      // Open Explain box on both cards
+      const explainBtn1 = screen.getByRole("button", { name: /Explain Cleartext Protocol Detected/i });
+      fireEvent.click(explainBtn1);
+      const explainBtn2 = screen.getByRole("button", { name: /Explain DNS Latency Spike/i });
+      fireEvent.click(explainBtn2);
+
+      // Open Quick Peek drawer on both cards
+      const quickPeekBtns = screen.getAllByRole("button", { name: /Quick Peek Drawer/i });
+      expect(quickPeekBtns).toHaveLength(2);
+      fireEvent.click(quickPeekBtns[0]!);
+      fireEvent.click(quickPeekBtns[1]!);
+
+      // Verify both drawers are open simultaneously
+      const drawers = screen.getAllByRole("region", { name: "Quick Peek Technical Evidence" });
+      expect(drawers).toHaveLength(2);
+
+      // Verify each drawer has a unique ID matching card-inline-drawer-${card.at_mono_nanos}
+      expect(drawers[0]!.id).toBe("card-inline-drawer-10000000");
+      expect(drawers[1]!.id).toBe("card-inline-drawer-20000000");
+      expect(drawers[0]!.id).not.toBe(drawers[1]!.id);
+
+      // Verify the toggle buttons have matching aria-controls pointing to the unique drawer IDs
+      const hideBtns = screen.getAllByRole("button", { name: /Hide Quick Peek Drawer/i });
+      expect(hideBtns).toHaveLength(2);
+      expect(hideBtns[0]!).toHaveAttribute("aria-controls", "card-inline-drawer-10000000");
+      expect(hideBtns[1]!).toHaveAttribute("aria-controls", "card-inline-drawer-20000000");
+    });
+
     it("Invariant 15: Telemetry rates strictly honor the full 4-state contract (Active, Stale, Standby, Unavailable)", () => {
       // 1. Active: Displays measured numeric rate
       setMonitor({

@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useId } from "react";
 import type { NarrativeCard, EvidenceRef } from "@netpulse/contract";
 import { formatEvidenceLabel } from "@netpulse/components";
 import { Icon } from "../../icons";
@@ -15,6 +15,10 @@ export const CardExplainBox = memo(function CardExplainBox({
   onClose,
 }: CardExplainBoxProps) {
   const [showInlineDrawer, setShowInlineDrawer] = useState(false);
+  const reactId = useId();
+  const drawerId = card.at_mono_nanos != null
+    ? `card-inline-drawer-${card.at_mono_nanos}`
+    : `card-inline-drawer-${reactId}`;
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -134,7 +138,7 @@ export const CardExplainBox = memo(function CardExplainBox({
 
       {/* Complete In-Card Quick Peek Drawer */}
       {showInlineDrawer && evidenceRef && (
-        <div id="card-inline-drawer" className="np-inline-drawer" role="region" aria-label="Quick Peek Technical Evidence">
+        <div id={drawerId} className="np-inline-drawer" role="region" aria-label="Quick Peek Technical Evidence">
           <div className="np-inline-drawer__header">
             <span className="np-evidence np-evidence--static">{label}</span>
             <span className="np-inline-drawer__title">Quick Peek Technical Evidence</span>
@@ -228,7 +232,7 @@ export const CardExplainBox = memo(function CardExplainBox({
             className={`np-btn np-btn--sm ${showInlineDrawer ? "np-btn--primary" : "np-btn--ghost"}`}
             onClick={() => setShowInlineDrawer(!showInlineDrawer)}
             aria-expanded={showInlineDrawer}
-            aria-controls="card-inline-drawer"
+            aria-controls={drawerId}
             style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
           >
             <Icon name="search" style={{ width: "12px", height: "12px" }} />

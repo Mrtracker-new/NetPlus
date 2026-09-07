@@ -328,13 +328,13 @@ export function useDashboardController() {
         tooltipRows: [
           { label: "Current", value: `${hosts} endpoints` },
           { label: "Peak", value: `${Math.max(...sparklineHosts, hosts)} endpoints` },
-          { label: "Scope", value: "Local & remote hosts" },
+          { label: "Scope", value: "Observed destination endpoints" },
           { label: "Trend", value: hosts > 0 ? "Observed" : "Standby" },
         ],
         tooltip: {
           peak: `${Math.max(...sparklineHosts, hosts)} hosts`,
           avg: `${hosts} active`,
-          percentile: "Local and remote hosts",
+          percentile: "Observed destination endpoints",
           trend: hosts > 0 ? "Observed" : "Standby",
         },
       },

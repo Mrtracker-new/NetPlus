@@ -1379,6 +1379,13 @@ describe("Dashboard Screen", () => {
 
       // Verify that "Avg: X total" is NOT in the tooltip
       expect(tooltip!.textContent).not.toMatch(/Avg:.*total/i);
+
+      // Hosts card tooltip truthful scope
+      const hostsTooltip = document.getElementById("kpi-tooltip-hosts");
+      expect(hostsTooltip).toBeInTheDocument();
+      expect(within(hostsTooltip!).getByText("Scope:")).toBeInTheDocument();
+      expect(within(hostsTooltip!).getByText("Observed destination endpoints")).toBeInTheDocument();
+      expect(hostsTooltip!.textContent).not.toMatch(/local.*remote/i);
     });
 
     it("Invariant 17: When telemetry_state is standby, Hero card displays idle Standby and visualizer badge is quiet STANDBY without pulsing", () => {

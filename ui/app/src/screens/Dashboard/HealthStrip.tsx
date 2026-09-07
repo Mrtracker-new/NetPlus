@@ -1,22 +1,24 @@
 import { memo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import type { HealthViewModel } from "./viewModels";
 
 interface HealthStripProps {
   health: HealthViewModel;
 }
 
-function compactName(name: string): string {
+function compactName(name: string, t: TFunction): string {
   switch (name) {
     case "Capture Pipeline":
-      return "Capture";
+      return t("health.capture", "Capture");
     case "Storage Engine":
-      return "Storage";
+      return t("health.storage", "Storage");
     case "Process Correlator":
-      return "Correlator";
+      return t("health.correlator", "Correlator");
     case "Network Driver":
-      return "Driver";
+      return t("health.driver", "Driver");
     case "Diagnostic Engine":
-      return "Diagnostics";
+      return t("health.diagnostics", "Diagnostics");
     default:
       return name;
   }
@@ -75,15 +77,16 @@ function compactDetail(detail: string): string {
 // ARCHITECTURAL INVARIANT: capture_drops is displayed strictly as an independent
 // authoritative observation, and MUST NOT modify, override, or reinterpret SubsystemStatus.status.
 export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProps) {
+  const { t } = useTranslation("dashboard");
   const subsystems = health.subsystems ?? [];
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
 
   const dropsTooltipId = "health-tooltip-drops";
-  const dropsDescription = "Kernel / Buffer Packet Drop Count";
+  const dropsDescription = t("health.drops_desc", "Kernel / Buffer Packet Drop Count");
   const isDropsActive = activeTooltipId === dropsTooltipId;
 
   return (
-    <div className="np-health-strip" role="region" aria-label="System Health Telemetry">
+    <div className="np-health-strip" role="region" aria-label={t("health.system_health", "System Health Telemetry")}>
       {subsystems.map((sub, idx) => {
         const isHealthy = sub.status === "healthy";
         const isWarning = sub.status === "warning";
@@ -103,7 +106,7 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
           ? "np-health-strip__val np-health-strip__val--warning"
           : "np-health-strip__val np-health-strip__val--degraded";
 
-        const displayName = compactName(sub.name);
+        const displayName = compactName(sub.name, t);
         const displayDetail = compactDetail(sub.detail);
         const slug = slugify(sub.name);
         const tooltipId = `health-tooltip-${slug}`;
@@ -163,7 +166,7 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
           }
         }}
       >
-        <span className="np-health-strip__label">Drops:</span>
+        <span className="np-health-strip__label">{t("health.drops", "Drops")}:</span>
         <span className={health.drops > 0 ? "np-health-strip__val np-health-strip__val--numeric" : "np-health-strip__val"}>
           {health.drops}
         </span>

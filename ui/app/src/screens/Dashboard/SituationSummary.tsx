@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import type { EvidenceRef } from "@netpulse/contract";
 import type { HeroViewModel, SituationSummaryModel, NarrativeCategory, RecommendationItem } from "./viewModels";
 
@@ -17,6 +18,7 @@ export const SituationSummary = memo(function SituationSummary({
   onNavigateToEvidence,
   onRecommendationClick,
 }: SituationSummaryProps) {
+  const { t } = useTranslation("dashboard");
   const rec = summary.recommendations[0];
   const recText = rec?.text ?? "";
   const recClass =
@@ -43,8 +45,12 @@ export const SituationSummary = memo(function SituationSummary({
     }
   };
 
+  const recPrefix = t("recommendation_prefix", "Recommendation:");
+  const actPrefix = t("action_prefix", "Action:");
+  const statPrefix = t("status_prefix", "Status:");
+
   return (
-    <section className={`np-situation-card np-situation-card--${hero.state}`} aria-label="Situation Summary">
+    <section className={`np-situation-card np-situation-card--${hero.state}`} aria-label={t("situation_summary", "Situation Summary")}>
       <div className="np-situation-card__top">
         <div className="np-situation-card__title-group">
           <span className={`np-badge np-badge--${hero.state}`}>
@@ -60,22 +66,22 @@ export const SituationSummary = memo(function SituationSummary({
                 type="button"
                 className={`np-rec-tag ${recClass} np-rec-btn`}
                 onClick={handleRecClick}
-                aria-label={`Recommendation: ${rec.text}`}
+                aria-label={`${recPrefix} ${rec.text}`}
               >
-                <span className="np-rec-tag__prefix">Recommendation:</span> {rec.text}
+                <span className="np-rec-tag__prefix">{recPrefix}</span> {rec.text}
               </button>
             ) : rec.type === "monitor" ? (
               <button
                 type="button"
                 className={`np-rec-tag ${recClass} np-rec-btn`}
                 onClick={handleRecClick}
-                aria-label={`Action: ${rec.text}`}
+                aria-label={`${actPrefix} ${rec.text}`}
               >
-                <span className="np-rec-tag__prefix">Action:</span> {rec.text}
+                <span className="np-rec-tag__prefix">{actPrefix}</span> {rec.text}
               </button>
             ) : (
               <span className={`np-rec-tag ${recClass}`} role="status">
-                <span className="np-rec-tag__prefix">Status:</span> {rec.text}
+                <span className="np-rec-tag__prefix">{statPrefix}</span> {rec.text}
               </span>
             )}
           </div>

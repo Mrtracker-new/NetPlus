@@ -1,4 +1,5 @@
 import { memo, useState, useEffect, useId } from "react";
+import { useTranslation } from "react-i18next";
 import type { NarrativeCard, EvidenceRef } from "@netpulse/contract";
 import { formatEvidenceLabel } from "@netpulse/components";
 import { Icon } from "../../icons";
@@ -14,6 +15,7 @@ export const CardExplainBox = memo(function CardExplainBox({
   onNavigateToScreen,
   onClose,
 }: CardExplainBoxProps) {
+  const { t } = useTranslation("dashboard");
   const [showInlineDrawer, setShowInlineDrawer] = useState(false);
   const reactId = useId();
   const drawerId = card.at_mono_nanos != null
@@ -72,21 +74,21 @@ export const CardExplainBox = memo(function CardExplainBox({
   }
 
   // Grounded explanations based on authoritative protocol/category and severity
-  let whyText = "This card represents observed passive network telemetry on your local adapter.";
-  let actionText = "No immediate action required. NetPulse continues listening passively.";
+  let whyText = t("explanations.default_why", "This card represents observed passive network telemetry on your local adapter.");
+  let actionText = t("explanations.default_action", "No immediate action required. NetPulse continues listening passively.");
 
   if (isDns) {
-    whyText = "DNS queries resolve domain names (like github.com) to IP addresses. Higher latency usually happens when your configured DNS server responds slowly or over a congested Wi-Fi link.";
-    actionText = "If web pages load slowly, consider switching to a fast DNS resolver (like 1.1.1.1 or 8.8.8.8) or run a diagnostic test in the Diagnostics tab.";
+    whyText = t("explanations.dns_why", "DNS queries resolve domain names (like github.com) to IP addresses. Higher latency usually happens when your configured DNS server responds slowly or over a congested Wi-Fi link.");
+    actionText = t("explanations.dns_action", "If web pages load slowly, consider switching to a fast DNS resolver (like 1.1.1.1 or 8.8.8.8) or run a diagnostic test in the Diagnostics tab.");
   } else if (isTls || isQuic) {
-    whyText = "TLS handshakes establish encrypted connections to remote web servers. Spikes in TLS traffic indicate secure web browsing, streaming, or API requests.";
-    actionText = "Your connection is encrypted and private. No action needed.";
+    whyText = t("explanations.tls_why", "TLS handshakes establish encrypted connections to remote web servers. Spikes in TLS traffic indicate secure web browsing, streaming, or API requests.");
+    actionText = t("explanations.tls_action", "Your connection is encrypted and private. No action needed.");
   } else if (card.severity === "finding" || cat === "security") {
-    whyText = "This finding was flagged because the network behavior deviated from typical local baselines (e.g., unexpected ports, retry bursts, or protocol anomalies).";
-    actionText = "Review the process owning this flow in the Apps tab, or inspect raw packet headers below.";
+    whyText = t("explanations.finding_why", "This finding was flagged because the network behavior deviated from typical local baselines (e.g., unexpected ports, retry bursts, or protocol anomalies).");
+    actionText = t("explanations.finding_action", "Review the process owning this flow in the Apps tab, or inspect raw packet headers below.");
   } else if (card.severity === "notable") {
-    whyText = "This notable event recorded a transient change in throughput, host connectivity, or response timing.";
-    actionText = "Monitor your active connections if performance degrades.";
+    whyText = t("explanations.notable_why", "This notable event recorded a transient change in throughput, host connectivity, or response timing.");
+    actionText = t("explanations.notable_action", "Monitor your active connections if performance degrades.");
   }
 
   const protocolLabel = isDns
@@ -119,39 +121,39 @@ export const CardExplainBox = memo(function CardExplainBox({
       <div className="np-explain-box__header">
         <span className="np-explain-box__tag" style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}>
           <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
-          Explanation
+          {t("explanation", "Explanation")}
         </span>
         <button
           type="button"
           className="np-explain-box__close"
           onClick={onClose}
-          aria-label="Close explanation"
+          aria-label={t("close_explanation", "Close explanation")}
         >
           <Icon name="close" style={{ width: "14px", height: "14px" }} />
         </button>
       </div>
 
       <div className="np-explain-box__section">
-        <h4 className="np-explain-box__label">Why is this happening?</h4>
+        <h4 className="np-explain-box__label">{t("why_is_this_happening", "Why is this happening?")}</h4>
         <p className="np-explain-box__text">{whyText}</p>
       </div>
 
       <div className="np-explain-box__section">
-        <h4 className="np-explain-box__label">What should I do?</h4>
+        <h4 className="np-explain-box__label">{t("what_should_i_do", "What should I do?")}</h4>
         <p className="np-explain-box__text">{actionText}</p>
       </div>
 
       {/* Complete In-Card Quick Peek Drawer */}
       {showInlineDrawer && evidenceRef && (
-        <div id={drawerId} className="np-inline-drawer" role="region" aria-label="Quick Peek Technical Evidence">
+        <div id={drawerId} className="np-inline-drawer" role="region" aria-label={t("quick_peek_title", "Quick Peek Technical Evidence")}>
           <div className="np-inline-drawer__header">
             <span className="np-evidence np-evidence--static">{label}</span>
-            <span className="np-inline-drawer__title">Quick Peek Technical Evidence</span>
+            <span className="np-inline-drawer__title">{t("quick_peek_title", "Quick Peek Technical Evidence")}</span>
             <button
               type="button"
               className="np-inline-drawer__close"
               onClick={() => setShowInlineDrawer(false)}
-              aria-label="Close technical drawer"
+              aria-label={t("close_technical_drawer", "Close technical drawer")}
             >
               <Icon name="close" style={{ width: "14px", height: "14px" }} />
             </button>
@@ -159,7 +161,7 @@ export const CardExplainBox = memo(function CardExplainBox({
 
           <div className="np-inline-drawer__grid">
             <div className="np-inline-drawer__col">
-              <h5 className="np-inline-drawer__sub">Observation Grounding</h5>
+              <h5 className="np-inline-drawer__sub">{t("observation_grounding", "Observation Grounding")}</h5>
               <div
                 className="np-direct-observation-badge"
                 style={{
@@ -170,7 +172,7 @@ export const CardExplainBox = memo(function CardExplainBox({
                 }}
               >
                 <span className="np-badge np-badge--healthy" style={{ fontSize: "0.75rem" }}>
-                  ● Direct Observation
+                  {t("direct_observation", "● Direct Observation")}
                 </span>
                 <p
                   style={{
@@ -180,13 +182,13 @@ export const CardExplainBox = memo(function CardExplainBox({
                     lineHeight: 1.3,
                   }}
                 >
-                  Direct wire capture. Telemetry grounded in reconstructed packet and flow headers.
+                  {t("direct_observation_desc", "Direct wire capture. Telemetry grounded in reconstructed packet and flow headers.")}
                 </p>
               </div>
             </div>
 
             <div className="np-inline-drawer__col">
-              <h5 className="np-inline-drawer__sub">Protocol Context</h5>
+              <h5 className="np-inline-drawer__sub">{t("protocol_context", "Protocol Context")}</h5>
               <ul className="np-inline-drawer__list">
                 <li><span>Kind:</span> <strong>{evidenceRef.kind}</strong></li>
                 <li><span>ID:</span> <code>#{evidenceRef.id}</code></li>
@@ -199,7 +201,7 @@ export const CardExplainBox = memo(function CardExplainBox({
 
           {card.lines.length > 0 && (
             <div className="np-inline-drawer__section">
-              <h5 className="np-inline-drawer__sub">Telemetry Observables</h5>
+              <h5 className="np-inline-drawer__sub">{t("telemetry_observables", "Telemetry Observables")}</h5>
               <ul className="np-inline-drawer__observables">
                 {card.lines.map((line, idx) => (
                   <li key={idx}>• {line}</li>
@@ -209,7 +211,7 @@ export const CardExplainBox = memo(function CardExplainBox({
           )}
 
           <div className="np-inline-drawer__section">
-            <h5 className="np-inline-drawer__sub">Payload Policy & Telemetry Status</h5>
+            <h5 className="np-inline-drawer__sub">{t("payload_policy_title", "Payload Policy & Telemetry Status")}</h5>
             <div className="np-explain-box__payload-notice" style={{ padding: "0.75rem", background: "var(--np-surface-2, rgba(255,255,255,0.03))", borderRadius: "var(--np-radius-sm, 6px)", fontSize: "0.8rem", color: "var(--np-text-mute, #a0aec0)" }}>
               <div><strong>Policy:</strong> Metadata-Only Capture (Payload bytes omitted by design for zero-leak privacy)</div>
               <div style={{ marginTop: "0.25rem" }}><strong>Evidence Handle:</strong> {evidenceRef.kind} #{evidenceRef.id} (Monotonic Time: {card.at_mono_nanos ? `${(card.at_mono_nanos / 1_000_000_000).toFixed(3)}s` : "live"})</div>
@@ -223,7 +225,7 @@ export const CardExplainBox = memo(function CardExplainBox({
                 className="np-btn np-btn--primary np-btn--sm"
                 onClick={() => onNavigateToScreen(evidenceRef)}
               >
-                Inspect Technical Evidence →
+                {t("inspect_technical_evidence", "Inspect Technical Evidence →")}
               </button>
             )}
           </div>
@@ -241,7 +243,7 @@ export const CardExplainBox = memo(function CardExplainBox({
             style={{ display: "inline-flex", alignItems: "center", gap: "0.35rem" }}
           >
             <Icon name="search" style={{ width: "12px", height: "12px" }} />
-            {showInlineDrawer ? "Hide Quick Peek Drawer" : "Quick Peek Drawer"}
+            {showInlineDrawer ? t("hide_quick_peek", "Hide Quick Peek Drawer") : t("quick_peek_drawer", "Quick Peek Drawer")}
           </button>
         )}
         {!showInlineDrawer && onNavigateToScreen && evidenceRef && (
@@ -250,7 +252,7 @@ export const CardExplainBox = memo(function CardExplainBox({
             className="np-btn np-btn--primary np-btn--sm"
             onClick={() => onNavigateToScreen(evidenceRef)}
           >
-            Inspect Technical Evidence →
+            {t("inspect_technical_evidence", "Inspect Technical Evidence →")}
           </button>
         )}
       </div>

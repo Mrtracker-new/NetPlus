@@ -72,6 +72,7 @@ interface CardProps {
 }
 
 function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
+  const { t } = useTranslation("dashboard");
   const [showExplain, setShowExplain] = useState(false);
 
   const handleCardNavigate = useCallback(
@@ -112,9 +113,9 @@ function Card({ card, onNavigate, onNavigateToScreen }: CardProps) {
           className={`np-btn np-btn--sm ${showExplain ? "np-btn--primary" : "np-btn--ghost"}`}
           onClick={() => setShowExplain(!showExplain)}
           aria-expanded={showExplain}
-          aria-label={`Explain ${card.headline}`}
+          aria-label={t("explain_headline", { headline: card.headline, defaultValue: `Explain ${card.headline}` })}
         >
-          {showExplain ? "Hide Explanation" : "Explain"}
+          {showExplain ? t("hide_explanation", "Hide Explanation") : t("explain", "Explain")}
         </button>
       </footer>
     </article>
@@ -224,7 +225,11 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
           clearTimeout(noticeTimerRef.current);
         }
         setEvidenceNotice({
-          message: `Evidence ${ref.kind === "flow" ? "flow" : ref.kind} #${ref.id} is outside the active visible feed window.`,
+          message: t("evidence_outside_feed", {
+            kind: ref.kind === "flow" ? "flow" : ref.kind,
+            id: ref.id,
+            defaultValue: `Evidence ${ref.kind === "flow" ? "flow" : ref.kind} #${ref.id} is outside the active visible feed window.`,
+          }),
           ref,
         });
         noticeTimerRef.current = setTimeout(() => {
@@ -233,7 +238,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         }, 6000);
       }
     },
-    [feed, category, dispatchEvent, dismissEvidenceNotice]
+    [feed, category, dispatchEvent, dismissEvidenceNotice, t]
   );
 
   const handleRecommendationClick = useCallback(
@@ -263,7 +268,11 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
           clearTimeout(noticeTimerRef.current);
         }
         setEvidenceNotice({
-          message: `Evidence ${rec.evidenceRef.kind === "flow" ? "flow" : rec.evidenceRef.kind} #${rec.evidenceRef.id} is outside the active visible feed window.`,
+          message: t("evidence_outside_feed", {
+            kind: rec.evidenceRef.kind === "flow" ? "flow" : rec.evidenceRef.kind,
+            id: rec.evidenceRef.id,
+            defaultValue: `Evidence ${rec.evidenceRef.kind === "flow" ? "flow" : rec.evidenceRef.kind} #${rec.evidenceRef.id} is outside the active visible feed window.`,
+          }),
           ref: rec.evidenceRef,
         });
         noticeTimerRef.current = setTimeout(() => {
@@ -272,7 +281,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
         }, 6000);
       }
     },
-    [navigateToRecommendation, dismissEvidenceNotice]
+    [navigateToRecommendation, dismissEvidenceNotice, t]
   );
 
   const handleNoticeNavigate = useCallback(() => {
@@ -328,7 +337,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
   }, [onRetry, depth]);
 
   return (
-    <section className="np-dash" aria-label="Network Dashboard">
+    <section className="np-dash" aria-label={t("title", "Network Dashboard")}>
       {/* 1. Capture & System Health Telemetry Strip */}
       <WidgetErrorBoundary title="System Health">
         <HealthStrip health={healthViewModel} />
@@ -364,7 +373,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                     className="np-btn np-btn--primary np-btn--sm"
                     onClick={handleNoticeNavigate}
                   >
-                    View in Apps / Timeline →
+                    {t("view_in_apps_timeline", "View in Apps / Timeline →")}
                   </button>
                 )}
                 <button
@@ -372,7 +381,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                   className="np-btn np-btn--ghost np-btn--sm"
                   onClick={dismissEvidenceNotice}
                 >
-                  Dismiss
+                  {t("common:actions.dismiss", "Dismiss")}
                 </button>
               </div>
             </div>
@@ -413,24 +422,24 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
           <div className="np-dash__section-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "var(--np-2)" }}>
               <h2 id="dashboard-live-title" className="np-dash__section-title">
-                {vizMode === "map" ? "Global Traffic Map" : t("live_traffic")}
+                {vizMode === "map" ? t("global_traffic_map", "Global Traffic Map") : t("live_traffic")}
               </h2>
               {telemetryState === "standby" ? (
                 <span className="np-telemetry-badge np-telemetry-badge--standby np-telemetry-badge--quiet" aria-label="Telemetry Standby">
-                  <span>STANDBY</span>
+                  <span>{t("telemetry_state.standby", "STANDBY")}</span>
                 </span>
               ) : telemetryState === "stale" ? (
                 <span className="np-telemetry-badge np-telemetry-badge--stale" aria-label="Telemetry Stale">
-                  <span>STALE</span>
+                  <span>{t("telemetry_state.stale", "STALE")}</span>
                 </span>
               ) : telemetryState === "unavailable" ? (
                 <span className="np-telemetry-badge np-telemetry-badge--unavailable np-telemetry-badge--quiet" aria-label="Telemetry Unavailable">
-                  <span>UNAVAILABLE</span>
+                  <span>{t("telemetry_state.unavailable", "UNAVAILABLE")}</span>
                 </span>
               ) : (
                 <span className="np-telemetry-badge np-telemetry-badge--active" aria-label="Live Telemetry Active">
                   <span className="np-pulse-dot" aria-hidden="true" />
-                  <span>LIVE TELEMETRY</span>
+                  <span>{t("telemetry_state.live", "LIVE TELEMETRY")}</span>
                 </span>
               )}
             </div>
@@ -457,7 +466,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                   <line x1="2" y1="12" x2="22" y2="12" />
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
                 </svg>
-                <span>GLOBAL MAP</span>
+                <span>{t("viz_mode.map", "GLOBAL MAP")}</span>
               </button>
               <button
                 type="button"
@@ -483,7 +492,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                   <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
                   <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
                 </svg>
-                <span>TOPOLOGY</span>
+                <span>{t("viz_mode.topology", "TOPOLOGY")}</span>
               </button>
             </div>
           </div>
@@ -553,11 +562,11 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
           ) : filteredNarratives.length === 0 ? (
             <EmptyState
               compact
-              title={search || category !== "all" ? "No Matching Narratives" : t("no_traffic")}
+              title={search || category !== "all" ? t("no_matching_narratives", "No Matching Narratives") : t("no_traffic")}
               description={
                 search || category !== "all"
-                  ? "No narrative items match your search or filter criteria."
-                  : "Start packet capture or select an active network adapter in the header bar to observe real-time network activity."
+                  ? t("no_matching_narratives_desc", "No narrative items match your search or filter criteria.")
+                  : t("no_traffic_desc", "Start packet capture or select an active network adapter in the header bar to observe real-time network activity.")
               }
               action={
                 (search || category !== "all") ? (
@@ -569,7 +578,7 @@ export function Dashboard({ loading = false, error: propsError = null, onRetry }
                       dispatchEvent({ type: "SET_SEARCH", search: "" });
                     }}
                   >
-                    Reset Filters
+                    {t("reset_filters", "Reset Filters")}
                   </button>
                 ) : undefined
               }

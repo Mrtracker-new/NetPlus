@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import type { NarrativeCard } from "@netpulse/contract";
 import { useStore } from "../../state/store";
 import { useDisclosure } from "../../modes/DisclosureContext";
@@ -131,6 +132,7 @@ export function cardMatchesCategory(card: NarrativeCard, category: NarrativeCate
 }
 
 export function useDashboardController() {
+  const { t } = useTranslation("dashboard");
   const { monitor, feed, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
   const { depth, shows } = useDisclosure();
   const sidebar = useOptionalSidebar();
@@ -153,7 +155,7 @@ export function useDashboardController() {
     if (situationSummaryModel.overallHealth === "finding") {
       return {
         state: "finding",
-        badgeText: "Attention",
+        badgeText: t("badge_attention", "Attention"),
         title: situationSummaryModel.headline,
         subtitle: situationSummaryModel.explanation,
       };
@@ -162,7 +164,7 @@ export function useDashboardController() {
     if (situationSummaryModel.overallHealth === "notable") {
       return {
         state: "spike",
-        badgeText: "Notable",
+        badgeText: t("badge_notable", "Notable"),
         title: situationSummaryModel.headline,
         subtitle: situationSummaryModel.explanation,
       };
@@ -172,19 +174,19 @@ export function useDashboardController() {
     if (isStandby) {
       return {
         state: "idle",
-        badgeText: "Standby",
-        title: "Passive Capture Standby",
-        subtitle: "Start packet capture in the header bar to observe network telemetry.",
+        badgeText: t("hero_standby_badge", "Standby"),
+        title: t("hero_standby_title", "Passive Capture Standby"),
+        subtitle: t("hero_standby_subtitle", "Start packet capture in the header bar to observe network telemetry."),
       };
     }
 
     return {
       state: "healthy",
-      badgeText: "Nominal",
+      badgeText: t("badge_nominal", "Nominal"),
       title: situationSummaryModel.headline,
       subtitle: situationSummaryModel.explanation,
     };
-  }, [situationSummaryModel, monitor]);
+  }, [situationSummaryModel, monitor, t]);
 
   // 3. KPI View Models (Strict Authoritative Rates from throughput_history & telemetry_state)
   const kpiViewModels: KpiViewModel[] = useMemo(() => {
@@ -284,7 +286,7 @@ export function useDashboardController() {
     return [
       {
         id: "activity",
-        label: "Network Activity",
+        label: t("total_bytes", "Network Activity"),
         value: humanBytes(bytes),
         rateDown,
         rateUp,
@@ -318,7 +320,7 @@ export function useDashboardController() {
       },
       {
         id: "hosts",
-        label: "Hosts Observed",
+        label: t("hosts_observed", "Hosts Observed"),
         value: String(hosts),
         statusBadge: {
           text: hosts > 0 ? "Observed" : "Standby",
@@ -340,7 +342,7 @@ export function useDashboardController() {
       },
       {
         id: "flows",
-        label: "Active Flows",
+        label: t("active_flows", "Active Flows"),
         value: String(flows),
         statusBadge: {
           text: flows > 0 ? "Active" : "Standby",
@@ -362,7 +364,7 @@ export function useDashboardController() {
       },
       {
         id: "cards",
-        label: "Narrative Cards",
+        label: t("narrative_cards", "Narrative Cards"),
         value: String(feed.length),
         statusBadge: {
           text: feed.some((f) => f.severity === "finding") ? "Finding" : feed.length > 0 ? "Active" : "Learning",
@@ -383,7 +385,7 @@ export function useDashboardController() {
         },
       },
     ];
-  }, [monitor, feed, hostsHistory, flowsHistory, cardsHistory]);
+  }, [monitor, feed, hostsHistory, flowsHistory, cardsHistory, t]);
 
   // 4. Health Telemetry View Model (Direct mapping of backend subsystems)
   // ARCHITECTURAL INVARIANT: Rust backend owns SubsystemStatus evaluation.

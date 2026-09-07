@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { useTranslation } from "react-i18next";
 import { Skeleton } from "@netpulse/components";
 import { Sparkline } from "@netpulse/viz";
 import type { KpiViewModel } from "./viewModels";
@@ -9,9 +10,11 @@ interface KpiCardsProps {
 }
 
 export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps) {
+  const { t } = useTranslation("dashboard");
+
   if (loading) {
     return (
-      <div className="np-kpis" role="region" aria-label="Loading statistics">
+      <div className="np-kpis" role="region" aria-label={t("loading_statistics", "Loading statistics")}>
         {[1, 2, 3, 4].map((i) => (
           <div className="np-kpi-card" key={i}>
             <Skeleton variant="text" width="60%" height="12px" style={{ marginBottom: "8px" }} />
@@ -23,7 +26,7 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
   }
 
   return (
-    <div className="np-kpis" role="region" aria-label="Key Performance Indicators">
+    <div className="np-kpis" role="region" aria-label={t("kpi_section_label", "Key Performance Indicators")}>
       {kpis.map((kpi) => (
         <div className="np-kpi-card" key={kpi.id} tabIndex={0} aria-describedby={`kpi-tooltip-${kpi.id}`}>
           <div className="np-kpi-card__header">
@@ -64,8 +67,8 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
               />
             </div>
           ) : (
-            <div className="np-kpi-card__spark np-kpi-card__spark--empty" aria-label="No historical telemetry">
-              <span className="np-kpi-spark-empty-label">NO HISTORY</span>
+            <div className="np-kpi-card__spark np-kpi-card__spark--empty" aria-label={t("no_historical_telemetry", "No historical telemetry")}>
+              <span className="np-kpi-spark-empty-label">{t("no_history", "NO HISTORY")}</span>
               <div className="np-kpi-spark-baseline" aria-hidden="true" />
             </div>
           )}

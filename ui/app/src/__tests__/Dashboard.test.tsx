@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import "../i18n";
+import i18n from "../i18n";
 import { Dashboard } from "../screens/Dashboard";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
@@ -9,7 +9,8 @@ import { setFeed, setMonitor, setError, resetSession, __resetForTest } from "../
 import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
 import * as ipc from "../ipc";
 
-afterEach(() => {
+afterEach(async () => {
+  await i18n.changeLanguage("en");
   cleanup();
   vi.restoreAllMocks();
 });
@@ -1734,6 +1735,83 @@ describe("Dashboard Screen", () => {
         expect(screen.getByText(/24.5 ms/i)).toBeInTheDocument();
         expect(screen.getByText(/Default gateway reachable with jitter/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe("Internationalization (i18n)", () => {
+    it("translates KPI labels, category tabs, health strip, and explain box when switched to Spanish", async () => {
+      await i18n.changeLanguage("es");
+
+      setFeed([
+        {
+          headline: "DNS query to example.com",
+          summary: "Standard query via 1.1.1.1",
+          lines: ["Response 15ms"],
+          severity: "neutral",
+          protocol: "DNS",
+          category: "dns",
+          evidence: [{ kind: "flow", id: 42 }],
+          at_mono_nanos: 1000,
+        },
+      ]);
+
+      setMonitor({
+        by_host: {
+          dimension: "host",
+          rows: [{ label: "1.1.1.1", flows: 1, bytes: 512, hostnames: [], evidence: [] }],
+        },
+        by_protocol: {
+          dimension: "protocol",
+          rows: [{ label: "DNS", flows: 1, bytes: 512, hostnames: [], evidence: [] }],
+        },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        subsystems: [
+          { name: "Capture Pipeline", status: "healthy", detail: "Active streaming" },
+        ],
+        capture_drops: 0,
+        telemetry_state: "active",
+        throughput_history: [
+          { timestamp_mono_nanos: 100, ingress_rate_bytes_sec: 1000, egress_rate_bytes_sec: 2000 },
+        ],
+      });
+
+      render(<DashboardTestWrapper />);
+
+      // Dashboard section title
+      expect(screen.getByRole("region", { name: "Panel Principal de Red" })).toBeInTheDocument();
+
+      // KPI labels translated to Spanish
+      expect(screen.getByText("Bytes Totales Procesados")).toBeInTheDocument();
+      expect(screen.getByText("Hosts Observados")).toBeInTheDocument();
+      expect(screen.getByText("Flujos Activos")).toBeInTheDocument();
+      expect(screen.getByText("Tarjetas Narrativas")).toBeInTheDocument();
+
+      // Category tabs translated to Spanish
+      expect(screen.getByRole("tab", { name: /Toda la Actividad/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Hallazgos de Seguridad/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Rendimiento y Latencia/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Consultas DNS/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /TLS y HTTPS/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Aplicaciones/i })).toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: /Flujos de Red/i })).toBeInTheDocument();
+
+      // Health strip labels translated to Spanish
+      expect(screen.getByText("Captura:")).toBeInTheDocument();
+      expect(screen.getByText("Descartes:")).toBeInTheDocument();
+
+      // Section title
+      expect(screen.getByText("¿Qué está pasando?")).toBeInTheDocument();
+
+      // Explain box in Spanish
+      const explainBtn = screen.getByRole("button", { name: /Explicar/i });
+      expect(explainBtn).toBeInTheDocument();
+      fireEvent.click(explainBtn);
+
+      expect(screen.getByText("¿Por qué sucede esto?")).toBeInTheDocument();
+      expect(screen.getByText("¿Qué debo hacer?")).toBeInTheDocument();
+      expect(screen.getByText("Ocultar Explicación")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Explicar DNS query to example.com/i })).toBeInTheDocument();
     });
   });
 });

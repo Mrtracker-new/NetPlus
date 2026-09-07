@@ -1,4 +1,5 @@
 import { memo, useRef, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import type { NarrativeCategory } from "./viewModels";
 
 interface NarrativeFilterBarProps {
@@ -109,6 +110,7 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
   count,
   totalCount,
 }: NarrativeFilterBarProps) {
+  const { t } = useTranslation("dashboard");
   const tabRefs = useRef<Map<NarrativeCategory, HTMLButtonElement>>(new Map());
 
   const focusAndSelect = (catId: NarrativeCategory) => {
@@ -142,7 +144,7 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
           <input
             type="text"
             className="np-filter-search-input"
-            placeholder="Search processes (chrome, spotify), IPs (192.168), protocols (DNS, TLS)..."
+            placeholder={t("search_placeholder", "Search processes (chrome, spotify), IPs (192.168), protocols (DNS, TLS)...")}
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={(e) => {
@@ -151,14 +153,14 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
                 onSearchChange("");
               }
             }}
-            aria-label="Search narrative feed"
+            aria-label={t("search_aria_label", "Search narrative feed")}
           />
           {search && (
             <button
               type="button"
               className="np-filter-search-clear"
               onClick={() => onSearchChange("")}
-              aria-label="Clear search"
+              aria-label={t("clear_search", "Clear search")}
             >
               <svg
                 width="12"
@@ -179,7 +181,7 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
         </div>
 
         <div className="np-filter-counter-badge" aria-live="polite" aria-atomic="true">
-          <span><strong>{count}</strong> / {totalCount} cards</span>
+          <span><strong>{count}</strong> / {totalCount} {t("cards_suffix", "cards")}</span>
         </div>
       </div>
 
@@ -191,6 +193,7 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
       >
         {CATEGORIES.map((cat, idx) => {
           const isSelected = category === cat.id;
+          const label = t(`categories.${cat.id}`, cat.label);
           return (
             <button
               key={cat.id}
@@ -230,7 +233,7 @@ export const NarrativeFilterBar = memo(function NarrativeFilterBar({
               <span className="np-filter-tab-icon" aria-hidden="true">
                 {cat.icon}
               </span>
-              <span className="np-filter-tab-label">{cat.label}</span>
+              <span className="np-filter-tab-label">{label}</span>
               {isSelected && <span className="np-filter-tab-indicator" aria-hidden="true" />}
             </button>
           );

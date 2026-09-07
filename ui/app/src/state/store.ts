@@ -17,9 +17,6 @@ interface State {
   captureSessionId: string | null;
   /** Monotonically increasing snapshot ingestion sequence number. */
   snapshotSequence: number;
-  /** Rolling total-bytes-observed samples, one per snapshot, for a throughput
-   *  trend. Bounded — a sparkline, not a historian. */
-  throughput: number[];
   /** Rolling host count samples for KPI sparkline trends. */
   hostsHistory: number[];
   /** Rolling active flow count samples for KPI sparkline trends. */
@@ -38,7 +35,6 @@ let state: State = {
   monitor: null,
   captureSessionId: `session-${Date.now()}`,
   snapshotSequence: 0,
-  throughput: [],
   hostsHistory: [],
   flowsHistory: [],
   cardsHistory: [],
@@ -108,11 +104,9 @@ export function setSnapshotBatch(
   }
 
   if (monitor != null) {
-    const total = monitor.by_protocol.rows.reduce((s, r) => s + r.bytes, 0);
     const hosts = monitor.by_host.rows.length;
     const flows = monitor.by_host.rows.reduce((s, r) => s + r.flows, 0);
 
-    const throughput = [...next.throughput, total].slice(-MAX_SAMPLES);
     const hostsHistory = [...next.hostsHistory, hosts].slice(-MAX_SAMPLES);
     const flowsHistory = [...next.flowsHistory, flows].slice(-MAX_SAMPLES);
 
@@ -120,7 +114,6 @@ export function setSnapshotBatch(
       ...next,
       monitor,
       snapshotSequence: next.snapshotSequence + 1,
-      throughput,
       hostsHistory,
       flowsHistory,
     };
@@ -146,7 +139,7 @@ export function setFeed(cards: NarrativeCard[]): void {
 }
 
 /** Replace the current monitoring snapshot and append samples
- *  (total bytes, hosts count, flows count) to bounded trend histories.
+ *  (hosts count, flows count) to bounded trend histories.
  *  Assigns authoritative snapshotSequence exactly once upon ingestion. */
 export function setMonitor(snapshot: MonitorSnapshot): void {
   setSnapshotBatch(null, snapshot);
@@ -172,7 +165,6 @@ export function __resetForTest(): void {
   state = {
     feed: [],
     monitor: null,
-    throughput: [],
     hostsHistory: [],
     flowsHistory: [],
     cardsHistory: [],

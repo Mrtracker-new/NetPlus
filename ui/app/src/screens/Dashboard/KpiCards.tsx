@@ -74,21 +74,12 @@ export const KpiCards = memo(function KpiCards({ kpis, loading }: KpiCardsProps)
           )}
 
           <div className="np-kpi-card__tooltip" id={`kpi-tooltip-${kpi.id}`} role="tooltip">
-            {kpi.tooltipRows ? (
-              kpi.tooltipRows.map((row, idx) => (
-                <div key={idx} className="np-kpi-card__tooltip-row">
-                  <span className="np-kpi-card__tooltip-label">{row.label}:</span>
-                  <span className="np-kpi-card__tooltip-val">{row.value}</span>
-                </div>
-              ))
-            ) : (
-              <>
-                {kpi.tooltip?.peak && <div>Peak: {kpi.tooltip.peak}</div>}
-                {kpi.tooltip?.avg && <div>Avg: {kpi.tooltip.avg}</div>}
-                {kpi.tooltip?.percentile && <div>{kpi.tooltip.percentile}</div>}
-                {kpi.tooltip?.trend && <div>Trend: {kpi.tooltip.trend}</div>}
-              </>
-            )}
+            {kpi.tooltipRows.map((row, idx) => (
+              <div key={idx} className="np-kpi-card__tooltip-row">
+                <span className="np-kpi-card__tooltip-label">{row.label}:</span>
+                <span className="np-kpi-card__tooltip-val">{row.value}</span>
+              </div>
+            ))}
           </div>
         </div>
       ))}

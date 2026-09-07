@@ -44,12 +44,6 @@ export interface KpiViewModel {
   };
   sparklineData: number[];
   tooltipRows: KpiTooltipRow[];
-  tooltip?: {
-    peak: string;
-    avg: string;
-    percentile: string;
-    trend: string;
-  };
 }
 
 export interface HealthViewModel {

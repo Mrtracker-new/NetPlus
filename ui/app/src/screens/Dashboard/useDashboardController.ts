@@ -422,12 +422,6 @@ export function useDashboardController() {
                 : `${activityBadgeText} Mode`,
           },
         ],
-        tooltip: {
-          peak: peakRate,
-          avg: avgRate,
-          percentile: humanBytes(bytes),
-          trend: telemetryState === "active" ? (totalBps > 0 ? "Active" : "Nominal") : activityBadgeText,
-        },
       };
 
       prevActivityRef.current = {
@@ -474,12 +468,6 @@ export function useDashboardController() {
           { label: "Scope", value: "Observed destination endpoints" },
           { label: "Trend", value: hosts > 0 ? "Observed" : "Standby" },
         ],
-        tooltip: {
-          peak: `${Math.max(...sparklineHosts, hosts)} hosts`,
-          avg: `${hosts} active`,
-          percentile: "Observed destination endpoints",
-          trend: hosts > 0 ? "Observed" : "Standby",
-        },
       };
 
       prevHostsRef.current = {
@@ -523,12 +511,6 @@ export function useDashboardController() {
           { label: "Scope", value: "Active TCP/UDP sockets" },
           { label: "Trend", value: flows > 0 ? "Active" : "Standby" },
         ],
-        tooltip: {
-          peak: `${Math.max(...sparklineFlows, flows)} flows`,
-          avg: `${flows} active`,
-          percentile: "Active TCP/UDP sockets",
-          trend: flows > 0 ? "Active" : "Standby",
-        },
       };
 
       prevFlowsRef.current = {
@@ -575,12 +557,6 @@ export function useDashboardController() {
           { label: "Feed", value: "All evidence linked" },
           { label: "Trend", value: feedLength > 0 ? "Active" : "Empty" },
         ],
-        tooltip: {
-          peak: `${Math.max(...sparklineCards, feedLength)} cards`,
-          avg: `${feedLength} cards`,
-          percentile: "All evidence linked",
-          trend: feedLength > 0 ? "Active" : "Empty",
-        },
       };
 
       prevCardsRef.current = {

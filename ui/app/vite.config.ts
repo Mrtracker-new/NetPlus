@@ -15,6 +15,7 @@ export default defineConfig({
       "/api": {
         target: "http://127.0.0.1:4040",
         changeOrigin: true,
+        headers: { Connection: "close" },
         configure: (proxy) => {
           proxy.on("error", (_err, _req, res) => {
             if ("writeHead" in res && !res.headersSent) {

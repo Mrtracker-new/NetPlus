@@ -20,6 +20,9 @@ updates:
       semver-major-days: 7
       semver-minor-days: 3
       semver-patch-days: 1
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "cargo"
@@ -49,6 +52,9 @@ updates:
       semver-major-days: 7
       semver-minor-days: 3
       semver-patch-days: 1
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "cargo"
@@ -75,6 +81,9 @@ updates:
     rebase-strategy: "auto"
     cooldown:
       default-days: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "cargo"
@@ -104,6 +113,9 @@ updates:
       semver-major-days: 7
       semver-minor-days: 3
       semver-patch-days: 1
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "npm"
@@ -130,6 +142,9 @@ updates:
     rebase-strategy: "auto"
     cooldown:
       default-days: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     labels:
       - "dependencies"
       - "github-actions"

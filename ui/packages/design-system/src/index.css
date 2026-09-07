@@ -7728,7 +7728,7 @@ svg path {
   margin-bottom: var(--np-3);
   box-shadow: var(--np-neu-inset);
   white-space: nowrap;
-  overflow-x: auto;
+  overflow: visible;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   min-height: 32px;
@@ -7744,6 +7744,37 @@ svg path {
   flex-shrink: 0;
   white-space: nowrap;
   max-width: 280px;
+  position: relative;
+  cursor: default;
+  border-radius: var(--np-radius-xs, 4px);
+  padding: 2px 6px;
+  transition: background-color var(--np-t-fast, 150ms ease), outline-color var(--np-t-fast, 150ms ease);
+}
+
+.np-health-strip__item:focus-visible {
+  outline: 2px solid var(--np-accent, #38bdf8);
+  outline-offset: 1px;
+  background: var(--np-surface-raised, rgba(255, 255, 255, 0.06));
+}
+
+.np-health-strip__tooltip {
+  display: block;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--np-surface-raised, #181c24);
+  backdrop-filter: var(--np-glass-blur, blur(8px));
+  border: 1px solid var(--np-border-strong, rgba(255, 255, 255, 0.15));
+  border-radius: var(--np-radius-sm, 6px);
+  padding: 4px 10px;
+  font-family: var(--np-font-mono, monospace);
+  font-size: 11px;
+  color: var(--np-text, #f1f5f9);
+  white-space: nowrap;
+  box-shadow: var(--np-neu-lg, 0 4px 16px rgba(0, 0, 0, 0.5));
+  z-index: var(--np-z-tooltip, 100);
+  pointer-events: none;
 }
 
 .np-health-dot {

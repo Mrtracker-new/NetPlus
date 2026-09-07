@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import type { HealthViewModel } from "./viewModels";
 
 interface HealthStripProps {
@@ -20,6 +20,10 @@ function compactName(name: string): string {
     default:
       return name;
   }
+}
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
 function compactDetail(detail: string): string {
@@ -72,6 +76,11 @@ function compactDetail(detail: string): string {
 // authoritative observation, and MUST NOT modify, override, or reinterpret SubsystemStatus.status.
 export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProps) {
   const subsystems = health.subsystems ?? [];
+  const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
+
+  const dropsTooltipId = "health-tooltip-drops";
+  const dropsDescription = "Kernel / Buffer Packet Drop Count";
+  const isDropsActive = activeTooltipId === dropsTooltipId;
 
   return (
     <div className="np-health-strip" role="region" aria-label="System Health Telemetry">
@@ -96,17 +105,41 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
 
         const displayName = compactName(sub.name);
         const displayDetail = compactDetail(sub.detail);
+        const slug = slugify(sub.name);
+        const tooltipId = `health-tooltip-${slug}`;
+        const description = `${sub.name}: ${sub.detail}`;
+        const isActive = activeTooltipId === tooltipId;
 
         return (
           <span key={sub.name} style={{ display: "contents" }}>
             {idx > 0 && <div className="np-health-strip__divider" aria-hidden="true">•</div>}
-            <div className="np-health-strip__item" title={`${sub.name}: ${sub.detail}`}>
+            <div
+              className="np-health-strip__item"
+              tabIndex={0}
+              title={description}
+              aria-description={description}
+              aria-describedby={isActive ? tooltipId : undefined}
+              onMouseEnter={() => setActiveTooltipId(tooltipId)}
+              onMouseLeave={() => setActiveTooltipId((prev) => (prev === tooltipId ? null : prev))}
+              onFocus={() => setActiveTooltipId(tooltipId)}
+              onBlur={() => setActiveTooltipId((prev) => (prev === tooltipId ? null : prev))}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  setActiveTooltipId(null);
+                }
+              }}
+            >
               <span className={`np-health-dot ${dotClass}`} aria-hidden="true" />
               <span className="np-health-strip__label">{displayName}:</span>
               <span className={valClass}>
                 {(isWarning || isDegraded) && <span className="np-health-glyph" aria-hidden="true">⚠ </span>}
                 {displayDetail}
               </span>
+              {isActive && (
+                <span id={tooltipId} className="np-health-strip__tooltip" role="tooltip">
+                  {description}
+                </span>
+              )}
             </div>
           </span>
         );
@@ -114,11 +147,31 @@ export const HealthStrip = memo(function HealthStrip({ health }: HealthStripProp
 
       {subsystems.length > 0 && <div className="np-health-strip__divider" aria-hidden="true">•</div>}
 
-      <div className="np-health-strip__item" title="Kernel / Buffer Packet Drop Count">
+      <div
+        className="np-health-strip__item"
+        tabIndex={0}
+        title={dropsDescription}
+        aria-description={dropsDescription}
+        aria-describedby={isDropsActive ? dropsTooltipId : undefined}
+        onMouseEnter={() => setActiveTooltipId(dropsTooltipId)}
+        onMouseLeave={() => setActiveTooltipId((prev) => (prev === dropsTooltipId ? null : prev))}
+        onFocus={() => setActiveTooltipId(dropsTooltipId)}
+        onBlur={() => setActiveTooltipId((prev) => (prev === dropsTooltipId ? null : prev))}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setActiveTooltipId(null);
+          }
+        }}
+      >
         <span className="np-health-strip__label">Drops:</span>
         <span className={health.drops > 0 ? "np-health-strip__val np-health-strip__val--numeric" : "np-health-strip__val"}>
           {health.drops}
         </span>
+        {isDropsActive && (
+          <span id={dropsTooltipId} className="np-health-strip__tooltip" role="tooltip">
+            {dropsDescription}
+          </span>
+        )}
       </div>
     </div>
   );

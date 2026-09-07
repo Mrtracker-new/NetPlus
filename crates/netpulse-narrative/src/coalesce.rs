@@ -61,7 +61,9 @@ fn merge_run(seed: NarrativeCard, mut rest: Vec<NarrativeCard>) -> NarrativeCard
         .max_by_key(|s| severity_rank(*s))
         .unwrap_or(Severity::Neutral);
 
-    let category = if rest.iter().any(|c| c.category == CardCategory::Security) || severity == Severity::Finding {
+    let category = if rest.iter().any(|c| c.category == CardCategory::Security)
+        || severity == Severity::Finding
+    {
         CardCategory::Security
     } else {
         rest.iter()

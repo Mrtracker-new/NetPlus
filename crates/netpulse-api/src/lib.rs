@@ -35,12 +35,11 @@ pub use dto::{
     GroundedExerciseDto, HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto,
     JourneyStageDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
     LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto, NarrativeCardDto,
-    NarrativeCategoryDto,
-    PageJourneyDto, PayloadLevelDto, PluginCapabilityDto, PluginDescriptorDto, PluginTrustDto,
-    PluginTypeDto, PrivacyManifestDto, ProcessMetricDto, ProjectionDepth, RecordingSummaryDto,
-    ReplayStateDto, SecurityFindingDto, SeverityDto, ShedStageDto, StageKindDto,
-    StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto, TelemetryStateDto,
-    ThroughputSampleDto, VersionPinsDto, VisualEventDto,
+    NarrativeCategoryDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto,
+    PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProcessMetricDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
+    ShedStageDto, StageKindDto, StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto,
+    TelemetryStateDto, ThroughputSampleDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI

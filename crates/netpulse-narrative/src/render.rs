@@ -237,14 +237,43 @@ fn human_bytes(bytes: u64) -> String {
 fn detect_protocol_and_category(view: &SessionView) -> (Option<String>, CardCategory) {
     let s = view.session;
 
-    let has_tls = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Tls) || f.key.dst_port == 443 || f.key.src_port == 443)
-        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::TlsClientHello | ProtoEventKind::TlsServerHello));
-    let has_quic = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Quic | L7Proto::Http3))
-        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::QuicHandshakeComplete));
-    let has_http = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Http1 | L7Proto::Http2) || f.key.dst_port == 80 || f.key.src_port == 80)
-        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::HttpRequest | ProtoEventKind::HttpResponse));
-    let has_dns = view.flows.iter().any(|f| matches!(f.l7, L7Proto::Dns) || f.key.dst_port == 53 || f.key.src_port == 53)
-        || view.events.iter().any(|e| matches!(e.kind, ProtoEventKind::DnsQuery | ProtoEventKind::DnsResponse));
+    let has_tls =
+        view.flows.iter().any(|f| {
+            matches!(f.l7, L7Proto::Tls) || f.key.dst_port == 443 || f.key.src_port == 443
+        }) || view.events.iter().any(|e| {
+            matches!(
+                e.kind,
+                ProtoEventKind::TlsClientHello | ProtoEventKind::TlsServerHello
+            )
+        });
+    let has_quic = view
+        .flows
+        .iter()
+        .any(|f| matches!(f.l7, L7Proto::Quic | L7Proto::Http3))
+        || view
+            .events
+            .iter()
+            .any(|e| matches!(e.kind, ProtoEventKind::QuicHandshakeComplete));
+    let has_http = view.flows.iter().any(|f| {
+        matches!(f.l7, L7Proto::Http1 | L7Proto::Http2)
+            || f.key.dst_port == 80
+            || f.key.src_port == 80
+    }) || view.events.iter().any(|e| {
+        matches!(
+            e.kind,
+            ProtoEventKind::HttpRequest | ProtoEventKind::HttpResponse
+        )
+    });
+    let has_dns = view
+        .flows
+        .iter()
+        .any(|f| matches!(f.l7, L7Proto::Dns) || f.key.dst_port == 53 || f.key.src_port == 53)
+        || view.events.iter().any(|e| {
+            matches!(
+                e.kind,
+                ProtoEventKind::DnsQuery | ProtoEventKind::DnsResponse
+            )
+        });
     let has_udp = view.flows.iter().any(|f| matches!(f.l4, L4Proto::Udp));
     let has_tcp = view.flows.iter().any(|f| matches!(f.l4, L4Proto::Tcp));
 
@@ -266,7 +295,11 @@ fn detect_protocol_and_category(view: &SessionView) -> (Option<String>, CardCate
 
     let category = if s.process_id > 0 {
         CardCategory::Applications
-    } else if view.flows.iter().any(|f| f.stats.loss_indicators > 0 || f.stats.retransmits > 5) {
+    } else if view
+        .flows
+        .iter()
+        .any(|f| f.stats.loss_indicators > 0 || f.stats.retransmits > 5)
+    {
         CardCategory::Performance
     } else if has_quic || has_tls {
         CardCategory::Tls
@@ -405,7 +438,13 @@ mod tests {
         let s = session(1_000, vec![10]);
         let f = Flow {
             id: 10,
-            key: FiveTuple::new(ip(192, 168, 0, 1), 50000, ip(192, 168, 1, 53), 50000, L4Proto::Tcp),
+            key: FiveTuple::new(
+                ip(192, 168, 0, 1),
+                50000,
+                ip(192, 168, 1, 53),
+                50000,
+                L4Proto::Tcp,
+            ),
             first_ts: Timestamp::new(1_000, 1_000),
             last_ts: Timestamp::new(1_001, 1_001),
             l4: L4Proto::Tcp,

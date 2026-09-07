@@ -23,12 +23,17 @@ export const CardExplainBox = memo(function CardExplainBox({
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose();
+        if (showInlineDrawer) {
+          e.stopPropagation();
+          setShowInlineDrawer(false);
+        } else {
+          onClose();
+        }
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [onClose, showInlineDrawer]);
 
   const lowerHead = card.headline.toLowerCase();
   const lowerSum = (card.summary || "").toLowerCase();

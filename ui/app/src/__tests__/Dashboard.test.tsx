@@ -1258,6 +1258,49 @@ describe("Dashboard Screen", () => {
       expect(hideBtns[1]!).toHaveAttribute("aria-controls", "card-inline-drawer-20000000");
     });
 
+    it("Invariant 14c: Escape key dismisses Quick Peek drawer first while keeping explain box open, then closes explain box on next Escape", () => {
+      setFeed([
+        {
+          at_mono_nanos: 15_000_000,
+          severity: "finding",
+          headline: "Cleartext Protocol Detected",
+          summary: "Unencrypted traffic observed on port 80.",
+          lines: ["Observed GET request without TLS"],
+          evidence: [{ kind: "flow", id: 42 }],
+        },
+      ]);
+
+      render(<DashboardTestWrapper />);
+
+      // 1. Open Explain box
+      const explainBtn = screen.getByRole("button", { name: /Explain Cleartext Protocol Detected/i });
+      fireEvent.click(explainBtn);
+      expect(screen.getByRole("region", { name: "Explanation details" })).toBeInTheDocument();
+
+      // 2. Open Quick Peek drawer
+      const quickPeekBtn = screen.getByRole("button", { name: /Quick Peek Drawer/i });
+      fireEvent.click(quickPeekBtn);
+      expect(screen.getByRole("region", { name: "Quick Peek Technical Evidence" })).toBeInTheDocument();
+
+      // 3. First Escape: closes Quick Peek drawer, stops propagation, and keeps Explain box open
+      const escapeEvent1 = new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true });
+      const stopPropSpy1 = vi.spyOn(escapeEvent1, "stopPropagation");
+      act(() => {
+        window.dispatchEvent(escapeEvent1);
+      });
+
+      expect(stopPropSpy1).toHaveBeenCalled();
+      expect(screen.queryByRole("region", { name: "Quick Peek Technical Evidence" })).not.toBeInTheDocument();
+      expect(screen.getByRole("region", { name: "Explanation details" })).toBeInTheDocument();
+
+      // 4. Second Escape: closes the Explain box
+      act(() => {
+        window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      });
+
+      expect(screen.queryByRole("region", { name: "Explanation details" })).not.toBeInTheDocument();
+    });
+
     it("Invariant 15: Telemetry rates strictly honor the full 4-state contract (Active, Stale, Standby, Unavailable)", () => {
       // 1. Active: Displays measured numeric rate
       setMonitor({

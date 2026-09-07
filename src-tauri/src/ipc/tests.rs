@@ -287,6 +287,105 @@ fn test_query_journey_of_session() {
 }
 
 #[test]
+fn test_query_journey_stages_of_session_and_latency() {
+    let state = seeded_state();
+
+    // 1. Non-existent session returns empty stages
+    let res = execute_query(
+        &state,
+        Query::JourneyStagesOfSession {
+            session_id: 999,
+            depth: ProjectionDepth::Beginner,
+        },
+    )
+    .unwrap();
+    if let QueryResponse::PageJourney { journey } = res {
+        assert_eq!(journey.session_id, 999);
+        assert!(journey.stages.is_empty());
+    } else {
+        panic!("expected PageJourney response");
+    }
+
+    // 2. Populate store with large capture data (200 sessions, 200 flows, 400 events)
+    {
+        let mut store = state.store.lock().unwrap();
+        for s_id in 1..=200 {
+            let f_id = s_id * 10;
+            let flow = netpulse_core::Flow {
+                id: f_id,
+                key: netpulse_core::net::FiveTuple::new(
+                    std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 168, 1, 100)),
+                    40000 + (s_id as u16),
+                    std::net::IpAddr::V4(std::net::Ipv4Addr::new(93, 184, 216, 34)),
+                    443,
+                    netpulse_core::net::L4Proto::Tcp,
+                ),
+                first_ts: netpulse_core::Timestamp::new(1000 + s_id, 1000 + s_id),
+                last_ts: netpulse_core::Timestamp::new(2000 + s_id, 2000 + s_id),
+                l4: netpulse_core::net::L4Proto::Tcp,
+                l7: netpulse_core::net::L7Proto::Tls,
+                stats: netpulse_core::FlowMetrics {
+                    bytes: 1024,
+                    packets: 5,
+                    rtt_estimate_nanos: Some(25_000_000),
+                    retransmits: 0,
+                    loss_indicators: 0,
+                },
+                state: netpulse_core::FlowState::Closed,
+            };
+            let events = vec![
+                netpulse_core::ProtoEvent {
+                    flow_id: f_id,
+                    ts: netpulse_core::Timestamp::new(1000 + s_id, 1000 + s_id),
+                    kind: netpulse_core::ProtoEventKind::DnsResponse,
+                },
+                netpulse_core::ProtoEvent {
+                    flow_id: f_id,
+                    ts: netpulse_core::Timestamp::new(1100 + s_id, 1100 + s_id),
+                    kind: netpulse_core::ProtoEventKind::TlsClientHello,
+                },
+            ];
+            store.insert_flow(flow, events);
+            store.insert_session(netpulse_core::Session {
+                id: s_id,
+                process_id: 0,
+                start_ts: netpulse_core::Timestamp::new(1000 + s_id, 1000 + s_id),
+                trigger: format!("resolved and connected to site{s_id}.com"),
+                flow_ids: vec![f_id],
+            });
+        }
+    }
+
+    // 3. Querying one session on large capture executes in < 1 ms
+    let start = std::time::Instant::now();
+    let res = execute_query(
+        &state,
+        Query::JourneyStagesOfSession {
+            session_id: 42,
+            depth: ProjectionDepth::Beginner,
+        },
+    )
+    .unwrap();
+    let elapsed = start.elapsed();
+
+    if let QueryResponse::PageJourney { journey } = res {
+        assert_eq!(journey.session_id, 42);
+        assert!(
+            !journey.stages.is_empty(),
+            "expected stages to be populated"
+        );
+    } else {
+        panic!("expected PageJourney response");
+    }
+
+    assert!(
+        elapsed < std::time::Duration::from_millis(1),
+        "journeyStagesOfSession took {:?}, expected < 1 ms",
+        elapsed
+    );
+}
+
+#[test]
 fn test_query_attribution_of_flow() {
     let state = seeded_state();
     let res = execute_query(&state, Query::AttributionOfFlow { flow_id: 1 }).unwrap();

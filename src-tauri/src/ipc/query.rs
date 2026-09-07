@@ -3,6 +3,7 @@ use netpulse_api::{InterfaceDto, Query, QueryResponse, SessionSummaryDto};
 use netpulse_engine::attribution::Attribution;
 use netpulse_engine::education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
+    present_journey_for_session,
 };
 use netpulse_engine::export::{preview as export_preview, Sanitizer};
 use netpulse_engine::pipeline::present;
@@ -177,11 +178,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             }
         }
         Query::JourneyStagesOfSession { session_id, depth } => {
-            let view = present_education(&store, crate::to_depth(depth));
-            let journey = view
-                .journeys
-                .into_iter()
-                .find(|j| j.session_id == session_id)
+            let journey = present_journey_for_session(&store, session_id, crate::to_depth(depth))
                 .unwrap_or(netpulse_api::PageJourneyDto {
                     session_id,
                     stages: Vec::new(),

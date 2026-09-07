@@ -31,7 +31,7 @@ pub use supervisor::{TaskStatus, TaskSupervisor};
 
 pub use education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
-    EducationView,
+    present_journey_for_session, EducationView,
 };
 pub use export::{
     export_csv, export_json, export_pcapng, export_report, import_capture,

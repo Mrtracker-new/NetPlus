@@ -91,6 +91,23 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
     }
 }
 
+/// Project a single session's website journey at `depth`.
+pub fn present_journey_for_session(
+    store: &CaptureStore,
+    session_id: u64,
+    depth: Depth,
+) -> Option<PageJourneyDto> {
+    let session = store.session(session_id)?;
+    let flows = store.flows_for_session(session_id);
+    let mut events = Vec::new();
+    for f in &flows {
+        events.extend(store.events_for_flow(f.id));
+    }
+    let sview = SessionView::new(session, flows, events);
+    let journey = build_page_journey(&sview);
+    Some(project::page_journey_dto(&journey, depth))
+}
+
 /// Project the full curriculum and progress summary.
 pub fn curriculum_view(
     store: &CaptureStore,
@@ -478,5 +495,20 @@ mod tests {
         assert_eq!(anim.reduced_motion.len(), anim.events.len());
         // An unknown flow yields no fabricated animation.
         assert!(handshake_animation_for_flow(&store, 999).is_none());
+    }
+
+    #[test]
+    fn journey_for_session_matches_present_education() {
+        let store = seeded_store();
+        let full_view = present_education(&store, Depth::Beginner);
+        let single = present_journey_for_session(&store, 1, Depth::Beginner)
+            .expect("session 1 journey exists");
+        assert_eq!(full_view.journeys[0].session_id, single.session_id);
+        assert_eq!(full_view.journeys[0].stages.len(), single.stages.len());
+        for (expected, actual) in full_view.journeys[0].stages.iter().zip(&single.stages) {
+            assert_eq!(expected.title, actual.title);
+            assert_eq!(expected.kind, actual.kind);
+        }
+        assert!(present_journey_for_session(&store, 999, Depth::Beginner).is_none());
     }
 }

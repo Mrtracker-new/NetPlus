@@ -8636,7 +8636,7 @@ svg path {
 
 .np-diag-chain__node:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: var(--np-neu-md);
+  box-shadow: var(--np-neu-control-hover);
 }
 
 .np-diag-chain__node:disabled {

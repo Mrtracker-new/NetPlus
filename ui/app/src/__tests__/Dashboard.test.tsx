@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within, waitFor, act } from "@testing-library/react";
+import { render, renderHook, screen, fireEvent, cleanup, within, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import i18n from "../i18n";
 import { Dashboard } from "../screens/Dashboard";
+import { useDashboardController } from "../screens/Dashboard/useDashboardController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setFeed, setMonitor, setError, resetSession, __resetForTest } from "../state/store";
 import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
 import * as ipc from "../ipc";
+import type { MonitorSnapshot } from "@netpulse/contract";
 
 afterEach(async () => {
   await i18n.changeLanguage("en");
@@ -1814,6 +1816,297 @@ describe("Dashboard Screen", () => {
       expect(screen.getByRole("button", { name: /Explicar DNS query to example.com/i })).toBeInTheDocument();
     });
   });
+
+  describe("View Model Memoization & Performance Invariants", () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    it("Invariant: kpiViewModels and healthViewModel retain stable references during idle standby polls", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        telemetry_state: "standby",
+        throughput_history: [],
+        subsystems: [
+          { name: "Capture Pipeline", status: "healthy", detail: "Standby" },
+        ],
+      });
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialHealth = result.current.healthViewModel;
+      const initialActivityKpi = initialKpis[0];
+      const initialHostsKpi = initialKpis[1];
+      const initialFlowsKpi = initialKpis[2];
+      const initialCardsKpi = initialKpis[3];
+
+      // Simulate an identical snapshot arriving over IPC (fresh object references)
+      act(() => {
+        setMonitor({
+          by_protocol: { dimension: "protocol", rows: [] },
+          by_host: { dimension: "host", rows: [] },
+          diagnoses: [],
+          network_loss_indicators: 0,
+          capture_drops: 0,
+          telemetry_state: "standby",
+          throughput_history: [],
+          subsystems: [
+            { name: "Capture Pipeline", status: "healthy", detail: "Standby" },
+          ],
+        });
+      });
+
+      // Array and object references MUST be strictly identical
+      expect(result.current.kpiViewModels).toBe(initialKpis);
+      expect(result.current.healthViewModel).toBe(initialHealth);
+      expect(result.current.kpiViewModels[0]).toBe(initialActivityKpi);
+      expect(result.current.kpiViewModels[1]).toBe(initialHostsKpi);
+      expect(result.current.kpiViewModels[2]).toBe(initialFlowsKpi);
+      expect(result.current.kpiViewModels[3]).toBe(initialCardsKpi);
+    });
+
+    it("Invariant: kpiViewModels and healthViewModel retain stable references during active steady state polls", () => {
+      const activeSnapshot: MonitorSnapshot = {
+        by_protocol: {
+          dimension: "protocol",
+          rows: [{ label: "TCP", bytes: 1000, flows: 10, hostnames: [], evidence: [] }],
+        },
+        by_host: {
+          dimension: "host",
+          rows: [{ label: "192.168.1.1", flows: 5, bytes: 1000, hostnames: [], evidence: [] }],
+        },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        telemetry_state: "active",
+        throughput_history: [
+          { ingress_rate_bytes_sec: 500, egress_rate_bytes_sec: 500, timestamp_mono_nanos: 1000 },
+          { ingress_rate_bytes_sec: 500, egress_rate_bytes_sec: 500, timestamp_mono_nanos: 2000 },
+        ],
+        subsystems: [
+          { name: "Capture Pipeline", status: "healthy", detail: "Active streaming" },
+        ],
+      };
+
+      // Seed steady state history
+      setMonitor(activeSnapshot);
+      setMonitor(activeSnapshot);
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialHealth = result.current.healthViewModel;
+      const initialActivityKpi = initialKpis[0];
+      const initialHostsKpi = initialKpis[1];
+      const initialFlowsKpi = initialKpis[2];
+      const initialCardsKpi = initialKpis[3];
+
+      // Simulate a successive snapshot with identical metrics arriving over IPC
+      act(() => {
+        setMonitor({
+          by_protocol: {
+            dimension: "protocol",
+            rows: [{ label: "TCP", bytes: 1000, flows: 10, hostnames: [], evidence: [] }],
+          },
+          by_host: {
+            dimension: "host",
+            rows: [{ label: "192.168.1.1", flows: 5, bytes: 1000, hostnames: [], evidence: [] }],
+          },
+          diagnoses: [],
+          network_loss_indicators: 0,
+          capture_drops: 0,
+          telemetry_state: "active",
+          throughput_history: [
+            { ingress_rate_bytes_sec: 500, egress_rate_bytes_sec: 500, timestamp_mono_nanos: 1000 },
+            { ingress_rate_bytes_sec: 500, egress_rate_bytes_sec: 500, timestamp_mono_nanos: 2000 },
+          ],
+          subsystems: [
+            { name: "Capture Pipeline", status: "healthy", detail: "Active streaming" },
+          ],
+        });
+      });
+
+      expect(result.current.kpiViewModels).toBe(initialKpis);
+      expect(result.current.healthViewModel).toBe(initialHealth);
+      expect(result.current.kpiViewModels[0]).toBe(initialActivityKpi);
+      expect(result.current.kpiViewModels[1]).toBe(initialHostsKpi);
+      expect(result.current.kpiViewModels[2]).toBe(initialFlowsKpi);
+      expect(result.current.kpiViewModels[3]).toBe(initialCardsKpi);
+    });
+
+    it("Invariant: local state changes (search, category) preserve view model references", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      });
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialHealth = result.current.healthViewModel;
+
+      // Dispatch search filter change
+      act(() => {
+        result.current.dispatchEvent({ type: "SET_SEARCH", search: "dns" });
+      });
+
+      expect(result.current.search).toBe("dns");
+      expect(result.current.kpiViewModels).toBe(initialKpis);
+      expect(result.current.healthViewModel).toBe(initialHealth);
+
+      // Dispatch category filter change
+      act(() => {
+        result.current.dispatchEvent({ type: "SET_CATEGORY", category: "dns" });
+      });
+
+      expect(result.current.category).toBe("dns");
+      expect(result.current.kpiViewModels).toBe(initialKpis);
+      expect(result.current.healthViewModel).toBe(initialHealth);
+    });
+
+    it("Invariant: surgical re-allocation when only narrative feed updates", () => {
+      const activeSnapshot: MonitorSnapshot = {
+        by_protocol: {
+          dimension: "protocol",
+          rows: [{ label: "TCP", bytes: 1000, flows: 10, hostnames: [], evidence: [] }],
+        },
+        by_host: {
+          dimension: "host",
+          rows: [{ label: "192.168.1.1", flows: 5, bytes: 1000, hostnames: [], evidence: [] }],
+        },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      };
+      setMonitor(activeSnapshot);
+      setMonitor(activeSnapshot);
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialActivityKpi = initialKpis[0];
+      const initialHostsKpi = initialKpis[1];
+      const initialFlowsKpi = initialKpis[2];
+      const initialCardsKpi = initialKpis[3];
+
+      // Add a narrative card to feed (monitor metrics unchanged)
+      act(() => {
+        setFeed([
+          {
+            headline: "Suspicious DNS lookup",
+            summary: "Resolved unknown domain",
+            lines: [],
+            severity: "finding",
+            at_mono_nanos: 1,
+            evidence: [],
+          },
+        ]);
+      });
+
+      const updatedKpis = result.current.kpiViewModels;
+      // Activity, Hosts, and Flows KPI objects MUST retain their stable references
+      expect(updatedKpis[0]).toBe(initialActivityKpi);
+      expect(updatedKpis[1]).toBe(initialHostsKpi);
+      expect(updatedKpis[2]).toBe(initialFlowsKpi);
+
+      // Only Cards KPI should have re-allocated
+      expect(updatedKpis[3]).not.toBe(initialCardsKpi);
+      expect(updatedKpis[3]?.value).toBe("1");
+      expect(updatedKpis[3]?.statusBadge.text).toBe("Finding");
+    });
+
+    it("Invariant: surgical re-allocation when only byte throughput updates", () => {
+      const activeSnapshot: MonitorSnapshot = {
+        by_protocol: {
+          dimension: "protocol",
+          rows: [{ label: "TCP", bytes: 1000, flows: 10, hostnames: [], evidence: [] }],
+        },
+        by_host: {
+          dimension: "host",
+          rows: [{ label: "192.168.1.1", flows: 5, bytes: 1000, hostnames: [], evidence: [] }],
+        },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+      };
+      setMonitor(activeSnapshot);
+      setMonitor(activeSnapshot);
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialActivityKpi = initialKpis[0];
+      const initialHostsKpi = initialKpis[1];
+      const initialFlowsKpi = initialKpis[2];
+      const initialCardsKpi = initialKpis[3];
+
+      // Update byte volume (hosts, flows, feed unchanged)
+      act(() => {
+        setMonitor({
+          by_protocol: {
+            dimension: "protocol",
+            rows: [{ label: "TCP", bytes: 50000, flows: 50, hostnames: [], evidence: [] }],
+          },
+          by_host: {
+            dimension: "host",
+            rows: [{ label: "192.168.1.1", flows: 5, bytes: 50000, hostnames: [], evidence: [] }],
+          },
+          diagnoses: [],
+          network_loss_indicators: 0,
+          capture_drops: 0,
+        });
+      });
+
+      const updatedKpis = result.current.kpiViewModels;
+      // Only Activity KPI should update reference
+      expect(updatedKpis[0]).not.toBe(initialActivityKpi);
+      expect(updatedKpis[1]).toBe(initialHostsKpi);
+      expect(updatedKpis[2]).toBe(initialFlowsKpi);
+      expect(updatedKpis[3]).toBe(initialCardsKpi);
+    });
+
+    it("Invariant: capture_drops updates healthViewModel while preserving kpiViewModels", () => {
+      setMonitor({
+        by_protocol: { dimension: "protocol", rows: [] },
+        by_host: { dimension: "host", rows: [] },
+        diagnoses: [],
+        network_loss_indicators: 0,
+        capture_drops: 0,
+        subsystems: [{ name: "Capture Pipeline", status: "healthy", detail: "Nominal" }],
+      });
+
+      const { result } = renderHook(() => useDashboardController(), { wrapper });
+
+      const initialKpis = result.current.kpiViewModels;
+      const initialHealth = result.current.healthViewModel;
+
+      act(() => {
+        setMonitor({
+          by_protocol: { dimension: "protocol", rows: [] },
+          by_host: { dimension: "host", rows: [] },
+          diagnoses: [],
+          network_loss_indicators: 0,
+          capture_drops: 42,
+          subsystems: [{ name: "Capture Pipeline", status: "healthy", detail: "Nominal" }],
+        });
+      });
+
+      expect(result.current.kpiViewModels).toBe(initialKpis);
+      expect(result.current.healthViewModel).not.toBe(initialHealth);
+      expect(result.current.healthViewModel.drops).toBe(42);
+    });
+  });
 });
+
 
 

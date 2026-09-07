@@ -1,6 +1,6 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import type { NarrativeCard } from "@netpulse/contract";
+import type { NarrativeCard, SubsystemStatus } from "@netpulse/contract";
 import { useStore } from "../../state/store";
 import { useDisclosure } from "../../modes/DisclosureContext";
 import { useOptionalSidebar } from "../../components/RightRail";
@@ -131,6 +131,53 @@ export function cardMatchesCategory(card: NarrativeCard, category: NarrativeCate
   return true;
 }
 
+const EMPTY_NUMBERS: number[] = [];
+const EMPTY_SUBSYSTEMS: SubsystemStatus[] = [];
+
+function areNumberArraysEqual(a: number[], b: number[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
+function areSparklinesEquivalent(prev: number[] | undefined, next: number[]): boolean {
+  if (prev === next) return true;
+  if (!prev || prev.length === 0) {
+    return next.length === 0 || next.every((v) => v === 0);
+  }
+  if (next.length === 0) {
+    return prev.every((v) => v === 0);
+  }
+  if (areNumberArraysEqual(prev, next)) return true;
+  if (
+    prev.every((v) => v === prev[0]) &&
+    next.every((v) => v === prev[0])
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function areSubsystemsEqual(a: SubsystemStatus[], b: SubsystemStatus[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const itemA = a[i]!;
+    const itemB = b[i]!;
+    if (
+      itemA.name !== itemB.name ||
+      itemA.status !== itemB.status ||
+      itemA.detail !== itemB.detail
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function useDashboardController() {
   const { t } = useTranslation("dashboard");
   const { monitor, feed, hostsHistory, flowsHistory, cardsHistory, captureSessionId, snapshotSequence } = useStore();
@@ -144,6 +191,47 @@ export function useDashboardController() {
   const [localSelectedEntity, setLocalSelectedEntity] = useState<SelectedEntity | null>(null);
 
   const selectedEntity = sidebar ? sidebar.selectedEntity : localSelectedEntity;
+
+  // Memoization refs for KPI objects and Health view model
+  const prevActivityRef = useRef<{
+    kpi: KpiViewModel;
+    bytes: number;
+    telemetryState: string;
+    ingressBps: number;
+    egressBps: number;
+    sparkline: number[];
+    label: string;
+  } | null>(null);
+
+  const prevHostsRef = useRef<{
+    kpi: KpiViewModel;
+    hosts: number;
+    sparkline: number[];
+    label: string;
+  } | null>(null);
+
+  const prevFlowsRef = useRef<{
+    kpi: KpiViewModel;
+    flows: number;
+    sparkline: number[];
+    label: string;
+  } | null>(null);
+
+  const prevCardsRef = useRef<{
+    kpi: KpiViewModel;
+    count: number;
+    hasFinding: boolean;
+    sparkline: number[];
+    label: string;
+  } | null>(null);
+
+  const prevKpisRef = useRef<KpiViewModel[] | null>(null);
+
+  const prevHealthRef = useRef<{
+    vm: HealthViewModel;
+    drops: number;
+    subsystems: SubsystemStatus[];
+  } | null>(null);
 
   // 1. Situation Summary Model
   const situationSummaryModel: SituationSummaryModel = useMemo(() => {
@@ -201,92 +289,115 @@ export function useDashboardController() {
     const ingressBps = telemetryState === "active" && latestSample ? latestSample.ingress_rate_bytes_sec : 0;
     const egressBps = telemetryState === "active" && latestSample ? latestSample.egress_rate_bytes_sec : 0;
 
-    // Truthful 4-State Telemetry Rate Mapping:
-    // Active      -> live measured rate (or 0 B/s if measured zero traffic)
-    // Stale       -> rate unknown due to expired telemetry: ▼ — /s (Stale)
-    // Standby     -> capture not active:                   ▼ 0 B/s (Standby)
-    // Unavailable -> telemetry offline / unmeasured:       ▼ — (Unavailable)
-    let rateDown: string;
-    let rateUp: string;
-    let activityBadgeText = "Standby";
-    let activityBadgeVariant: "healthy" | "quiet" | "congested" | "spike" = "quiet";
-
-    switch (telemetryState) {
-      case "active":
-        rateDown = ingressBps > 0 ? `▼ ${humanBytes(ingressBps)}/s` : "▼ 0 B/s";
-        rateUp = egressBps > 0 ? `▲ ${humanBytes(egressBps)}/s` : "▲ 0 B/s";
-        activityBadgeText = ingressBps > 10_000_000 ? "Active" : "Nominal";
-        activityBadgeVariant = "healthy";
-        break;
-      case "stale":
-        rateDown = "▼ — /s (Stale)";
-        rateUp = "▲ — /s (Stale)";
-        activityBadgeText = "Stale";
-        activityBadgeVariant = "congested";
-        break;
-      case "standby":
-        rateDown = "▼ 0 B/s (Standby)";
-        rateUp = "▲ 0 B/s (Standby)";
-        activityBadgeText = "Standby";
-        activityBadgeVariant = "quiet";
-        break;
-      case "unavailable":
-      default:
-        rateDown = "▼ — (Unavailable)";
-        rateUp = "▲ — (Unavailable)";
-        activityBadgeText = "Unavailable";
-        activityBadgeVariant = "quiet";
-        break;
-    }
-
-    const totalBps = ingressBps + egressBps;
-
     const sparklineActivity =
-      history.length > 1
+      history.length > 1 && history.some((s) => s.ingress_rate_bytes_sec + s.egress_rate_bytes_sec > 0)
         ? history.map((s) => s.ingress_rate_bytes_sec + s.egress_rate_bytes_sec).slice(-8)
-        : [];
-    const sparklineHosts = hostsHistory && hostsHistory.length > 1 ? hostsHistory.slice(-8) : [];
-    const sparklineFlows = flowsHistory && flowsHistory.length > 1 ? flowsHistory.slice(-8) : [];
-    const sparklineCards = cardsHistory && cardsHistory.length > 1 ? cardsHistory.slice(-8) : [];
+        : EMPTY_NUMBERS;
+    const sparklineHosts =
+      hostsHistory && hostsHistory.length > 1 && hostsHistory.some((v) => v > 0)
+        ? hostsHistory.slice(-8)
+        : EMPTY_NUMBERS;
+    const sparklineFlows =
+      flowsHistory && flowsHistory.length > 1 && flowsHistory.some((v) => v > 0)
+        ? flowsHistory.slice(-8)
+        : EMPTY_NUMBERS;
+    const sparklineCards =
+      cardsHistory && cardsHistory.length > 1 && cardsHistory.some((v) => v > 0)
+        ? cardsHistory.slice(-8)
+        : EMPTY_NUMBERS;
 
-    const peakActivityBps = sparklineActivity.length > 0 ? Math.max(...sparklineActivity, totalBps) : totalBps;
-    const avgActivityBps =
-      sparklineActivity.length > 0
-        ? Math.round(sparklineActivity.reduce((sum, v) => sum + v, 0) / sparklineActivity.length)
-        : totalBps;
+    // --- Activity KPI ---
+    const activityLabel = t("total_bytes", "Network Activity");
+    const prevActivity = prevActivityRef.current;
+    let activityKpi: KpiViewModel;
 
-    const inboundRate =
-      telemetryState === "active"
-        ? `${humanBytes(ingressBps)}/s`
-        : telemetryState === "standby"
-        ? "0 B/s"
-        : "—";
+    if (
+      prevActivity &&
+      prevActivity.bytes === bytes &&
+      prevActivity.telemetryState === telemetryState &&
+      prevActivity.ingressBps === ingressBps &&
+      prevActivity.egressBps === egressBps &&
+      areSparklinesEquivalent(prevActivity.sparkline, sparklineActivity) &&
+      prevActivity.label === activityLabel
+    ) {
+      activityKpi = prevActivity.kpi;
+    } else {
+      let rateDown: string;
+      let rateUp: string;
+      let activityBadgeText = "Standby";
+      let activityBadgeVariant: "healthy" | "quiet" | "congested" | "spike" = "quiet";
 
-    const outboundRate =
-      telemetryState === "active"
-        ? `${humanBytes(egressBps)}/s`
-        : telemetryState === "standby"
-        ? "0 B/s"
-        : "—";
+      switch (telemetryState) {
+        case "active":
+          rateDown = ingressBps > 0 ? `▼ ${humanBytes(ingressBps)}/s` : "▼ 0 B/s";
+          rateUp = egressBps > 0 ? `▲ ${humanBytes(egressBps)}/s` : "▲ 0 B/s";
+          activityBadgeText = ingressBps > 10_000_000 ? "Active" : "Nominal";
+          activityBadgeVariant = "healthy";
+          break;
+        case "stale":
+          rateDown = "▼ — /s (Stale)";
+          rateUp = "▲ — /s (Stale)";
+          activityBadgeText = "Stale";
+          activityBadgeVariant = "congested";
+          break;
+        case "standby":
+          rateDown = "▼ 0 B/s (Standby)";
+          rateUp = "▲ 0 B/s (Standby)";
+          activityBadgeText = "Standby";
+          activityBadgeVariant = "quiet";
+          break;
+        case "unavailable":
+        default:
+          rateDown = "▼ — (Unavailable)";
+          rateUp = "▲ — (Unavailable)";
+          activityBadgeText = "Unavailable";
+          activityBadgeVariant = "quiet";
+          break;
+      }
 
-    const peakRate =
-      telemetryState === "active"
-        ? `${humanBytes(peakActivityBps)}/s`
-        : telemetryState === "standby"
-        ? "0 B/s"
-        : "—";
+      const totalBps = ingressBps + egressBps;
+      const peakActivityBps = sparklineActivity.length > 0 ? Math.max(...sparklineActivity, totalBps) : totalBps;
+      const avgActivityBps =
+        sparklineActivity.length > 0
+          ? Math.round(sparklineActivity.reduce((sum, v) => sum + v, 0) / sparklineActivity.length)
+          : totalBps;
 
-    const avgRate =
-      telemetryState === "active"
-        ? `${humanBytes(avgActivityBps)}/s`
-        : telemetryState === "standby"
-        ? "0 B/s"
-        : "—";
+      const inboundRate =
+        telemetryState === "active"
+          ? `${humanBytes(ingressBps)}/s`
+          : telemetryState === "standby"
+          ? "0 B/s"
+          : "—";
 
-    return [
-      {
+      const outboundRate =
+        telemetryState === "active"
+          ? `${humanBytes(egressBps)}/s`
+          : telemetryState === "standby"
+          ? "0 B/s"
+          : "—";
+
+      const peakRate =
+        telemetryState === "active"
+          ? `${humanBytes(peakActivityBps)}/s`
+          : telemetryState === "standby"
+          ? "0 B/s"
+          : "—";
+
+      const avgRate =
+        telemetryState === "active"
+          ? `${humanBytes(avgActivityBps)}/s`
+          : telemetryState === "standby"
+          ? "0 B/s"
+          : "—";
+
+      const stableSparkline =
+        prevActivity && areSparklinesEquivalent(prevActivity.sparkline, sparklineActivity)
+          ? prevActivity.sparkline
+          : sparklineActivity;
+
+      activityKpi = {
         id: "activity",
-        label: t("total_bytes", "Network Activity"),
+        label: activityLabel,
         value: humanBytes(bytes),
         rateDown,
         rateUp,
@@ -294,7 +405,7 @@ export function useDashboardController() {
           text: activityBadgeText,
           variant: activityBadgeVariant,
         },
-        sparklineData: sparklineActivity,
+        sparklineData: stableSparkline,
         tooltipRows: [
           { label: "Inbound", value: inboundRate },
           { label: "Outbound", value: outboundRate },
@@ -317,16 +428,46 @@ export function useDashboardController() {
           percentile: humanBytes(bytes),
           trend: telemetryState === "active" ? (totalBps > 0 ? "Active" : "Nominal") : activityBadgeText,
         },
-      },
-      {
+      };
+
+      prevActivityRef.current = {
+        kpi: activityKpi,
+        bytes,
+        telemetryState,
+        ingressBps,
+        egressBps,
+        sparkline: stableSparkline,
+        label: activityLabel,
+      };
+    }
+
+    // --- Hosts KPI ---
+    const hostsLabel = t("hosts_observed", "Hosts Observed");
+    const prevHosts = prevHostsRef.current;
+    let hostsKpi: KpiViewModel;
+
+    if (
+      prevHosts &&
+      prevHosts.hosts === hosts &&
+      areSparklinesEquivalent(prevHosts.sparkline, sparklineHosts) &&
+      prevHosts.label === hostsLabel
+    ) {
+      hostsKpi = prevHosts.kpi;
+    } else {
+      const stableSparkline =
+        prevHosts && areSparklinesEquivalent(prevHosts.sparkline, sparklineHosts)
+          ? prevHosts.sparkline
+          : sparklineHosts;
+
+      hostsKpi = {
         id: "hosts",
-        label: t("hosts_observed", "Hosts Observed"),
+        label: hostsLabel,
         value: String(hosts),
         statusBadge: {
           text: hosts > 0 ? "Observed" : "Standby",
           variant: hosts > 0 ? "healthy" : "quiet",
         },
-        sparklineData: sparklineHosts,
+        sparklineData: stableSparkline,
         tooltipRows: [
           { label: "Current", value: `${hosts} endpoints` },
           { label: "Peak", value: `${Math.max(...sparklineHosts, hosts)} endpoints` },
@@ -339,16 +480,43 @@ export function useDashboardController() {
           percentile: "Observed destination endpoints",
           trend: hosts > 0 ? "Observed" : "Standby",
         },
-      },
-      {
+      };
+
+      prevHostsRef.current = {
+        kpi: hostsKpi,
+        hosts,
+        sparkline: stableSparkline,
+        label: hostsLabel,
+      };
+    }
+
+    // --- Flows KPI ---
+    const flowsLabel = t("active_flows", "Active Flows");
+    const prevFlows = prevFlowsRef.current;
+    let flowsKpi: KpiViewModel;
+
+    if (
+      prevFlows &&
+      prevFlows.flows === flows &&
+      areSparklinesEquivalent(prevFlows.sparkline, sparklineFlows) &&
+      prevFlows.label === flowsLabel
+    ) {
+      flowsKpi = prevFlows.kpi;
+    } else {
+      const stableSparkline =
+        prevFlows && areSparklinesEquivalent(prevFlows.sparkline, sparklineFlows)
+          ? prevFlows.sparkline
+          : sparklineFlows;
+
+      flowsKpi = {
         id: "flows",
-        label: t("active_flows", "Active Flows"),
+        label: flowsLabel,
         value: String(flows),
         statusBadge: {
           text: flows > 0 ? "Active" : "Standby",
           variant: flows > 0 ? "healthy" : "quiet",
         },
-        sparklineData: sparklineFlows,
+        sparklineData: stableSparkline,
         tooltipRows: [
           { label: "Current", value: `${flows} active flows` },
           { label: "Peak", value: `${Math.max(...sparklineFlows, flows)} flows` },
@@ -361,30 +529,85 @@ export function useDashboardController() {
           percentile: "Active TCP/UDP sockets",
           trend: flows > 0 ? "Active" : "Standby",
         },
-      },
-      {
+      };
+
+      prevFlowsRef.current = {
+        kpi: flowsKpi,
+        flows,
+        sparkline: stableSparkline,
+        label: flowsLabel,
+      };
+    }
+
+    // --- Cards KPI ---
+    const feedLength = feed.length;
+    const hasFinding = feed.some((f) => f.severity === "finding");
+    const cardsLabel = t("narrative_cards", "Narrative Cards");
+    const prevCards = prevCardsRef.current;
+    let cardsKpi: KpiViewModel;
+
+    if (
+      prevCards &&
+      prevCards.count === feedLength &&
+      prevCards.hasFinding === hasFinding &&
+      areSparklinesEquivalent(prevCards.sparkline, sparklineCards) &&
+      prevCards.label === cardsLabel
+    ) {
+      cardsKpi = prevCards.kpi;
+    } else {
+      const stableSparkline =
+        prevCards && areSparklinesEquivalent(prevCards.sparkline, sparklineCards)
+          ? prevCards.sparkline
+          : sparklineCards;
+
+      cardsKpi = {
         id: "cards",
-        label: t("narrative_cards", "Narrative Cards"),
-        value: String(feed.length),
+        label: cardsLabel,
+        value: String(feedLength),
         statusBadge: {
-          text: feed.some((f) => f.severity === "finding") ? "Finding" : feed.length > 0 ? "Active" : "Learning",
-          variant: feed.some((f) => f.severity === "finding") ? "spike" : feed.length > 0 ? "healthy" : "learning",
+          text: hasFinding ? "Finding" : feedLength > 0 ? "Active" : "Learning",
+          variant: hasFinding ? "spike" : feedLength > 0 ? "healthy" : "learning",
         },
-        sparklineData: sparklineCards,
+        sparklineData: stableSparkline,
         tooltipRows: [
-          { label: "Current", value: `${feed.length} narrative cards` },
-          { label: "Peak", value: `${Math.max(...sparklineCards, feed.length)} cards` },
+          { label: "Current", value: `${feedLength} narrative cards` },
+          { label: "Peak", value: `${Math.max(...sparklineCards, feedLength)} cards` },
           { label: "Feed", value: "All evidence linked" },
-          { label: "Trend", value: feed.length > 0 ? "Active" : "Empty" },
+          { label: "Trend", value: feedLength > 0 ? "Active" : "Empty" },
         ],
         tooltip: {
-          peak: `${Math.max(...sparklineCards, feed.length)} cards`,
-          avg: `${feed.length} cards`,
+          peak: `${Math.max(...sparklineCards, feedLength)} cards`,
+          avg: `${feedLength} cards`,
           percentile: "All evidence linked",
-          trend: feed.length > 0 ? "Active" : "Empty",
+          trend: feedLength > 0 ? "Active" : "Empty",
         },
-      },
-    ];
+      };
+
+      prevCardsRef.current = {
+        kpi: cardsKpi,
+        count: feedLength,
+        hasFinding,
+        sparkline: stableSparkline,
+        label: cardsLabel,
+      };
+    }
+
+    // Array memoization: return stable array reference if all KPIs are referentially equal
+    const prevKpis = prevKpisRef.current;
+    if (
+      prevKpis &&
+      prevKpis.length === 4 &&
+      prevKpis[0] === activityKpi &&
+      prevKpis[1] === hostsKpi &&
+      prevKpis[2] === flowsKpi &&
+      prevKpis[3] === cardsKpi
+    ) {
+      return prevKpis;
+    }
+
+    const nextKpis = [activityKpi, hostsKpi, flowsKpi, cardsKpi];
+    prevKpisRef.current = nextKpis;
+    return nextKpis;
   }, [monitor, feed, hostsHistory, flowsHistory, cardsHistory, t]);
 
   // 4. Health Telemetry View Model (Direct mapping of backend subsystems)
@@ -392,10 +615,28 @@ export function useDashboardController() {
   // capture_drops is an independent authoritative observation and MUST NOT
   // modify, override, or reinterpret SubsystemStatus.status.
   const healthViewModel: HealthViewModel = useMemo(() => {
-    return {
-      subsystems: monitor?.subsystems ?? [],
-      drops: monitor?.capture_drops ?? 0,
+    const drops = monitor?.capture_drops ?? 0;
+    const subsystems = monitor?.subsystems ?? EMPTY_SUBSYSTEMS;
+
+    const prevHealth = prevHealthRef.current;
+    if (
+      prevHealth &&
+      prevHealth.drops === drops &&
+      areSubsystemsEqual(prevHealth.subsystems, subsystems)
+    ) {
+      return prevHealth.vm;
+    }
+
+    const nextHealth: HealthViewModel = {
+      subsystems,
+      drops,
     };
+    prevHealthRef.current = {
+      vm: nextHealth,
+      drops,
+      subsystems,
+    };
+    return nextHealth;
   }, [monitor]);
 
   // 5. Filtered Narrative Cards (Comprehensive Category & Search Filter)

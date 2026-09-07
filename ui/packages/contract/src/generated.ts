@@ -396,6 +396,13 @@ export interface PrivacyManifest {
   redactions: string[];
 }
 
+export interface SessionSummary {
+  id: number;
+  domain: string;
+  start_mono_nanos: number;
+  flow_count: number;
+}
+
 export interface RecordingSummary {
   id: number;
   from_mono_nanos: number;

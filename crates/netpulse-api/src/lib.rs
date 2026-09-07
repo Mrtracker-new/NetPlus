@@ -37,9 +37,9 @@ pub use dto::{
     LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto, NarrativeCardDto,
     NarrativeCategoryDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto,
     PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProcessMetricDto,
-    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SeverityDto,
-    ShedStageDto, StageKindDto, StageProbeResultDto, StageProbeStatusDto, SubsystemStatusDto,
-    TelemetryStateDto, ThroughputSampleDto, VersionPinsDto, VisualEventDto,
+    ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SessionSummaryDto,
+    SeverityDto, ShedStageDto, StageKindDto, StageProbeResultDto, StageProbeStatusDto,
+    SubsystemStatusDto, TelemetryStateDto, ThroughputSampleDto, VersionPinsDto, VisualEventDto,
 };
 
 /// Contract version. Bumped on any breaking change to the message schema so UI
@@ -277,6 +277,8 @@ pub enum Query {
         stage: DiagnosticChainStageKindDto,
         target: Option<String>,
     },
+    /// List all sessions retained in the capture store.
+    ListSessions,
 }
 
 /// The typed response to a [`Query`]. One variant per query answer, so the UI
@@ -407,6 +409,10 @@ pub enum QueryResponse {
     /// Result of an active stage diagnostic probe.
     StageProbeResult {
         result: StageProbeResultDto,
+    },
+    /// Retained sessions summary list.
+    Sessions {
+        sessions: Vec<SessionSummaryDto>,
     },
 }
 
@@ -806,6 +812,12 @@ mod tests {
         let json2 = serde_json::to_string(&q2).unwrap();
         let back2: Query = serde_json::from_str(&json2).unwrap();
         assert_eq!(q2, back2);
+
+        let q3 = Query::ListSessions;
+        let json3 = serde_json::to_string(&q3).unwrap();
+        let back3: Query = serde_json::from_str(&json3).unwrap();
+        assert_eq!(q3, back3);
+        assert!(json3.contains("\"kind\":\"listSessions\""));
     }
 
     #[test]
@@ -870,6 +882,20 @@ mod tests {
         let json4 = serde_json::to_string(&r4).unwrap();
         let back4: QueryResponse = serde_json::from_str(&json4).unwrap();
         assert_eq!(r4, back4);
+
+        let r5 = QueryResponse::Sessions {
+            sessions: vec![SessionSummaryDto {
+                id: 1,
+                domain: "example.com".into(),
+                start_mono_nanos: 1_000,
+                flow_count: 3,
+            }],
+        };
+        let json5 = serde_json::to_string(&r5).unwrap();
+        let back5: QueryResponse = serde_json::from_str(&json5).unwrap();
+        assert_eq!(r5, back5);
+        assert!(json5.contains("\"kind\":\"sessions\""));
+        assert!(json5.contains("\"domain\":\"example.com\""));
     }
 
     #[test]

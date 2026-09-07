@@ -32,6 +32,7 @@ import type {
   AnimationModel,
   SecurityFinding,
   AssistantAnswer,
+  SessionSummary,
   RecordingSummary,
   ReplayState,
   ExportPreview,
@@ -103,7 +104,8 @@ export type Query =
   | { kind: "buildAndDecodePacket"; layers: string[] }
   | { kind: "compareSessions"; session_id_a: number; session_id_b: number }
   | { kind: "listFleetHosts" }
-  | { kind: "runStageProbe"; stage: DiagnosticChainStageKind; target?: string | null };
+  | { kind: "runStageProbe"; stage: DiagnosticChainStageKind; target?: string | null }
+  | { kind: "listSessions" };
 
 export type FleetHostStatus = "Online" | "Offline" | "Degraded" | "Healthy" | "Unknown";
 
@@ -143,7 +145,8 @@ export type QueryResponse =
   | { kind: "decodedPacketInspection"; inspection: PacketInspection }
   | { kind: "sessionDiff"; diff: SessionDiff }
   | { kind: "fleetHosts"; hosts: FleetHost[] }
-  | { kind: "stageProbeResult"; result: StageProbeResult };
+  | { kind: "stageProbeResult"; result: StageProbeResult }
+  | { kind: "sessions"; sessions: SessionSummary[] };
 
 /** The only write paths UI→engine (mirrors `netpulse_api::Command`). Observe-only:
  *  nothing here modifies network traffic. */

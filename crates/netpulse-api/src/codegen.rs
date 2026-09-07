@@ -624,6 +624,15 @@ pub fn typescript_contract() -> String {
         ],
     ));
     s.push_str(&iface(
+        "SessionSummary",
+        &[
+            ("id", "number"),
+            ("domain", "string"),
+            ("start_mono_nanos", "number"),
+            ("flow_count", "number"),
+        ],
+    ));
+    s.push_str(&iface(
         "RecordingSummary",
         &[
             ("id", "number"),
@@ -895,6 +904,7 @@ mod tests {
             "ExportSelection",
             "VersionPins",
             "PrivacyManifest",
+            "SessionSummary",
             "RecordingSummary",
             "ReplayState",
             "ExportPreview",

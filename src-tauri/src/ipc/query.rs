@@ -1,5 +1,5 @@
 use crate::AppState;
-use netpulse_api::{InterfaceDto, Query, QueryResponse};
+use netpulse_api::{InterfaceDto, Query, QueryResponse, SessionSummaryDto};
 use netpulse_engine::attribution::Attribution;
 use netpulse_engine::education::{
     explorer_browse, explorer_search, handshake_animation_for_flow, present_education,
@@ -226,6 +226,35 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             Ok(QueryResponse::Recordings {
                 recordings: summaries,
             })
+        }
+        Query::ListSessions => {
+            let session_ids = store.session_ids();
+            let mut sessions = Vec::with_capacity(session_ids.len());
+            for sid in session_ids {
+                let Some(s) = store.session(sid) else {
+                    continue;
+                };
+                let flows = store.flows_for_session(sid);
+                let flow_count = s.flow_ids.len() as u32;
+                let domain = extract_session_domain(s, &flows, store.resolutions());
+                let start_mono_nanos = if s.start_ts.mono_nanos > 0 {
+                    s.start_ts.mono_nanos
+                } else {
+                    flows
+                        .iter()
+                        .map(|f| f.first_ts.mono_nanos)
+                        .min()
+                        .unwrap_or(0)
+                };
+
+                sessions.push(SessionSummaryDto {
+                    id: s.id,
+                    domain,
+                    start_mono_nanos,
+                    flow_count,
+                });
+            }
+            Ok(QueryResponse::Sessions { sessions })
         }
         Query::ReplayState => {
             let replay = state.replay.lock().map_err(|_| "state poisoned")?;
@@ -843,4 +872,41 @@ fn is_valid_probe_target(t: &str) -> bool {
             && !label.starts_with('-')
             && !label.ends_with('-')
     })
+}
+
+/// Authoritatively extract a clean domain name for a session from its trigger or observed flow resolutions.
+fn extract_session_domain(
+    session: &netpulse_core::Session,
+    flows: &[&netpulse_core::Flow],
+    resolutions: &std::collections::HashMap<std::net::IpAddr, Vec<netpulse_core::HostName>>,
+) -> String {
+    // 1. Extract host from trigger (e.g. "resolved and connected to example.com" or "user navigated to example.com")
+    if let Some(host) = session
+        .trigger
+        .rsplit(" to ")
+        .next()
+        .filter(|s| !s.is_empty() && *s != session.trigger)
+    {
+        return host.trim().to_string();
+    }
+
+    // 2. Check if trigger itself is already a domain name without spaces
+    let trimmed = session.trigger.trim();
+    if !trimmed.is_empty() && !trimmed.contains(' ') {
+        return trimmed.to_string();
+    }
+
+    // 3. Look up destination IP of session flows in resolutions
+    for flow in flows {
+        if let Some(names) = resolutions.get(&flow.key.dst_ip) {
+            if let Some(first) = names.first() {
+                if !first.name.trim().is_empty() {
+                    return first.name.trim().to_string();
+                }
+            }
+        }
+    }
+
+    // 4. Fallback: formatted session id
+    format!("Session #{}", session.id)
 }

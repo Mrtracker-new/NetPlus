@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import type { PageJourney } from "@netpulse/contract";
+import type { PageJourney, SessionSummary } from "@netpulse/contract";
 import { query } from "../ipc";
 import { useStore } from "../state/store";
 import { useDisclosure } from "../modes/DisclosureContext";
@@ -14,10 +14,11 @@ export interface JourneySessionOption {
 }
 
 export function useJourneyController() {
-  const { feed } = useStore();
+  const { feed, snapshotSequence } = useStore();
   const { depth } = useDisclosure();
   const { navigationTarget } = useEvidenceNavigation();
 
+  const [storedSessions, setStoredSessions] = useState<SessionSummary[]>([]);
   const [journey, setJourney] = useState<PageJourney | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,30 +33,70 @@ export function useJourneyController() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Extract sessions list from feed evidence & navigation target
+  // Authoritatively discover sessions from IPC on mount and on capture updates
+  const fetchSessions = useCallback(async () => {
+    try {
+      const res = await query({ kind: "listSessions" });
+      if (res.kind === "sessions") {
+        setStoredSessions(res.sessions);
+      }
+    } catch {
+      // Gracefully ignore in offline or test environments
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions, snapshotSequence, feed]);
+
+  // Extract sessions list from authoritative stored sessions merged with feed evidence
   const sessions = useMemo<JourneySessionOption[]>(() => {
     const map = new Map<number, JourneySessionOption>();
-    let latestId: number | null = null;
 
+    // 1. Authoritative sessions from CaptureStore
+    for (const s of storedSessions) {
+      map.set(s.id, {
+        id: s.id,
+        label: s.domain,
+        domain: s.domain,
+        category: "historical",
+        timestamp: s.start_mono_nanos,
+      });
+    }
+
+    // 2. Augment and correlate with live feed cards evidence
     for (const card of feed) {
       for (const ev of card.evidence) {
-        if (ev.kind === "session" && !map.has(ev.id)) {
-          if (latestId === null) latestId = ev.id;
-          const isLatest = ev.id === latestId;
-          map.set(ev.id, {
-            id: ev.id,
-            label: card.headline,
-            domain: card.headline.split(" ")[0] || `Session #${ev.id}`,
-            category: isLatest ? "latest" : "active",
-            timestamp: card.at_mono_nanos,
-          });
+        if (ev.kind === "session") {
+          const existing = map.get(ev.id);
+          if (existing) {
+            existing.category = "active";
+            if (!existing.timestamp && card.at_mono_nanos) {
+              existing.timestamp = card.at_mono_nanos;
+            }
+            if (card.headline) {
+              existing.label = card.headline;
+            }
+          } else {
+            map.set(ev.id, {
+              id: ev.id,
+              label: card.headline,
+              domain: card.headline.split(" ")[0] || `Session #${ev.id}`,
+              category: "active",
+              timestamp: card.at_mono_nanos,
+            });
+          }
         }
       }
     }
 
     const list = Array.from(map.values());
-    return list.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
-  }, [feed]);
+    list.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+    if (list.length > 0) {
+      list[0]!.category = "latest";
+    }
+    return list;
+  }, [storedSessions, feed]);
 
   const activeSessionId =
     selectedSessionId !== null
@@ -105,6 +146,11 @@ export function useJourneyController() {
     setSelectedStageIndex(null);
     fetchJourney();
   }, [fetchJourney]);
+
+  const refetch = useCallback(async () => {
+    await fetchSessions();
+    await fetchJourney();
+  }, [fetchSessions, fetchJourney]);
 
   // Summary Metrics Calculation — Authoritative derivation from real PageJourney data
   const summaryMetrics = useMemo(() => {
@@ -169,6 +215,6 @@ export function useJourneyController() {
     selectedStageIndex,
     setSelectedStageIndex,
     summaryMetrics,
-    refetch: fetchJourney,
+    refetch,
   };
 }

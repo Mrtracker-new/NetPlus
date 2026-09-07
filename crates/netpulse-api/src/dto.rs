@@ -798,6 +798,15 @@ pub struct PrivacyManifestDto {
     pub redactions: Vec<String>,
 }
 
+/// Authoritative summary metadata for a captured session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SessionSummaryDto {
+    pub id: u64,
+    pub domain: String,
+    pub start_mono_nanos: u64,
+    pub flow_count: u32,
+}
+
 /// A recording listed for the user. Everything needed to understand
 /// and choose a recording without opening it: its window, size, privacy level, and
 /// determinism metadata.
@@ -1305,6 +1314,12 @@ mod tests {
 
     #[test]
     fn lifecycle_dtos_round_trip() {
+        roundtrip(&SessionSummaryDto {
+            id: 42,
+            domain: "example.com".into(),
+            start_mono_nanos: 1_234_567,
+            flow_count: 5,
+        });
         roundtrip(&RecordingSummaryDto {
             id: 1,
             from_mono_nanos: 0,

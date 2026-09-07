@@ -1005,15 +1005,53 @@ fn test_monitor_snapshot_query_enforces_standby_when_capture_inactive() {
         // Verify that subsystems truthfully report Standby (not Capturing or 7 Hops Grounded)
         let subs = &snapshot.subsystems;
         if let Some(cap) = subs.iter().find(|s| s.name == "Capture Pipeline") {
-            assert_eq!(cap.detail, "Standby", "Capture Pipeline must be Standby when inactive");
+            assert_eq!(
+                cap.detail, "Standby",
+                "Capture Pipeline must be Standby when inactive"
+            );
         }
         if let Some(driver) = subs.iter().find(|s| s.name == "Network Driver") {
-            assert_eq!(driver.detail, "Standby", "Network Driver must be Standby when inactive");
+            assert_eq!(
+                driver.detail, "Standby",
+                "Network Driver must be Standby when inactive"
+            );
         }
         if let Some(diag) = subs.iter().find(|s| s.name == "Diagnostic Engine") {
-            assert_eq!(diag.detail, "Standby", "Diagnostic Engine must be Standby when inactive and 0 flows");
+            assert_eq!(
+                diag.detail, "Standby",
+                "Diagnostic Engine must be Standby when inactive and 0 flows"
+            );
         }
     } else {
         panic!("expected MonitorSnapshot response");
+    }
+}
+
+#[test]
+fn test_query_list_sessions() {
+    let state = seeded_state();
+    {
+        let mut store = state.store.lock().unwrap();
+        store.insert_session(netpulse_core::Session {
+            id: 42,
+            process_id: 0,
+            start_ts: netpulse_core::Timestamp::new(500_000, 0),
+            trigger: "resolved and connected to github.com".into(),
+            flow_ids: vec![10, 11, 12],
+        });
+    }
+
+    let res = execute_query(&state, Query::ListSessions).unwrap();
+    match res {
+        QueryResponse::Sessions { sessions } => {
+            let s = sessions
+                .iter()
+                .find(|s| s.id == 42)
+                .expect("session 42 found");
+            assert_eq!(s.domain, "github.com");
+            assert_eq!(s.start_mono_nanos, 500_000);
+            assert_eq!(s.flow_count, 3);
+        }
+        _ => panic!("expected Sessions response"),
     }
 }

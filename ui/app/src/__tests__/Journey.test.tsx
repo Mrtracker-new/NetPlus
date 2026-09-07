@@ -92,6 +92,49 @@ describe("Journey Screen & useJourneyController", () => {
     expect(result.current.sessions[0]?.id).toBe(101);
   });
 
+  it("discovers historical sessions authoritatively from listSessions query", async () => {
+    vi.spyOn(ipc, "query").mockImplementation(async (q) => {
+      if (q.kind === "listSessions") {
+        return {
+          kind: "sessions" as const,
+          sessions: [
+            {
+              id: 202,
+              domain: "github.com",
+              start_mono_nanos: 2000,
+              flow_count: 5,
+            },
+            {
+              id: 201,
+              domain: "example.com",
+              start_mono_nanos: 1000,
+              flow_count: 2,
+            },
+          ],
+        };
+      }
+      return mockJourneyResponse;
+    });
+
+    const { result } = renderHook(() => useJourneyController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.sessions.length).toBe(2));
+
+    expect(result.current.sessions[0]?.id).toBe(202);
+    expect(result.current.sessions[0]?.domain).toBe("github.com");
+    expect(result.current.sessions[0]?.category).toBe("latest");
+
+    expect(result.current.sessions[1]?.id).toBe(201);
+    expect(result.current.sessions[1]?.domain).toBe("example.com");
+    expect(result.current.sessions[1]?.category).toBe("historical");
+  });
+
   it("renders empty state when no journey has been captured yet", async () => {
     render(<JourneyTestWrapper />);
 

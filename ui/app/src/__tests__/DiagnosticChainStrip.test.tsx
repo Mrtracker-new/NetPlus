@@ -53,11 +53,20 @@ describe("DiagnosticChainStrip", () => {
     ],
   };
 
-  it("renders all 7 diagnostic stages in the track", () => {
+  it("renders all 7 diagnostic stages in the track with navigation landmark and disclosure attributes", () => {
     render(<DiagnosticChainStrip chain={mockChain} />);
 
-    expect(screen.getByRole("region", { name: /7-Stage Diagnostic Telemetry Chain/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Device Stack/i })).toBeInTheDocument();
+    const nav = screen.getByRole("navigation", { name: /7-Stage Diagnostic Telemetry Chain/i });
+    expect(nav).toBeInTheDocument();
+    expect(nav.tagName.toLowerCase()).toBe("nav");
+    expect(nav).not.toHaveAttribute("role");
+
+    const deviceBtn = screen.getByRole("button", { name: /Device Stack/i });
+    expect(deviceBtn).toBeInTheDocument();
+    expect(deviceBtn).toHaveAttribute("aria-expanded", "false");
+    expect(deviceBtn).toHaveAttribute("aria-controls", "stage-inspector-drawer");
+    expect(deviceBtn).not.toHaveAttribute("aria-haspopup");
+
     expect(screen.getByRole("button", { name: /Gateway Hop/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /DNS Resolver/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /ISP/i })).toBeInTheDocument();
@@ -70,7 +79,13 @@ describe("DiagnosticChainStrip", () => {
 
     // Click on Device stage (observed, 0.2 ms)
     const deviceBtn = screen.getByRole("button", { name: /Device Stack/i });
+    expect(deviceBtn).toHaveAttribute("aria-expanded", "false");
     fireEvent.click(deviceBtn);
+    expect(deviceBtn).toHaveAttribute("aria-expanded", "true");
+
+    const inspectorDrawer = screen.getByRole("region", { name: /Inspection details for Device Stack/i });
+    expect(inspectorDrawer).toBeInTheDocument();
+    expect(inspectorDrawer).toHaveAttribute("id", "stage-inspector-drawer");
 
     const badge = screen.getByTestId("stage-measurement-badge");
     expect(badge).toBeInTheDocument();

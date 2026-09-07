@@ -212,7 +212,6 @@ export const DiagnosticChainStrip = memo(function DiagnosticChainStrip({
     <nav
       className="np-diag-chain"
       aria-label="7-Stage Diagnostic Telemetry Chain"
-      role="region"
     >
       <div className="np-diag-chain__track">
         {ORDERED_STAGES.map((def, idx) => {
@@ -242,8 +241,8 @@ export const DiagnosticChainStrip = memo(function DiagnosticChainStrip({
                 }`}
                 title={fullLabel}
                 aria-label={ariaLabel}
-                aria-haspopup="dialog"
                 aria-expanded={isInspected}
+                aria-controls="stage-inspector-drawer"
                 onClick={() => handleNodeClick(def, node)}
                 tabIndex={0}
               >
@@ -275,6 +274,7 @@ export const DiagnosticChainStrip = memo(function DiagnosticChainStrip({
       {/* Stage Measurement Inspection Drawer */}
       {inspectedDef && (
         <div
+          id="stage-inspector-drawer"
           className="np-diag-chain__inspector"
           role="region"
           aria-label={`Inspection details for ${inspectedNode?.label || inspectedDef.defaultLabel}`}

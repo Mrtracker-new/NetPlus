@@ -888,7 +888,7 @@ describe("Dashboard Screen", () => {
       });
 
       render(<DashboardTestWrapper />);
-      const chain = screen.getByRole("region", { name: "7-Stage Diagnostic Telemetry Chain" });
+      const chain = screen.getByRole("navigation", { name: "7-Stage Diagnostic Telemetry Chain" });
       expect(chain).toBeInTheDocument();
 
       // Configured stages

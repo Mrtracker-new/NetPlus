@@ -159,37 +159,19 @@ export function useJourneyController() {
     const totalEvidence = journey.stages.reduce((s, st) => s + st.evidence.length, 0);
     const orgSet = new Set(journey.fanout.map((f) => f.label));
 
-    // Authoritatively scan stage details for timing facts (never fabricate)
-    let durationMs: number | null = null;
-    let ttfbMs: number | null = null;
-
-    for (const stage of journey.stages) {
-      if (stage.detail) {
-        const durMatch = stage.detail.match(/in\s+(\d+(?:\.\d+)?)\s*ms/i);
-        if (durMatch && durMatch[1]) {
-          const val = parseFloat(durMatch[1]);
-          if (!isNaN(val) && isFinite(val) && val >= 0) {
-            durationMs = (durationMs || 0) + val;
-          }
-        }
-        const ttfbMatch = stage.detail.match(/ttfb[:\s]+(\d+(?:\.\d+)?)\s*ms/i);
-        if (ttfbMatch && ttfbMatch[1]) {
-          const val = parseFloat(ttfbMatch[1]);
-          if (!isNaN(val) && isFinite(val) && val >= 0) {
-            ttfbMs = val;
-          }
-        }
-      }
-    }
+    // Directly bind to authoritative journey metrics (never regex parse)
+    const durationMs = journey.duration_ms;
+    const ttfbMs = journey.ttfb_ms;
 
     const durationStr =
-      durationMs !== null
+      durationMs !== null && durationMs !== undefined
         ? durationMs >= 1000
           ? `${(durationMs / 1000).toFixed(2)} s`
           : `${durationMs.toFixed(0)} ms`
         : "Unavailable";
 
-    const ttfbStr = ttfbMs !== null ? `${ttfbMs.toFixed(0)} ms` : "Unavailable";
+    const ttfbStr =
+      ttfbMs !== null && ttfbMs !== undefined ? `${ttfbMs.toFixed(0)} ms` : "Unavailable";
 
     return {
       durationStr,

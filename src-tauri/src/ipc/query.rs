@@ -183,6 +183,8 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                     session_id,
                     stages: Vec::new(),
                     fanout: Vec::new(),
+                    duration_ms: None,
+                    ttfb_ms: None,
                 });
             Ok(QueryResponse::PageJourney { journey })
         }

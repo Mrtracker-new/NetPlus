@@ -441,6 +441,8 @@ pub fn page_journey_dto(journey: &PageJourney, depth: Depth) -> PageJourneyDto {
             .map(|s| journey_stage_dto(s, depth))
             .collect(),
         fanout: journey.fanout.iter().map(fanout_node_dto).collect(),
+        duration_ms: journey.duration_ms,
+        ttfb_ms: journey.ttfb_ms,
     }
 }
 

@@ -307,6 +307,8 @@ export interface PageJourney {
   session_id: number;
   stages: JourneyStage[];
   fanout: FanoutNode[];
+  duration_ms: number | null;
+  ttfb_ms: number | null;
 }
 
 export interface VisualEvent {

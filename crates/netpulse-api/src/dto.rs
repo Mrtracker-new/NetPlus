@@ -609,6 +609,8 @@ pub struct PageJourneyDto {
     pub session_id: u64,
     pub stages: Vec<JourneyStageDto>,
     pub fanout: Vec<FanoutNodeDto>,
+    pub duration_ms: Option<u64>,
+    pub ttfb_ms: Option<u64>,
 }
 
 /// Which way a visual element moves.
@@ -1255,6 +1257,8 @@ mod tests {
                 bytes: 300,
                 evidence: vec![EvidenceRefDto::Flow(1)],
             }],
+            duration_ms: Some(150),
+            ttfb_ms: Some(45),
         });
         roundtrip(&AnimationModelDto {
             kind: AnimationKindDto::Handshake,

@@ -478,6 +478,8 @@ pub fn typescript_contract() -> String {
             ("session_id", "number"),
             ("stages", "JourneyStage[]"),
             ("fanout", "FanoutNode[]"),
+            ("duration_ms", "number | null"),
+            ("ttfb_ms", "number | null"),
         ],
     ));
     s.push_str(&iface(

@@ -21,7 +21,7 @@
 use std::collections::BTreeMap;
 
 use netpulse_core::net::{L4Proto, L7Proto};
-use netpulse_core::{EvidenceRef, Flow, Host};
+use netpulse_core::{EvidenceRef, Flow, Host, ProtoEvent, ProtoEventKind};
 
 use crate::render::SessionView;
 
@@ -80,6 +80,8 @@ pub struct PageJourney {
     pub session_id: u64,
     pub stages: Vec<JourneyStage>,
     pub fanout: Vec<FanoutNode>,
+    pub duration_ms: Option<u64>,
+    pub ttfb_ms: Option<u64>,
 }
 
 /// Build a journey from a session view, without host enrichment (fan-out nodes
@@ -116,10 +118,15 @@ pub fn build_page_journey_with_hosts(view: &SessionView, hosts: &[Host]) -> Page
     }
     stages.push(completion_stage(view));
 
+    let duration_ms = calculate_duration_ms(&view.flows);
+    let ttfb_ms = calculate_ttfb_ms(&view.events);
+
     PageJourney {
         session_id: view.session.id,
         stages,
         fanout,
+        duration_ms,
+        ttfb_ms,
     }
 }
 
@@ -369,6 +376,46 @@ fn triggering_host(trigger: &str) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Calculate total session duration in milliseconds from the earliest flow start
+/// to the latest flow end, or None if no flows exist.
+fn calculate_duration_ms(flows: &[&Flow]) -> Option<u64> {
+    let first = flows.iter().map(|f| f.first_ts.mono_nanos).min()?;
+    let last = flows.iter().map(|f| f.last_ts.mono_nanos).max()?;
+    if last >= first {
+        Some((last - first) / 1_000_000)
+    } else {
+        None
+    }
+}
+
+/// Calculate HTTP Time To First Byte (TTFB) in milliseconds from HttpRequest to HttpResponse.
+fn calculate_ttfb_ms(events: &[&ProtoEvent]) -> Option<u64> {
+    let first_req = events
+        .iter()
+        .filter(|e| e.kind == ProtoEventKind::HttpRequest)
+        .min_by_key(|e| e.ts.mono_nanos)?;
+
+    let resp = events
+        .iter()
+        .filter(|e| {
+            e.flow_id == first_req.flow_id
+                && e.kind == ProtoEventKind::HttpResponse
+                && e.ts.mono_nanos >= first_req.ts.mono_nanos
+        })
+        .min_by_key(|e| e.ts.mono_nanos)
+        .or_else(|| {
+            events
+                .iter()
+                .filter(|e| {
+                    e.kind == ProtoEventKind::HttpResponse
+                        && e.ts.mono_nanos >= first_req.ts.mono_nanos
+                })
+                .min_by_key(|e| e.ts.mono_nanos)
+        })?;
+
+    Some((resp.ts.mono_nanos - first_req.ts.mono_nanos) / 1_000_000)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -579,5 +626,34 @@ mod tests {
             .find(|st| st.kind == StageKind::Completion)
             .unwrap();
         assert!(done.narration.contains("did not complete"));
+    }
+
+    #[test]
+    fn journey_calculates_duration_and_ttfb_accurately() {
+        let s = session(1_000, vec![10]);
+        let mut f = flow(
+            10,
+            ip(93, 184, 216, 34),
+            L7Proto::Http1,
+            1_000_000_000,
+            4096,
+            FlowState::Closed,
+        );
+        f.last_ts = Timestamp::new(1_250_000_000, 1_250_000_000);
+        let req_event = ProtoEvent {
+            flow_id: 10,
+            ts: Timestamp::new(1_050_000_000, 1_050_000_000),
+            kind: ProtoEventKind::HttpRequest,
+        };
+        let resp_event = ProtoEvent {
+            flow_id: 10,
+            ts: Timestamp::new(1_095_000_000, 1_095_000_000),
+            kind: ProtoEventKind::HttpResponse,
+        };
+        let view = SessionView::new(&s, vec![&f], vec![&req_event, &resp_event]);
+        let journey = build_page_journey(&view);
+
+        assert_eq!(journey.duration_ms, Some(250));
+        assert_eq!(journey.ttfb_ms, Some(45));
     }
 }

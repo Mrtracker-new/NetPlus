@@ -58,6 +58,8 @@ const mockJourneyResponse = {
         evidence: [{ kind: "flow" as const, id: 602 }],
       },
     ],
+    duration_ms: null,
+    ttfb_ms: null,
   },
 };
 
@@ -268,6 +270,48 @@ describe("Journey Screen & useJourneyController", () => {
 
     await screen.findByText("Journey Summary");
     expect(container.querySelector(".np-journey__stepper")).toBeNull();
+  });
+
+  it("displays accurate Duration and TTFB values at all depth levels", async () => {
+    const depths = ["beginner", "intermediate", "expert"] as const;
+    for (const d of depths) {
+      cleanup();
+      const journeyWithMetrics = {
+        kind: "pageJourney" as const,
+        journey: {
+          session_id: 101,
+          stages: [
+            {
+              kind: "request" as const,
+              title: "Request",
+              narration: "It requested the page.",
+              detail: d === "beginner" ? null : "Detail line",
+              evidence: [],
+            },
+          ],
+          fanout: [],
+          duration_ms: 1250,
+          ttfb_ms: 45,
+        },
+      };
+      vi.spyOn(ipc, "query").mockResolvedValue(journeyWithMetrics);
+
+      setFeed([
+        {
+          headline: "example.com session",
+          summary: "Loaded page",
+          lines: [],
+          severity: "neutral",
+          evidence: [{ kind: "session", id: 101 }],
+          at_mono_nanos: 1000,
+        },
+      ]);
+
+      render(<JourneyTestWrapper />);
+
+      expect(await screen.findByText("1.25 s")).toBeInTheDocument();
+      expect(screen.getByText("45 ms")).toBeInTheDocument();
+    }
   });
 });
 

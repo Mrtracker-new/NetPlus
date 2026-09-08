@@ -3918,7 +3918,7 @@ button {
   border-radius: var(--np-radius-md, 12px);
   padding: 14px 18px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.035), 4px 4px 12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  box-shadow: var(--np-neu-card);
   position: relative;
   overflow: hidden;
   transition: transform var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease), border-color var(--np-t, 0.15s ease);
@@ -4009,7 +4009,7 @@ button {
   margin-bottom: var(--np-3, 12px);
   background: var(--np-surface-1);
   border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.04), 4px 4px 14px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--np-neu-card);
   padding: 10px 16px;
   border-radius: var(--np-radius-md, 12px);
   min-height: 52px;
@@ -4039,7 +4039,7 @@ button {
   font-size: var(--np-fs-sm, 0.8125rem);
   border-radius: var(--np-radius-sm, 8px);
   border: 1px solid rgba(0, 0, 0, 0.5);
-  background: var(--np-surface-recessed, #0c1018);
+  background: var(--np-surface-recessed);
   box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.65), inset -1px -1px 3px rgba(255, 255, 255, 0.04);
   color: var(--np-text, #e2e8f0);
   outline: none;
@@ -4096,7 +4096,7 @@ button {
 .np-timeline-filters__btn:hover {
   color: var(--np-text, #e2e8f0);
   transform: translateY(-1px);
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.04), 3px 3px 8px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--np-neu-control);
 }
 
 .np-timeline-filters__btn:active,
@@ -4214,7 +4214,7 @@ button {
   position: relative;
   height: 26px;
   border-radius: var(--np-radius-pill, 999px);
-  background: var(--np-surface-recessed, #0c1018);
+  background: var(--np-surface-recessed);
   box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.65), inset -1px -1px 3px rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.35);
   display: flex;
@@ -4420,7 +4420,7 @@ button {
 
 .np-timeline-inspector__btn-stepper:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.04), 3px 3px 8px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--np-neu-control);
 }
 
 .np-timeline-inspector__btn-stepper:active:not(:disabled) {
@@ -4576,7 +4576,7 @@ button {
 }
 
 .np-timeline-inspector__log-well {
-  background: var(--np-surface-recessed, #0c1018);
+  background: var(--np-surface-recessed);
   border: 1px solid rgba(0, 0, 0, 0.5);
   box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.7), inset -1px -1px 3px rgba(255, 255, 255, 0.04);
   padding: 12px 16px;
@@ -4643,7 +4643,7 @@ button {
   padding: 12px 16px;
   background: var(--np-surface-1);
   border-radius: var(--np-radius-md, 12px);
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.035), 4px 4px 12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  box-shadow: var(--np-neu-card);
   border: 1px solid rgba(255, 255, 255, 0.05);
   min-width: 0;
   transition: transform var(--np-t), box-shadow var(--np-t);

@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { TimeRibbon } from "../TimeRibbon";
 import type { RibbonEvent } from "../types";
@@ -198,6 +198,50 @@ describe("TimeRibbon Component", () => {
       />
     );
     expect(scrubber).toHaveStyle({ left: "80%" });
+  });
+
+  it("handles duplicate event objects maintaining distinct global indices without indexOf collisions", () => {
+    const sharedEvent: RibbonEvent = {
+      at: 1000,
+      label: "Repeated Alert",
+      severity: "finding",
+    };
+    const onSelect = vi.fn();
+
+    render(<TimeRibbon events={[sharedEvent, sharedEvent]} onSelectEvent={onSelect} />);
+
+    const mark1 = screen.getByRole("button", { name: "Event 1: Repeated Alert (finding)" });
+    const mark2 = screen.getByRole("button", { name: "Event 2: Repeated Alert (finding)" });
+
+    expect(mark1).toBeInTheDocument();
+    expect(mark2).toBeInTheDocument();
+
+    // Clicking second identical event mark passes globalIndex 1, not 0
+    fireEvent.click(mark2);
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith(sharedEvent, 1);
+  });
+
+  it("safely computes min and max via loop reduction without timeDomain or array spread", () => {
+    const events: RibbonEvent[] = [
+      { at: 5000, label: "Mid", severity: "neutral" },
+      { at: 1000, label: "Min", severity: "neutral" },
+      { at: 9000, label: "Max", severity: "neutral" },
+    ];
+
+    render(<TimeRibbon events={events} />);
+
+    const minMark = screen.getByRole("button", { name: "Event 2: Min (neutral)" });
+    const midMark = screen.getByRole("button", { name: "Event 1: Mid (neutral)" });
+    const maxMark = screen.getByRole("button", { name: "Event 3: Max (neutral)" });
+
+    // Span is 9000 - 1000 = 8000
+    // Min at 1000 -> ratio 0 -> clamped to 2%
+    // Mid at 5000 -> ratio (5000-1000)/8000 = 0.5 -> 50%
+    // Max at 9000 -> ratio 1.0 -> clamped to 98%
+    expect(minMark).toHaveStyle({ left: "2%" });
+    expect(midMark).toHaveStyle({ left: "50%" });
+    expect(maxMark).toHaveStyle({ left: "98%" });
   });
 });
 

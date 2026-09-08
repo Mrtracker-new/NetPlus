@@ -79,9 +79,17 @@ export const TimeRibbon = memo(function TimeRibbon({
     return <EmptyState compact description="No timeline events to display." />;
   }
 
-  const times = events.map((e) => e.at);
-  const min = timeDomain !== undefined ? timeDomain.min : Math.min(...times);
-  const max = timeDomain !== undefined ? timeDomain.max : Math.max(...times);
+  let min = timeDomain !== undefined ? timeDomain.min : events[0]!.at;
+  let max = timeDomain !== undefined ? timeDomain.max : events[0]!.at;
+
+  if (timeDomain === undefined) {
+    for (let i = 1; i < events.length; i++) {
+      const at = events[i]!.at;
+      if (at < min) min = at;
+      if (at > max) max = at;
+    }
+  }
+
   const span = max - min || 1;
 
   // Clamped proportional positioning (2% to 98%)
@@ -120,6 +128,21 @@ export const TimeRibbon = memo(function TimeRibbon({
       ? events[0]?.at
       : undefined;
 
+  // Group events by severity with their original globalIndex in a single O(N) pass
+  const laneEventsMap: Record<Severity, Array<{ event: RibbonEvent; globalIndex: number }>> = {
+    finding: [],
+    notable: [],
+    neutral: [],
+  };
+
+  for (let i = 0; i < events.length; i++) {
+    const e = events[i]!;
+    const lane = laneEventsMap[e.severity];
+    if (lane) {
+      lane.push({ event: e, globalIndex: i });
+    }
+  }
+
   return (
     <div className="np-ribbon" role="region" aria-label="Interactive event timeline ribbon">
       {scrubberTimestamp !== undefined && (
@@ -132,7 +155,7 @@ export const TimeRibbon = memo(function TimeRibbon({
         </div>
       )}
       {RIBBON_LANES.map((lane) => {
-        const laneEvents = events.filter((e) => e.severity === lane.severity);
+        const laneEntries = laneEventsMap[lane.severity] || [];
         return (
           <div className="np-ribbon__lane" key={lane.severity}>
             <span className="np-ribbon__lane-label">
@@ -144,15 +167,14 @@ export const TimeRibbon = memo(function TimeRibbon({
               {lane.label}
             </span>
             <div
-              className={`np-ribbon__track ${laneEvents.length === 0 ? "np-ribbon__track--empty" : ""}`}
+              className={`np-ribbon__track ${laneEntries.length === 0 ? "np-ribbon__track--empty" : ""}`}
             >
-              {laneEvents.length === 0 && (
+              {laneEntries.length === 0 && (
                 <span className="np-ribbon__empty-guide" aria-hidden="true">
                   — No {lane.label.toLowerCase()} in window —
                 </span>
               )}
-              {laneEvents.map((e) => {
-                const globalIndex = events.indexOf(e);
+              {laneEntries.map(({ event: e, globalIndex }) => {
                 const isHighlighted = isEventHighlighted(e, globalIndex);
 
                 return (

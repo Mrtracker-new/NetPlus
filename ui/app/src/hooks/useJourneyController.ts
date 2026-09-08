@@ -22,7 +22,7 @@ export function useJourneyController() {
   const [journey, setJourney] = useState<PageJourney | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(null);
+  const [selectedStageIndex, setSelectedStageIndex] = useState<number | null>(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
@@ -134,6 +134,7 @@ export function useJourneyController() {
       });
       if (res.kind === "pageJourney") {
         setJourney(res.journey);
+        setSelectedStageIndex(0);
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -143,7 +144,7 @@ export function useJourneyController() {
   }, [activeSessionId, depth]);
 
   useEffect(() => {
-    setSelectedStageIndex(null);
+    setSelectedStageIndex(0);
     fetchJourney();
   }, [fetchJourney]);
 

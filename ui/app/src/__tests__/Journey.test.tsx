@@ -238,15 +238,23 @@ describe("Journey Screen & useJourneyController", () => {
     const stageTabs = await screen.findAllByRole("tab", { name: /Stage 1: DNS Resolution/i });
     const stageTab = stageTabs[0]!;
     expect(stageTab).toBeInTheDocument();
-    expect(stageTab).toHaveAttribute("aria-selected", "false");
-
-    fireEvent.keyDown(stageTab, { key: "Enter" });
+    // Tab 0 has aria-selected="true" and active class on initial load (WAI-ARIA sync)
     expect(stageTab).toHaveAttribute("aria-selected", "true");
+    expect(stageTab).toHaveClass("np-jflow__node--active");
 
     // Test ArrowRight navigation to next stage
     fireEvent.keyDown(stageTab, { key: "ArrowRight" });
     const stage2Tabs = screen.getAllByRole("tab", { name: /Stage 2: TCP Connection/i });
-    expect(stage2Tabs[0]).toHaveAttribute("aria-selected", "true");
+    const stage2Tab = stage2Tabs[0]!;
+    expect(stage2Tab).toHaveAttribute("aria-selected", "true");
+    expect(stage2Tab).toHaveClass("np-jflow__node--active");
+    expect(stageTab).toHaveAttribute("aria-selected", "false");
+    expect(stageTab).not.toHaveClass("np-jflow__node--active");
+
+    // Test ArrowLeft navigation back to previous stage
+    fireEvent.keyDown(stage2Tab, { key: "ArrowLeft" });
+    expect(stageTab).toHaveAttribute("aria-selected", "true");
+    expect(stageTab).toHaveClass("np-jflow__node--active");
   });
 
   it("supports searching and selecting sessions from dropdown picker", async () => {

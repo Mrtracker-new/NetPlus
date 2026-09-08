@@ -1,4 +1,4 @@
-import { Fragment, memo, useState, useCallback } from "react";
+import { Fragment, memo, useCallback } from "react";
 import type { ReactElement } from "react";
 import type { FanoutNode, JourneyStage, StageKind, EvidenceRef } from "@netpulse/contract";
 import { EvidenceChips } from "@netpulse/components";
@@ -123,6 +123,7 @@ export interface JourneyFlowLabels {
   fanoutTitle?: string;
   fanoutAria?: string;
   fanoutOrgAria?: (orgName: string, hostCount: number, flowCount: number) => string;
+  fanoutNodeAria?: (label: string, flowCount: number, bytes: number) => string;
   hostsCount?: (count: number) => string;
   flowsCount?: (count: number) => string;
 
@@ -140,40 +141,6 @@ export interface JourneyFlowProps {
   labels?: JourneyFlowLabels;
 }
 
-interface OrgGroup {
-  orgName: string;
-  nodes: FanoutNode[];
-  totalBytes: number;
-  totalFlows: number;
-}
-
-/** Group fanout nodes by primary organization domain or IP address */
-function groupFanoutByOrg(nodes: FanoutNode[]): OrgGroup[] {
-  const map = new Map<string, FanoutNode[]>();
-  for (const n of nodes) {
-    const isIp = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(n.label) || n.label.includes(":");
-    let org: string;
-    if (isIp) {
-      org = n.label;
-    } else {
-      const parts = n.label.split(".");
-      org = parts.length > 2 ? parts.slice(-2).join(".") : n.label;
-    }
-    const list = map.get(org) ?? [];
-    list.push(n);
-    map.set(org, list);
-  }
-
-  const groups: OrgGroup[] = [];
-  map.forEach((list, orgName) => {
-    const totalBytes = list.reduce((s, x) => s + x.bytes, 0);
-    const totalFlows = list.reduce((s, x) => s + x.flows, 0);
-    groups.push({ orgName, nodes: list, totalBytes, totalFlows });
-  });
-
-  return groups.sort((a, b) => b.totalBytes - a.totalBytes);
-}
-
 export const JourneyFlow = memo(function JourneyFlow({
   stages,
   fanout,
@@ -182,8 +149,6 @@ export const JourneyFlow = memo(function JourneyFlow({
   onNavigate,
   labels,
 }: JourneyFlowProps): ReactElement {
-  const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
-
   const activeIndex =
     selectedStageIndex !== null && selectedStageIndex >= 0 && selectedStageIndex < stages.length
       ? selectedStageIndex
@@ -192,15 +157,6 @@ export const JourneyFlow = memo(function JourneyFlow({
         : null;
 
   const activeStage = activeIndex !== null ? stages[activeIndex] : null;
-
-  const toggleOrg = useCallback((orgName: string) => {
-    setExpandedOrgs((prev) => {
-      const next = new Set(prev);
-      if (next.has(orgName)) next.delete(orgName);
-      else next.add(orgName);
-      return next;
-    });
-  }, []);
 
   const handleNavigateFanout = useCallback(
     (ref: EvidenceRef) => {
@@ -243,8 +199,6 @@ export const JourneyFlow = memo(function JourneyFlow({
     },
     [stages, onSelectStage]
   );
-
-  const orgGroups = groupFanoutByOrg(fanout);
 
   return (
     <div className="np-jflow">
@@ -383,75 +337,38 @@ export const JourneyFlow = memo(function JourneyFlow({
       )}
 
       {/* 3. Contacted Infrastructure & Servers Fan-out */}
-      {orgGroups.length > 0 && (
+      {fanout.length > 0 && (
         <div className="np-jflow__fanout" aria-label={labels?.fanoutAria ?? "Contacted Servers Fan-out"}>
           <div className="np-jflow__fanout-title">
             <span className="np-jflow__hub" aria-hidden="true">
-              {orgGroups.length}
+              {fanout.length}
             </span>
             <span>{labels?.fanoutTitle ?? "Contacted Organizations & Servers Fan-out"}</span>
           </div>
 
           <ul className="np-jflow__dests">
-            {orgGroups.map((group) => {
-              const isExpanded = expandedOrgs.has(group.orgName);
-              const hostCountStr = labels?.hostsCount
-                ? labels.hostsCount(group.nodes.length)
-                : group.nodes.length === 1
-                  ? "host"
-                  : "hosts";
+            {fanout.map((node) => {
               const flowCountStr = labels?.flowsCount
-                ? labels.flowsCount(group.totalFlows)
-                : `${group.totalFlows} flows`;
+                ? labels.flowsCount(node.flows)
+                : `${node.flows} ${node.flows === 1 ? "flow" : "flows"}`;
 
               return (
-                <li className="np-jflow__dest" key={group.orgName}>
-                  <div
-                    className="np-jflow__dest-header"
-                    onClick={() => toggleOrg(group.orgName)}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={isExpanded}
-                    aria-label={
-                      labels?.fanoutOrgAria
-                        ? labels.fanoutOrgAria(group.orgName, group.nodes.length, group.totalFlows)
-                        : `Organization ${group.orgName}, ${group.nodes.length} ${group.nodes.length === 1 ? "host" : "hosts"}, ${group.totalFlows} flows`
-                    }
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        toggleOrg(group.orgName);
-                      }
-                    }}
-                  >
-                    <span className="np-jflow__dest-label" title={group.orgName}>
-                      {group.orgName} ({group.nodes.length} {hostCountStr})
+                <li className="np-jflow__dest" key={node.label}>
+                  <div className="np-jflow__dest-header" style={{ cursor: "default" }}>
+                    <span className="np-jflow__dest-label" title={node.label}>
+                      {node.label}
                     </span>
                     <span className="np-jflow__dest-meta">
-                      <span>{flowCountStr}</span> · <span>{humanBytes(group.totalBytes)}</span>
-                      <span aria-hidden="true">{isExpanded ? "▲" : "▼"}</span>
+                      <span>{flowCountStr}</span> · <span>{humanBytes(node.bytes)}</span>
+                      {node.evidence && node.evidence.length > 0 && (
+                        <EvidenceChips
+                          evidence={node.evidence}
+                          onNavigate={handleNavigateFanout}
+                          className="np-evidence-chips--compact"
+                        />
+                      )}
                     </span>
                   </div>
-
-                  {isExpanded && (
-                    <div className="np-jflow__dest-children">
-                      {group.nodes.map((node) => (
-                        <div className="np-jflow__dest-child" key={node.label}>
-                          <span title={node.label}>{node.label}</span>
-                          <span style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <span>{humanBytes(node.bytes)}</span>
-                            {node.evidence && node.evidence.length > 0 && (
-                              <EvidenceChips
-                                evidence={node.evidence}
-                                onNavigate={handleNavigateFanout}
-                                className="np-evidence-chips--compact"
-                              />
-                            )}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </li>
               );
             })}

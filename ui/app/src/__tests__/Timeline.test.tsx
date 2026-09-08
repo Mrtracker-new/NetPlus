@@ -614,6 +614,118 @@ describe("Timeline Screen & useTimelineController", () => {
     expect(screen.getByRole("heading", { name: "Keepalive Ping" })).toBeInTheDocument();
     expect(screen.getByText("Periodic keepalive at 2s")).toBeInTheDocument();
   });
+
+  it("announces filter result counts on search or severity change in useTimelineController hook without announcing on mount", () => {
+    setFeed([
+      {
+        headline: "DNS Tunneling Detected",
+        summary: "High volume TXT queries",
+        lines: [],
+        severity: "finding",
+        evidence: [],
+        at_mono_nanos: 1_000_000_000,
+      },
+      {
+        headline: "Normal TLS Session",
+        summary: "TLS 1.3 handshake",
+        lines: [],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 2_000_000_000,
+      },
+    ]);
+
+    const { result } = renderHook(() => useTimelineController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    // Does not announce on initial mount
+    expect(result.current.announcement).toBe("");
+
+    // Search query change
+    act(() => {
+      result.current.actions.setSearchQuery("DNS");
+    });
+    expect(result.current.announcement).toBe("Showing 1 of 2 events.");
+
+    // Search query with no match
+    act(() => {
+      result.current.actions.setSearchQuery("nonexistent query");
+    });
+    expect(result.current.announcement).toBe("Showing 0 of 2 events.");
+
+    // Clearing search manually
+    act(() => {
+      result.current.actions.setSearchQuery("");
+    });
+    expect(result.current.announcement).toBe("Showing 2 of 2 events.");
+
+    // Severity filter change
+    act(() => {
+      result.current.actions.setSeverityFilter("finding");
+    });
+    expect(result.current.announcement).toBe("Showing 1 of 2 events.");
+
+    // Severity filter with no match
+    act(() => {
+      result.current.actions.setSeverityFilter("notable");
+    });
+    expect(result.current.announcement).toBe("Showing 0 of 2 events.");
+
+    // Clear filters preserves "Filters cleared."
+    act(() => {
+      result.current.actions.clearFilters();
+    });
+    expect(result.current.announcement).toBe("Filters cleared.");
+  });
+
+  it("announces filter result counts in aria-live region on user search and severity selection in UI", async () => {
+    setFeed([
+      {
+        headline: "TCP Port Scan",
+        summary: "Sequential SYN probes",
+        lines: [],
+        severity: "finding",
+        evidence: [],
+        at_mono_nanos: 1_000_000_000,
+      },
+      {
+        headline: "HTTP Keepalive",
+        summary: "Idle keepalive",
+        lines: [],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 2_000_000_000,
+      },
+    ]);
+
+    const { container } = render(<TimelineTestWrapper />);
+    const liveRegion = container.querySelector(".np-sr-only[aria-live='polite']");
+    expect(liveRegion).toBeInTheDocument();
+    expect(liveRegion).toHaveTextContent("");
+
+    // Type in search box
+    const searchInput = screen.getByPlaceholderText("Search timeline events by headline, summary, packet ID...");
+    fireEvent.change(searchInput, { target: { value: "TCP" } });
+
+    expect(liveRegion).toHaveTextContent("Showing 1 of 2 events.");
+
+    // Toggle severity via KPI button
+    const findingsKpi = screen.getByRole("button", { name: /Findings: 1/i });
+    fireEvent.click(findingsKpi);
+
+    expect(liveRegion).toHaveTextContent("Showing 1 of 2 events.");
+
+    // Clear filters via button
+    const clearButton = screen.getAllByRole("button", { name: "Clear Timeline Filters" })[0]!;
+    fireEvent.click(clearButton);
+
+    expect(liveRegion).toHaveTextContent("Filters cleared.");
+  });
 });
 
 describe("formatTimelineAxis Utility", () => {

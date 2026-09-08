@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import {
@@ -18,6 +18,10 @@ export function useTimelineController() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [selectedEventKey, setSelectedEventKey] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+
+  const isInitialMount = useRef(true);
+  const isClearingFiltersRef = useRef(false);
+  const prevFiltersRef = useRef({ searchQuery, severityFilter });
 
   const highlightPacketId =
     navigationTarget?.screen === "timeline" ? navigationTarget.packetId : undefined;
@@ -44,6 +48,36 @@ export function useTimelineController() {
       return matchesSeverity && matchesSearch;
     });
   }, [events, severityFilter, searchQuery]);
+
+  // Announce filter result counts via setAnnouncement on search/severity change
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevFiltersRef.current = { searchQuery, severityFilter };
+      return;
+    }
+
+    if (isClearingFiltersRef.current) {
+      isClearingFiltersRef.current = false;
+      prevFiltersRef.current = { searchQuery, severityFilter };
+      return;
+    }
+
+    const filtersChanged =
+      prevFiltersRef.current.searchQuery !== searchQuery ||
+      prevFiltersRef.current.severityFilter !== severityFilter;
+
+    prevFiltersRef.current = { searchQuery, severityFilter };
+
+    if (!filtersChanged) {
+      return;
+    }
+
+    const count = filteredEvents.length;
+    const total = events.length;
+    const eventWord = count === 1 && total === 1 ? "event" : "events";
+    setAnnouncement(`Showing ${count} of ${total} ${eventWord}.`);
+  }, [searchQuery, severityFilter, filteredEvents.length, events.length]);
 
   // Sync evidence navigation highlightPacketId to selectedEventKey
   useEffect(() => {
@@ -173,12 +207,16 @@ export function useTimelineController() {
   }, [filteredEvents, selectedEventIndex]);
 
   const clearFilters = useCallback(() => {
+    const hadActiveFilter = searchQuery !== "" || severityFilter !== "all";
+    if (hadActiveFilter) {
+      isClearingFiltersRef.current = true;
+    }
     setSearchQuery("");
     setSeverityFilter("all");
     setSelectedEventKey(null);
     clearNavigationTarget();
     setAnnouncement("Filters cleared.");
-  }, [clearNavigationTarget]);
+  }, [clearNavigationTarget, searchQuery, severityFilter]);
 
   return {
     events,

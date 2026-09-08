@@ -4294,6 +4294,15 @@ button {
 }
 
 /* Temporal Scrubber Guide */
+.np-ribbon__guide-track {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(24px + 96px + 16px);
+  right: 24px;
+  pointer-events: none;
+}
+
 .np-ribbon__scrubber {
   position: absolute;
   top: 14px;
@@ -4303,6 +4312,7 @@ button {
   pointer-events: none;
   z-index: 1;
   transform: translateX(-50%);
+  transition: left var(--np-t, 0.15s ease);
 }
 
 .np-ribbon__axis {
@@ -4605,6 +4615,9 @@ button {
 }
 
 @media (max-width: 768px) {
+  .np-ribbon__guide-track {
+    left: calc(24px + 80px + 10px);
+  }
   .np-ribbon__lane {
     grid-template-columns: 80px 1fr;
     gap: 10px;
@@ -4621,6 +4634,7 @@ button {
 
 @media (prefers-reduced-motion: reduce) {
   .np-ribbon__mark,
+  .np-ribbon__scrubber,
   .np-timeline-kpi,
   .np-timeline-filters__btn,
   .np-timeline-inspector__btn-stepper {

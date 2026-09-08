@@ -92,21 +92,45 @@ export const TimeRibbon = memo(function TimeRibbon({
   };
 
   const isEventHighlighted = (e: RibbonEvent, index: number) => {
+    if (selectedIndex !== null && selectedIndex !== undefined) {
+      return selectedIndex === index;
+    }
     const hasMatchingPacket =
       highlightPacketId !== undefined &&
       ((e as any).packetId === highlightPacketId ||
         e.evidence?.some((ev: any) => ev.kind === "packet" && ev.id === highlightPacketId));
     return (
-      selectedIndex === index ||
       hasMatchingPacket ||
       (highlightTimestamp !== undefined && Math.abs(e.at - highlightTimestamp) < 1000)
     );
   };
 
   const hasSelectedMark = events.some(isEventHighlighted);
+  const activeEvent =
+    selectedIndex !== null && selectedIndex !== undefined && events[selectedIndex]
+      ? events[selectedIndex]
+      : events.find(isEventHighlighted);
+
+  const scrubberTimestamp =
+    activeEvent !== undefined
+      ? activeEvent.at
+      : highlightTimestamp !== undefined
+      ? highlightTimestamp
+      : events.length > 0
+      ? events[0]?.at
+      : undefined;
 
   return (
     <div className="np-ribbon" role="region" aria-label="Interactive event timeline ribbon">
+      {scrubberTimestamp !== undefined && (
+        <div className="np-ribbon__guide-track" aria-hidden="true">
+          <div
+            className="np-ribbon__scrubber"
+            aria-hidden="true"
+            style={{ left: pos(scrubberTimestamp) }}
+          />
+        </div>
+      )}
       {RIBBON_LANES.map((lane) => {
         const laneEvents = events.filter((e) => e.severity === lane.severity);
         return (

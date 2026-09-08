@@ -94,5 +94,110 @@ describe("TimeRibbon Component", () => {
     expect(mark1).toHaveAttribute("tabindex", "0");
     expect(mark2).toHaveAttribute("tabindex", "-1");
   });
+
+  it("renders .np-ribbon__scrubber vertical line guide across lanes positioned at selected event", () => {
+    const events: RibbonEvent[] = [
+      { at: 1000, label: "First event", severity: "neutral" },
+      { at: 2000, label: "Second event", severity: "notable" },
+      { at: 3000, label: "Third event", severity: "finding" },
+    ];
+
+    const { container } = render(
+      <TimeRibbon
+        events={events}
+        selectedIndex={1}
+        timeDomain={{ min: 0, max: 4000 }}
+      />
+    );
+
+    const scrubber = container.querySelector(".np-ribbon__scrubber");
+    expect(scrubber).toBeInTheDocument();
+    expect(scrubber).toHaveAttribute("aria-hidden", "true");
+    // at=2000 in domain 0..4000 is 50%
+    expect(scrubber).toHaveStyle({ left: "50%" });
+  });
+
+  it("renders .np-ribbon__scrubber positioned at highlightTimestamp when scrubbing time directly", () => {
+    const events: RibbonEvent[] = [
+      { at: 0, label: "Start event", severity: "neutral" },
+      { at: 10000, label: "End event", severity: "finding" },
+    ];
+
+    const { container } = render(
+      <TimeRibbon
+        events={events}
+        highlightTimestamp={7500}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+
+    const scrubber = container.querySelector(".np-ribbon__scrubber");
+    expect(scrubber).toBeInTheDocument();
+    // at=7500 in domain 0..10000 is 75%
+    expect(scrubber).toHaveStyle({ left: "75%" });
+  });
+
+  it("renders .np-ribbon__scrubber at first event position when no event is selected", () => {
+    const events: RibbonEvent[] = [
+      { at: 5000, label: "Default event", severity: "neutral" },
+    ];
+
+    const { container } = render(
+      <TimeRibbon
+        events={events}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+
+    const scrubber = container.querySelector(".np-ribbon__scrubber");
+    expect(scrubber).toBeInTheDocument();
+    // at=5000 in domain 0..10000 is 50%
+    expect(scrubber).toHaveStyle({ left: "50%" });
+  });
+
+  it("does not render .np-ribbon__scrubber when events array is empty", () => {
+    const { container } = render(<TimeRibbon events={[]} />);
+    expect(container.querySelector(".np-ribbon__scrubber")).not.toBeInTheDocument();
+  });
+
+  it("updates .np-ribbon__scrubber position dynamically as selectedIndex navigates between events", () => {
+    const events: RibbonEvent[] = [
+      { at: 2000, label: "First", severity: "neutral" },
+      { at: 5000, label: "Second", severity: "notable" },
+      { at: 8000, label: "Third", severity: "finding" },
+    ];
+
+    const { container, rerender } = render(
+      <TimeRibbon
+        events={events}
+        selectedIndex={0}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+
+    const scrubber = container.querySelector(".np-ribbon__scrubber");
+    expect(scrubber).toBeInTheDocument();
+    expect(scrubber).toHaveStyle({ left: "20%" });
+
+    // Navigate to next event (index 1)
+    rerender(
+      <TimeRibbon
+        events={events}
+        selectedIndex={1}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+    expect(scrubber).toHaveStyle({ left: "50%" });
+
+    // Navigate to third event (index 2)
+    rerender(
+      <TimeRibbon
+        events={events}
+        selectedIndex={2}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+    expect(scrubber).toHaveStyle({ left: "80%" });
+  });
 });
 

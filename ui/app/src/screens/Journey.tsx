@@ -81,6 +81,7 @@ export function Journey() {
     activeSessionId,
     selectedSessionId,
     setSelectedSessionId,
+    resetSelection,
     filteredSessions,
     searchQuery,
     setSearchQuery,
@@ -89,6 +90,11 @@ export function Journey() {
     summaryMetrics,
     refetch,
   } = useJourneyController();
+
+  const handleClearFilter = useCallback(() => {
+    clearNavigationTarget();
+    resetSelection();
+  }, [clearNavigationTarget, resetSelection]);
 
   const handleNavigateEvidence = useCallback(
     (ref: EvidenceRef, source?: NavigationSource) => {
@@ -154,7 +160,7 @@ export function Journey() {
                   <button
                     type="button"
                     className="np-btn np-btn--ghost"
-                    onClick={() => setSelectedSessionId(null)}
+                    onClick={resetSelection}
                   >
                     {t("back_to_latest")}
                   </button>
@@ -221,7 +227,7 @@ export function Journey() {
           <button
             type="button"
             className="np-session-bar__clear-btn"
-            onClick={clearNavigationTarget}
+            onClick={handleClearFilter}
             aria-label="Clear active session filter"
           >
             <Icon name="close" style={{ width: "13px", height: "13px" }} />

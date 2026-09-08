@@ -184,6 +184,10 @@ export function useJourneyController() {
     };
   }, [journey]);
 
+  const resetSelection = useCallback(() => {
+    setSelectedSessionId(null);
+  }, []);
+
   return {
     journey,
     loaded,
@@ -191,6 +195,7 @@ export function useJourneyController() {
     activeSessionId,
     selectedSessionId,
     setSelectedSessionId,
+    resetSelection,
     sessions,
     filteredSessions,
     searchQuery,

@@ -1,11 +1,12 @@
+import { useEffect } from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, renderHook, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import i18n from "../i18n";
 import { Journey } from "../screens/Journey";
 import { useJourneyController } from "../hooks/useJourneyController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setFeed, __resetForTest } from "../state/store";
 import * as ipc from "../ipc";
 
@@ -406,6 +407,144 @@ describe("Journey Screen & useJourneyController", () => {
     expect(screen.getByText("Paso 2 de 2")).toBeInTheDocument();
     expect(nextBtn).toBeDisabled();
     expect(prevBtn).not.toBeDisabled();
+  });
+
+  it("provides resetSelection() to reset selectedSessionId to null", async () => {
+    setFeed([
+      {
+        headline: "google.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 101 }],
+        at_mono_nanos: 1000,
+      },
+      {
+        headline: "github.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 102 }],
+        at_mono_nanos: 2000,
+      },
+    ]);
+
+    const { result } = renderHook(() => useJourneyController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    await waitFor(() => expect(result.current.loaded).toBe(true));
+
+    expect(result.current.activeSessionId).toBe(102);
+    expect(result.current.selectedSessionId).toBeNull();
+
+    // Manually select session 101
+    act(() => {
+      result.current.setSelectedSessionId(101);
+    });
+    await waitFor(() => expect(result.current.selectedSessionId).toBe(101));
+    expect(result.current.activeSessionId).toBe(101);
+
+    // Call resetSelection()
+    act(() => {
+      result.current.resetSelection();
+    });
+    await waitFor(() => expect(result.current.selectedSessionId).toBeNull());
+    expect(result.current.activeSessionId).toBe(102);
+  });
+
+  it("resets dropdown and restores latest session view when clicking Clear Session Filter", async () => {
+    vi.spyOn(ipc, "query").mockImplementation(async (q) => {
+      if (q.kind === "journeyStagesOfSession") {
+        return {
+          kind: "pageJourney" as const,
+          journey: {
+            session_id: q.session_id,
+            stages: [
+              {
+                kind: "request" as const,
+                title: `Request for Session ${q.session_id}`,
+                narration: `Session ${q.session_id} content`,
+                detail: null,
+                evidence: [],
+              },
+            ],
+            fanout: [],
+            duration_ms: 100,
+            ttfb_ms: 10,
+          },
+        };
+      }
+      return mockJourneyResponse;
+    });
+
+    setFeed([
+      {
+        headline: "google.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 101 }],
+        at_mono_nanos: 1000,
+      },
+      {
+        headline: "github.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 102 }],
+        at_mono_nanos: 2000,
+      },
+    ]);
+
+    function JourneyWithNavTarget() {
+      const { navigateToEvidence } = useEvidenceNavigation();
+      useEffect(() => {
+        navigateToEvidence({ kind: "session", id: 101 });
+      }, [navigateToEvidence]);
+      return <Journey />;
+    }
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <JourneyWithNavTarget />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Filter is active for 101 from navigationTarget
+    const clearBtn = await screen.findByRole("button", { name: "Clear active session filter" });
+    expect(clearBtn).toBeInTheDocument();
+
+    const select = screen.getByRole("combobox", { name: "Select Session:" }) as HTMLSelectElement;
+    expect(select.value).toBe("101");
+
+    // Change dropdown manually to set selectedSessionId in state
+    fireEvent.change(select, { target: { value: "101" } });
+    expect(select.value).toBe("101");
+
+    // Click Clear Session Filter
+    fireEvent.click(clearBtn);
+
+    // Clear filter button should disappear
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Clear active session filter" })).toBeNull();
+    });
+
+    // Dropdown should be restored to the latest session (102, highest timestamp)
+    await waitFor(() => {
+      expect(select.value).toBe("102");
+    });
+
+    // Latest session journey is fetched and displayed
+    await waitFor(() => {
+      expect(screen.getByText("Request for Session 102")).toBeInTheDocument();
+    });
   });
 });
 

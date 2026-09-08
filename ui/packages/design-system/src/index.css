@@ -4293,6 +4293,29 @@ button {
   background: var(--np-accent, #2fe0d6);
 }
 
+/* Collision Count Badge for Co-located Marks */
+.np-ribbon__count-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  transform: rotate(-45deg);
+  min-width: 13px;
+  height: 13px;
+  padding: 0 2px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  border-radius: 7px;
+  background: var(--np-surface-recessed, #0e131f);
+  color: var(--np-text-primary, #ffffff);
+  border: 1px solid var(--np-border, #3a475d);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  font-family: var(--np-font-mono, monospace);
+  z-index: 15;
+}
+
 /* Temporal Scrubber Guide */
 .np-ribbon__guide-track {
   position: absolute;

@@ -271,6 +271,13 @@ describe("Timeline Screen & useTimelineController", () => {
   });
 
   it("handles copy diagnostic logs with visual feedback", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
     setFeed([
       {
         headline: "Event with logs",
@@ -288,6 +295,39 @@ describe("Timeline Screen & useTimelineController", () => {
     fireEvent.click(copyButton);
 
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
+    expect(writeTextMock).toHaveBeenCalledWith("line 1 output\nline 2 output");
+  });
+
+  it("does not report 'Copied!' when clipboard copy fails or throws in handleCopyLogs", async () => {
+    const writeTextMock = vi.fn().mockRejectedValue(new Error("Clipboard permission denied"));
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: writeTextMock,
+      },
+    });
+
+    setFeed([
+      {
+        headline: "Event with logs",
+        summary: "Log details available",
+        lines: ["line 1 output", "line 2 output"],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<TimelineTestWrapper />);
+
+    const copyButton = await screen.findByRole("button", { name: "Copy diagnostic logs" });
+    fireEvent.click(copyButton);
+
+    await vi.waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalled();
+    });
+
+    expect(screen.queryByText("Copied!")).not.toBeInTheDocument();
+    expect(screen.getByText("Copy")).toBeInTheDocument();
   });
 
   it("navigates to target packet and highlights mark when dispatching { screen: 'timeline', packetId: 999 } with real NarrativeCard", async () => {
@@ -745,6 +785,147 @@ describe("formatTimelineAxis Utility", () => {
         expect(ticks[i]!.label).not.toBe(ticks[i + 1]!.label);
       }
     }
+  });
+
+  it("parameterizes now label with custom string or options object", () => {
+    const min = 1_000_000_000;
+    const max = min + 45 * 1e9;
+
+    // String parameter
+    const stringTicks = formatTimelineAxis(min, max, "+45s");
+    expect(stringTicks[stringTicks.length - 1]?.label).toBe("+45s");
+    expect(stringTicks[stringTicks.length - 1]?.positionPercent).toBe(98);
+    for (let i = 0; i < stringTicks.length - 1; i++) {
+      expect(stringTicks[i]!.label).not.toBe(stringTicks[i + 1]!.label);
+    }
+
+    // Options object with nowLabel
+    const nowLabelTicks = formatTimelineAxis(min, max, { nowLabel: "End" });
+    expect(nowLabelTicks[nowLabelTicks.length - 1]?.label).toBe("End");
+
+    // Options object with endLabel
+    const endLabelTicks = formatTimelineAxis(min, max, { endLabel: "+10s" });
+    expect(endLabelTicks[endLabelTicks.length - 1]?.label).toBe("+10s");
+
+    // "0s" end label avoids collision with start label
+    const zeroTicks = formatTimelineAxis(min, min, "0s");
+    expect(zeroTicks[0]?.label).toBe("-0s");
+    expect(zeroTicks[1]?.label).toBe("0s");
+  });
+
+  it("parameterizes historical captures with isHistorical option showing actual elapsed offsets", () => {
+    const min = 1_000_000_000;
+
+    // Zero elapsed span
+    const zeroTicks = formatTimelineAxis(min, min, { isHistorical: true });
+    expect(zeroTicks[zeroTicks.length - 1]?.label).toBe("0s");
+    expect(zeroTicks[0]?.label).toBe("-0s");
+
+    // Sub-second span (500ms)
+    const subSecTicks = formatTimelineAxis(min, min + 500_000_000, { isHistorical: true });
+    expect(subSecTicks[subSecTicks.length - 1]?.label).toBe("+0.5s");
+
+    // 15 seconds elapsed
+    const secTicks = formatTimelineAxis(min, min + 15 * 1e9, { isHistorical: true });
+    expect(secTicks[secTicks.length - 1]?.label).toBe("+15s");
+
+    // 75 seconds elapsed (1m 15s)
+    const minTicks = formatTimelineAxis(min, min + 75 * 1e9, { isHistorical: true });
+    expect(minTicks[minTicks.length - 1]?.label).toBe("+1m 15s");
+
+    // Check adjacent deduplication across various spans in historical mode
+    const spans = [0, 0.5, 1, 2, 10, 30, 60, 90, 180, 3600];
+    for (const span of spans) {
+      const ticks = formatTimelineAxis(min, min + span * 1e9, { isHistorical: true });
+      for (let i = 0; i < ticks.length - 1; i++) {
+        expect(ticks[i]!.label).not.toBe(ticks[i + 1]!.label);
+      }
+    }
+  });
+
+  it("useTimelineController forwards nowLabel and isHistorical options to axisTicks", () => {
+    setFeed([
+      {
+        headline: "Start Event",
+        summary: "First packet in capture",
+        lines: [],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 1_000_000_000,
+      },
+      {
+        headline: "End Event",
+        summary: "Last packet in capture",
+        lines: [],
+        severity: "finding",
+        evidence: [],
+        at_mono_nanos: 16_000_000_000,
+      },
+    ]);
+
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+    );
+
+    // Custom nowLabel
+    const { result: customResult } = renderHook(
+      () => useTimelineController({ nowLabel: "+15s" }),
+      { wrapper }
+    );
+    const customTicks = customResult.current.axisTicks;
+    expect(customTicks[customTicks.length - 1]?.label).toBe("+15s");
+
+    // Historical capture option
+    const { result: historicalResult } = renderHook(
+      () => useTimelineController({ isHistorical: true }),
+      { wrapper }
+    );
+    const historicalTicks = historicalResult.current.axisTicks;
+    expect(historicalTicks[historicalTicks.length - 1]?.label).toBe("+15s");
+  });
+
+  it("Timeline component renders custom nowLabel and historical elapsed offsets", () => {
+    setFeed([
+      {
+        headline: "Event A",
+        summary: "Summary A",
+        lines: [],
+        severity: "neutral",
+        evidence: [],
+        at_mono_nanos: 1_000_000_000,
+      },
+      {
+        headline: "Event B",
+        summary: "Summary B",
+        lines: [],
+        severity: "finding",
+        evidence: [],
+        at_mono_nanos: 16_000_000_000,
+      },
+    ]);
+
+    // Historical mode renders +15s offset
+    const { unmount } = render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <Timeline isHistorical />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    expect(screen.getByText("+15s")).toBeInTheDocument();
+    unmount();
+
+    // Explicit custom label renders custom label
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <Timeline nowLabel="Finished" />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    expect(screen.getByText("Finished")).toBeInTheDocument();
   });
 });
 

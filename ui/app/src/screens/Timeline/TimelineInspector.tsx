@@ -170,7 +170,7 @@ export function TimelineInspector({
       }
       setCopied(true);
     } catch {
-      setCopied(true);
+      // Clipboard write failed; do not report "Copied!" on catch
     }
   };
 

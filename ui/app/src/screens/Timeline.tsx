@@ -13,7 +13,12 @@ import { TimelineSummary } from "./Timeline/TimelineSummary";
 import { TimelineFilters } from "./Timeline/TimelineFilters";
 import { TimelineInspector } from "./Timeline/TimelineInspector";
 
-export function Timeline() {
+export interface TimelineProps {
+  nowLabel?: string;
+  isHistorical?: boolean;
+}
+
+export function Timeline({ nowLabel, isHistorical }: TimelineProps = {}) {
   const { t } = useTranslation(["timeline", "common"]);
   const { navigateToEvidence } = useEvidenceNavigation();
 
@@ -31,7 +36,7 @@ export function Timeline() {
     highlightTimestamp,
     announcement,
     actions,
-  } = useTimelineController();
+  } = useTimelineController({ nowLabel, isHistorical });
 
   const handleNavigateEvidence = useCallback(
     (ref: any, source?: NavigationSource) => {

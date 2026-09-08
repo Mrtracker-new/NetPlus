@@ -1,5 +1,4 @@
 import type { NarrativeCard, Severity } from "@netpulse/contract";
-import { calcRibbonPos } from "@netpulse/viz";
 
 export type SeverityFilter = "all" | "finding" | "notable" | "neutral";
 
@@ -22,7 +21,7 @@ export interface TimelineSummaryMetrics {
   timeSpanStr: string;
 }
 
-export { calcRibbonPos };
+export { calcRibbonPos, calcCollisionOffset } from "@netpulse/viz";
 
 /** Format time span from nanoseconds into human-readable string */
 export function formatTimeSpan(spanNanos: number): string {
@@ -52,22 +51,57 @@ export function formatTimeOffset(seconds: number): string {
   return `-${hrs}h ${remMins}m`;
 }
 
-/** Generate adaptive time axis ticks based on time span with strict label deduplication */
-export function formatTimelineAxis(min: number, max: number): TimelineAxisTick[] {
+export interface FormatTimelineAxisOptions {
+  nowLabel?: string;
+  endLabel?: string;
+  isHistorical?: boolean;
+}
+
+/** Generate adaptive time axis ticks based on time span with strict label deduplication and parameterized now/end label */
+export function formatTimelineAxis(
+  min: number,
+  max: number,
+  nowLabelOrOptions: string | FormatTimelineAxisOptions = "now"
+): TimelineAxisTick[] {
   const spanNanos = max - min;
   const totalSeconds = spanNanos / 1e9;
 
+  let endLabel = "now";
+  if (typeof nowLabelOrOptions === "string") {
+    endLabel = nowLabelOrOptions;
+  } else if (nowLabelOrOptions) {
+    if (nowLabelOrOptions.nowLabel !== undefined) {
+      endLabel = nowLabelOrOptions.nowLabel;
+    } else if (nowLabelOrOptions.endLabel !== undefined) {
+      endLabel = nowLabelOrOptions.endLabel;
+    } else if (nowLabelOrOptions.isHistorical) {
+      if (totalSeconds <= 0) {
+        endLabel = "0s";
+      } else if (totalSeconds < 1) {
+        endLabel = `+${totalSeconds.toFixed(1)}s`;
+      } else {
+        endLabel = `+${formatTimeSpan(spanNanos)}`;
+      }
+    }
+  }
+
   if (totalSeconds <= 0) {
+    const leftLabel = endLabel === "0s" ? "-0s" : "0s";
     return [
-      { positionPercent: 2, label: "0s" },
-      { positionPercent: 98, label: "now" },
+      { positionPercent: 2, label: leftLabel },
+      { positionPercent: 98, label: endLabel },
     ];
   }
 
   if (totalSeconds <= 2) {
+    const startSec = totalSeconds.toFixed(totalSeconds < 1 ? 1 : 0);
+    let startLabel = `-${startSec}s`;
+    if (startLabel === endLabel) {
+      startLabel = `-${(totalSeconds || 1).toFixed(1)}s`;
+    }
     return [
-      { positionPercent: 2, label: `-${totalSeconds.toFixed(totalSeconds < 1 ? 1 : 0)}s` },
-      { positionPercent: 98, label: "now" },
+      { positionPercent: 2, label: startLabel },
+      { positionPercent: 98, label: endLabel },
     ];
   }
 
@@ -76,15 +110,23 @@ export function formatTimelineAxis(min: number, max: number): TimelineAxisTick[]
 
   // Guarantee strict deduplication: if startLabel and midLabel match, fallback to exact seconds
   let finalMidLabel = midLabel;
-  if (startLabel === midLabel || midLabel === "now" || midLabel === "0s") {
+  if (startLabel === midLabel || midLabel === endLabel || midLabel === "0s" || midLabel === "now") {
     const halfSec = Math.round(totalSeconds / 2);
     finalMidLabel = halfSec > 0 ? `-${halfSec}s` : "-0.5s";
+    if (finalMidLabel === endLabel || finalMidLabel === startLabel) {
+      finalMidLabel = `-${(totalSeconds / 2).toFixed(1)}s`;
+    }
+  }
+
+  let finalStartLabel = startLabel;
+  if (finalStartLabel === finalMidLabel || finalStartLabel === endLabel) {
+    finalStartLabel = `-${totalSeconds.toFixed(1)}s`;
   }
 
   return [
-    { positionPercent: 2, label: startLabel },
+    { positionPercent: 2, label: finalStartLabel },
     { positionPercent: 50, label: finalMidLabel },
-    { positionPercent: 98, label: "now" },
+    { positionPercent: 98, label: endLabel },
   ];
 }
 

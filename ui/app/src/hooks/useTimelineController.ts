@@ -10,7 +10,12 @@ import {
   matchesTimelineSearch,
 } from "../utils/timeline.utils";
 
-export function useTimelineController() {
+export interface UseTimelineControllerOptions {
+  nowLabel?: string;
+  isHistorical?: boolean;
+}
+
+export function useTimelineController(options?: UseTimelineControllerOptions) {
   const { feed } = useStore();
   const { navigationTarget, clearNavigationTarget } = useEvidenceNavigation();
 
@@ -144,8 +149,14 @@ export function useTimelineController() {
   // Dynamic Time Axis Ticks
   const axisTicks = useMemo(() => {
     if (timeDomain.min === 0 && timeDomain.max === 0) return [];
-    return formatTimelineAxis(timeDomain.min, timeDomain.max);
-  }, [timeDomain]);
+    const nowLabelOrOptions =
+      options?.nowLabel !== undefined
+        ? options.nowLabel
+        : options?.isHistorical
+        ? { isHistorical: true }
+        : "now";
+    return formatTimelineAxis(timeDomain.min, timeDomain.max, nowLabelOrOptions);
+  }, [timeDomain, options?.nowLabel, options?.isHistorical]);
 
   // Summary Metrics Computation
   const summaryMetrics = useMemo<TimelineSummaryMetrics | null>(() => {

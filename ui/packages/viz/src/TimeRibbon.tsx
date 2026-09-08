@@ -18,6 +18,16 @@ export function calcRibbonPos(at: number, min: number, max: number): string {
   return `${(clamped * 100).toFixed(2)}%`;
 }
 
+/** Calculate horizontal pixel offset for marks sharing identical timestamps to prevent visual occlusion */
+export function calcCollisionOffset(
+  collisionIndex: number,
+  collisionCount: number,
+  stepPx: number = 6
+): number {
+  if (collisionCount <= 1) return 0;
+  return (collisionIndex - (collisionCount - 1) / 2) * stepPx;
+}
+
 export interface TimeRibbonProps {
   events: RibbonEvent[];
   timeDomain?: TimeDomain;
@@ -26,6 +36,8 @@ export interface TimeRibbonProps {
   selectedIndex?: number | null;
   onSelectEvent?: (event: any, index: number) => void;
   axisTicks?: Array<{ positionPercent: number; label: string }>;
+  collisionOffsetPx?: number;
+  showCountBadge?: boolean;
 }
 
 const RIBBON_LANES: Array<{ severity: Severity; label: string; color: string }> = [
@@ -45,6 +57,8 @@ export const TimeRibbon = memo(function TimeRibbon({
   selectedIndex = null,
   onSelectEvent,
   axisTicks,
+  collisionOffsetPx = 6,
+  showCountBadge = true,
 }: TimeRibbonProps): ReactElement {
   const highlightedRef = useRef<HTMLButtonElement | null>(null);
   const markRefs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -159,6 +173,15 @@ export const TimeRibbon = memo(function TimeRibbon({
       )}
       {RIBBON_LANES.map((lane) => {
         const laneEntries = laneEventsMap[lane.severity] || [];
+
+        // Count occurrences of identical timestamps within this lane
+        const timestampCounts = new Map<number, number>();
+        for (let i = 0; i < laneEntries.length; i++) {
+          const at = laneEntries[i]!.event.at;
+          timestampCounts.set(at, (timestampCounts.get(at) || 0) + 1);
+        }
+        const timestampIndices = new Map<number, number>();
+
         return (
           <div className="np-ribbon__lane" key={lane.severity}>
             <span className="np-ribbon__lane-label">
@@ -179,6 +202,15 @@ export const TimeRibbon = memo(function TimeRibbon({
               )}
               {laneEntries.map(({ event: e, globalIndex }) => {
                 const isHighlighted = isEventHighlighted(e, globalIndex);
+                const collisionCount = timestampCounts.get(e.at) || 1;
+                const collisionIndex = timestampIndices.get(e.at) || 0;
+                timestampIndices.set(e.at, collisionIndex + 1);
+
+                const offsetPx = calcCollisionOffset(collisionIndex, collisionCount, collisionOffsetPx);
+                const markLeft =
+                  offsetPx !== 0
+                    ? `calc(${pos(e.at)} ${offsetPx > 0 ? "+" : "-"} ${Math.abs(offsetPx)}px)`
+                    : pos(e.at);
 
                 return (
                   <button
@@ -194,13 +226,30 @@ export const TimeRibbon = memo(function TimeRibbon({
                     aria-label={`Event ${globalIndex + 1}: ${e.label} (${e.severity})`}
                     data-sev={e.severity}
                     data-highlighted={isHighlighted ? "true" : undefined}
+                    data-collision-count={collisionCount > 1 ? collisionCount : undefined}
+                    data-collision-index={collisionCount > 1 ? collisionIndex : undefined}
+                    data-collision-offset={collisionCount > 1 ? `${offsetPx}px` : undefined}
                     onClick={() => onSelectEvent?.(e, globalIndex)}
                     onKeyDown={(evt) => handleKeyDown(evt, globalIndex)}
                     style={{
-                      left: pos(e.at),
+                      left: markLeft,
                     }}
-                    title={e.label}
-                  />
+                    title={
+                      collisionCount > 1
+                        ? `${e.label} (${collisionIndex + 1} of ${collisionCount} at this timestamp)`
+                        : e.label
+                    }
+                  >
+                    {showCountBadge && collisionCount > 1 && collisionIndex === collisionCount - 1 && (
+                      <span
+                        className="np-ribbon__count-badge"
+                        aria-hidden="true"
+                        data-count={collisionCount}
+                      >
+                        {collisionCount}
+                      </span>
+                    )}
+                  </button>
                 );
               })}
             </div>

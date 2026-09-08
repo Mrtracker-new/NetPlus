@@ -113,6 +113,9 @@ describe("Timeline Screen & useTimelineController", () => {
     // Inspector card appears
     expect(await screen.findByText("SYN flood targeting port 80")).toBeInTheDocument();
     expect(screen.getByText("flow #101")).toBeInTheDocument();
+    const findingBadge = screen.getByText("finding");
+    expect(findingBadge).toHaveAttribute("data-sev", "finding");
+    expect(findingBadge).toHaveClass("np-timeline-inspector__badge--finding");
   });
 
   it("supports keyboard arrow navigation (ArrowRight / ArrowLeft / Home / End) across ribbon marks using aria-pressed", async () => {

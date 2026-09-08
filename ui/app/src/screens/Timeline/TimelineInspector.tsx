@@ -190,7 +190,8 @@ export function TimelineInspector({
       <div className="np-timeline-inspector__header">
         <div className="np-timeline-inspector__lead">
           <span
-            className="np-timeline-inspector__badge"
+            className={`np-timeline-inspector__badge np-timeline-inspector__badge--${event.severity}`}
+            data-sev={event.severity}
             style={{ background: severityColor }}
           >
             {event.severity}

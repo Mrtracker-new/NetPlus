@@ -4391,6 +4391,11 @@ button {
   color: #000;
 }
 
+.np-timeline-inspector__badge[data-sev="finding"],
+.np-timeline-inspector__badge--finding {
+  color: #ffffff;
+}
+
 .np-timeline-inspector__title {
   margin: 0;
   font-size: 1.15rem;

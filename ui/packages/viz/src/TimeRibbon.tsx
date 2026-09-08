@@ -91,6 +91,20 @@ export const TimeRibbon = memo(function TimeRibbon({
     return `${(clamped * 100).toFixed(2)}%`;
   };
 
+  const isEventHighlighted = (e: RibbonEvent, index: number) => {
+    const hasMatchingPacket =
+      highlightPacketId !== undefined &&
+      ((e as any).packetId === highlightPacketId ||
+        e.evidence?.some((ev: any) => ev.kind === "packet" && ev.id === highlightPacketId));
+    return (
+      selectedIndex === index ||
+      hasMatchingPacket ||
+      (highlightTimestamp !== undefined && Math.abs(e.at - highlightTimestamp) < 1000)
+    );
+  };
+
+  const hasSelectedMark = events.some(isEventHighlighted);
+
   return (
     <div className="np-ribbon" role="region" aria-label="Interactive event timeline ribbon">
       {RIBBON_LANES.map((lane) => {
@@ -115,14 +129,7 @@ export const TimeRibbon = memo(function TimeRibbon({
               )}
               {laneEvents.map((e) => {
                 const globalIndex = events.indexOf(e);
-                const hasMatchingPacket =
-                  highlightPacketId !== undefined &&
-                  ((e as any).packetId === highlightPacketId ||
-                    e.evidence?.some((ev: any) => ev.kind === "packet" && ev.id === highlightPacketId));
-                const isHighlighted =
-                  selectedIndex === globalIndex ||
-                  hasMatchingPacket ||
-                  (highlightTimestamp !== undefined && Math.abs(e.at - highlightTimestamp) < 1000);
+                const isHighlighted = isEventHighlighted(e, globalIndex);
 
                 return (
                   <button
@@ -133,6 +140,7 @@ export const TimeRibbon = memo(function TimeRibbon({
                       if (isHighlighted) highlightedRef.current = el;
                     }}
                     className={`np-ribbon__mark ${isHighlighted ? "np-ribbon__mark--highlighted" : ""}`}
+                    tabIndex={isHighlighted ? 0 : !hasSelectedMark && globalIndex === 0 ? 0 : -1}
                     aria-pressed={isHighlighted}
                     aria-label={`Event ${globalIndex + 1}: ${e.label} (${e.severity})`}
                     data-sev={e.severity}

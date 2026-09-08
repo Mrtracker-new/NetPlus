@@ -58,4 +58,41 @@ describe("TimeRibbon Component", () => {
     // at=5000 in domain 0..10000 should be positioned at 50%
     expect(mark.style.left).toBe("50%");
   });
+
+  it("applies roving tabindex: sets tabIndex=0 on index 0 and tabIndex=-1 on remaining marks when no mark is selected", () => {
+    const events: RibbonEvent[] = [
+      { at: 1000, label: "First event", severity: "neutral" },
+      { at: 2000, label: "Second event", severity: "notable" },
+      { at: 3000, label: "Third event", severity: "finding" },
+    ];
+
+    render(<TimeRibbon events={events} />);
+
+    const mark0 = screen.getByRole("button", { name: /First event/i });
+    const mark1 = screen.getByRole("button", { name: /Second event/i });
+    const mark2 = screen.getByRole("button", { name: /Third event/i });
+
+    expect(mark0).toHaveAttribute("tabindex", "0");
+    expect(mark1).toHaveAttribute("tabindex", "-1");
+    expect(mark2).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("applies roving tabindex: sets tabIndex=0 on highlighted mark and tabIndex=-1 on others when a mark is selected", () => {
+    const events: RibbonEvent[] = [
+      { at: 1000, label: "First event", severity: "neutral" },
+      { at: 2000, label: "Second event", severity: "notable" },
+      { at: 3000, label: "Third event", severity: "finding" },
+    ];
+
+    render(<TimeRibbon events={events} selectedIndex={1} />);
+
+    const mark0 = screen.getByRole("button", { name: /First event/i });
+    const mark1 = screen.getByRole("button", { name: /Second event/i });
+    const mark2 = screen.getByRole("button", { name: /Third event/i });
+
+    expect(mark0).toHaveAttribute("tabindex", "-1");
+    expect(mark1).toHaveAttribute("tabindex", "0");
+    expect(mark2).toHaveAttribute("tabindex", "-1");
+  });
 });
+

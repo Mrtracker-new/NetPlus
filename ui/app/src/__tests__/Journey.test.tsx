@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, renderHook, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import "../i18n";
+import i18n from "../i18n";
 import { Journey } from "../screens/Journey";
 import { useJourneyController } from "../hooks/useJourneyController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
@@ -9,9 +9,10 @@ import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext
 import { setFeed, __resetForTest } from "../state/store";
 import * as ipc from "../ipc";
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
   vi.restoreAllMocks();
+  await i18n.changeLanguage("en");
 });
 
 function JourneyTestWrapper() {
@@ -354,6 +355,57 @@ describe("Journey Screen & useJourneyController", () => {
       expect(await screen.findByText("1.25 s")).toBeInTheDocument();
       expect(screen.getByText("45 ms")).toBeInTheDocument();
     }
+  });
+
+  it("translates stepper controls, headers, and stage badges when switched to Spanish", async () => {
+    await i18n.changeLanguage("es");
+
+    vi.spyOn(ipc, "query").mockResolvedValue(mockJourneyResponse);
+
+    setFeed([
+      {
+        headline: "google.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 101 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<JourneyTestWrapper />);
+
+    // Track header & tabs
+    expect(await screen.findByRole("tablist", { name: "Pasos del trayecto web" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Etapa 1: Resolución DNS/i })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Etapa 2: Conexión TCP/i })).toBeInTheDocument();
+
+    // Readout Header & Badge (Initial Stage 1: DNS Resolution)
+    expect(screen.getByText("Etapa 1: Resolución DNS")).toBeInTheDocument();
+    const badge = document.querySelector(".np-jflow__readout-badge");
+    expect(badge).toHaveTextContent("Resolución DNS");
+
+    // Stepper Controls
+    expect(screen.getByText("Paso 1 de 2")).toBeInTheDocument();
+    const prevBtn = screen.getByRole("button", { name: "Etapa anterior del trayecto" });
+    const nextBtn = screen.getByRole("button", { name: "Etapa siguiente del trayecto" });
+    expect(prevBtn).toHaveTextContent("← Ant");
+    expect(nextBtn).toHaveTextContent("Sig →");
+    expect(prevBtn).toBeDisabled();
+    expect(nextBtn).not.toBeDisabled();
+
+    // Other localized sections
+    expect(screen.getByText("Evidencias y traza:")).toBeInTheDocument();
+    expect(screen.getByText("Despliegue de organizaciones y servidores contactados")).toBeInTheDocument();
+
+    // Advance Stepper to Next Stage (Stage 2: Connection)
+    fireEvent.click(nextBtn);
+
+    expect(await screen.findByText("Etapa 2: Conexión TCP")).toBeInTheDocument();
+    expect(document.querySelector(".np-jflow__readout-badge")).toHaveTextContent("Conexión TCP");
+    expect(screen.getByText("Paso 2 de 2")).toBeInTheDocument();
+    expect(nextBtn).toBeDisabled();
+    expect(prevBtn).not.toBeDisabled();
   });
 });
 

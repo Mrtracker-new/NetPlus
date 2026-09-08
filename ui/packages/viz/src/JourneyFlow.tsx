@@ -104,12 +104,40 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
   },
 };
 
+export interface JourneyFlowLabels {
+  // Stepper controls
+  stepIndicator?: (current: number, total: number) => string;
+  stepPrev?: string;
+  stepPrevAria?: string;
+  stepNext?: string;
+  stepNextAria?: string;
+
+  // Track and Stage headers
+  trackAria?: string;
+  stageHeader?: (index: number, title: string) => string;
+  stageAriaLabel?: (index: number, title: string) => string;
+  stageTitle?: (stage: JourneyStage) => string;
+  evidenceLabel?: string;
+
+  // Fanout
+  fanoutTitle?: string;
+  fanoutAria?: string;
+  fanoutOrgAria?: (orgName: string, hostCount: number, flowCount: number) => string;
+  hostsCount?: (count: number) => string;
+  flowsCount?: (count: number) => string;
+
+  // Stage badges
+  stageBadge?: (kind: StageKind) => string;
+  stages?: Partial<Record<StageKind, string>>;
+}
+
 export interface JourneyFlowProps {
   stages: JourneyStage[];
   fanout: FanoutNode[];
   selectedStageIndex?: number | null;
   onSelectStage?: (index: number) => void;
   onNavigate?: (ref: EvidenceRef, source?: any) => void;
+  labels?: JourneyFlowLabels;
 }
 
 interface OrgGroup {
@@ -152,6 +180,7 @@ export const JourneyFlow = memo(function JourneyFlow({
   selectedStageIndex = null,
   onSelectStage,
   onNavigate,
+  labels,
 }: JourneyFlowProps): ReactElement {
   const [expandedOrgs, setExpandedOrgs] = useState<Set<string>>(new Set());
 
@@ -223,7 +252,7 @@ export const JourneyFlow = memo(function JourneyFlow({
       <div
         className="np-jflow__track"
         role="tablist"
-        aria-label="Journey stage steps"
+        aria-label={labels?.trackAria ?? "Journey stage steps"}
         aria-orientation="horizontal"
       >
         {stages.map((s, i) => {
@@ -231,6 +260,10 @@ export const JourneyFlow = memo(function JourneyFlow({
           const isRovingFocusable = isSelected || (selectedStageIndex === null && i === 0);
           const config = STAGE_CONFIG_REGISTRY[s.kind];
           const glyphNode = config?.glyph ?? null;
+          const stageDisplayName = labels?.stageTitle ? labels.stageTitle(s) : s.title;
+          const stageAria = labels?.stageAriaLabel
+            ? labels.stageAriaLabel(i + 1, stageDisplayName)
+            : `Stage ${i + 1}: ${stageDisplayName}`;
 
           return (
             <Fragment key={`${s.kind}-${i}`}>
@@ -241,7 +274,7 @@ export const JourneyFlow = memo(function JourneyFlow({
                 role="tab"
                 aria-selected={isSelected}
                 aria-controls="journey-stage-readout"
-                aria-label={`Stage ${i + 1}: ${s.title}`}
+                aria-label={stageAria}
                 className={`np-jflow__node ${isSelected ? "np-jflow__node--active" : ""}`}
                 title={s.narration}
                 onClick={() => onSelectStage?.(i)}
@@ -250,7 +283,7 @@ export const JourneyFlow = memo(function JourneyFlow({
                 <span className="np-jflow__glyph" aria-hidden="true">
                   {glyphNode}
                 </span>
-                <span className="np-jflow__label">{s.title}</span>
+                <span className="np-jflow__label">{stageDisplayName}</span>
               </button>
               {i < stages.length - 1 && (
                 <div className="np-jflow__link" aria-hidden="true">
@@ -277,17 +310,28 @@ export const JourneyFlow = memo(function JourneyFlow({
                   {STAGE_CONFIG_REGISTRY[activeStage.kind]?.glyph ?? "•"}
                 </span>
                 <span>
-                  Stage {activeIndex + 1}: {activeStage.title}
+                  {labels?.stageHeader
+                    ? labels.stageHeader(
+                        activeIndex + 1,
+                        labels?.stageTitle ? labels.stageTitle(activeStage) : activeStage.title
+                      )
+                    : `Stage ${activeIndex + 1}: ${
+                        labels?.stageTitle ? labels.stageTitle(activeStage) : activeStage.title
+                      }`}
                 </span>
               </div>
               <span className="np-jflow__readout-badge">
-                {activeStage.kind.replace(/_/g, " ")}
+                {labels?.stageBadge?.(activeStage.kind) ??
+                  labels?.stages?.[activeStage.kind] ??
+                  activeStage.kind.replace(/_/g, " ")}
               </span>
             </div>
 
             <div className="np-jflow__readout-stepper">
               <span className="np-jflow__step-indicator">
-                Step {activeIndex + 1} of {stages.length}
+                {labels?.stepIndicator
+                  ? labels.stepIndicator(activeIndex + 1, stages.length)
+                  : `Step ${activeIndex + 1} of ${stages.length}`}
               </span>
               <button
                 type="button"
@@ -296,9 +340,9 @@ export const JourneyFlow = memo(function JourneyFlow({
                   if (activeIndex > 0) onSelectStage?.(activeIndex - 1);
                 }}
                 disabled={activeIndex <= 0}
-                aria-label="Previous journey stage"
+                aria-label={labels?.stepPrevAria ?? "Previous journey stage"}
               >
-                ← Prev
+                {labels?.stepPrev ?? "← Prev"}
               </button>
               <button
                 type="button"
@@ -307,9 +351,9 @@ export const JourneyFlow = memo(function JourneyFlow({
                   if (activeIndex < stages.length - 1) onSelectStage?.(activeIndex + 1);
                 }}
                 disabled={activeIndex >= stages.length - 1}
-                aria-label="Next journey stage"
+                aria-label={labels?.stepNextAria ?? "Next journey stage"}
               >
-                Next →
+                {labels?.stepNext ?? "Next →"}
               </button>
             </div>
           </div>
@@ -326,7 +370,7 @@ export const JourneyFlow = memo(function JourneyFlow({
             {activeStage.evidence && activeStage.evidence.length > 0 && (
               <div className="np-jflow__readout-evidence">
                 <span className="np-jflow__readout-evidence-label">
-                  Evidence & Trace:
+                  {labels?.evidenceLabel ?? "Evidence & Trace:"}
                 </span>
                 <EvidenceChips
                   evidence={activeStage.evidence}
@@ -340,17 +384,26 @@ export const JourneyFlow = memo(function JourneyFlow({
 
       {/* 3. Contacted Infrastructure & Servers Fan-out */}
       {orgGroups.length > 0 && (
-        <div className="np-jflow__fanout" aria-label="Contacted Servers Fan-out">
+        <div className="np-jflow__fanout" aria-label={labels?.fanoutAria ?? "Contacted Servers Fan-out"}>
           <div className="np-jflow__fanout-title">
             <span className="np-jflow__hub" aria-hidden="true">
               {orgGroups.length}
             </span>
-            <span>Contacted Organizations & Servers Fan-out</span>
+            <span>{labels?.fanoutTitle ?? "Contacted Organizations & Servers Fan-out"}</span>
           </div>
 
           <ul className="np-jflow__dests">
             {orgGroups.map((group) => {
               const isExpanded = expandedOrgs.has(group.orgName);
+              const hostCountStr = labels?.hostsCount
+                ? labels.hostsCount(group.nodes.length)
+                : group.nodes.length === 1
+                  ? "host"
+                  : "hosts";
+              const flowCountStr = labels?.flowsCount
+                ? labels.flowsCount(group.totalFlows)
+                : `${group.totalFlows} flows`;
+
               return (
                 <li className="np-jflow__dest" key={group.orgName}>
                   <div
@@ -359,7 +412,11 @@ export const JourneyFlow = memo(function JourneyFlow({
                     role="button"
                     tabIndex={0}
                     aria-expanded={isExpanded}
-                    aria-label={`Organization ${group.orgName}, ${group.nodes.length} hosts, ${group.totalFlows} flows`}
+                    aria-label={
+                      labels?.fanoutOrgAria
+                        ? labels.fanoutOrgAria(group.orgName, group.nodes.length, group.totalFlows)
+                        : `Organization ${group.orgName}, ${group.nodes.length} ${group.nodes.length === 1 ? "host" : "hosts"}, ${group.totalFlows} flows`
+                    }
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
@@ -368,10 +425,10 @@ export const JourneyFlow = memo(function JourneyFlow({
                     }}
                   >
                     <span className="np-jflow__dest-label" title={group.orgName}>
-                      {group.orgName} ({group.nodes.length} {group.nodes.length === 1 ? "host" : "hosts"})
+                      {group.orgName} ({group.nodes.length} {hostCountStr})
                     </span>
                     <span className="np-jflow__dest-meta">
-                      <span>{group.totalFlows} flows</span> · <span>{humanBytes(group.totalBytes)}</span>
+                      <span>{flowCountStr}</span> · <span>{humanBytes(group.totalBytes)}</span>
                       <span aria-hidden="true">{isExpanded ? "▲" : "▼"}</span>
                     </span>
                   </div>

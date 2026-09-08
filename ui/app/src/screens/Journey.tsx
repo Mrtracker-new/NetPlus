@@ -1,13 +1,13 @@
 // Website Journey — the flagship "what happened after I typed the URL?" view
 // Reconstructs the complete page-load story stage by stage and narrates it.
 
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { EvidenceRef } from "@netpulse/contract";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { Icon } from "../icons";
 import { useJourneyController } from "../hooks/useJourneyController";
-import { JourneyFlow } from "@netpulse/viz";
+import { JourneyFlow, type JourneyFlowLabels } from "@netpulse/viz";
 import { useEvidenceNavigation, type NavigationSource } from "../context/EvidenceNavigationContext";
 
 type KpiValueKind = "metric" | "status";
@@ -26,8 +26,53 @@ function getKpiKind(val: string | number): KpiValueKind {
 }
 
 export function Journey() {
-  const { t } = useTranslation(["journey", "common"]);
+  const { t, i18n } = useTranslation(["journey", "common"]);
   const { navigationTarget, navigateToEvidence, clearNavigationTarget } = useEvidenceNavigation();
+
+  const isSpanish = i18n.language?.startsWith("es");
+
+  const journeyFlowLabels: JourneyFlowLabels = useMemo(
+    () => ({
+      trackAria: t("track_aria", { defaultValue: "Journey stage steps" }),
+      stageHeader: (index, title) =>
+        t("stage_header", { index, title, defaultValue: `Stage ${index}: ${title}` }),
+      stageAriaLabel: (index, title) =>
+        t("stage_aria_label", { index, title, defaultValue: `Stage ${index}: ${title}` }),
+      stageTitle: (stage) =>
+        isSpanish
+          ? t(`stages.${stage.kind}`, { defaultValue: stage.title })
+          : stage.title,
+      stepIndicator: (current, total) =>
+        t("step_indicator", { current, total, defaultValue: `Step ${current} of ${total}` }),
+      stepPrev: t("step_prev", { defaultValue: "← Prev" }),
+      stepPrevAria: t("step_prev_aria", { defaultValue: "Previous journey stage" }),
+      stepNext: t("step_next", { defaultValue: "Next →" }),
+      stepNextAria: t("step_next_aria", { defaultValue: "Next journey stage" }),
+      evidenceLabel: t("evidence_label", { defaultValue: "Evidence & Trace:" }),
+      fanoutTitle: t("fanout_title", { defaultValue: "Contacted Organizations & Servers Fan-out" }),
+      fanoutAria: t("fanout_aria", { defaultValue: "Contacted Servers Fan-out" }),
+      fanoutOrgAria: (orgName, hostCount, flowCount) =>
+        t("fanout_org_aria", {
+          name: orgName,
+          hosts: t("hosts", { count: hostCount, defaultValue: `${hostCount} ${hostCount === 1 ? "host" : "hosts"}` }),
+          flows: t("flows", { count: flowCount, defaultValue: `${flowCount} flows` }),
+          defaultValue: `Organization ${orgName}, ${hostCount} ${hostCount === 1 ? "host" : "hosts"}, ${flowCount} flows`,
+        }),
+      hostsCount: (count) => t("hosts", { count, defaultValue: count === 1 ? "host" : "hosts" }),
+      flowsCount: (count) => t("flows", { count, defaultValue: `${count} flows` }),
+      stageBadge: (kind) => t(`stages.${kind}`, { defaultValue: kind.replace(/_/g, " ") }),
+      stages: {
+        navigation: t("stages.navigation"),
+        dns_resolution: t("stages.dns_resolution"),
+        connection: t("stages.connection"),
+        encryption: t("stages.encryption"),
+        request: t("stages.request"),
+        fan_out: t("stages.fan_out"),
+        completion: t("stages.completion"),
+      },
+    }),
+    [t, isSpanish]
+  );
 
   const {
     journey,
@@ -223,13 +268,22 @@ export function Journey() {
               selectedStageIndex={selectedStageIndex}
               onSelectStage={setSelectedStageIndex}
               onNavigate={handleNavigateEvidence}
+              labels={journeyFlowLabels}
             />
           </section>
 
           {/* Screen Reader Live Region for Stage Selection */}
           <div className="np-sr-only" aria-live="polite" aria-atomic="true">
             {selectedStageIndex !== null && journey?.stages[selectedStageIndex]
-              ? `Selected stage ${selectedStageIndex + 1}: ${journey.stages[selectedStageIndex].title}`
+              ? t("stage_selected_announcement", {
+                  index: selectedStageIndex + 1,
+                  title: isSpanish
+                    ? t(`stages.${journey.stages[selectedStageIndex].kind}`, {
+                        defaultValue: journey.stages[selectedStageIndex].title,
+                      })
+                    : journey.stages[selectedStageIndex].title,
+                  defaultValue: `Selected stage ${selectedStageIndex + 1}: ${journey.stages[selectedStageIndex].title}`,
+                })
               : ""}
           </div>
         </>

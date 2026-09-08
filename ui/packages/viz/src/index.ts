@@ -11,7 +11,7 @@ export { BarRow } from "./BarRow";
 export type { BarRowProps } from "./BarRow";
 
 export { JourneyFlow, STAGE_CONFIG_REGISTRY } from "./JourneyFlow";
-export type { JourneyFlowProps, StageConfig } from "./JourneyFlow";
+export type { JourneyFlowProps, JourneyFlowLabels, StageConfig } from "./JourneyFlow";
 
 export { TimeRibbon } from "./TimeRibbon";
 export type { TimeRibbonProps } from "./TimeRibbon";

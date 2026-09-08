@@ -16,7 +16,7 @@ export function useTimelineController() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
-  const [selectedEventIndex, setSelectedEventIndex] = useState<number | null>(null);
+  const [selectedEventKey, setSelectedEventKey] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
 
   const highlightPacketId =
@@ -45,13 +45,32 @@ export function useTimelineController() {
     });
   }, [events, severityFilter, searchQuery]);
 
-  // Deterministic initial auto-selection:
-  // Runs when selectedEventIndex === null or when highlightPacketId is provided from evidence navigation.
-  // Selects target packet if highlighted, else highest-severity event (finding > notable > neutral).
+  // Sync evidence navigation highlightPacketId to selectedEventKey
   useEffect(() => {
-    if (filteredEvents.length === 0) {
-      if (selectedEventIndex !== null) setSelectedEventIndex(null);
-      return;
+    if (highlightPacketId !== undefined && filteredEvents.length > 0) {
+      const target = filteredEvents.find(
+        (e) =>
+          (e as any).packetId === highlightPacketId ||
+          e.evidence?.some((ev) => ev.kind === "packet" && ev.id === highlightPacketId)
+      );
+      if (target) {
+        setSelectedEventKey(`${target.at}-${target.headline}`);
+      }
+    }
+  }, [highlightPacketId, filteredEvents]);
+
+  // Derive selectedEventIndex by matching key in filteredEvents.
+  // If key is not found, default to highest-severity event.
+  const selectedEventIndex = useMemo<number | null>(() => {
+    if (filteredEvents.length === 0) return null;
+
+    if (selectedEventKey !== null) {
+      const matchIndex = filteredEvents.findIndex(
+        (e) => `${e.at}-${e.headline}` === selectedEventKey
+      );
+      if (matchIndex !== -1) {
+        return matchIndex;
+      }
     }
 
     if (highlightPacketId !== undefined) {
@@ -60,29 +79,24 @@ export function useTimelineController() {
           (e as any).packetId === highlightPacketId ||
           e.evidence?.some((ev) => ev.kind === "packet" && ev.id === highlightPacketId)
       );
-      if (matchIndex !== -1 && matchIndex !== selectedEventIndex) {
-        setSelectedEventIndex(matchIndex);
-        return;
+      if (matchIndex !== -1) {
+        return matchIndex;
       }
     }
 
-    if (selectedEventIndex === null) {
-      let bestIndex = 0;
-      let bestSeverityWeight = -1;
+    let bestIndex = 0;
+    let bestSeverityWeight = -1;
 
-      for (let i = 0; i < filteredEvents.length; i++) {
-        const ev = filteredEvents[i]!;
-        const weight = ev.severity === "finding" ? 3 : ev.severity === "notable" ? 2 : 1;
-        if (weight > bestSeverityWeight) {
-          bestSeverityWeight = weight;
-          bestIndex = i;
-        }
+    for (let i = 0; i < filteredEvents.length; i++) {
+      const ev = filteredEvents[i]!;
+      const weight = ev.severity === "finding" ? 3 : ev.severity === "notable" ? 2 : 1;
+      if (weight > bestSeverityWeight) {
+        bestSeverityWeight = weight;
+        bestIndex = i;
       }
-      setSelectedEventIndex(bestIndex);
-    } else if (selectedEventIndex >= filteredEvents.length) {
-      setSelectedEventIndex(filteredEvents.length - 1);
     }
-  }, [filteredEvents, selectedEventIndex, highlightPacketId]);
+    return bestIndex;
+  }, [filteredEvents, selectedEventKey, highlightPacketId]);
 
 
   // Unified Time Domain for synchronized mark positions and axis ticks
@@ -132,7 +146,7 @@ export function useTimelineController() {
 
   const selectEvent = useCallback(
     (event: TimelineEvent, index: number) => {
-      setSelectedEventIndex(index);
+      setSelectedEventKey(`${event.at}-${event.headline}`);
       setAnnouncement(`Selected event ${index + 1}: ${event.headline}`);
     },
     []
@@ -141,23 +155,27 @@ export function useTimelineController() {
   const selectNextEvent = useCallback(() => {
     if (filteredEvents.length === 0) return;
     const next = selectedEventIndex === null ? 0 : Math.min(filteredEvents.length - 1, selectedEventIndex + 1);
-    setSelectedEventIndex(next);
     const ev = filteredEvents[next];
-    if (ev) setAnnouncement(`Selected event ${next + 1}: ${ev.headline}`);
+    if (ev) {
+      setSelectedEventKey(`${ev.at}-${ev.headline}`);
+      setAnnouncement(`Selected event ${next + 1}: ${ev.headline}`);
+    }
   }, [filteredEvents, selectedEventIndex]);
 
   const selectPrevEvent = useCallback(() => {
     if (filteredEvents.length === 0) return;
     const prev = selectedEventIndex === null ? 0 : Math.max(0, selectedEventIndex - 1);
-    setSelectedEventIndex(prev);
     const ev = filteredEvents[prev];
-    if (ev) setAnnouncement(`Selected event ${prev + 1}: ${ev.headline}`);
+    if (ev) {
+      setSelectedEventKey(`${ev.at}-${ev.headline}`);
+      setAnnouncement(`Selected event ${prev + 1}: ${ev.headline}`);
+    }
   }, [filteredEvents, selectedEventIndex]);
 
   const clearFilters = useCallback(() => {
     setSearchQuery("");
     setSeverityFilter("all");
-    setSelectedEventIndex(null);
+    setSelectedEventKey(null);
     clearNavigationTarget();
     setAnnouncement("Filters cleared.");
   }, [clearNavigationTarget]);
@@ -170,6 +188,7 @@ export function useTimelineController() {
     axisTicks,
     selectedEvent,
     selectedEventIndex,
+    selectedEventKey,
     searchQuery,
     severityFilter,
     highlightPacketId,
@@ -182,6 +201,7 @@ export function useTimelineController() {
       selectNextEvent,
       selectPrevEvent,
       clearFilters,
+      setSelectedEventKey,
     },
   };
 }

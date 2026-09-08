@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, renderHook } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, renderHook, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import type { NarrativeCard } from "@netpulse/contract";
 import "../i18n";
@@ -8,7 +8,7 @@ import { useTimelineController } from "../hooks/useTimelineController";
 import { formatTimelineAxis } from "../utils/timeline.utils";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-import { setFeed, __resetForTest } from "../state/store";
+import { setFeed, pushCards, __resetForTest } from "../state/store";
 
 afterEach(() => {
   cleanup();
@@ -487,6 +487,122 @@ describe("Timeline Screen & useTimelineController", () => {
     expect(screen.getByText("-10s")).toBeInTheDocument();
     expect(screen.getByText("-5s")).toBeInTheDocument();
     expect(screen.getByText("now")).toBeInTheDocument();
+  });
+
+  it("preserves stable entity-key selection across live feed delta updates (NET-UX-004)", async () => {
+    const cardA: NarrativeCard = {
+      headline: "Card A DNS Query",
+      summary: "DNS query at 1000",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 1_000_000_000,
+    };
+    const cardB: NarrativeCard = {
+      headline: "Card B SYN Flood",
+      summary: "SYN flood at 2000",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 2_000_000_000,
+    };
+
+    setFeed([cardA, cardB]);
+
+    // 1. Test controller hook stability
+    const { result } = renderHook(() => useTimelineController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    // Explicitly select Card A (index 0, key: 1000000000-Card A DNS Query)
+    act(() => {
+      result.current.actions.selectEvent(result.current.events[0]!, 0);
+    });
+
+    expect(result.current.selectedEventKey).toBe("1000000000-Card A DNS Query");
+    expect(result.current.selectedEventIndex).toBe(0);
+    expect(result.current.selectedEvent?.headline).toBe("Card A DNS Query");
+
+    // Live delta arrives with a new earlier event (prepending at index 0)
+    const cardPrepend: NarrativeCard = {
+      headline: "Card Prepend Earlier",
+      summary: "Earlier event at 500",
+      lines: [],
+      severity: "notable",
+      evidence: [],
+      at_mono_nanos: 500_000_000,
+    };
+
+    act(() => {
+      pushCards([cardPrepend]);
+    });
+
+    // Card A is now at index 1 in chronological filteredEvents, but selection must remain on Card A!
+    expect(result.current.selectedEventKey).toBe("1000000000-Card A DNS Query");
+    expect(result.current.selectedEventIndex).toBe(1);
+    expect(result.current.selectedEvent?.headline).toBe("Card A DNS Query");
+
+    // If Card A is removed or not found, defaults to highest-severity event (Card B, finding)
+    act(() => {
+      setFeed([cardPrepend, cardB]);
+    });
+
+    expect(result.current.selectedEventIndex).toBe(1); // Card B is at index 1
+    expect(result.current.selectedEvent?.headline).toBe("Card B SYN Flood");
+  });
+
+  it("maintains selected event mark and inspector card across live updates in Timeline UI (NET-UX-004)", async () => {
+    const cardA: NarrativeCard = {
+      headline: "Session Handshake",
+      summary: "TLS handshake at 1s",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 1_000_000_000,
+    };
+    const cardB: NarrativeCard = {
+      headline: "Keepalive Ping",
+      summary: "Periodic keepalive at 2s",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 2_000_000_000,
+    };
+
+    setFeed([cardA, cardB]);
+
+    render(<TimelineTestWrapper />);
+
+    // Click Card B mark
+    const cardBMark = screen.getByRole("button", { name: /Keepalive Ping/i });
+    fireEvent.click(cardBMark);
+
+    expect(cardBMark).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Keepalive Ping" })).toBeInTheDocument();
+
+    // Ingest new live card with earlier timestamp
+    const cardEarlier: NarrativeCard = {
+      headline: "ARP Resolution",
+      summary: "Initial ARP broadcast at 0.5s",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 500_000_000,
+    };
+
+    act(() => {
+      pushCards([cardEarlier]);
+    });
+
+    // Card B mark must remain selected and inspector must still show Keepalive Ping
+    const updatedCardBMark = screen.getByRole("button", { name: /Keepalive Ping/i });
+    expect(updatedCardBMark).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("heading", { name: "Keepalive Ping" })).toBeInTheDocument();
+    expect(screen.getByText("Periodic keepalive at 2s")).toBeInTheDocument();
   });
 });
 

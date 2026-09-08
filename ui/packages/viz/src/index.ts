@@ -13,7 +13,7 @@ export type { BarRowProps } from "./BarRow";
 export { JourneyFlow, STAGE_CONFIG_REGISTRY } from "./JourneyFlow";
 export type { JourneyFlowProps, JourneyFlowLabels, StageConfig } from "./JourneyFlow";
 
-export { TimeRibbon } from "./TimeRibbon";
+export { TimeRibbon, calcRibbonPos } from "./TimeRibbon";
 export type { TimeRibbonProps, TimeDomain } from "./TimeRibbon";
 
 export { ConfidenceMeter } from "./ConfidenceMeter";

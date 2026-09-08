@@ -1,4 +1,5 @@
 import type { NarrativeCard, Severity } from "@netpulse/contract";
+import { calcRibbonPos } from "@netpulse/viz";
 
 export type SeverityFilter = "all" | "finding" | "notable" | "neutral";
 
@@ -21,14 +22,7 @@ export interface TimelineSummaryMetrics {
   timeSpanStr: string;
 }
 
-/** Calculate proportional horizontal percentage position clamped between 2% and 98% */
-export function calcRibbonPos(at: number, min: number, max: number): string {
-  const span = max - min;
-  if (span <= 0) return "50%";
-  const ratio = (at - min) / span;
-  const clamped = Math.max(0.02, Math.min(0.98, ratio));
-  return `${(clamped * 100).toFixed(2)}%`;
-}
+export { calcRibbonPos };
 
 /** Format time span from nanoseconds into human-readable string */
 export function formatTimeSpan(spanNanos: number): string {

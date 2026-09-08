@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import { TimeRibbon } from "../TimeRibbon";
+import { TimeRibbon, calcRibbonPos } from "../TimeRibbon";
 import type { RibbonEvent } from "../types";
 
 describe("TimeRibbon Component", () => {
@@ -242,6 +242,29 @@ describe("TimeRibbon Component", () => {
     expect(minMark).toHaveStyle({ left: "2%" });
     expect(midMark).toHaveStyle({ left: "50%" });
     expect(maxMark).toHaveStyle({ left: "98%" });
+  });
+});
+
+describe("calcRibbonPos", () => {
+  it("returns '50%' when span <= 0 (min equals max or inverted)", () => {
+    expect(calcRibbonPos(5000, 5000, 5000)).toBe("50%");
+    expect(calcRibbonPos(5000, 10000, 5000)).toBe("50%");
+  });
+
+  it("clamps lower bound to 2.00% for values at or below min", () => {
+    expect(calcRibbonPos(0, 1000, 5000)).toBe("2.00%");
+    expect(calcRibbonPos(1000, 1000, 5000)).toBe("2.00%");
+  });
+
+  it("clamps upper bound to 98.00% for values at or above max", () => {
+    expect(calcRibbonPos(5000, 1000, 5000)).toBe("98.00%");
+    expect(calcRibbonPos(6000, 1000, 5000)).toBe("98.00%");
+  });
+
+  it("calculates accurate proportional percentage between 2% and 98%", () => {
+    expect(calcRibbonPos(3000, 1000, 5000)).toBe("50.00%");
+    expect(calcRibbonPos(2000, 1000, 5000)).toBe("25.00%");
+    expect(calcRibbonPos(4000, 1000, 5000)).toBe("75.00%");
   });
 });
 

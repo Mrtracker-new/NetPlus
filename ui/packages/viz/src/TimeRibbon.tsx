@@ -9,6 +9,15 @@ export interface TimeDomain {
   max: number;
 }
 
+/** Calculate proportional horizontal percentage position clamped between 2% and 98% */
+export function calcRibbonPos(at: number, min: number, max: number): string {
+  const span = max - min;
+  if (span <= 0) return "50%";
+  const ratio = (at - min) / span;
+  const clamped = Math.max(0.02, Math.min(0.98, ratio));
+  return `${(clamped * 100).toFixed(2)}%`;
+}
+
 export interface TimeRibbonProps {
   events: RibbonEvent[];
   timeDomain?: TimeDomain;
@@ -90,14 +99,8 @@ export const TimeRibbon = memo(function TimeRibbon({
     }
   }
 
-  const span = max - min || 1;
-
   // Clamped proportional positioning (2% to 98%)
-  const pos = (at: number) => {
-    const ratio = (at - min) / span;
-    const clamped = Math.max(0.02, Math.min(0.98, ratio));
-    return `${(clamped * 100).toFixed(2)}%`;
-  };
+  const pos = (at: number) => calcRibbonPos(at, min, max);
 
   const isEventHighlighted = (e: RibbonEvent, index: number) => {
     if (selectedIndex !== null && selectedIndex !== undefined) {

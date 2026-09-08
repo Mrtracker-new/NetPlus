@@ -4885,7 +4885,7 @@ button {
   font-weight: var(--np-fw-medium);
   font-family: var(--np-font-mono);
   font-variant-numeric: tabular-nums;
-  color: var(--np-text-mute);
+  color: var(--np-text-dim);
 }
 
 .np-jflow__step-btn {

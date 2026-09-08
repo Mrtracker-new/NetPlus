@@ -341,6 +341,80 @@ describe("Timeline Screen & useTimelineController", () => {
     expect(screen.getByRole("heading", { name: "Suspicious DNS Tunnel Packet" })).toBeInTheDocument();
     expect(screen.getByText("packet #999")).toBeInTheDocument();
   });
+
+  it("sorts events chronologically (at_mono_nanos ascending) and ArrowRight advances toward newer events (NET-UX-002)", async () => {
+    // Reverse-chronological feed input (newest first)
+    const newestCard: NarrativeCard = {
+      headline: "Newest Event",
+      summary: "Happened at t=3000",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 3000000000,
+    };
+    const middleCard: NarrativeCard = {
+      headline: "Middle Event",
+      summary: "Happened at t=2000",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 2000000000,
+    };
+    const oldestCard: NarrativeCard = {
+      headline: "Oldest Event",
+      summary: "Happened at t=1000",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 1000000000,
+    };
+
+    // Feed in reverse chronological order
+    setFeed([newestCard, middleCard, oldestCard]);
+
+    // 1. Controller hook assertion: events are sorted chronologically
+    const { result } = renderHook(() => useTimelineController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    expect(result.current.events[0]!.at <= result.current.events[result.current.events.length - 1]!.at).toBe(true);
+    expect(result.current.events[0]!.at).toBe(1000000000);
+    expect(result.current.events[0]!.headline).toBe("Oldest Event");
+    expect(result.current.events[1]!.at).toBe(2000000000);
+    expect(result.current.events[1]!.headline).toBe("Middle Event");
+    expect(result.current.events[2]!.at).toBe(3000000000);
+    expect(result.current.events[2]!.headline).toBe("Newest Event");
+
+    // 2. Screen UI assertion: ArrowRight advances toward newer events
+    render(<TimelineTestWrapper />);
+
+    const markButtons = screen.getAllByRole("button", { name: /^Event \d+:/i });
+    expect(markButtons.length).toBe(3);
+
+    // Click oldest event mark (index 0)
+    fireEvent.click(markButtons[0]!);
+    expect(markButtons[0]!).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Oldest Event" })).toBeInTheDocument();
+
+    // ArrowRight advances to newer event (index 1)
+    fireEvent.keyDown(markButtons[0]!, { key: "ArrowRight" });
+    expect(markButtons[1]!).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Middle Event" })).toBeInTheDocument();
+
+    // ArrowRight advances to newest event (index 2)
+    fireEvent.keyDown(markButtons[1]!, { key: "ArrowRight" });
+    expect(markButtons[2]!).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByRole("heading", { name: "Newest Event" })).toBeInTheDocument();
+
+    // Inspector stepper: Prev moves back toward earlier events
+    const prevButton = screen.getByRole("button", { name: /Previous event/i });
+    fireEvent.click(prevButton);
+    expect(await screen.findByRole("heading", { name: "Middle Event" })).toBeInTheDocument();
+  });
 });
 
 describe("formatTimelineAxis Utility", () => {

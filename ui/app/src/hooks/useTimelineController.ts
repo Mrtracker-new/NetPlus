@@ -24,14 +24,16 @@ export function useTimelineController() {
   const highlightTimestamp =
     navigationTarget?.screen === "timeline" ? navigationTarget.timestamp : undefined;
 
-  // Preserve all original FeedEvent fields & add lane
+  // Preserve all original FeedEvent fields, sort chronologically & add lane
   const events = useMemo<TimelineEvent[]>(() => {
-    return feed.map((card) => ({
-      ...card,
-      at: card.at_mono_nanos,
-      label: card.headline,
-      lane: card.severity,
-    }));
+    return [...feed]
+      .sort((a, b) => a.at_mono_nanos - b.at_mono_nanos)
+      .map((card) => ({
+        ...card,
+        at: card.at_mono_nanos,
+        label: card.headline,
+        lane: card.severity,
+      }));
   }, [feed]);
 
   // Filtered Events with normalized search & severity filter

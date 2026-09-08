@@ -14,7 +14,7 @@ export { JourneyFlow, STAGE_CONFIG_REGISTRY } from "./JourneyFlow";
 export type { JourneyFlowProps, JourneyFlowLabels, StageConfig } from "./JourneyFlow";
 
 export { TimeRibbon } from "./TimeRibbon";
-export type { TimeRibbonProps } from "./TimeRibbon";
+export type { TimeRibbonProps, TimeDomain } from "./TimeRibbon";
 
 export { ConfidenceMeter } from "./ConfidenceMeter";
 export type { ConfidenceMeterProps } from "./ConfidenceMeter";

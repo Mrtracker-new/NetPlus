@@ -85,12 +85,19 @@ export function useTimelineController() {
   }, [filteredEvents, selectedEventIndex, highlightPacketId]);
 
 
+  // Unified Time Domain for synchronized mark positions and axis ticks
+  const timeDomain = useMemo(() => {
+    const activeEvents = filteredEvents.length > 0 ? filteredEvents : events;
+    if (activeEvents.length === 0) return { min: 0, max: 0 };
+    const times = activeEvents.map((e) => e.at);
+    return { min: Math.min(...times), max: Math.max(...times) };
+  }, [filteredEvents, events]);
+
   // Dynamic Time Axis Ticks
   const axisTicks = useMemo(() => {
-    if (events.length === 0) return [];
-    const times = events.map((e) => e.at);
-    return formatTimelineAxis(Math.min(...times), Math.max(...times));
-  }, [events]);
+    if (timeDomain.min === 0 && timeDomain.max === 0) return [];
+    return formatTimelineAxis(timeDomain.min, timeDomain.max);
+  }, [timeDomain]);
 
   // Summary Metrics Computation
   const summaryMetrics = useMemo<TimelineSummaryMetrics | null>(() => {
@@ -159,6 +166,7 @@ export function useTimelineController() {
     events,
     filteredEvents,
     summaryMetrics,
+    timeDomain,
     axisTicks,
     selectedEvent,
     selectedEventIndex,

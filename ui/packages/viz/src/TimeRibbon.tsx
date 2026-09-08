@@ -4,8 +4,14 @@ import type { Severity } from "@netpulse/contract";
 import { EmptyState } from "@netpulse/components";
 import type { RibbonEvent } from "./types";
 
+export interface TimeDomain {
+  min: number;
+  max: number;
+}
+
 export interface TimeRibbonProps {
   events: RibbonEvent[];
+  timeDomain?: TimeDomain;
   highlightPacketId?: number;
   highlightTimestamp?: number;
   selectedIndex?: number | null;
@@ -24,6 +30,7 @@ const RIBBON_LANES: Array<{ severity: Severity; label: string; color: string }> 
  *  by shape+color and support arrow-key navigation. */
 export const TimeRibbon = memo(function TimeRibbon({
   events,
+  timeDomain,
   highlightPacketId,
   highlightTimestamp,
   selectedIndex = null,
@@ -73,8 +80,8 @@ export const TimeRibbon = memo(function TimeRibbon({
   }
 
   const times = events.map((e) => e.at);
-  const min = Math.min(...times);
-  const max = Math.max(...times);
+  const min = timeDomain !== undefined ? timeDomain.min : Math.min(...times);
+  const max = timeDomain !== undefined ? timeDomain.max : Math.max(...times);
   const span = max - min || 1;
 
   // Clamped proportional positioning (2% to 98%)

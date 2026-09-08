@@ -415,6 +415,79 @@ describe("Timeline Screen & useTimelineController", () => {
     fireEvent.click(prevButton);
     expect(await screen.findByRole("heading", { name: "Middle Event" })).toBeInTheDocument();
   });
+
+  it("synchronizes mark positions and time axis domain when severity filter is active (NET-DATA-003)", async () => {
+    // Session events spanning from 1s to 31s
+    const earlyNeutral: NarrativeCard = {
+      headline: "Early Ping",
+      summary: "Normal ping at 1s",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 1_000_000_000,
+    };
+    const firstFinding: NarrativeCard = {
+      headline: "Port Scan Started",
+      summary: "Port scan detected at 11s",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 11_000_000_000,
+    };
+    const midFinding: NarrativeCard = {
+      headline: "Brute Force Burst",
+      summary: "Brute force attempts at 16s",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 16_000_000_000,
+    };
+    const lastFinding: NarrativeCard = {
+      headline: "Exfiltration Alert",
+      summary: "High volume egress at 21s",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 21_000_000_000,
+    };
+    const lateNeutral: NarrativeCard = {
+      headline: "Late Ping",
+      summary: "Normal ping at 31s",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 31_000_000_000,
+    };
+
+    setFeed([earlyNeutral, firstFinding, midFinding, lastFinding, lateNeutral]);
+
+    render(<TimelineTestWrapper />);
+
+    // Activate Findings severity filter by clicking Findings KPI button
+    const findingsKpi = screen.getByRole("button", { name: /Findings: 3/i });
+    fireEvent.click(findingsKpi);
+
+    // Filtered marks in ribbon
+    const finding1Mark = screen.getByRole("button", { name: /Port Scan Started/i });
+    const midMark = screen.getByRole("button", { name: /Brute Force Burst/i });
+    const finding2Mark = screen.getByRole("button", { name: /Exfiltration Alert/i });
+
+    // Mark positions must match the active timeDomain (11s to 21s, span = 10s)
+    // 11s is min -> clamped to 2%
+    // 16s is midpoint -> 50%
+    // 21s is max -> clamped to 98%
+    expect(finding1Mark.style.left).toBe("2%");
+    expect(midMark.style.left).toBe("50%");
+    expect(finding2Mark.style.left).toBe("98%");
+
+    // Verify axis ticks match the active domain (11s to 21s = 10s span):
+    // Start tick at 2% is -10s
+    // Mid tick at 50% is -5s
+    // End tick at 98% is now
+    expect(screen.getByText("-10s")).toBeInTheDocument();
+    expect(screen.getByText("-5s")).toBeInTheDocument();
+    expect(screen.getByText("now")).toBeInTheDocument();
+  });
 });
 
 describe("formatTimelineAxis Utility", () => {

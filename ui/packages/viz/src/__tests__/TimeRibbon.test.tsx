@@ -36,4 +36,26 @@ describe("TimeRibbon Component", () => {
     expect(targetMark).toHaveAttribute("aria-pressed", "true");
     expect(targetMark.className).toContain("np-ribbon__mark--highlighted");
   });
+
+  it("uses authoritative timeDomain to position marks instead of fallback local min/max", () => {
+    const events: RibbonEvent[] = [
+      {
+        at: 5000,
+        label: "Mid event",
+        severity: "finding",
+      },
+    ];
+
+    // Authoritative timeDomain from parent filter (0 to 10000)
+    render(
+      <TimeRibbon
+        events={events}
+        timeDomain={{ min: 0, max: 10000 }}
+      />
+    );
+
+    const mark = screen.getByRole("button", { name: /Mid event/i });
+    // at=5000 in domain 0..10000 should be positioned at 50%
+    expect(mark.style.left).toBe("50%");
+  });
 });

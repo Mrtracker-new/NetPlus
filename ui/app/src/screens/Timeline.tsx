@@ -21,6 +21,7 @@ export function Timeline() {
     events,
     filteredEvents,
     summaryMetrics,
+    timeDomain,
     axisTicks,
     selectedEvent,
     selectedEventIndex,
@@ -120,6 +121,7 @@ export function Timeline() {
               {/* Interactive Native Button TimeRibbon */}
               <TimeRibbon
                 events={filteredEvents}
+                timeDomain={timeDomain}
                 highlightPacketId={highlightPacketId}
                 highlightTimestamp={highlightTimestamp}
                 selectedIndex={selectedEventIndex}

@@ -9,6 +9,13 @@ import { formatTimelineAxis } from "../utils/timeline.utils";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setFeed, pushCards, __resetForTest } from "../state/store";
+import {
+  TimelineInspector,
+  formatRelativeTime,
+  formatWallTimeClock,
+  resolveCategory,
+} from "../screens/Timeline/TimelineInspector";
+import type { TimelineEvent } from "../utils/timeline.utils";
 
 afterEach(() => {
   cleanup();
@@ -625,3 +632,215 @@ describe("formatTimelineAxis Utility", () => {
     }
   });
 });
+
+describe("TimelineInspector Metadata Header", () => {
+  it("renders relative elapsed time (e.g. T +14.2s), category badge (Security), and protocol tag (TLS 1.3) above summary", () => {
+    const event: TimelineEvent = {
+      headline: "Suspicious TLS Handshake",
+      summary: "Unusual cipher suite negotiated during connection setup",
+      lines: ["Cipher: TLS_NULL_WITH_NULL_NULL"],
+      severity: "finding",
+      category: "security",
+      protocol: "TLS 1.3",
+      evidence: [{ kind: "flow", id: 501 }],
+      at_mono_nanos: 14_200_000_000,
+      at: 14_200_000_000,
+      label: "Suspicious TLS Handshake",
+      lane: "finding",
+    };
+
+    render(
+      <TimelineInspector
+        event={event}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    // Relative elapsed time formatted as T +14.2s
+    expect(screen.getByText("T +14.2s")).toBeInTheDocument();
+
+    // Category badge displaying Security
+    expect(screen.getByText("Security")).toBeInTheDocument();
+
+    // Protocol tag displaying TLS 1.3
+    expect(screen.getByText("TLS 1.3")).toBeInTheDocument();
+
+    // Summary narrative rendered below metadata header
+    expect(
+      screen.getByText("Unusual cipher suite negotiated during connection setup")
+    ).toBeInTheDocument();
+  });
+
+  it("renders Category badges correctly for DNS and Network, and protocol tag for HTTP/2", () => {
+    const dnsEvent: TimelineEvent = {
+      headline: "DNS A Record Query",
+      summary: "Query for api.internal.corp",
+      lines: [],
+      severity: "neutral",
+      category: "dns",
+      protocol: "UDP",
+      evidence: [],
+      at_mono_nanos: 1_500_000_000,
+      at: 1_500_000_000,
+      label: "DNS A Record Query",
+      lane: "neutral",
+    };
+
+    const { unmount } = render(
+      <TimelineInspector
+        event={dnsEvent}
+        currentIndex={0}
+        totalCount={2}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("T +1.5s")).toBeInTheDocument();
+    expect(screen.getByText("DNS")).toBeInTheDocument();
+    unmount();
+
+    const networkEvent: TimelineEvent = {
+      headline: "HTTP Stream Multiplexing",
+      summary: "Multiplexed stream opened on connection #4",
+      lines: [],
+      severity: "notable",
+      category: "network",
+      protocol: "HTTP/2",
+      evidence: [],
+      at_mono_nanos: 25_000_000_000,
+      at: 25_000_000_000,
+      label: "HTTP Stream Multiplexing",
+      lane: "notable",
+    };
+
+    render(
+      <TimelineInspector
+        event={networkEvent}
+        currentIndex={1}
+        totalCount={2}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("T +25.0s")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
+    expect(screen.getByText("HTTP/2")).toBeInTheDocument();
+  });
+
+  it("omits protocol tag when protocol is not present", () => {
+    const noProtoEvent: TimelineEvent = {
+      headline: "Raw Gateway Activity",
+      summary: "Gateway router ping without protocol tag",
+      lines: [],
+      severity: "neutral",
+      category: "network",
+      evidence: [],
+      at_mono_nanos: 10_000_000_000,
+      at: 10_000_000_000,
+      label: "Raw Gateway Activity",
+      lane: "neutral",
+    };
+
+    const { container } = render(
+      <TimelineInspector
+        event={noProtoEvent}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("T +10.0s")).toBeInTheDocument();
+    expect(screen.getByText("Network")).toBeInTheDocument();
+    expect(
+      container.querySelector(".np-timeline-inspector__protocol-tag")
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders wall time clock and clock icon in the inspector metadata bar", () => {
+    const eventWithWallTime: TimelineEvent = {
+      headline: "Timestamped Event",
+      summary: "Event with explicit wall time",
+      lines: [],
+      severity: "neutral",
+      category: "general",
+      evidence: [],
+      at_mono_nanos: 14_200_000_000,
+      at: 14_200_000_000,
+      label: "Timestamped Event",
+      lane: "neutral",
+      ...({ wall_time: "14:32:05" } as any),
+    };
+
+    render(
+      <TimelineInspector
+        event={eventWithWallTime}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText("14:32:05")).toBeInTheDocument();
+    expect(screen.getByText("T +14.2s")).toBeInTheDocument();
+    expect(screen.getByText("General")).toBeInTheDocument();
+  });
+
+  it("correctly calculates formatRelativeTime, formatWallTimeClock, and resolveCategory utilities", () => {
+    const ev14s: TimelineEvent = {
+      headline: "Test Event",
+      summary: "Test",
+      lines: [],
+      severity: "neutral",
+      evidence: [],
+      at_mono_nanos: 14_200_000_000,
+      at: 14_200_000_000,
+      label: "Test",
+      lane: "neutral",
+    };
+    expect(formatRelativeTime(ev14s)).toBe("T +14.2s");
+
+    const ev0s: TimelineEvent = {
+      ...ev14s,
+      at_mono_nanos: 0,
+      at: 0,
+    };
+    expect(formatRelativeTime(ev0s)).toBe("T +0.0s");
+
+    // Float seconds support (e.g. 14.2 passed directly)
+    const evFloat: TimelineEvent = {
+      ...ev14s,
+      at_mono_nanos: 14.2,
+      at: 14.2,
+    };
+    expect(formatRelativeTime(evFloat)).toBe("T +14.2s");
+
+    // resolveCategory checks
+    expect(resolveCategory({ ...ev14s, category: "security" }).label).toBe("Security");
+    expect(resolveCategory({ ...ev14s, category: "dns" }).label).toBe("DNS");
+    expect(resolveCategory({ ...ev14s, category: "network" }).label).toBe("Network");
+    expect(resolveCategory({ ...ev14s, category: "tls" }).label).toBe("TLS");
+    expect(resolveCategory({ ...ev14s, category: "performance" }).label).toBe("Performance");
+
+    // Fallback checks when category is absent
+    expect(resolveCategory({ ...ev14s, category: undefined, severity: "finding" }).label).toBe("Security");
+    expect(resolveCategory({ ...ev14s, category: undefined, headline: "DNS Lookup Failure" }).label).toBe("DNS");
+    expect(resolveCategory({ ...ev14s, category: undefined, protocol: "TLS 1.3" }).label).toBe("TLS");
+
+    // formatWallTimeClock explicit string
+    expect(formatWallTimeClock({ ...ev14s, ...({ wall_time: "12:00:00" } as any) })).toBe("12:00:00");
+  });
+});
+

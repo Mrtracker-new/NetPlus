@@ -185,7 +185,7 @@ export function Journey() {
         )}
       </div>
 
-      {!journey ? (
+      {!journey || journey.stages.length === 0 ? (
         <EmptyState
           icon={<Icon name="journey" />}
           title={t("title", { defaultValue: "Page-Load Journey Reconstruction" })}

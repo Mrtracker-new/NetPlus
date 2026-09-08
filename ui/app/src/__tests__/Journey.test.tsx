@@ -147,6 +147,40 @@ describe("Journey Screen & useJourneyController", () => {
     });
   });
 
+  it("renders empty state when session has empty stages", async () => {
+    vi.spyOn(ipc, "query").mockResolvedValue({
+      kind: "pageJourney",
+      journey: {
+        session_id: 101,
+        stages: [],
+        fanout: [],
+        duration_ms: null,
+        ttfb_ms: null,
+      },
+    });
+
+    setFeed([
+      {
+        headline: "google.com session",
+        summary: "Loaded page",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "session", id: 101 }],
+        at_mono_nanos: 1000,
+      },
+    ]);
+
+    render(<JourneyTestWrapper />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("No journey has been captured yet. Run a capture to reconstruct the page-load timeline.")
+      ).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Journey Summary")).toBeNull();
+  });
+
   it("renders populated journey stages, summary metrics, and collapsible provider groups", async () => {
     vi.spyOn(ipc, "query").mockResolvedValue(mockJourneyResponse);
 

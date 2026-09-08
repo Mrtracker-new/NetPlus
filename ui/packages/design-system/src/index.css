@@ -4560,8 +4560,8 @@ button {
   gap: 12px;
   margin-bottom: var(--np-4);
   background: var(--np-surface-1);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.04), 4px 4px 14px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-card);
   padding: 8px 14px;
   border-radius: var(--np-radius-md, 12px);
   min-height: 52px;
@@ -4590,7 +4590,7 @@ button {
   display: grid;
   place-items: center;
   background: var(--np-surface-recessed);
-  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.6), inset -1px -1px 2px rgba(255, 255, 255, 0.05);
+  box-shadow: var(--np-neu-inset);
   color: var(--np-accent);
 }
 
@@ -4626,17 +4626,17 @@ button {
   padding: 0 12px 0 34px;
   font-size: var(--np-fs-sm);
   border-radius: var(--np-radius-sm, 8px);
-  border: 1px solid rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--np-border);
   background: var(--np-surface-recessed);
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.65), inset -1px -1px 3px rgba(255, 255, 255, 0.04);
+  box-shadow: var(--np-neu-inset);
   color: var(--np-text);
   outline: none;
   transition: border-color var(--np-t), box-shadow var(--np-t);
 }
 
 .np-session-bar__input:focus-visible {
-  border-color: rgba(47, 224, 214, 0.5);
-  box-shadow: inset 2px 2px 6px rgba(0, 0, 0, 0.8), inset -1px -1px 3px rgba(255, 255, 255, 0.05), 0 0 0 1px var(--np-accent);
+  border-color: var(--np-accent);
+  box-shadow: var(--np-neu-inset), 0 0 0 1px var(--np-accent);
 }
 
 .np-session-bar__select-wrap {
@@ -4654,8 +4654,8 @@ button {
   font-weight: var(--np-fw-medium);
   border-radius: var(--np-radius-sm, 8px);
   background: var(--np-surface-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.06), 3px 3px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
   color: var(--np-text);
   cursor: pointer;
   outline: none;
@@ -4669,13 +4669,13 @@ button {
 }
 
 .np-session-bar__select:hover {
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.09), 4px 4px 12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  box-shadow: var(--np-neu-control-hover);
   transform: translateY(-1px);
 }
 
 .np-session-bar__select:focus-visible {
   border-color: var(--np-accent);
-  box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.6), inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+  box-shadow: var(--np-neu-inset);
   transform: translateY(0);
 }
 
@@ -4688,7 +4688,7 @@ button {
   border-radius: var(--np-radius-sm, 8px);
   background: var(--np-surface-elevated);
   border: 1px solid rgba(47, 224, 214, 0.35);
-  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.05), 2px 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--np-neu-control);
   color: var(--np-accent);
   cursor: pointer;
   display: inline-flex;
@@ -4699,7 +4699,7 @@ button {
 }
 
 .np-session-bar__clear-btn:hover {
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.08), 3px 3px 10px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--np-neu-control-hover);
   color: var(--np-accent-strong);
   transform: translateY(-1px);
 }
@@ -4709,8 +4709,8 @@ button {
   padding: 20px;
   background: var(--np-surface-1);
   border-radius: var(--np-radius-lg, 16px);
-  box-shadow: -4px -4px 14px rgba(255, 255, 255, 0.03), 6px 6px 20px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--np-neu-card);
+  border: 1px solid var(--np-border);
   overflow: hidden;
   margin-bottom: var(--np-4);
 }
@@ -4762,21 +4762,21 @@ button {
   font-size: var(--np-fs-lg);
   color: var(--np-text-dim);
   background: var(--np-surface-elevated);
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.07), 3px 3px 8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--np-neu-control);
+  border: 1px solid var(--np-border);
   transition: all var(--np-t);
 }
 
 .np-jflow__node:hover .np-jflow__glyph {
   color: var(--np-text);
-  box-shadow: -4px -4px 10px rgba(255, 255, 255, 0.1), 4px 4px 12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  box-shadow: var(--np-neu-control-hover);
 }
 
 .np-jflow__node--active .np-jflow__glyph {
   color: var(--np-accent-strong);
   border-color: var(--np-accent);
   background: var(--np-surface-recessed);
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.8), inset -1px -1px 3px rgba(255, 255, 255, 0.06);
+  box-shadow: var(--np-neu-inset);
 }
 
 .np-jflow__label {
@@ -4813,7 +4813,7 @@ button {
   height: 6px;
   border-radius: var(--np-radius-pill);
   background: var(--np-surface-recessed);
-  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.8), inset -1px -1px 2px rgba(255, 255, 255, 0.04);
+  box-shadow: var(--np-neu-inset);
 }
 
 /* Subordinate informational packet motion */
@@ -4833,8 +4833,8 @@ button {
   padding: 18px 20px;
   background: var(--np-surface-2);
   border-radius: var(--np-radius-md, 12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: inset 1px 1px 4px rgba(0, 0, 0, 0.6), inset -1px -1px 2px rgba(255, 255, 255, 0.03), 0 2px 8px rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-inset);
   display: flex;
   flex-direction: column;
   gap: var(--np-3);
@@ -4898,20 +4898,20 @@ button {
   font-weight: var(--np-fw-semibold);
   color: var(--np-text);
   background: var(--np-surface-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-sm, 6px);
-  box-shadow: -2px -2px 5px rgba(255, 255, 255, 0.06), 2px 2px 6px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: var(--np-neu-control);
   cursor: pointer;
   transition: all var(--np-t);
 }
 
 .np-jflow__step-btn:hover:not(:disabled) {
-  box-shadow: -3px -3px 7px rgba(255, 255, 255, 0.09), 3px 3px 8px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--np-neu-control-hover);
   color: var(--np-accent);
 }
 
 .np-jflow__step-btn:active:not(:disabled) {
-  box-shadow: inset 1px 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: var(--np-neu-inset);
   transform: translateY(1px);
 }
 
@@ -4940,9 +4940,9 @@ button {
   font-variant-numeric: tabular-nums;
   color: var(--np-text-dim);
   background: var(--np-surface-recessed);
-  border: 1px solid rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-sm, 6px);
-  box-shadow: inset 2px 2px 5px rgba(0, 0, 0, 0.7), inset -1px -1px 2px rgba(255, 255, 255, 0.03);
+  box-shadow: var(--np-neu-inset);
 }
 
 .np-jflow__readout-evidence {
@@ -5009,15 +5009,15 @@ button {
   flex-direction: column;
   padding: 12px 14px;
   background: var(--np-surface-elevated);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--np-border);
   border-radius: var(--np-radius-sm, 8px);
-  box-shadow: -2px -2px 6px rgba(255, 255, 255, 0.04), 3px 3px 8px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  box-shadow: var(--np-neu-control);
   transition: all var(--np-t);
 }
 
 .np-jflow__dest:hover {
-  box-shadow: -3px -3px 8px rgba(255, 255, 255, 0.06), 4px 4px 12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: var(--np-neu-control-hover);
+  border-color: var(--np-border-strong);
 }
 
 .np-jflow__dest-header {
@@ -5055,7 +5055,7 @@ button {
   padding: 10px 14px;
   background: var(--np-surface-recessed);
   border-radius: var(--np-radius-sm, 6px);
-  box-shadow: inset 1px 2px 4px rgba(0, 0, 0, 0.7), inset -1px -1px 2px rgba(255, 255, 255, 0.03);
+  box-shadow: var(--np-neu-inset);
   border-left: 2px solid var(--np-accent-line);
   display: flex;
   flex-direction: column;

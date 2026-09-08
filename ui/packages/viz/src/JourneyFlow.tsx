@@ -8,7 +8,6 @@ export interface StageConfig {
   kind: StageKind;
   glyph: ReactElement;
   glyphString: string;
-  labelKey: string;
   order: number;
 }
 
@@ -22,7 +21,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
       </svg>
     ),
-    labelKey: "stages.navigation",
     order: 0,
   },
   dns_resolution: {
@@ -35,7 +33,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
       </svg>
     ),
-    labelKey: "stages.dns_resolution",
     order: 1,
   },
   connection: {
@@ -49,7 +46,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <path d="M17 13l4-4-4-4" />
       </svg>
     ),
-    labelKey: "stages.connection",
     order: 2,
   },
   encryption: {
@@ -60,7 +56,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     ),
-    labelKey: "stages.encryption",
     order: 3,
   },
   request: {
@@ -73,7 +68,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
     ),
-    labelKey: "stages.request",
     order: 4,
   },
   fan_out: {
@@ -87,7 +81,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <line x1="6" y1="9" x2="6" y2="21" />
       </svg>
     ),
-    labelKey: "stages.fan_out",
     order: 5,
   },
   completion: {
@@ -99,7 +92,6 @@ export const STAGE_CONFIG_REGISTRY: Record<StageKind, StageConfig> = {
         <polyline points="22 4 12 14.01 9 11.01" />
       </svg>
     ),
-    labelKey: "stages.completion",
     order: 6,
   },
 };

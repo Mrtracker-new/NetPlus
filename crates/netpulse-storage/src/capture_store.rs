@@ -209,6 +209,16 @@ impl<R: CaptureRepository> CaptureStore<R> {
         self.findings.get(&id)
     }
 
+    /// All retained hosts.
+    pub fn hosts(&self) -> impl Iterator<Item = &Host> {
+        self.hosts.values()
+    }
+
+    /// A host by id.
+    pub fn host(&self, id: u64) -> Option<&Host> {
+        self.hosts.get(&id)
+    }
+
     /// Number of flows / sessions currently retained.
     pub fn flow_count(&self) -> usize {
         self.flows.len()

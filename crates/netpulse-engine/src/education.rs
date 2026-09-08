@@ -16,13 +16,13 @@ use netpulse_api::dto::{
     ExplorerEntryDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
     LessonStepDto, PageJourneyDto,
 };
-use netpulse_core::{Depth, Flow, ProtoEvent, Session};
+use netpulse_core::{Depth, Flow, Host, ProtoEvent, Session};
 use netpulse_decode::ExplanationKey;
 use netpulse_learn::{
     browse, detect_offers, examples_for, search, tcp_handshake, validate_exercise_choice,
     ExplorerEntry, ProgressStore, TrafficView, CURRICULUM,
 };
-use netpulse_narrative::{build_page_journey, SessionView};
+use netpulse_narrative::{build_page_journey_with_hosts, SessionView};
 use netpulse_storage::CaptureStore;
 
 use crate::project;
@@ -62,6 +62,8 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
         owned.push((session.clone(), flows, events));
     }
 
+    let hosts: Vec<Host> = store.hosts().cloned().collect();
+
     let mut offers = Vec::new();
     let mut journeys = Vec::new();
     for (session, flows, events) in &owned {
@@ -77,7 +79,7 @@ pub fn present_education(store: &CaptureStore, depth: Depth) -> EducationView {
 
         // The staged website journey for this session.
         let sview = SessionView::new(session, flows.iter().collect(), events.iter().collect());
-        let journey = build_page_journey(&sview);
+        let journey = build_page_journey_with_hosts(&sview, &hosts);
         journeys.push(project::page_journey_dto(&journey, depth));
     }
 
@@ -103,8 +105,9 @@ pub fn present_journey_for_session(
     for f in &flows {
         events.extend(store.events_for_flow(f.id));
     }
+    let hosts: Vec<Host> = store.hosts().cloned().collect();
     let sview = SessionView::new(session, flows, events);
-    let journey = build_page_journey(&sview);
+    let journey = build_page_journey_with_hosts(&sview, &hosts);
     Some(project::page_journey_dto(&journey, depth))
 }
 
@@ -510,5 +513,100 @@ mod tests {
             assert_eq!(expected.kind, actual.kind);
         }
         assert!(present_journey_for_session(&store, 999, Depth::Beginner).is_none());
+    }
+
+    #[test]
+    fn fanout_labels_display_recognized_organization_names() {
+        let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
+        let flow1 = Flow {
+            id: 1,
+            key: FiveTuple::new(ip(192, 168, 0, 1), 50000, ip(1, 1, 1, 1), 443, L4Proto::Tcp),
+            first_ts: Timestamp::new(1_000, 1_000),
+            last_ts: Timestamp::new(2_000, 2_000),
+            l4: L4Proto::Tcp,
+            l7: L7Proto::Tls,
+            stats: FlowMetrics {
+                bytes: 1000,
+                packets: 2,
+                rtt_estimate_nanos: Some(10_000_000),
+                retransmits: 0,
+                loss_indicators: 0,
+            },
+            state: FlowState::Established,
+        };
+        let flow2 = Flow {
+            id: 2,
+            key: FiveTuple::new(ip(192, 168, 0, 1), 50001, ip(3, 5, 0, 1), 443, L4Proto::Tcp),
+            first_ts: Timestamp::new(1_000, 1_000),
+            last_ts: Timestamp::new(2_000, 2_000),
+            l4: L4Proto::Tcp,
+            l7: L7Proto::Tls,
+            stats: FlowMetrics {
+                bytes: 2000,
+                packets: 4,
+                rtt_estimate_nanos: Some(15_000_000),
+                retransmits: 0,
+                loss_indicators: 0,
+            },
+            state: FlowState::Established,
+        };
+        store.insert_flow(flow1, vec![]);
+        store.insert_flow(flow2, vec![]);
+        store.insert_session(Session {
+            id: 42,
+            process_id: 0,
+            start_ts: Timestamp::new(1_000, 1_000),
+            trigger: "resolved and connected to multi-cdn site".into(),
+            flow_ids: vec![1, 2],
+        });
+
+        // Insert host enrichment with recognized organization names.
+        store.insert_host(
+            1,
+            Host {
+                ip: ip(1, 1, 1, 1),
+                names: vec!["one.one.one.one".into()],
+                geo: Some("US".into()),
+                asn: Some(13335),
+                org: Some("Cloudflare".into()),
+            },
+        );
+        store.insert_host(
+            2,
+            Host {
+                ip: ip(3, 5, 0, 1),
+                names: vec!["s3.amazonaws.com".into()],
+                geo: Some("US".into()),
+                asn: Some(16509),
+                org: Some("AWS".into()),
+            },
+        );
+
+        // Verify single session projection
+        let journey = present_journey_for_session(&store, 42, Depth::Beginner)
+            .expect("session 42 journey exists");
+        assert_eq!(journey.fanout.len(), 2);
+        let labels: Vec<&str> = journey.fanout.iter().map(|f| f.label.as_str()).collect();
+        assert!(
+            labels.contains(&"Cloudflare"),
+            "fan-out should contain Cloudflare label"
+        );
+        assert!(labels.contains(&"AWS"), "fan-out should contain AWS label");
+
+        // Verify full education projection
+        let edu_view = present_education(&store, Depth::Beginner);
+        let edu_journey = edu_view
+            .journeys
+            .iter()
+            .find(|j| j.session_id == 42)
+            .expect("session 42 in education view");
+        assert_eq!(edu_journey.fanout.len(), 2);
+        let edu_labels: Vec<&str> = edu_journey
+            .fanout
+            .iter()
+            .map(|f| f.label.as_str())
+            .collect();
+        assert!(edu_labels.contains(&"Cloudflare"));
+        assert!(edu_labels.contains(&"AWS"));
     }
 }

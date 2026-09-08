@@ -108,9 +108,13 @@ export const TimeRibbon = memo(function TimeRibbon({
               )}
               {laneEvents.map((e) => {
                 const globalIndex = events.indexOf(e);
+                const hasMatchingPacket =
+                  highlightPacketId !== undefined &&
+                  ((e as any).packetId === highlightPacketId ||
+                    e.evidence?.some((ev: any) => ev.kind === "packet" && ev.id === highlightPacketId));
                 const isHighlighted =
                   selectedIndex === globalIndex ||
-                  (highlightPacketId !== undefined && (e as { packetId?: number }).packetId === highlightPacketId) ||
+                  hasMatchingPacket ||
                   (highlightTimestamp !== undefined && Math.abs(e.at - highlightTimestamp) < 1000);
 
                 return (

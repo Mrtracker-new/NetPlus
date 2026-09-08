@@ -54,7 +54,9 @@ export function useTimelineController() {
 
     if (highlightPacketId !== undefined) {
       const matchIndex = filteredEvents.findIndex(
-        (e) => (e as { packetId?: number }).packetId === highlightPacketId
+        (e) =>
+          (e as any).packetId === highlightPacketId ||
+          e.evidence?.some((ev) => ev.kind === "packet" && ev.id === highlightPacketId)
       );
       if (matchIndex !== -1 && matchIndex !== selectedEventIndex) {
         setSelectedEventIndex(matchIndex);

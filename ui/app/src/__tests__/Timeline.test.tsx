@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, renderHook } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import type { NarrativeCard } from "@netpulse/contract";
 import "../i18n";
 import { Timeline } from "../screens/Timeline";
 import { useTimelineController } from "../hooks/useTimelineController";
 import { formatTimelineAxis } from "../utils/timeline.utils";
 import { DisclosureProvider } from "../modes/DisclosureContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setFeed, __resetForTest } from "../state/store";
 
 afterEach(() => {
@@ -277,6 +278,68 @@ describe("Timeline Screen & useTimelineController", () => {
     fireEvent.click(copyButton);
 
     expect(await screen.findByText("Copied!")).toBeInTheDocument();
+  });
+
+  it("navigates to target packet and highlights mark when dispatching { screen: 'timeline', packetId: 999 } with real NarrativeCard", async () => {
+    const targetCard: NarrativeCard = {
+      headline: "Suspicious DNS Tunnel Packet",
+      summary: "Packet 999 triggered deep inspection alert",
+      lines: ["Frame 999: 1420 bytes on wire", "DNS query length abnormal"],
+      severity: "neutral",
+      evidence: [{ kind: "packet", id: 999 }],
+      at_mono_nanos: 2000000000,
+    };
+    const defaultFindingCard: NarrativeCard = {
+      headline: "Critical Breach Detection",
+      summary: "High severity finding without target packet",
+      lines: ["Unauthorized exfiltration"],
+      severity: "finding",
+      evidence: [{ kind: "flow", id: 101 }],
+      at_mono_nanos: 1000000000,
+    };
+
+    setFeed([defaultFindingCard, targetCard]);
+
+    function NavigationDispatchHarness() {
+      const { navigateToEvidence } = useEvidenceNavigation();
+      return (
+        <div>
+          <button
+            type="button"
+            data-testid="dispatch-packet-target"
+            onClick={() => navigateToEvidence({ kind: "packet", id: 999 })}
+          >
+            Dispatch Packet Target
+          </button>
+          <Timeline />
+        </div>
+      );
+    }
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <NavigationDispatchHarness />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Initial state before dispatch: finding card is auto-selected due to higher severity weight
+    expect(screen.getByText("High severity finding without target packet")).toBeInTheDocument();
+
+    // Dispatch { screen: "timeline", packetId: 999 }
+    fireEvent.click(screen.getByTestId("dispatch-packet-target"));
+
+    // Verify target mark in ribbon is highlighted
+    const targetMark = await screen.findByRole("button", { name: /Suspicious DNS Tunnel Packet/i });
+    expect(targetMark).toHaveAttribute("aria-pressed", "true");
+    expect(targetMark).toHaveAttribute("data-highlighted", "true");
+    expect(targetMark.className).toContain("np-ribbon__mark--highlighted");
+
+    // Verify inspector displays target event
+    expect(await screen.findByText("Packet 999 triggered deep inspection alert")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Suspicious DNS Tunnel Packet" })).toBeInTheDocument();
+    expect(screen.getByText("packet #999")).toBeInTheDocument();
   });
 });
 

@@ -22,6 +22,8 @@
   "no_issues": "Nothing looks wrong.",
   "idle": "Idle — no traffic to measure. Start a capture to view live telemetry.",
   "error_loading": "Failed to load monitoring snapshot.",
+  "error_connection_title": "Engine Connection Error",
+  "retry_connection": "Retry Connection",
   "healthy": "Healthy",
   "degraded": "Degraded",
   "critical": "Critical",

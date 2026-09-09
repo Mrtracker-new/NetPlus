@@ -22,6 +22,8 @@
   "no_issues": "No se detectaron problemas.",
   "idle": "Inactivo: no hay tráfico para medir. Inicia una captura para ver la telemetría.",
   "error_loading": "Error al cargar la captura de monitoreo.",
+  "error_connection_title": "Error de Conexión del Motor",
+  "retry_connection": "Reintentar Conexión",
   "healthy": "Saludable",
   "degraded": "Degradado",
   "critical": "Crítico",

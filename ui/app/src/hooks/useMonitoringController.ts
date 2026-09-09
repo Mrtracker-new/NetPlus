@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import type {
   EvidenceRef,
   ShedStage,
@@ -6,12 +6,12 @@ import type {
   StageProbeResult,
 } from "@netpulse/contract";
 import { humanBytes } from "@netpulse/viz";
-import { useStore } from "../state/store";
+import { useStore, setSnapshotBatch, setError } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { query } from "../ipc";
 import { triggerLiveRefresh } from "../state/useLiveData";
 import { MonitoringMapper } from "../screens/Monitoring/MonitoringMapper";
-import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
+import { preferencesManager, toMonitorTimeRange } from "../screens/Monitoring/MonitoringPreferences";
 import {
   normalizeTopologySublabel,
   type DomainTelemetry,
@@ -225,12 +225,22 @@ export function mapTelemetryStateToEngineState(state?: string): EngineState {
 }
 
 export function useMonitoringController() {
-  const { monitor } = useStore();
+  const { monitor, error } = useStore();
   const { navigateToEvidence } = useEvidenceNavigation();
 
   const [preferences, setPreferences] = useState(() => preferencesManager.getPreferences());
   const [probeRunning, setProbeRunning] = useState(false);
   const [probeResult, setProbeResult] = useState<StageProbeResult | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const isRetryingRef = useRef(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Single Authoritative Pipeline: Synchronously derive domain telemetry directly from store snapshot
   const domainTelemetry: DomainTelemetry = useMemo(() => {
@@ -243,8 +253,8 @@ export function useMonitoringController() {
   // Derived View Model
   const viewModel: ViewTelemetry = useMemo(() => {
     const engineState: EngineState = mapTelemetryStateToEngineState(monitor?.telemetry_state);
-    return MonitoringMapper.toViewModel(domainTelemetry, engineState, null, preferences.timeRange);
-  }, [domainTelemetry, preferences.timeRange, monitor?.telemetry_state]);
+    return MonitoringMapper.toViewModel(domainTelemetry, engineState, error, preferences.timeRange);
+  }, [domainTelemetry, preferences.timeRange, monitor?.telemetry_state, error]);
 
   // Dynamic Headline KPIs
   const kpis = useMemo(() => {
@@ -337,6 +347,28 @@ export function useMonitoringController() {
     []
   );
 
+  const retryConnection = useCallback(async () => {
+    if (isRetryingRef.current) return;
+    isRetryingRef.current = true;
+    setIsRetrying(true);
+    try {
+      const time_range = toMonitorTimeRange(preferences.timeRange);
+      const res = await query({ kind: "monitorSnapshot", time_range });
+      if (res.kind === "monitorSnapshot") {
+        setSnapshotBatch(null, res.snapshot, null);
+      } else {
+        setError(null);
+      }
+    } catch (err) {
+      setError(String(err));
+    } finally {
+      isRetryingRef.current = false;
+      if (isMountedRef.current) {
+        setIsRetrying(false);
+      }
+    }
+  }, [preferences.timeRange]);
+
   return {
     monitor,
     kpis,
@@ -349,11 +381,13 @@ export function useMonitoringController() {
       running: probeRunning,
       result: probeResult,
     },
+    isRetrying,
     actions: {
       setTimeRange,
       setSelectedNodeId,
       openEvidence,
       runProbe,
+      retryConnection,
     },
   };
 }

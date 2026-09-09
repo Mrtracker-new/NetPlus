@@ -1,4 +1,5 @@
 import { useTranslation } from "react-i18next";
+import { Notice, Button } from "@netpulse/components";
 import { useMonitoringController } from "../hooks/useMonitoringController";
 import { CaptureHealthPanel } from "./Monitoring/CaptureHealthPanel";
 import { DiagnosticChainCard } from "./Monitoring/DiagnosticChainCard";
@@ -18,6 +19,7 @@ export function Monitoring() {
     viewModel,
     preferences,
     probeState,
+    isRetrying,
     actions,
   } = useMonitoringController();
 
@@ -100,6 +102,51 @@ export function Monitoring() {
       <div className="np-sr-only" aria-live="polite" aria-atomic="true">
         {healthAnnouncement}
       </div>
+
+      {/* IPC & Engine Connection Error Banner */}
+      {viewModel.error != null && (
+        <div style={{ marginBottom: "var(--np-4, 1rem)" }}>
+          <Notice level="error">
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "1rem",
+                flexWrap: "wrap",
+                width: "100%",
+              }}
+            >
+              <div>
+                <strong>
+                  {t(
+                    "error_connection_title",
+                    typeof viewModel.error === "object" && viewModel.error.title
+                      ? viewModel.error.title
+                      : "Engine Connection Error"
+                  )}
+                  :{" "}
+                </strong>
+                <span>
+                  {typeof viewModel.error === "string"
+                    ? viewModel.error
+                    : viewModel.error.message || t("error_loading", "Failed to load monitoring snapshot.")}
+                </span>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                busy={isRetrying}
+                disabled={isRetrying}
+                onClick={actions.retryConnection}
+              >
+                {t("retry_connection", "Retry Connection")}
+              </Button>
+            </div>
+          </Notice>
+        </div>
+      )}
 
       {/* Headline KPI Metric Cards — Level 1 Raised Plates */}
       <div className="np-kpis">

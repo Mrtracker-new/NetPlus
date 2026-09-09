@@ -117,7 +117,7 @@ export interface DomainTelemetry {
 
 export interface ViewTelemetry {
   engineState: EngineState;
-  error: StructuredError | null;
+  error: StructuredError | string | null;
   formattedTraffic: string;
   activeProtocolsCount: string;
   activeHostsCount: string;

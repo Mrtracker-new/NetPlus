@@ -5,7 +5,7 @@ import { I18nextProvider } from "react-i18next";
 import { protocolColor } from "@netpulse/viz";
 import type { MonitorSnapshot } from "@netpulse/contract";
 import i18n from "../i18n";
-import { setMonitor, __resetForTest } from "../state/store";
+import { setMonitor, setError, __resetForTest } from "../state/store";
 import { Monitoring } from "../screens/Monitoring";
 import { mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
@@ -480,6 +480,73 @@ describe("Monitoring Screen & useMonitoringController", () => {
       expect(badge).toBeTruthy();
       expect(badge).toHaveClass("np-monitor-badge--idle");
       expect(badge).toHaveTextContent("Standby");
+    });
+  });
+
+  describe("IPC & Engine Connection Error Handling", () => {
+    it("does not render error banner when store error is null", () => {
+      render(<MonitoringTestWrapper />);
+
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Retry Connection/i)).not.toBeInTheDocument();
+    });
+
+    it("surfaces simulated IPC error in an alert banner with retry button", () => {
+      setError("IPC timeout: engine process unresponsive");
+
+      render(<MonitoringTestWrapper />);
+
+      const alert = screen.getByRole("alert");
+      expect(alert).toBeInTheDocument();
+      expect(alert).toHaveTextContent("IPC timeout: engine process unresponsive");
+      expect(alert).toHaveTextContent("Engine Connection Error");
+
+      const retryBtn = screen.getByRole("button", { name: /Retry Connection/i });
+      expect(retryBtn).toBeInTheDocument();
+    });
+
+    it("triggers retry query and recovers from error state when 'Retry Connection' is clicked", async () => {
+      const { fireEvent, waitFor } = await import("@testing-library/react");
+      const ipc = await import("../ipc");
+      const querySpy = vi.spyOn(ipc, "query").mockResolvedValueOnce({
+        kind: "monitorSnapshot",
+        snapshot: mockMonitorSnapshot,
+      } as any);
+
+      setError("Connection failure: broken pipe");
+
+      render(<MonitoringTestWrapper />);
+
+      const retryBtn = screen.getByRole("button", { name: /Retry Connection/i });
+      expect(retryBtn).toBeInTheDocument();
+
+      fireEvent.click(retryBtn);
+
+      await waitFor(() => {
+        expect(querySpy).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "monitorSnapshot" })
+        );
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      });
+    });
+
+    it("translates error title and retry connection button when language is Spanish", async () => {
+      await i18n.changeLanguage("es");
+      try {
+        setError("Fallo en el socket IPC");
+
+        render(<MonitoringTestWrapper />);
+
+        const alert = screen.getByRole("alert");
+        expect(alert).toBeInTheDocument();
+        expect(alert).toHaveTextContent("Error de Conexión del Motor");
+        expect(alert).toHaveTextContent("Fallo en el socket IPC");
+
+        const retryBtn = screen.getByRole("button", { name: /Reintentar Conexión/i });
+        expect(retryBtn).toBeInTheDocument();
+      } finally {
+        await i18n.changeLanguage("en");
+      }
     });
   });
 });

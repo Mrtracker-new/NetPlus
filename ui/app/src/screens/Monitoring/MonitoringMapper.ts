@@ -12,10 +12,20 @@ export class MonitoringMapper {
   public static toViewModel(
     domain: DomainTelemetry,
     engineState: EngineState,
-    error: StructuredError | null,
+    error: StructuredError | string | null,
     timeRange: DashboardTimeRange = "24h"
   ): ViewTelemetry {
     const evaluation = evaluateDiagnosticsRules(domain);
+
+    const mappedError: StructuredError | null =
+      typeof error === "string"
+        ? {
+            code: "IPC_ERROR",
+            title: "Engine Connection Error",
+            message: error,
+            recoveryAction: "Retry Connection",
+          }
+        : error;
 
     // Dynamic, meaningful X-axis timestamps
     let timestamps: string[] = [];
@@ -46,7 +56,7 @@ export class MonitoringMapper {
 
     return {
       engineState,
-      error,
+      error: mappedError,
       formattedTraffic: humanBytes(domain.bytesSeen),
       activeProtocolsCount: String(domain.activeProtocols),
       activeHostsCount: String(domain.activeHosts),

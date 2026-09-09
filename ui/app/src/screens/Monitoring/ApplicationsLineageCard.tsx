@@ -1,12 +1,57 @@
 import { useState, useEffect, useRef } from "react";
-import { TopologyGraph, type TopologyNode, type TopologyEdge } from "@netpulse/viz";
+import { humanBytes, TopologyGraph, type TopologyNode, type TopologyEdge } from "@netpulse/viz";
+import type { FlowLineage as FlowLineageDto } from "@netpulse/contract";
+import { useStore } from "../../state/store";
 import { Icon } from "../../icons";
+
+export type { FlowLineageDto };
 
 export interface ApplicationsLineageCardProps {
   nodes: TopologyNode[];
   edges: TopologyEdge[];
   selectedNodeId?: string | null;
   onSelectNode?: (id: string | null) => void;
+  lineage?: FlowLineageDto[];
+}
+
+export function findMatchingLineage(
+  node: TopologyNode,
+  lineage: FlowLineageDto[]
+): FlowLineageDto | undefined {
+  if (!node || !lineage || lineage.length === 0) return undefined;
+
+  const rawId = node.id;
+  const strippedId = rawId.startsWith("node-") ? rawId.slice(5) : rawId;
+
+  // 1. Direct id match if item has an id property
+  const idMatch = lineage.find((item) => (item as { id?: string }).id === rawId);
+  if (idMatch) return idMatch;
+
+  const isExplicitSource = node.sublabel === "SRC";
+
+  const matchDestination = () =>
+    lineage.find(
+      (item) =>
+        rawId === `node-${item.destination}` ||
+        rawId === item.destination ||
+        strippedId === item.destination ||
+        (node.label && node.label === item.destination)
+    );
+
+  const matchSource = () =>
+    lineage.find(
+      (item) =>
+        rawId === `node-${item.source}` ||
+        rawId === item.source ||
+        strippedId === item.source ||
+        (node.label && node.label === item.source)
+    );
+
+  if (isExplicitSource) {
+    return matchSource() ?? matchDestination();
+  }
+
+  return matchDestination() ?? matchSource();
 }
 
 export type LineageFilterMode =
@@ -21,10 +66,13 @@ export function ApplicationsLineageCard({
   edges = [],
   selectedNodeId,
   onSelectNode,
+  lineage: propLineage,
 }: ApplicationsLineageCardProps) {
   const [filterMode, setFilterMode] = useState<LineageFilterMode>("All Endpoints");
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { monitor } = useStore();
+  const lineage = propLineage ?? monitor?.lineage ?? [];
 
   // Close dropdown on Escape key or outside click
   useEffect(() => {
@@ -203,40 +251,50 @@ export function ApplicationsLineageCard({
       )}
 
       {/* Node Inspection Detail Popover — Level 4 Overlay Plate */}
-      {selectedNode && (
-        <div
-          style={{
-            background: "var(--np-surface-raised, var(--np-surface-1))",
-            border: "1px solid var(--np-border)",
-            borderRadius: "var(--np-radius-sm)",
-            padding: "0.6rem 0.85rem",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            fontSize: "0.825rem",
-            boxShadow: "var(--np-neu-card)",
-            marginTop: "0.5rem",
-          }}
-        >
-          <div>
-            <div style={{ fontWeight: 600, color: "var(--np-text)" }}>
-              {selectedNode.label} ({selectedNode.status})
-            </div>
-            <div style={{ color: "var(--np-text-dim)", fontSize: "0.75rem", marginTop: "2px" }}>
-              Rate: {selectedNode.sublabel || "Nominal"} • Protocol: Active Flow • Active
-            </div>
-          </div>
-          <button
-            type="button"
-            className="np-monitor-icon-btn"
-            style={{ padding: "4px 6px" }}
-            onClick={() => onSelectNode?.(null)}
-            aria-label="Close node details"
+      {selectedNode && (() => {
+        const item = findMatchingLineage(selectedNode, lineage);
+        const classification = item?.classification || selectedNode.sublabel || "Nominal";
+        const protocol = item?.protocol || "Active Flow";
+        const bytesText =
+          typeof item?.bytes === "number" && !isNaN(item.bytes)
+            ? humanBytes(Math.max(0, item.bytes))
+            : null;
+
+        return (
+          <div
+            style={{
+              background: "var(--np-surface-raised, var(--np-surface-1))",
+              border: "1px solid var(--np-border)",
+              borderRadius: "var(--np-radius-sm)",
+              padding: "0.6rem 0.85rem",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              fontSize: "0.825rem",
+              boxShadow: "var(--np-neu-card)",
+              marginTop: "0.5rem",
+            }}
           >
-            <Icon name="close" style={{ width: "12px", height: "12px" }} />
-          </button>
-        </div>
-      )}
+            <div>
+              <div style={{ fontWeight: 600, color: "var(--np-text)" }}>
+                {selectedNode.label} ({selectedNode.status})
+              </div>
+              <div style={{ color: "var(--np-text-dim)", fontSize: "0.75rem", marginTop: "2px" }}>
+                Classification: {classification}{bytesText != null ? ` • ${bytesText}` : ""} • Protocol: {protocol} • Active
+              </div>
+            </div>
+            <button
+              type="button"
+              className="np-monitor-icon-btn"
+              style={{ padding: "4px 6px" }}
+              onClick={() => onSelectNode?.(null)}
+              aria-label="Close node details"
+            >
+              <Icon name="close" style={{ width: "12px", height: "12px" }} />
+            </button>
+          </div>
+        );
+      })()}
     </div>
   );
 }

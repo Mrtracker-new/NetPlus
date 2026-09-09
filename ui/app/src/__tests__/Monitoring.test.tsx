@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom";
 import { I18nextProvider } from "react-i18next";
@@ -686,4 +686,92 @@ describe("Monitoring Screen & useMonitoringController", () => {
       }
     });
   });
+
+  describe("Protocol Breakdown & Network Loss Counters", () => {
+    it("renders top protocols bar in Throughput card with proportional segments and colors", () => {
+      setMonitor(mockMonitorSnapshot);
+
+      render(<MonitoringTestWrapper />);
+
+      // Top protocols bar container
+      const protocolsBar = screen.getByTestId("top-protocols-bar");
+      expect(protocolsBar).toBeInTheDocument();
+
+      // Heading and total bytes (1048576 + 524288 + 65536 = 1.6 MB)
+      expect(within(protocolsBar).getByText("Top Protocols")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("1.6 MB")).toBeInTheDocument();
+
+      // Protocol labels & percentages
+      expect(within(protocolsBar).getByText("TCP")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("64%")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("UDP")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("32%")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("DNS")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("4%")).toBeInTheDocument();
+
+      // Progress bar segments with stable protocol colors
+      const progressTrack = within(protocolsBar).getByRole("progressbar", { name: "Top protocols distribution" });
+      expect(progressTrack).toBeInTheDocument();
+
+      const segments = progressTrack.children;
+      expect(segments).toHaveLength(3);
+      expect(segments[0]).toHaveStyle({ backgroundColor: "#3E8FE0" });
+      expect(segments[1]).toHaveStyle({ backgroundColor: "#B47B24" });
+      expect(segments[2]).toHaveStyle({ backgroundColor: "#7C83F7" });
+    });
+
+    it("renders empty protocol state gracefully when no protocol rows are present", () => {
+      const emptyProtocolSnapshot: MonitorSnapshot = {
+        ...mockMonitorSnapshot,
+        by_protocol: { dimension: "protocol", rows: [] },
+      };
+      setMonitor(emptyProtocolSnapshot);
+
+      render(<MonitoringTestWrapper />);
+
+      const protocolsBar = screen.getByTestId("top-protocols-bar");
+      expect(protocolsBar).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("No protocol activity observed")).toBeInTheDocument();
+      expect(within(protocolsBar).getByText("0 B")).toBeInTheDocument();
+    });
+
+    it("displays network_loss_indicators alongside capture_drops in .np-loss container", () => {
+      const snapshotWithLoss: MonitorSnapshot = {
+        ...mockMonitorSnapshot,
+        network_loss_indicators: 7,
+        capture_drops: 42,
+      };
+      setMonitor(snapshotWithLoss);
+
+      render(<MonitoringTestWrapper />);
+
+      const lossContainer = screen.getByTestId("monitoring-loss-counters");
+      expect(lossContainer).toBeInTheDocument();
+      expect(lossContainer).toHaveClass("np-loss");
+
+      // Both figures rendered distinctly side-by-side
+      expect(screen.getByText("Network loss indicators: 7")).toBeInTheDocument();
+      expect(screen.getByText("Capture drops (ours): 42")).toBeInTheDocument();
+    });
+
+    it("translates network loss indicators and capture drops in Spanish", async () => {
+      await i18n.changeLanguage("es");
+      const snapshotWithLoss: MonitorSnapshot = {
+        ...mockMonitorSnapshot,
+        network_loss_indicators: 3,
+        capture_drops: 15,
+      };
+      setMonitor(snapshotWithLoss);
+
+      try {
+        render(<MonitoringTestWrapper />);
+
+        expect(screen.getByText("Indicadores de pérdida de red: 3")).toBeInTheDocument();
+        expect(screen.getByText("Descartes de captura (nuestros): 15")).toBeInTheDocument();
+      } finally {
+        await i18n.changeLanguage("en");
+      }
+    });
+  });
 });
+

@@ -189,6 +189,29 @@ export function Monitoring() {
       {/* Capture Health Panel */}
       {captureHealth && <CaptureHealthPanel health={captureHealth} />}
 
+      {/* Network Loss & Capture Drops Counters — distinct figures, never conflated */}
+      {monitor && (
+        <div
+          className="np-loss"
+          aria-label="Loss telemetry"
+          data-testid="monitoring-loss-counters"
+          style={{ marginBottom: "var(--np-4, 1rem)" }}
+        >
+          <span>
+            {t("network_loss", {
+              count: monitor.network_loss_indicators ?? 0,
+              defaultValue: `Network loss indicators: ${monitor.network_loss_indicators ?? 0}`,
+            })}
+          </span>
+          <span>
+            {t("capture_drops", {
+              count: monitor.capture_drops ?? 0,
+              defaultValue: `Capture drops (ours): ${monitor.capture_drops ?? 0}`,
+            })}
+          </span>
+        </div>
+      )}
+
       {/* Perfectly Symmetrical 2x2 Grid */}
       <div className="np-monitor-grid" data-testid={isLoading ? "monitor-grid-skeleton" : undefined}>
         {isLoading ? (
@@ -222,6 +245,7 @@ export function Monitoring() {
             <ThroughputLineageCard
               series={viewModel.throughputSeries}
               timestamps={viewModel.timestamps}
+              protocols={monitor?.by_protocol?.rows}
             />
             <ApplicationsLineageCard
               nodes={viewModel.nodes}

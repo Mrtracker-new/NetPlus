@@ -1,6 +1,6 @@
 {
   "title": "Monitoreo en Vivo y Salud del Sistema",
-  "hero_subtitle": "Desgloses de uso en tiempo real, rendimiento de interfaces e hipótesis de diagnóstico.",
+  "hero_subtitle": "Telemetría de paquetes en tiempo real, linaje de flujos de red, volumen total de rendimiento y seguimiento de procesos.",
   "kpi_traffic": "Tráfico Visto",
   "kpi_protocols": "Protocolos",
   "kpi_hosts": "Hosts",
@@ -12,6 +12,14 @@
   "shedding_stage": "Etapa de Descarte",
   "drop_count": "Conteo de Descartes",
   "throughput": "Rendimiento",
+  "total_throughput_volume": "Volumen Total de Rendimiento",
+  "throughput_volume_subtitle": "Volumen de tráfico combinado de entrada y salida",
+  "throughput_volume_legend": "Tasa Combinada",
+  "throughput_volume": {
+    "title": "Volumen Total de Rendimiento",
+    "subtitle": "Volumen de tráfico combinado de entrada y salida",
+    "legend": "Tasa Combinada"
+  },
   "bytes_observed": "Bytes observados",
   "by_protocol": "Por Protocolo",
   "total_protocol": "total",

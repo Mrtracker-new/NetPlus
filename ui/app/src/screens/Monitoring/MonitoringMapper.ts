@@ -52,7 +52,8 @@ export class MonitoringMapper {
     const aggregatedGains = this.downsampleSeries(domain.gainsHistory);
 
     const maxGain = Math.max(...aggregatedGains, 0);
-    const peakGainBadge = maxGain > 0 ? `+${humanBytes(maxGain * 1024)}/s` : "+0 B/s";
+    const maxRate = maxGain * 1024;
+    const peakGainBadge = `${humanBytes(maxRate)}/s`;
 
     return {
       engineState,
@@ -66,7 +67,7 @@ export class MonitoringMapper {
         { name: "Egress", data: aggregatedEgress, color: "var(--np-accent-2, #7c83f7)" },
       ],
       gainsSeries: [
-        { name: "Throughput Gains", data: aggregatedGains, color: "var(--np-accent, #2fe0d6)" },
+        { name: "Total Throughput Volume", data: aggregatedGains, color: "var(--np-accent, #2fe0d6)" },
       ],
       timestamps,
       peakGainBadge,

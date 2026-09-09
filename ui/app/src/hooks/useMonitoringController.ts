@@ -82,7 +82,7 @@ function buildDomainFromSnapshot(monitor: MonitorSnapshot): DomainTelemetry {
   const activeHosts = monitor.by_host.rows.length;
   const activeProtocols = monitor.by_protocol.rows.length;
 
-  // 1. Directional Throughput History from Rust Monotonic Bucket Series
+  // 1. Directional Throughput & Total Volume History from Rust Monotonic Bucket Series
   const numBuckets = 12;
   const ingressHistory: number[] = Array(numBuckets).fill(0);
   const egressHistory: number[] = Array(numBuckets).fill(0);
@@ -97,7 +97,7 @@ function buildDomainFromSnapshot(monitor: MonitorSnapshot): DomainTelemetry {
         const outKb = Math.round(sample.egress_rate_bytes_sec / 1024);
         ingressHistory[i] = inKb;
         egressHistory[i] = outKb;
-        gainsHistory[i] = inKb + outKb;
+        gainsHistory[i] = inKb + outKb; // Combined Total Throughput Volume (Ingress + Egress)
       }
     }
   }
@@ -369,6 +369,11 @@ export function useMonitoringController() {
     }
   }, [preferences.timeRange]);
 
+  // Peak Total Throughput Volume Badge formatted as humanBytes(maxRate) + "/s" without leading +
+  const peakBadgeText = useMemo(() => {
+    return viewModel.peakGainBadge;
+  }, [viewModel.peakGainBadge]);
+
   return {
     monitor,
     kpis,
@@ -382,6 +387,7 @@ export function useMonitoringController() {
       result: probeResult,
     },
     isRetrying,
+    peakBadgeText,
     actions: {
       setTimeRange,
       setSelectedNodeId,

@@ -163,6 +163,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
     expect(screen.getByRole("heading", { name: /Live Monitoring & System Health/i })).toBeTruthy();
     expect(screen.getByText("Throughput & Lineage")).toBeTruthy();
+    expect(screen.getByText("Total Throughput Volume")).toBeTruthy();
     expect(screen.getByText("Applications & Lineage")).toBeTruthy();
     expect(screen.getByText("Process Attributes")).toBeTruthy();
     expect(screen.getByText("System Subsystem Health")).toBeTruthy();
@@ -544,6 +545,58 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
         const retryBtn = screen.getByRole("button", { name: /Reintentar Conexión/i });
         expect(retryBtn).toBeInTheDocument();
+      } finally {
+        await i18n.changeLanguage("en");
+      }
+    });
+  });
+
+  describe("Total Throughput Volume Semantics & Peak Rate Formatting", () => {
+    it("renders 'Total Throughput Volume' card with updated subtitle and without leading + on peak badge", () => {
+      const snapshotWithThroughput: MonitorSnapshot = {
+        ...mockMonitorSnapshot,
+        throughput_history: [
+          {
+            timestamp_mono_nanos: 1000,
+            ingress_rate_bytes_sec: 400 * 1024,
+            egress_rate_bytes_sec: 200 * 1024,
+          },
+        ],
+      };
+      setMonitor(snapshotWithThroughput);
+
+      render(<MonitoringTestWrapper />);
+
+      expect(screen.getByText("Total Throughput Volume")).toBeTruthy();
+      expect(screen.getByText("Combined ingress and egress traffic volume")).toBeTruthy();
+      expect(screen.queryByText("Throughput Gains")).toBeNull();
+
+      // Peak rate badge: 400KB + 200KB = 600KB/s without leading + (rendered on card header badge and chart callout)
+      expect(screen.getAllByText("600 KB/s").length).toBe(2);
+      expect(screen.queryByText("+600 KB/s")).toBeNull();
+    });
+
+    it("formats zero peak rate as '0 B/s' without leading +", () => {
+      const emptyThroughputSnapshot: MonitorSnapshot = {
+        ...mockMonitorSnapshot,
+        throughput_history: [],
+      };
+      setMonitor(emptyThroughputSnapshot);
+
+      render(<MonitoringTestWrapper />);
+
+      expect(screen.getByText("Total Throughput Volume")).toBeTruthy();
+      expect(screen.queryByText("+0 B/s")).toBeNull();
+    });
+
+    it("translates Total Throughput Volume title, subtitle, and legend in Spanish", async () => {
+      await i18n.changeLanguage("es");
+      try {
+        render(<MonitoringTestWrapper />);
+
+        expect(screen.getByText("Volumen Total de Rendimiento")).toBeTruthy();
+        expect(screen.getByText("Volumen de tráfico combinado de entrada y salida")).toBeTruthy();
+        expect(screen.getByText("Tasa Combinada")).toBeTruthy();
       } finally {
         await i18n.changeLanguage("en");
       }

@@ -1,6 +1,6 @@
 {
   "title": "Live Monitoring & System Health",
-  "hero_subtitle": "Real-time usage breakdowns, interface throughput, and diagnostic hypotheses.",
+  "hero_subtitle": "Real-time packet telemetry, network flow lineage, total throughput volume & process attribute tracking.",
   "kpi_traffic": "Traffic Seen",
   "kpi_protocols": "Protocols",
   "kpi_hosts": "Hosts",
@@ -12,6 +12,14 @@
   "shedding_stage": "Shedding Stage",
   "drop_count": "Drop Count",
   "throughput": "Throughput",
+  "total_throughput_volume": "Total Throughput Volume",
+  "throughput_volume_subtitle": "Combined ingress and egress traffic volume",
+  "throughput_volume_legend": "Combined Rate",
+  "throughput_volume": {
+    "title": "Total Throughput Volume",
+    "subtitle": "Combined ingress and egress traffic volume",
+    "legend": "Combined Rate"
+  },
   "bytes_observed": "Bytes observed",
   "by_protocol": "By Protocol",
   "total_protocol": "total",

@@ -7550,6 +7550,11 @@ button {
   transform: translateY(-1px);
 }
 
+.np-monitor-icon-btn:active:not(:disabled) {
+  box-shadow: var(--np-neu-inset);
+  transform: translateY(1px);
+}
+
 .np-monitor-icon-btn:disabled {
   opacity: 0.4;
   cursor: default;

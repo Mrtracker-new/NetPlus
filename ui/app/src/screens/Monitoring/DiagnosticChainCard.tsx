@@ -368,7 +368,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "var(--np-3)", marginTop: "var(--np-2)" }}>
             {selectedStage.latency_ms !== undefined && selectedStage.latency_ms !== null && (
-              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)" }}>
+              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)", boxShadow: "var(--np-neu-inset)" }}>
                 <span style={{ fontSize: "var(--np-fs-2xs)", textTransform: "uppercase", color: "var(--np-text-mute)", fontWeight: "var(--np-fw-semibold)" }}>
                   {t("diagnostic_chain.measured_latency", "Measured Latency")}
                 </span>
@@ -379,7 +379,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
             )}
 
             {selectedStage.affected_targets && selectedStage.affected_targets.length > 0 && (
-              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)" }}>
+              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)", boxShadow: "var(--np-neu-inset)" }}>
                 <span style={{ fontSize: "var(--np-fs-2xs)", textTransform: "uppercase", color: "var(--np-text-mute)", fontWeight: "var(--np-fw-semibold)" }}>
                   {t("diagnostic_chain.identified_endpoints", "Identified Endpoints")}
                 </span>
@@ -391,7 +391,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
             )}
 
             {selectedStage.evidence && selectedStage.evidence.length > 0 && onSelectEvidence && selectedStage.evidence[0] && (
-              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ background: "var(--np-surface-recessed)", padding: "8px 12px", borderRadius: "var(--np-radius-xs)", border: "1px solid var(--np-border)", display: "flex", justifyContent: "space-between", alignItems: "center", boxShadow: "var(--np-neu-inset)" }}>
                 <div>
                   <span style={{ fontSize: "var(--np-fs-2xs)", textTransform: "uppercase", color: "var(--np-text-mute)", fontWeight: "var(--np-fw-semibold)" }}>
                     {t("diagnostic_chain.evidence_backing", "Evidence Backing")}
@@ -425,6 +425,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                   padding: "12px 14px",
                   borderRadius: "var(--np-radius-xs)",
                   border: "1px solid var(--np-border)",
+                  boxShadow: "var(--np-neu-inset)",
                   display: "flex",
                   flexDirection: "column",
                   gap: "10px",
@@ -494,6 +495,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                             fontSize: "0.8rem",
                             fontFamily: "var(--np-font-mono)",
                             outline: "none",
+                            boxShadow: "var(--np-neu-inset)",
                           }}
                         />
                         <button

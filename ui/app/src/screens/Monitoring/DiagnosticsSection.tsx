@@ -163,7 +163,7 @@ export function DiagnosticsSection({
                   borderRadius: "var(--np-radius-sm)",
                   fontSize: "0.825rem",
                   border: "1px solid var(--np-border)",
-                  boxShadow: "var(--np-neu-sm)",
+                  boxShadow: "var(--np-neu-inset)",
                 }}
               >
                 <div style={{ fontWeight: 600, color: "var(--np-accent-strong, var(--np-text))", display: "flex", alignItems: "center", gap: "0.35rem" }}>

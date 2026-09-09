@@ -210,11 +210,23 @@ function buildDomainFromSnapshot(monitor: MonitorSnapshot): DomainTelemetry {
   };
 }
 
+export function mapTelemetryStateToEngineState(state?: string): EngineState {
+  switch (state?.toLowerCase()) {
+    case "active":
+      return "Live";
+    case "stale":
+      return "Stale";
+    case "unavailable":
+      return "Unavailable";
+    case "standby":
+    default:
+      return "Standby";
+  }
+}
+
 export function useMonitoringController() {
   const { monitor } = useStore();
   const { navigateToEvidence } = useEvidenceNavigation();
-
-  const isLive = Boolean(monitor && monitor.by_protocol.rows.length > 0);
 
   const [preferences, setPreferences] = useState(() => preferencesManager.getPreferences());
   const [probeRunning, setProbeRunning] = useState(false);
@@ -230,9 +242,9 @@ export function useMonitoringController() {
 
   // Derived View Model
   const viewModel: ViewTelemetry = useMemo(() => {
-    const engineState: EngineState = isLive ? "Live" : "Standby";
+    const engineState: EngineState = mapTelemetryStateToEngineState(monitor?.telemetry_state);
     return MonitoringMapper.toViewModel(domainTelemetry, engineState, null, preferences.timeRange);
-  }, [domainTelemetry, preferences.timeRange, isLive]);
+  }, [domainTelemetry, preferences.timeRange, monitor?.telemetry_state]);
 
   // Dynamic Headline KPIs
   const kpis = useMemo(() => {

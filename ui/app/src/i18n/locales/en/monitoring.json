@@ -26,6 +26,13 @@
   "degraded": "Degraded",
   "critical": "Critical",
   "unknown": "Unknown",
+  "engine_state": {
+    "live": "Live",
+    "standby": "Standby",
+    "stale": "Stale",
+    "unavailable": "Unavailable",
+    "degraded": "Degraded"
+  },
   "shed_stages": {
     "none": "Full Fidelity",
     "payloads_off": "Payloads Off",

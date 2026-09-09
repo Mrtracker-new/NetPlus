@@ -3,7 +3,7 @@ import type { EngineState, StructuredError } from "./monitoringTypes";
 const VALID_TRANSITIONS: Record<EngineState, EngineState[]> = {
   Initializing: ["Connecting", "Simulation", "Standby", "Error"],
   Connecting: ["Live", "Simulation", "Standby", "Degraded", "Reconnecting", "Disconnected", "Error"],
-  Live: ["Paused", "Degraded", "Standby", "Disconnected", "Error"],
+  Live: ["Paused", "Degraded", "Standby", "Disconnected", "Error", "Stale"],
   Standby: ["Connecting", "Live", "Simulation", "Disconnected", "Error"],
   Paused: ["Live", "Standby", "Disconnected", "Error"],
   Degraded: ["Live", "Reconnecting", "Standby", "Disconnected", "Error"],
@@ -11,6 +11,8 @@ const VALID_TRANSITIONS: Record<EngineState, EngineState[]> = {
   Simulation: ["Live", "Paused", "Standby", "Disconnected", "Error"],
   Disconnected: ["Connecting", "Live", "Reconnecting", "Standby", "Simulation", "Initializing", "Error"],
   Error: ["Initializing", "Connecting", "Standby", "Simulation", "Reconnecting"],
+  Stale: ["Live", "Standby", "Disconnected", "Error"],
+  Unavailable: ["Initializing", "Connecting", "Standby", "Live", "Error"],
 };
 
 export class MonitoringStateMachine {

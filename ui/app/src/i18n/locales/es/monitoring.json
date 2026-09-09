@@ -26,6 +26,13 @@
   "degraded": "Degradado",
   "critical": "Crítico",
   "unknown": "Desconocido",
+  "engine_state": {
+    "live": "En Vivo",
+    "standby": "En Espera",
+    "stale": "Obsoleto",
+    "unavailable": "No Disponible",
+    "degraded": "Degradado"
+  },
   "shed_stages": {
     "none": "Alta Fidelidad",
     "payloads_off": "Cargas Útiles Desactivadas",

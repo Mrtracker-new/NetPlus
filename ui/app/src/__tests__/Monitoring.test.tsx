@@ -7,6 +7,7 @@ import type { MonitorSnapshot } from "@netpulse/contract";
 import i18n from "../i18n";
 import { setMonitor, __resetForTest } from "../state/store";
 import { Monitoring } from "../screens/Monitoring";
+import { mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 
@@ -399,6 +400,86 @@ describe("Monitoring Screen & useMonitoringController", () => {
       expect(screen.getByText(/GatewayProbe \(SUCCESS\)/i)).toBeTruthy();
       expect(screen.getByText("1.8 ms")).toBeTruthy();
       expect(screen.getByText("Default gateway 192.168.1.1 reachable (1.8ms RTT)")).toBeTruthy();
+    });
+  });
+
+  describe("Authoritative Telemetry State Binding & Header Badges", () => {
+    it("mapTelemetryStateToEngineState maps all variants deterministically", () => {
+      expect(mapTelemetryStateToEngineState("active")).toBe("Live");
+      expect(mapTelemetryStateToEngineState("Active")).toBe("Live");
+      expect(mapTelemetryStateToEngineState("standby")).toBe("Standby");
+      expect(mapTelemetryStateToEngineState("Standby")).toBe("Standby");
+      expect(mapTelemetryStateToEngineState("stale")).toBe("Stale");
+      expect(mapTelemetryStateToEngineState("Stale")).toBe("Stale");
+      expect(mapTelemetryStateToEngineState("unavailable")).toBe("Unavailable");
+      expect(mapTelemetryStateToEngineState("Unavailable")).toBe("Unavailable");
+      expect(mapTelemetryStateToEngineState(undefined)).toBe("Standby");
+      expect(mapTelemetryStateToEngineState("")).toBe("Standby");
+    });
+
+    it("renders 'Live' badge when telemetry_state is active", () => {
+      setMonitor({
+        ...mockMonitorSnapshot,
+        telemetry_state: "active",
+      });
+
+      const { container } = render(<MonitoringTestWrapper />);
+      const badge = container.querySelector(".np-monitor-badge");
+      expect(badge).toBeTruthy();
+      expect(badge).toHaveClass("np-monitor-badge--live");
+      expect(badge).toHaveTextContent("Live");
+    });
+
+    it("renders 'Standby' badge when capture is stopped (telemetry_state is standby) even with historical flow rows", () => {
+      // Historical flow rows exist in mockMonitorSnapshot
+      expect(mockMonitorSnapshot.by_protocol.rows.length).toBeGreaterThan(0);
+
+      setMonitor({
+        ...mockMonitorSnapshot,
+        telemetry_state: "standby",
+      });
+
+      const { container } = render(<MonitoringTestWrapper />);
+      const badge = container.querySelector(".np-monitor-badge");
+      expect(badge).toBeTruthy();
+      expect(badge).toHaveClass("np-monitor-badge--idle");
+      expect(badge).toHaveTextContent("Standby");
+    });
+
+    it("renders 'Stale' badge when telemetry_state is stale", () => {
+      setMonitor({
+        ...mockMonitorSnapshot,
+        telemetry_state: "stale",
+      });
+
+      const { container } = render(<MonitoringTestWrapper />);
+      const badge = container.querySelector(".np-monitor-badge");
+      expect(badge).toBeTruthy();
+      expect(badge).toHaveClass("np-monitor-badge--warning");
+      expect(badge).toHaveTextContent("Stale");
+    });
+
+    it("renders 'Unavailable' badge when telemetry_state is unavailable", () => {
+      setMonitor({
+        ...mockMonitorSnapshot,
+        telemetry_state: "unavailable",
+      });
+
+      const { container } = render(<MonitoringTestWrapper />);
+      const badge = container.querySelector(".np-monitor-badge");
+      expect(badge).toBeTruthy();
+      expect(badge).toHaveClass("np-monitor-badge--danger");
+      expect(badge).toHaveTextContent("Unavailable");
+    });
+
+    it("defaults to 'Standby' badge when monitor is null", () => {
+      __resetForTest();
+
+      const { container } = render(<MonitoringTestWrapper />);
+      const badge = container.querySelector(".np-monitor-badge");
+      expect(badge).toBeTruthy();
+      expect(badge).toHaveClass("np-monitor-badge--idle");
+      expect(badge).toHaveTextContent("Standby");
     });
   });
 });

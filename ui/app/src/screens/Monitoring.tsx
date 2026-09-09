@@ -26,9 +26,24 @@ export function Monitoring() {
       ? "np-monitor-badge--live"
       : viewModel.engineState === "Standby"
       ? "np-monitor-badge--idle"
+      : viewModel.engineState === "Stale"
+      ? "np-monitor-badge--warning"
+      : viewModel.engineState === "Unavailable"
+      ? "np-monitor-badge--danger"
       : viewModel.engineState === "Degraded"
       ? "np-monitor-badge--warning"
       : "np-monitor-badge--danger";
+
+  const badgeLabel =
+    viewModel.engineState === "Live"
+      ? t("engine_state.live", "Live")
+      : viewModel.engineState === "Standby"
+      ? t("engine_state.standby", "Standby")
+      : viewModel.engineState === "Stale"
+      ? t("engine_state.stale", "Stale")
+      : viewModel.engineState === "Unavailable"
+      ? t("engine_state.unavailable", "Unavailable")
+      : viewModel.engineState;
 
   const displayKpis =
     kpis.length > 0
@@ -49,7 +64,7 @@ export function Monitoring() {
             {t("title", "Live Monitoring & System Health")}
             <span className={`np-monitor-badge ${badgeClass}`}>
               <span className="np-health-dot" style={{ width: 6, height: 6 }} />
-              {viewModel.engineState}
+              {badgeLabel}
             </span>
           </h1>
           <p className="np-monitor-header__subtitle">

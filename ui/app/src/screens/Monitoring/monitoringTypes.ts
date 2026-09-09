@@ -11,7 +11,9 @@ export type EngineState =
   | "Reconnecting"
   | "Simulation"
   | "Disconnected"
-  | "Error";
+  | "Error"
+  | "Stale"
+  | "Unavailable";
 
 export interface StructuredError {
   code: string;

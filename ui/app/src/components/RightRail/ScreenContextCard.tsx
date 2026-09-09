@@ -45,6 +45,11 @@ export const SCREEN_CONTEXTS: Record<Screen, ScreenContextDescriptor> = {
     summaryKey: "screen_summaries.timeline",
     defaultSummary: "Chronological sequence of captured network frames, ribbon markers, and protocol events.",
     badge: "Time Series",
+    getTelemetry: (monitor, feedLength) => [
+      { label: "Timeline Events", value: feedLength },
+      { label: "Active Flows", value: monitor?.by_host.rows.reduce((s, r) => s + r.flows, 0) ?? 0 },
+      { label: "Capture Drops", value: monitor?.capture_drops ?? 0 },
+    ],
   },
   monitoring: {
     titleKey: "screen_titles.monitoring",

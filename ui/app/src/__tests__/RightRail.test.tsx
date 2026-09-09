@@ -6,7 +6,7 @@ import { App } from "../App";
 import { setMonitor, __resetForTest } from "../state/store";
 import { SCREEN_CONTEXTS, ScreenContextCard } from "../components/RightRail/ScreenContextCard";
 import { SidebarProvider, useSidebar } from "../components/RightRail/RightRailContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { enrichHost, makeHostEntityId } from "@netpulse/viz";
 
 afterEach(() => {
@@ -243,5 +243,84 @@ describe("RightRail Context Sidebar", () => {
     expect(screen.getByText("Autonomous System (ASN)")).toBeInTheDocument();
     expect(screen.getByText("AS13335 (Cloudflare, Inc.)")).toBeInTheDocument();
     expect(screen.getByText("Traffic routed through Autonomous System AS13335 (Cloudflare, Inc.).")).toBeInTheDocument();
+  });
+
+  it("provides getTelemetry callback for timeline screen descriptor", () => {
+    const descriptor = SCREEN_CONTEXTS.timeline;
+    expect(descriptor.getTelemetry).toBeDefined();
+
+    // With null monitor
+    const emptyResult = descriptor.getTelemetry!(null, 5);
+    expect(emptyResult).toEqual([
+      { label: "Timeline Events", value: 5 },
+      { label: "Active Flows", value: 0 },
+      { label: "Capture Drops", value: 0 },
+    ]);
+
+    // With active monitor
+    const mockMonitor = {
+      by_protocol: { dimension: "protocol" as const, rows: [] },
+      by_host: {
+        dimension: "host" as const,
+        rows: [
+          { label: "10.0.0.1", bytes: 100, flows: 4, hostnames: [], evidence: [] },
+          { label: "10.0.0.2", bytes: 200, flows: 3, hostnames: [], evidence: [] },
+        ],
+      },
+      diagnoses: [],
+      network_loss_indicators: 1,
+      capture_drops: 12,
+    };
+    const activeResult = descriptor.getTelemetry!(mockMonitor as any, 42);
+    expect(activeResult).toEqual([
+      { label: "Timeline Events", value: 42 },
+      { label: "Active Flows", value: 7 },
+      { label: "Capture Drops", value: 12 },
+    ]);
+  });
+
+  it("renders timeline telemetry in ScreenContextCard when timeline screen is active", () => {
+    setMonitor({
+      by_protocol: { dimension: "protocol", rows: [] },
+      by_host: {
+        dimension: "host",
+        rows: [
+          { label: "10.0.0.1", bytes: 100, flows: 8, hostnames: [], evidence: [] },
+        ],
+      },
+      diagnoses: [],
+      network_loss_indicators: 0,
+      capture_drops: 3,
+    });
+
+    function TimelineHarness() {
+      const { setScreen } = useEvidenceNavigation();
+      return (
+        <div>
+          <button type="button" data-testid="to-timeline" onClick={() => setScreen("timeline")}>
+            Switch to Timeline
+          </button>
+          <ScreenContextCard />
+        </div>
+      );
+    }
+
+    render(
+      <EvidenceNavigationProvider>
+        <SidebarProvider>
+          <TimelineHarness />
+        </SidebarProvider>
+      </EvidenceNavigationProvider>
+    );
+
+    fireEvent.click(screen.getByTestId("to-timeline"));
+
+    expect(screen.getByText("Timeline")).toBeInTheDocument();
+    expect(screen.getByText("Time Series")).toBeInTheDocument();
+    expect(screen.getByText("Timeline Events")).toBeInTheDocument();
+    expect(screen.getByText("Active Flows")).toBeInTheDocument();
+    expect(screen.getByText("Capture Drops")).toBeInTheDocument();
+    expect(screen.getByText("8")).toBeInTheDocument();
+    expect(screen.getByText("3")).toBeInTheDocument();
   });
 });

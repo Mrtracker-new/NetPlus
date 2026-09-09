@@ -146,6 +146,12 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
                 <div className="np-process-track">
                   <div
                     className="np-process-fill"
+                    role="progressbar"
+                    aria-label={`${p.name} utilization`}
+                    aria-valuenow={p.utilizationPercent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuetext={`${p.utilizationPercent}%`}
                     style={{
                       width: `${Math.min(100, Math.max(0, p.utilizationPercent))}%`,
                       backgroundColor: p.color,

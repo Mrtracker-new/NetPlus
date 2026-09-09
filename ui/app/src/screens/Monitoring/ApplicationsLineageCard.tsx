@@ -61,6 +61,14 @@ export type LineageFilterMode =
   | "CDN Edge"
   | "Multicast";
 
+export const FILTER_MODES: readonly LineageFilterMode[] = [
+  "All Endpoints",
+  "External WAN",
+  "Local Subnet",
+  "CDN Edge",
+  "Multicast",
+];
+
 export function ApplicationsLineageCard({
   nodes = [],
   edges = [],
@@ -71,8 +79,18 @@ export function ApplicationsLineageCard({
   const [filterMode, setFilterMode] = useState<LineageFilterMode>("All Endpoints");
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const triggerBtnRef = useRef<HTMLButtonElement>(null);
+  const optionRefs = useRef<Map<LineageFilterMode, HTMLButtonElement>>(new Map());
   const { monitor } = useStore();
   const lineage = propLineage ?? monitor?.lineage ?? [];
+
+  // Focus selected option when dropdown opens
+  useEffect(() => {
+    if (showDropdown) {
+      const selectedEl = optionRefs.current.get(filterMode);
+      selectedEl?.focus();
+    }
+  }, [showDropdown]);
 
   // Close dropdown on Escape key or outside click
   useEffect(() => {
@@ -81,6 +99,7 @@ export function ApplicationsLineageCard({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowDropdown(false);
+        triggerBtnRef.current?.focus();
       }
     };
 
@@ -129,7 +148,11 @@ export function ApplicationsLineageCard({
   const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
   return (
-    <div className="np-monitor-card" aria-label="Applications & Lineage Topology Graph">
+    <div
+      className="np-monitor-card"
+      aria-label="Applications & Lineage Topology Graph"
+      style={{ justifyContent: "flex-start" }}
+    >
       <div className="np-monitor-card__header">
         <h3 className="np-monitor-card__title">Applications & Lineage</h3>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }} ref={dropdownRef}>
@@ -137,6 +160,7 @@ export function ApplicationsLineageCard({
             {filteredNodes.length} Active Nodes
           </span>
           <button
+            ref={triggerBtnRef}
             type="button"
             className="np-monitor-badge"
             style={{
@@ -151,8 +175,19 @@ export function ApplicationsLineageCard({
               outline: "none",
             }}
             onClick={() => setShowDropdown((prev) => !prev)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                if (!showDropdown) {
+                  setShowDropdown(true);
+                } else {
+                  optionRefs.current.get(filterMode)?.focus();
+                }
+              }
+            }}
             aria-expanded={showDropdown}
             aria-haspopup="listbox"
+            aria-controls={showDropdown ? "lineage-filter-listbox" : undefined}
             aria-label="Filter lineage topology rules"
           >
             {filterMode} ▾
@@ -160,7 +195,10 @@ export function ApplicationsLineageCard({
 
           {showDropdown && (
             <div
+              id="lineage-filter-listbox"
+              role="listbox"
               aria-label="Topology rules options"
+              tabIndex={-1}
               style={{
                 position: "absolute",
                 top: "100%",
@@ -179,21 +217,22 @@ export function ApplicationsLineageCard({
                 backdropFilter: "var(--np-glass-blur)",
               }}
             >
-              {(
-                [
-                  "All Endpoints",
-                  "External WAN",
-                  "Local Subnet",
-                  "CDN Edge",
-                  "Multicast",
-                ] as const
-              ).map((mode) => {
+              {FILTER_MODES.map((mode, idx) => {
                 const isSelected = filterMode === mode;
                 return (
                   <button
                     key={mode}
+                    ref={(el) => {
+                      if (el) {
+                        optionRefs.current.set(mode, el);
+                      } else {
+                        optionRefs.current.delete(mode);
+                      }
+                    }}
                     type="button"
-                    aria-pressed={isSelected}
+                    role="option"
+                    aria-selected={isSelected}
+                    tabIndex={isSelected ? 0 : -1}
                     style={{
                       background: isSelected ? "var(--np-surface-2)" : "transparent",
                       color: isSelected ? "var(--np-accent-strong, var(--np-text))" : "var(--np-text)",
@@ -203,20 +242,48 @@ export function ApplicationsLineageCard({
                       fontSize: "0.78rem",
                       textAlign: "left",
                       cursor: "pointer",
-                        fontWeight: isSelected ? 600 : 400,
-                        outline: "none",
-                        transition: "all var(--np-t)",
-                      }}
-                      onClick={() => {
+                      fontWeight: isSelected ? 600 : 400,
+                      outline: "none",
+                      transition: "all var(--np-t)",
+                    }}
+                    onClick={() => {
+                      setFilterMode(mode);
+                      setShowDropdown(false);
+                      triggerBtnRef.current?.focus();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        const nextIdx = (idx + 1) % FILTER_MODES.length;
+                        optionRefs.current.get(FILTER_MODES[nextIdx]!)?.focus();
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        const prevIdx = (idx - 1 + FILTER_MODES.length) % FILTER_MODES.length;
+                        optionRefs.current.get(FILTER_MODES[prevIdx]!)?.focus();
+                      } else if (e.key === "Home") {
+                        e.preventDefault();
+                        optionRefs.current.get(FILTER_MODES[0]!)?.focus();
+                      } else if (e.key === "End") {
+                        e.preventDefault();
+                        optionRefs.current.get(FILTER_MODES[FILTER_MODES.length - 1]!)?.focus();
+                      } else if (e.key === "Escape") {
+                        e.preventDefault();
+                        setShowDropdown(false);
+                        triggerBtnRef.current?.focus();
+                      } else if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
                         setFilterMode(mode);
                         setShowDropdown(false);
-                      }}
-                    >
-                      {mode}
-                    </button>
-                  );
-                }
-              )}
+                        triggerBtnRef.current?.focus();
+                      } else if (e.key === "Tab") {
+                        setShowDropdown(false);
+                      }
+                    }}
+                  >
+                    {mode}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -225,7 +292,7 @@ export function ApplicationsLineageCard({
       {filteredNodes.length === 0 ? (
         <div
           style={{
-            height: 220,
+            height: 240,
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -246,7 +313,7 @@ export function ApplicationsLineageCard({
           edges={filteredEdges}
           selectedNodeId={selectedNodeId}
           onSelectNode={(id: string) => onSelectNode?.(id === selectedNodeId ? null : id)}
-          height={220}
+          height={240}
         />
       )}
 
@@ -272,7 +339,7 @@ export function ApplicationsLineageCard({
               alignItems: "center",
               fontSize: "0.825rem",
               boxShadow: "var(--np-neu-card)",
-              marginTop: "0.5rem",
+              marginTop: "auto",
             }}
           >
             <div>

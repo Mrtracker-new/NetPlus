@@ -47,6 +47,12 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
           <div className="np-capture-health-gauge-track">
             <div
               className="np-capture-health-gauge-fill"
+              role="progressbar"
+              aria-label={t("buffer_usage", "Buffer Usage")}
+              aria-valuenow={health.bufferPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuetext={`${health.bufferPercent}%`}
               style={{
                 width: `${Math.min(100, Math.max(2, health.bufferPercent))}%`,
                 backgroundColor: severityColor,

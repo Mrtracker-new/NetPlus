@@ -104,6 +104,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
   const [customTarget, setCustomTarget] = useState<string>("");
   const [targetError, setTargetError] = useState<string | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement>(null);
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
 
   const stages = chain?.stages ?? [];
   const selectedStage = stages.find((s) => s.stage === selectedStageKey) ?? null;
@@ -112,6 +113,23 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
     const defaultTarget = selectedStage?.affected_targets?.[0] ?? "";
     setCustomTarget(defaultTarget);
     setTargetError(null);
+  }, [selectedStageKey]);
+
+  useEffect(() => {
+    if (!selectedStageKey) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        const currentKey = selectedStageKey;
+        setSelectedStageKey(null);
+        if (currentKey) {
+          tabRefs.current.get(currentKey)?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
   }, [selectedStageKey]);
 
   const handleQuickProbe = () => {
@@ -132,6 +150,37 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
 
   const handleStageClick = (stage: DiagnosticStageNode) => {
     setSelectedStageKey((prev: string | null) => (prev === stage.stage ? null : stage.stage));
+  };
+
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    if (stages.length === 0) return;
+
+    let targetIndex: number | null = null;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      targetIndex = (currentIndex + 1) % stages.length;
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      targetIndex = (currentIndex - 1 + stages.length) % stages.length;
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      targetIndex = 0;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      targetIndex = stages.length - 1;
+    }
+
+    if (targetIndex !== null) {
+      const targetStage = stages[targetIndex];
+      if (targetStage) {
+        setSelectedStageKey(targetStage.stage);
+        const targetBtn = tabRefs.current.get(targetStage.stage);
+        if (targetBtn) {
+          targetBtn.focus();
+          targetBtn.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "nearest" });
+        }
+      }
+    }
   };
 
   const getStatusClass = (status: string) => {
@@ -212,22 +261,34 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
         </span>
       </div>
 
-      <div className="np-diagnostic-chain__track" role="tablist" aria-label="Diagnostic Hops">
-        {stages.map((stage: DiagnosticStageNode) => {
+      <div className="np-diagnostic-chain__track" role="tablist" aria-label="Diagnostic Hops" aria-orientation="horizontal">
+        {stages.map((stage: DiagnosticStageNode, idx: number) => {
           const isSelected = selectedStage?.stage === stage.stage;
           const iconName = STAGE_ICONS[stage.stage] || "activity";
           const statusClass = getStatusClass(stage.status);
           const statusBadgeClass = getStatusBadgeClass(stage.status);
+          const isRovingFocusable = isSelected || (selectedStageKey === null && idx === 0);
 
           return (
             <button
               key={stage.stage}
+              ref={(el) => {
+                if (el) {
+                  tabRefs.current.set(stage.stage, el);
+                } else {
+                  tabRefs.current.delete(stage.stage);
+                }
+              }}
+              id={`diagnostic-tab-${stage.stage}`}
               type="button"
               role="tab"
+              tabIndex={isRovingFocusable ? 0 : -1}
               aria-selected={isSelected}
               aria-expanded={isSelected}
+              aria-controls={isSelected ? "diagnostic-chain-drawer" : undefined}
               className={`np-diagnostic-chain__node ${statusClass} ${isSelected ? "np-diagnostic-chain__node--selected" : ""}`}
               onClick={() => handleStageClick(stage)}
+              onKeyDown={(e) => handleTabKeyDown(e, idx)}
             >
               <div className="np-diagnostic-chain__node-icon-wrapper">
                 <Icon name={iconName} style={{ width: 18, height: 18 }} />
@@ -245,7 +306,12 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
       </div>
 
       {selectedStage && (
-        <div className="np-diagnostic-chain__drawer" role="region" aria-label={`${formatStageLabel(selectedStage.stage, selectedStage.label)} Inspection`}>
+        <div
+          id="diagnostic-chain-drawer"
+          className="np-diagnostic-chain__drawer"
+          role="region"
+          aria-label={`${formatStageLabel(selectedStage.stage, selectedStage.label)} Inspection`}
+        >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--np-2)" }}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "var(--np-2)", marginBottom: "4px" }}>
@@ -286,7 +352,13 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
               <button
                 type="button"
                 className="np-monitor-icon-btn"
-                onClick={() => setSelectedStageKey(null)}
+                onClick={() => {
+                  const currentKey = selectedStageKey;
+                  setSelectedStageKey(null);
+                  if (currentKey) {
+                    tabRefs.current.get(currentKey)?.focus();
+                  }
+                }}
                 aria-label={t("diagnostic_chain.close_inspection", "Close stage inspection")}
               >
                 <Icon name="close" style={{ width: 14, height: 14 }} />

@@ -270,4 +270,69 @@ describe("ApplicationsLineageCard & findMatchingLineage", () => {
       expect(onSelectNode).toHaveBeenCalledWith(null);
     });
   });
+
+  describe("ApplicationsLineageCard listbox filter", () => {
+    it("renders trigger button with aria-haspopup='listbox' and toggles role='listbox'", () => {
+      render(
+        <ApplicationsLineageCard
+          nodes={sampleNodes}
+          edges={sampleEdges}
+          lineage={sampleLineage}
+        />
+      );
+
+      const triggerBtn = screen.getByRole("button", { name: /Filter lineage topology rules/i });
+      expect(triggerBtn).toHaveAttribute("aria-haspopup", "listbox");
+      expect(triggerBtn).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+
+      // Open listbox
+      fireEvent.click(triggerBtn);
+      expect(triggerBtn).toHaveAttribute("aria-expanded", "true");
+
+      const listbox = screen.getByRole("listbox", { name: /Topology rules options/i });
+      expect(listbox).toBeInTheDocument();
+
+      const options = screen.getAllByRole("option");
+      expect(options).toHaveLength(5);
+
+      // "All Endpoints" should be selected initially
+      expect(options[0]).toHaveTextContent("All Endpoints");
+      expect(options[0]).toHaveAttribute("aria-selected", "true");
+      expect(options[1]).toHaveAttribute("aria-selected", "false");
+
+      // Selecting "External WAN"
+      fireEvent.click(options[1]!);
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+      expect(triggerBtn).toHaveTextContent("External WAN ▾");
+    });
+
+    it("supports keyboard navigation within role='listbox'", () => {
+      render(
+        <ApplicationsLineageCard
+          nodes={sampleNodes}
+          edges={sampleEdges}
+          lineage={sampleLineage}
+        />
+      );
+
+      const triggerBtn = screen.getByRole("button", { name: /Filter lineage topology rules/i });
+
+      // Press ArrowDown on trigger to open listbox
+      fireEvent.keyDown(triggerBtn, { key: "ArrowDown" });
+      const listbox = screen.getByRole("listbox");
+      expect(listbox).toBeInTheDocument();
+
+      const options = screen.getAllByRole("option");
+
+      // Navigate down to second option (External WAN)
+      fireEvent.keyDown(options[0]!, { key: "ArrowDown" });
+      expect(document.activeElement).toBe(options[1]);
+
+      // Select via Enter key
+      fireEvent.keyDown(options[1]!, { key: "Enter" });
+      expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+      expect(triggerBtn).toHaveTextContent("External WAN ▾");
+    });
+  });
 });

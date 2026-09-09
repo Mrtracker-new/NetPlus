@@ -307,7 +307,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
     const rulesBtn = screen.getByRole("button", { name: "Filter lineage topology rules" });
     fireEvent.click(rulesBtn);
 
-    const wanRule = screen.getByRole("button", { name: "External WAN" });
+    const wanRule = screen.getByRole("option", { name: "External WAN" });
     fireEvent.click(wanRule);
 
     expect(screen.getByRole("button", { name: "Filter lineage topology rules" })).toHaveTextContent(

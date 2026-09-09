@@ -210,4 +210,48 @@ describe("DiagnosticChainCard", () => {
       screen.getByText("IPv4 octets must be numbers between 0 and 255 with no leading zeros")
     ).toBeInTheDocument();
   });
+
+  it("supports ArrowRight, ArrowLeft, Home, and End keyboard navigation across diagnostic tabs", () => {
+    render(<DiagnosticChainCard chain={mockChainWithTargets} />);
+
+    const tabs = screen.getAllByRole("tab");
+    expect(tabs).toHaveLength(2);
+
+    const tab0 = tabs[0]!; // Gateway Hop (router)
+    const tab1 = tabs[1]!; // Device Stack (device)
+
+    // Initial roving tabindex: first tab is 0, second tab is -1
+    expect(tab0).toHaveAttribute("tabindex", "0");
+    expect(tab1).toHaveAttribute("tabindex", "-1");
+    expect(tab0).toHaveAttribute("aria-selected", "false");
+    expect(tab1).toHaveAttribute("aria-selected", "false");
+
+    // Navigate to next tab via ArrowRight
+    fireEvent.keyDown(tab0, { key: "ArrowRight" });
+    expect(tab1).toHaveAttribute("aria-selected", "true");
+    expect(tab0).toHaveAttribute("aria-selected", "false");
+    expect(tab1).toHaveAttribute("tabindex", "0");
+    expect(tab0).toHaveAttribute("tabindex", "-1");
+    expect(document.activeElement).toBe(tab1);
+    expect(screen.getByRole("region", { name: /Device Stack Inspection/i })).toBeInTheDocument();
+
+    // Navigate back to previous tab via ArrowLeft
+    fireEvent.keyDown(tab1, { key: "ArrowLeft" });
+    expect(tab0).toHaveAttribute("aria-selected", "true");
+    expect(tab1).toHaveAttribute("aria-selected", "false");
+    expect(tab0).toHaveAttribute("tabindex", "0");
+    expect(tab1).toHaveAttribute("tabindex", "-1");
+    expect(document.activeElement).toBe(tab0);
+    expect(screen.getByRole("region", { name: /Gateway Hop Inspection/i })).toBeInTheDocument();
+
+    // End key moves to last tab
+    fireEvent.keyDown(tab0, { key: "End" });
+    expect(tab1).toHaveAttribute("aria-selected", "true");
+    expect(document.activeElement).toBe(tab1);
+
+    // Home key moves to first tab
+    fireEvent.keyDown(tab1, { key: "Home" });
+    expect(tab0).toHaveAttribute("aria-selected", "true");
+    expect(document.activeElement).toBe(tab0);
+  });
 });

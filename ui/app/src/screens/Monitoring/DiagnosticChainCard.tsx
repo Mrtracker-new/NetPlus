@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { DiagnosticChain, DiagnosticStageNode, EvidenceRef, StageProbeResult } from "@netpulse/contract";
 import { Icon, type IconName } from "../../icons";
@@ -28,15 +28,18 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
 
   // Check IPv4 (4 octets, 0-255)
   const ipv4Parts = trimmed.split(".");
-  if (ipv4Parts.length === 4) {
+  if (ipv4Parts.length === 4 && ipv4Parts.every((part) => /^\d+$/.test(part))) {
     const allOctetsValid = ipv4Parts.every((part) => {
-      if (!/^\d+$/.test(part)) return false;
       const num = parseInt(part, 10);
       return num >= 0 && num <= 255 && String(num) === part;
     });
     if (allOctetsValid) {
       return { valid: true };
     }
+    return {
+      valid: false,
+      error: "IPv4 octets must be numbers between 0 and 255 with no leading zeros",
+    };
   }
 
   // Check IPv6
@@ -45,10 +48,23 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
     if (isIpv6) {
       return { valid: true };
     }
+    return {
+      valid: false,
+      error: "Target must be a valid IPv6 address",
+    };
   }
 
   // Check RFC 1123 Hostname
   const labels = trimmed.split(".");
+  const lastLabel = labels[labels.length - 1];
+  // For multi-label hostnames, top-level domain cannot be all-numeric (RFC 1123 Section 2.1)
+  if (labels.length > 1 && lastLabel && /^\d+$/.test(lastLabel)) {
+    return {
+      valid: false,
+      error: "Top-level domain cannot be all-numeric",
+    };
+  }
+
   const validHostname = labels.every((label) => {
     return (
       label.length >= 1 &&
@@ -84,24 +100,38 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
   probeState,
 }) => {
   const { t } = useTranslation(["monitoring", "common"]);
-  const [selectedStage, setSelectedStage] = useState<DiagnosticStageNode | null>(null);
+  const [selectedStageKey, setSelectedStageKey] = useState<string | null>(null);
   const [customTarget, setCustomTarget] = useState<string>("");
   const [targetError, setTargetError] = useState<string | null>(null);
+  const customTargetInputRef = useRef<HTMLInputElement>(null);
+
+  const stages = chain?.stages ?? [];
+  const selectedStage = stages.find((s) => s.stage === selectedStageKey) ?? null;
 
   useEffect(() => {
     const defaultTarget = selectedStage?.affected_targets?.[0] ?? "";
     setCustomTarget(defaultTarget);
     setTargetError(null);
-  }, [selectedStage]);
+  }, [selectedStageKey]);
 
-  const stages = chain?.stages ?? [];
+  const handleQuickProbe = () => {
+    if (!selectedStage || probeState?.running) return;
+    const target = selectedStage.affected_targets?.[0];
+    if (target && target.trim()) {
+      setTargetError(null);
+      onRunProbe?.(selectedStage.stage, target);
+    } else {
+      setTargetError("Please specify a probe target address");
+      customTargetInputRef.current?.focus();
+    }
+  };
 
   if (stages.length === 0) {
     return null;
   }
 
   const handleStageClick = (stage: DiagnosticStageNode) => {
-    setSelectedStage((prev: DiagnosticStageNode | null) => (prev?.stage === stage.stage ? null : stage));
+    setSelectedStageKey((prev: string | null) => (prev === stage.stage ? null : stage.stage));
   };
 
   const getStatusClass = (status: string) => {
@@ -240,21 +270,23 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "var(--np-2)" }}>
-              {onRunProbe && (
+              {onRunProbe && isProbeableStage(selectedStage.stage) && (
                 <button
                   type="button"
                   className="np-monitor-icon-btn"
-                  onClick={() => onRunProbe(selectedStage.stage, selectedStage.affected_targets[0])}
+                  onClick={handleQuickProbe}
+                  disabled={probeState?.running}
+                  aria-busy={probeState?.running}
                   style={{ gap: "6px", padding: "6px 12px", fontSize: "var(--np-fs-xs)" }}
                 >
                   <Icon name="crosshair" style={{ width: 14, height: 14 }} />
-                  <span>{t("diagnostic_chain.run_active_probe", "Run Active Probe")}</span>
+                  <span>{probeState?.running ? t("diagnostic_chain.probing", "Probing...") : t("diagnostic_chain.run_active_probe", "Run Active Probe")}</span>
                 </button>
               )}
               <button
                 type="button"
                 className="np-monitor-icon-btn"
-                onClick={() => setSelectedStage(null)}
+                onClick={() => setSelectedStageKey(null)}
                 aria-label={t("diagnostic_chain.close_inspection", "Close stage inspection")}
               >
                 <Icon name="close" style={{ width: 14, height: 14 }} />
@@ -365,6 +397,8 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                       </div>
                       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                         <input
+                          ref={customTargetInputRef}
+                          data-testid="stage-probe-target-input"
                           type="text"
                           value={customTarget}
                           onChange={(e) => {
@@ -436,7 +470,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                       >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                           <span style={{ fontWeight: 600, color: "var(--np-text)" }}>
-                            {probeState.result.probe_type} ({probeState.result.status.toUpperCase()})
+                            {probeState.result.probe_type} ({probeState.result.status?.toUpperCase() ?? "UNKNOWN"})
                           </span>
                           {probeState.result.latency_ms != null && (
                             <span style={{ fontFamily: "var(--np-font-mono)", color: "var(--np-accent)" }}>

@@ -17,13 +17,16 @@ const isProbeableStage = (stageKind: string): boolean => {
   return ["destination", "dns", "cdn", "isp", "router"].includes(stageKind.toLowerCase());
 };
 
-const validateProbeTarget = (target: string): { valid: boolean; error?: string } => {
+const validateProbeTarget = (
+  target: string,
+  t: (key: string, fallback: string) => string = (_, fb) => fb
+): { valid: boolean; error?: string } => {
   const trimmed = target.trim();
   if (!trimmed) {
-    return { valid: false, error: "Target address cannot be empty" };
+    return { valid: false, error: t("diagnostic_chain.errors.target_empty", "Target address cannot be empty") };
   }
   if (trimmed.length > 253) {
-    return { valid: false, error: "Target exceeds maximum length of 253 characters" };
+    return { valid: false, error: t("diagnostic_chain.errors.target_too_long", "Target exceeds maximum length of 253 characters") };
   }
 
   // Check IPv4 (4 octets, 0-255)
@@ -38,7 +41,7 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
     }
     return {
       valid: false,
-      error: "IPv4 octets must be numbers between 0 and 255 with no leading zeros",
+      error: t("diagnostic_chain.errors.ipv4_octets", "IPv4 octets must be numbers between 0 and 255 with no leading zeros"),
     };
   }
 
@@ -50,7 +53,7 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
     }
     return {
       valid: false,
-      error: "Target must be a valid IPv6 address",
+      error: t("diagnostic_chain.errors.ipv6_invalid", "Target must be a valid IPv6 address"),
     };
   }
 
@@ -61,7 +64,7 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
   if (labels.length > 1 && lastLabel && /^\d+$/.test(lastLabel)) {
     return {
       valid: false,
-      error: "Top-level domain cannot be all-numeric",
+      error: t("diagnostic_chain.errors.tld_numeric", "Top-level domain cannot be all-numeric"),
     };
   }
 
@@ -79,7 +82,7 @@ const validateProbeTarget = (target: string): { valid: boolean; error?: string }
 
   return {
     valid: false,
-    error: "Target must be a valid IPv4 address, IPv6 address, or RFC 1123 hostname",
+    error: t("diagnostic_chain.errors.target_invalid", "Target must be a valid IPv4 address, IPv6 address, or RFC 1123 hostname"),
   };
 };
 
@@ -139,7 +142,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
       setTargetError(null);
       onRunProbe?.(selectedStage.stage, target);
     } else {
-      setTargetError("Please specify a probe target address");
+      setTargetError(t("diagnostic_chain.errors.specify_target", "Please specify a probe target address"));
       customTargetInputRef.current?.focus();
     }
   };
@@ -261,7 +264,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
         </span>
       </div>
 
-      <div className="np-diagnostic-chain__track" role="tablist" aria-label="Diagnostic Hops" aria-orientation="horizontal">
+      <div className="np-diagnostic-chain__track" role="tablist" aria-label={t("diagnostic_chain.hops_aria_label", "Diagnostic Hops")} aria-orientation="horizontal">
         {stages.map((stage: DiagnosticStageNode, idx: number) => {
           const isSelected = selectedStage?.stage === stage.stage;
           const iconName = STAGE_ICONS[stage.stage] || "activity";
@@ -310,7 +313,10 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
           id="diagnostic-chain-drawer"
           className="np-diagnostic-chain__drawer"
           role="region"
-          aria-label={`${formatStageLabel(selectedStage.stage, selectedStage.label)} Inspection`}
+          aria-label={t("diagnostic_chain.inspection_aria_label", {
+            stage: formatStageLabel(selectedStage.stage, selectedStage.label),
+            defaultValue: `${formatStageLabel(selectedStage.stage, selectedStage.label)} Inspection`,
+          })}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "var(--np-2)" }}>
             <div>
@@ -434,7 +440,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontSize: "var(--np-fs-2xs)", textTransform: "uppercase", color: "var(--np-text-mute)", fontWeight: "var(--np-fw-semibold)" }}>
-                      Active Stage Probe
+                      {t("diagnostic_chain.active_stage_probe", "Active Stage Probe")}
                     </span>
                     <span
                       style={{
@@ -447,13 +453,15 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                         fontWeight: 600,
                       }}
                     >
-                      {isProbeableStage(selectedStage.stage) ? "PROBEABLE" : "NON-PROBEABLE"}
+                      {isProbeableStage(selectedStage.stage)
+                        ? t("diagnostic_chain.probeable", "PROBEABLE")
+                        : t("diagnostic_chain.non_probeable", "NON-PROBEABLE")}
                     </span>
                   </div>
                   <div style={{ fontSize: "var(--np-fs-xs)", color: "var(--np-text-dim)", marginTop: "2px" }}>
                     {isProbeableStage(selectedStage.stage)
-                      ? "Execute on-demand diagnostic probe against this stage target"
-                      : "Local host OS and physical interface stages are evaluated from local kernel state and cannot be queried via network probes."}
+                      ? t("diagnostic_chain.probe_desc_probeable", "Execute on-demand diagnostic probe against this stage target")
+                      : t("diagnostic_chain.probe_desc_non_probeable", "Local host OS and physical interface stages are evaluated from local kernel state and cannot be queried via network probes.")}
                   </div>
                 </div>
 
@@ -461,7 +469,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                   <>
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                       <div style={{ fontSize: "0.72rem", color: "var(--np-text-mute)", display: "flex", justifyContent: "space-between" }}>
-                        <span>Probe Target (Default or Override):</span>
+                        <span>{t("diagnostic_chain.probe_target_label", "Probe Target (Default or Override):")}</span>
                         {targetError && (
                           <span style={{ color: "var(--np-sem-failure, #ef4444)", fontWeight: 500 }}>
                             {targetError}
@@ -480,11 +488,11 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                             if (!val.trim()) {
                               setTargetError(null);
                             } else {
-                              const v = validateProbeTarget(val);
-                              setTargetError(v.valid ? null : (v.error ?? "Invalid target"));
+                              const v = validateProbeTarget(val, (k, fb) => t(k as any, fb));
+                              setTargetError(v.valid ? null : (v.error ?? t("diagnostic_chain.errors.invalid_target", "Invalid target")));
                             }
                           }}
-                          placeholder={selectedStage.affected_targets?.[0] || "e.g. 1.1.1.1, router IP, or domain"}
+                          placeholder={selectedStage.affected_targets?.[0] || t("diagnostic_chain.target_placeholder", "e.g. 1.1.1.1, router IP, or domain")}
                           style={{
                             flex: 1,
                             background: "var(--np-surface-raised, var(--np-surface-1))",
@@ -505,13 +513,13 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                           onClick={() => {
                             const effectiveTarget = customTarget.trim() || selectedStage.affected_targets?.[0];
                             if (effectiveTarget) {
-                              const v = validateProbeTarget(effectiveTarget);
+                              const v = validateProbeTarget(effectiveTarget, (k, fb) => t(k as any, fb));
                               if (!v.valid) {
-                                setTargetError(v.error ?? "Invalid target");
+                                setTargetError(v.error ?? t("diagnostic_chain.errors.invalid_target", "Invalid target"));
                                 return;
                               }
                             }
-                            onRunProbe(selectedStage.stage, effectiveTarget);
+                            onRunProbe?.(selectedStage.stage, effectiveTarget);
                           }}
                           style={{
                             fontSize: "0.75rem",
@@ -523,7 +531,7 @@ export const DiagnosticChainCard: React.FC<DiagnosticChainCardProps> = ({
                           }}
                         >
                           <Icon name="zap" style={{ width: 12, height: 12 }} />
-                          <span>{probeState?.running ? "Probing..." : "Run Stage Probe"}</span>
+                          <span>{probeState?.running ? t("diagnostic_chain.probing", "Probing...") : t("diagnostic_chain.run_stage_probe", "Run Stage Probe")}</span>
                         </button>
                       </div>
                     </div>

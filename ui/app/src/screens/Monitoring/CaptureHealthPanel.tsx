@@ -112,7 +112,7 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
           </div>
 
           <div className="np-capture-health-well__sub">
-            Engine Dissection Mode
+            {t("capture_health_panel.dissection_mode", "Engine Dissection Mode")}
           </div>
         </div>
 
@@ -133,7 +133,7 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
                   color: "var(--np-sem-failure, #ef4444)",
                 }}
               >
-                Loss Detected
+                {t("capture_health_panel.loss_detected", "Loss Detected")}
               </span>
             ) : (
               <span
@@ -148,7 +148,7 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
                   color: "var(--np-sem-nominal, #10b981)",
                 }}
               >
-                Zero Loss
+                {t("capture_health_panel.zero_loss", "Zero Loss")}
               </span>
             )}
           </div>
@@ -165,7 +165,9 @@ export function CaptureHealthPanel({ health }: CaptureHealthPanelProps) {
           </div>
 
           <div className="np-capture-health-well__sub">
-            {health.drops > 0 ? "Packets dropped due to buffer limit" : "Full packet capture fidelity"}
+            {health.drops > 0
+              ? t("capture_health_panel.drops_buffer_limit", "Packets dropped due to buffer limit")
+              : t("capture_health_panel.full_fidelity", "Full packet capture fidelity")}
           </div>
         </div>
       </div>

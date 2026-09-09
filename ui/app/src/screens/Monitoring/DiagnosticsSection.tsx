@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { HealthIndicator } from "@netpulse/viz";
 import type { Diagnosis, EvidenceRef } from "@netpulse/contract";
 import type { SubsystemStatus, ActiveAlert, IntelligentRecommendation } from "./monitoringTypes";
@@ -20,6 +21,7 @@ export function DiagnosticsSection({
   diagnoses,
   onNavigateEvidence,
 }: DiagnosticsSectionProps) {
+  const { t } = useTranslation(["monitoring"]);
   const [selectedSubsystem, setSelectedSubsystem] = useState<SubsystemStatus | null>(null);
 
   // Close subsystem details on Escape key
@@ -41,11 +43,15 @@ export function DiagnosticsSection({
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "0.5rem" }}>
       {/* Subsystem Health Grid — True Neumorphic Tiles */}
-      <div className="np-monitor-card" aria-label="System Subsystem Health">
+      <div className="np-monitor-card" aria-label={t("diagnostics.subsystems_aria_label", "System Subsystem Health")}>
         <div className="np-monitor-card__header">
-          <h3 className="np-monitor-card__title">System Subsystem Health</h3>
+          <h3 className="np-monitor-card__title">{t("diagnostics.subsystems_title", "System Subsystem Health")}</h3>
           <span style={{ fontSize: "0.78rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)" }}>
-            {subsystems.filter((s) => s.status === "healthy").length}/{subsystems.length} Subsystems Healthy
+            {t("diagnostics.subsystems_healthy", {
+              healthy: subsystems.filter((s) => s.status === "healthy").length,
+              total: subsystems.length,
+              defaultValue: `${subsystems.filter((s) => s.status === "healthy").length}/${subsystems.length} Subsystems Healthy`,
+            })}
           </span>
         </div>
 
@@ -74,7 +80,12 @@ export function DiagnosticsSection({
                 role="button"
                 tabIndex={0}
                 aria-pressed={isSelected}
-                aria-label={`Inspect ${sub.name} status: ${sub.status}, ${sub.detail}`}
+                aria-label={t("diagnostics.inspect_subsystem", {
+                  name: sub.name,
+                  status: sub.status,
+                  detail: sub.detail,
+                  defaultValue: `Inspect ${sub.name} status: ${sub.status}, ${sub.detail}`,
+                })}
               >
                 <HealthIndicator status={sub.status} label={sub.name} sublabel={sub.detail} layout="vertical" />
               </div>
@@ -87,10 +98,17 @@ export function DiagnosticsSection({
           <div className="np-subsystem-detail-drawer" style={{ marginTop: "0.75rem" }}>
             <div>
               <span style={{ fontWeight: 600, color: "var(--np-text)" }}>
-                {selectedSubsystem.name} Subsystem
+                {t("diagnostics.subsystem_name", {
+                  name: selectedSubsystem.name,
+                  defaultValue: `${selectedSubsystem.name} Subsystem`,
+                })}
               </span>
               <span style={{ color: "var(--np-text-dim)", marginLeft: "0.75rem", fontFamily: "var(--np-font-mono)", fontSize: "0.8rem" }}>
-                Status: {selectedSubsystem.status.toUpperCase()} • Metric: {selectedSubsystem.detail}
+                {t("diagnostics.subsystem_status_metric", {
+                  status: selectedSubsystem.status.toUpperCase(),
+                  detail: selectedSubsystem.detail,
+                  defaultValue: `Status: ${selectedSubsystem.status.toUpperCase()} • Metric: ${selectedSubsystem.detail}`,
+                })}
               </span>
             </div>
             <button
@@ -98,7 +116,7 @@ export function DiagnosticsSection({
               className="np-monitor-icon-btn"
               style={{ padding: "4px 6px" }}
               onClick={() => setSelectedSubsystem(null)}
-              aria-label="Close details"
+              aria-label={t("diagnostics.close_details", "Close details")}
             >
               <Icon name="close" style={{ width: "12px", height: "12px" }} />
             </button>
@@ -109,18 +127,23 @@ export function DiagnosticsSection({
       {/* Active Alerts & Intelligent Recommendations Grid */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "1.25rem" }}>
         {/* Active Alerts Card */}
-        <div className="np-monitor-card" aria-label="Active System Alerts">
+        <div className="np-monitor-card" aria-label={t("diagnostics.alerts_aria_label", "Active System Alerts")}>
           <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">Active Alerts</h3>
+            <h3 className="np-monitor-card__title">{t("diagnostics.alerts_title", "Active Alerts")}</h3>
             {alerts.length > 0 && (
-              <span className="np-monitor-badge np-monitor-badge--warning">{alerts.length} Active</span>
+              <span className="np-monitor-badge np-monitor-badge--warning">
+                {t("diagnostics.alerts_active_count", {
+                  count: alerts.length,
+                  defaultValue: `${alerts.length} Active`,
+                })}
+              </span>
             )}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
             {alerts.length === 0 ? (
               <p style={{ color: "var(--np-sem-nominal, var(--np-good))", fontSize: "0.85rem", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
                 <Icon name="checkCircle" style={{ width: "14px", height: "14px" }} />
-                <span>No active telemetry alerts detected. System metrics nominal.</span>
+                <span>{t("diagnostics.no_alerts", "No active telemetry alerts detected. System metrics nominal.")}</span>
               </p>
             ) : (
               alerts.map((a) => (
@@ -149,9 +172,9 @@ export function DiagnosticsSection({
         </div>
 
         {/* Automated Recommendations Card */}
-        <div className="np-monitor-card" aria-label="Intelligent System Recommendations">
+        <div className="np-monitor-card" aria-label={t("diagnostics.recommendations_aria_label", "Intelligent System Recommendations")}>
           <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">Automated Recommendations</h3>
+            <h3 className="np-monitor-card__title">{t("diagnostics.recommendations_title", "Automated Recommendations")}</h3>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
             {recommendations.map((r) => (
@@ -179,9 +202,9 @@ export function DiagnosticsSection({
 
       {/* Diagnostic Hypotheses Cards */}
       {diagnoses.length > 0 && (
-        <div className="np-monitor-card" aria-label="Diagnostic Hypotheses">
+        <div className="np-monitor-card" aria-label={t("diagnostics.hypotheses_aria_label", "Diagnostic Hypotheses")}>
           <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">Diagnostic Hypotheses</h3>
+            <h3 className="np-monitor-card__title">{t("diagnostics.hypotheses_title", "Diagnostic Hypotheses")}</h3>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
             {diagnoses.map((d, i) => (

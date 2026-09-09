@@ -82,6 +82,100 @@
     "evidence_backing": "Evidence Backing",
     "flow_sample": "{{count}} flow sample",
     "flow_samples": "{{count}} flow samples",
-    "close_inspection": "Close stage inspection"
-  }
+    "close_inspection": "Close stage inspection",
+    "probing": "Probing...",
+    "active_stage_probe": "Active Stage Probe",
+    "probeable": "PROBEABLE",
+    "non_probeable": "NON-PROBEABLE",
+    "probe_desc_probeable": "Execute on-demand diagnostic probe against this stage target",
+    "probe_desc_non_probeable": "Local host OS and physical interface stages are evaluated from local kernel state and cannot be queried via network probes.",
+    "probe_target_label": "Probe Target (Default or Override):",
+    "target_placeholder": "e.g. 1.1.1.1, router IP, or domain",
+    "run_stage_probe": "Run Stage Probe",
+    "hops_aria_label": "Diagnostic Hops",
+    "inspection_aria_label": "{{stage}} Inspection",
+    "errors": {
+      "target_empty": "Target address cannot be empty",
+      "target_too_long": "Target exceeds maximum length of 253 characters",
+      "ipv4_octets": "IPv4 octets must be numbers between 0 and 255 with no leading zeros",
+      "ipv6_invalid": "Target must be a valid IPv6 address",
+      "tld_numeric": "Top-level domain cannot be all-numeric",
+      "target_invalid": "Target must be a valid IPv4 address, IPv6 address, or RFC 1123 hostname",
+      "specify_target": "Please specify a probe target address",
+      "invalid_target": "Invalid target"
+    }
+  },
+  "applications_lineage": {
+    "title": "Applications & Lineage",
+    "aria_label": "Applications & Lineage Topology Graph",
+    "active_nodes": "{{count}} Active Nodes",
+    "empty_standby": "Capture Standby — Start a packet capture to observe live network flow lineage.",
+    "filter_aria_label": "Filter lineage topology rules",
+    "options_aria_label": "Topology rules options",
+    "close_details": "Close node details",
+    "nominal": "Nominal",
+    "active_flow": "Active Flow",
+    "details_with_bytes": "Classification: {{classification}} • {{bytes}} • Protocol: {{protocol}} • Active",
+    "details_without_bytes": "Classification: {{classification}} • Protocol: {{protocol}} • Active",
+    "filters": {
+      "all_endpoints": "All Endpoints",
+      "external_wan": "External WAN",
+      "local_subnet": "Local Subnet",
+      "cdn_edge": "CDN Edge",
+      "multicast": "Multicast"
+    }
+  },
+  "capture_health_panel": {
+    "dissection_mode": "Engine Dissection Mode",
+    "loss_detected": "Loss Detected",
+    "zero_loss": "Zero Loss",
+    "drops_buffer_limit": "Packets dropped due to buffer limit",
+    "full_fidelity": "Full packet capture fidelity"
+  },
+  "diagnostics": {
+    "subsystems_title": "System Subsystem Health",
+    "subsystems_aria_label": "System Subsystem Health",
+    "subsystems_healthy": "{{healthy}}/{{total}} Subsystems Healthy",
+    "inspect_subsystem": "Inspect {{name}} status: {{status}}, {{detail}}",
+    "subsystem_name": "{{name}} Subsystem",
+    "subsystem_status_metric": "Status: {{status}} • Metric: {{detail}}",
+    "close_details": "Close details",
+    "alerts_title": "Active Alerts",
+    "alerts_aria_label": "Active System Alerts",
+    "alerts_active_count": "{{count}} Active",
+    "no_alerts": "No active telemetry alerts detected. System metrics nominal.",
+    "recommendations_title": "Automated Recommendations",
+    "recommendations_aria_label": "Intelligent System Recommendations",
+    "hypotheses_title": "Diagnostic Hypotheses",
+    "hypotheses_aria_label": "Diagnostic Hypotheses"
+  },
+  "process_attributes": {
+    "title": "Process Attributes",
+    "aria_label": "Process Attributes & Resource Usage",
+    "sort_aria_label": "Sort process attributes",
+    "sort_bandwidth": "Sort: Bandwidth",
+    "sort_cpu": "Sort: CPU",
+    "sort_memory": "Sort: Memory",
+    "sort_utilization": "Sort: Utilization",
+    "sort_name": "Sort: Name",
+    "pagination": "Page {{current}} of {{total}}",
+    "prev_page": "Previous process page",
+    "next_page": "Next process page",
+    "empty": "No attributed process flows active in current time window.",
+    "unattributed": "Unattributed",
+    "cpu_label": "CPU:",
+    "ram_label": "RAM:",
+    "utilization_aria_label": "{{name}} utilization"
+  },
+  "throughput_lineage": {
+    "title": "Throughput & Lineage",
+    "aria_label": "Throughput & Lineage Chart",
+    "ingress": "Ingress (Download)",
+    "egress": "Egress (Upload)",
+    "active_telemetry": "Active Telemetry",
+    "protocols_breakdown_aria_label": "Top protocols breakdown",
+    "protocols_distribution_aria_label": "Top protocols distribution",
+    "no_activity": "No protocol activity observed"
+  },
+  "dimension_protocols": "Protocols"
 }

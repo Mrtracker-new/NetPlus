@@ -29,21 +29,21 @@ export function ThroughputLineageCard({
   const totalProtocolBytes = topProtocols.reduce((sum, p) => sum + p.bytes, 0);
 
   return (
-    <div className="np-monitor-card" aria-label="Throughput & Lineage Chart">
+    <div className="np-monitor-card" aria-label={t("throughput_lineage.aria_label", "Throughput & Lineage Chart")}>
       <div className="np-monitor-card__header">
-        <h3 className="np-monitor-card__title">Throughput & Lineage</h3>
+        <h3 className="np-monitor-card__title">{t("throughput_lineage.title", "Throughput & Lineage")}</h3>
         <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
           {/* Color Legend */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-accent, #2fe0d6)" }} />
-            <span>Ingress (Download)</span>
+            <span>{t("throughput_lineage.ingress", "Ingress (Download)")}</span>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             <span style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--np-accent-2, #7c83f7)" }} />
-            <span>Egress (Upload)</span>
+            <span>{t("throughput_lineage.egress", "Egress (Upload)")}</span>
           </div>
           <span className={`np-monitor-badge ${hasTraffic ? "np-monitor-badge--live" : "np-monitor-badge--idle"}`}>
-            {hasTraffic ? "Active Telemetry" : "Standby"}
+            {hasTraffic ? t("throughput_lineage.active_telemetry", "Active Telemetry") : t("engine_state.standby", "Standby")}
           </span>
         </div>
       </div>
@@ -58,7 +58,7 @@ export function ThroughputLineageCard({
       <div
         className="np-protocol-breakdown"
         style={{ marginTop: "var(--np-3, 0.75rem)" }}
-        aria-label="Top protocols breakdown"
+        aria-label={t("throughput_lineage.protocols_breakdown_aria_label", "Top protocols breakdown")}
         data-testid="top-protocols-bar"
       >
         <div
@@ -78,7 +78,7 @@ export function ThroughputLineageCard({
               letterSpacing: "0.05em",
             }}
           >
-            {t("top_dimension", { dimension: "Protocols", defaultValue: "Top Protocols" })}
+            {t("top_dimension", { dimension: t("dimension_protocols", "Protocols"), defaultValue: "Top Protocols" })}
           </span>
           <span
             style={{
@@ -96,7 +96,7 @@ export function ThroughputLineageCard({
         {/* Segmented Bar Track */}
         <div
           role="progressbar"
-          aria-label="Top protocols distribution"
+          aria-label={t("throughput_lineage.protocols_distribution_aria_label", "Top protocols distribution")}
           aria-valuenow={totalProtocolBytes > 0 ? 100 : 0}
           aria-valuemin={0}
           aria-valuemax={100}
@@ -185,7 +185,7 @@ export function ThroughputLineageCard({
             })
           ) : (
             <span style={{ color: "var(--np-text-dim)", fontSize: "0.75rem" }}>
-              No protocol activity observed
+              {t("throughput_lineage.no_activity", "No protocol activity observed")}
             </span>
           )}
         </div>

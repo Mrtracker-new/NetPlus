@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { humanBytes, TopologyGraph, type TopologyNode, type TopologyEdge } from "@netpulse/viz";
 import type { FlowLineage as FlowLineageDto } from "@netpulse/contract";
 import { useStore } from "../../state/store";
@@ -76,6 +77,7 @@ export function ApplicationsLineageCard({
   onSelectNode,
   lineage: propLineage,
 }: ApplicationsLineageCardProps) {
+  const { t } = useTranslation(["monitoring"]);
   const [filterMode, setFilterMode] = useState<LineageFilterMode>("All Endpoints");
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -83,6 +85,23 @@ export function ApplicationsLineageCard({
   const optionRefs = useRef<Map<LineageFilterMode, HTMLButtonElement>>(new Map());
   const { monitor } = useStore();
   const lineage = propLineage ?? monitor?.lineage ?? [];
+
+  const formatFilterMode = (mode: LineageFilterMode): string => {
+    switch (mode) {
+      case "All Endpoints":
+        return t("applications_lineage.filters.all_endpoints", "All Endpoints");
+      case "External WAN":
+        return t("applications_lineage.filters.external_wan", "External WAN");
+      case "Local Subnet":
+        return t("applications_lineage.filters.local_subnet", "Local Subnet");
+      case "CDN Edge":
+        return t("applications_lineage.filters.cdn_edge", "CDN Edge");
+      case "Multicast":
+        return t("applications_lineage.filters.multicast", "Multicast");
+      default:
+        return mode;
+    }
+  };
 
   // Focus selected option when dropdown opens
   useEffect(() => {
@@ -150,14 +169,14 @@ export function ApplicationsLineageCard({
   return (
     <div
       className="np-monitor-card"
-      aria-label="Applications & Lineage Topology Graph"
+      aria-label={t("applications_lineage.aria_label", "Applications & Lineage Topology Graph")}
       style={{ justifyContent: "flex-start" }}
     >
       <div className="np-monitor-card__header">
-        <h3 className="np-monitor-card__title">Applications & Lineage</h3>
+        <h3 className="np-monitor-card__title">{t("applications_lineage.title", "Applications & Lineage")}</h3>
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", position: "relative" }} ref={dropdownRef}>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-mute)" }}>
-            {filteredNodes.length} Active Nodes
+            {t("applications_lineage.active_nodes", { count: filteredNodes.length, defaultValue: `${filteredNodes.length} Active Nodes` })}
           </span>
           <button
             ref={triggerBtnRef}
@@ -188,16 +207,16 @@ export function ApplicationsLineageCard({
             aria-expanded={showDropdown}
             aria-haspopup="listbox"
             aria-controls={showDropdown ? "lineage-filter-listbox" : undefined}
-            aria-label="Filter lineage topology rules"
+            aria-label={t("applications_lineage.filter_aria_label", "Filter lineage topology rules")}
           >
-            {filterMode} ▾
+            {formatFilterMode(filterMode)} ▾
           </button>
 
           {showDropdown && (
             <div
               id="lineage-filter-listbox"
               role="listbox"
-              aria-label="Topology rules options"
+              aria-label={t("applications_lineage.options_aria_label", "Topology rules options")}
               tabIndex={-1}
               style={{
                 position: "absolute",
@@ -280,7 +299,7 @@ export function ApplicationsLineageCard({
                       }
                     }}
                   >
-                    {mode}
+                    {formatFilterMode(mode)}
                   </button>
                 );
               })}
@@ -305,7 +324,7 @@ export function ApplicationsLineageCard({
           }}
         >
           <Icon name="radio" style={{ width: "24px", height: "24px", color: "var(--np-accent)" }} />
-          <span>Capture Standby — Start a packet capture to observe live network flow lineage.</span>
+          <span>{t("applications_lineage.empty_standby", "Capture Standby — Start a packet capture to observe live network flow lineage.")}</span>
         </div>
       ) : (
         <TopologyGraph
@@ -320,8 +339,8 @@ export function ApplicationsLineageCard({
       {/* Node Inspection Detail Popover — Level 4 Overlay Plate */}
       {selectedNode && (() => {
         const item = findMatchingLineage(selectedNode, lineage);
-        const classification = item?.classification || selectedNode.sublabel || "Nominal";
-        const protocol = item?.protocol || "Active Flow";
+        const classification = item?.classification || selectedNode.sublabel || t("applications_lineage.nominal", "Nominal");
+        const protocol = item?.protocol || t("applications_lineage.active_flow", "Active Flow");
         const bytesText =
           typeof item?.bytes === "number" && !isNaN(item.bytes)
             ? humanBytes(Math.max(0, item.bytes))
@@ -347,7 +366,18 @@ export function ApplicationsLineageCard({
                 {selectedNode.label} ({selectedNode.status})
               </div>
               <div style={{ color: "var(--np-text-dim)", fontSize: "0.75rem", marginTop: "2px" }}>
-                Classification: {classification}{bytesText != null ? ` • ${bytesText}` : ""} • Protocol: {protocol} • Active
+                {bytesText != null
+                  ? t("applications_lineage.details_with_bytes", {
+                      classification,
+                      bytes: bytesText,
+                      protocol,
+                      defaultValue: `Classification: ${classification} • ${bytesText} • Protocol: ${protocol} • Active`,
+                    })
+                  : t("applications_lineage.details_without_bytes", {
+                      classification,
+                      protocol,
+                      defaultValue: `Classification: ${classification} • Protocol: ${protocol} • Active`,
+                    })}
               </div>
             </div>
             <button
@@ -355,7 +385,7 @@ export function ApplicationsLineageCard({
               className="np-monitor-icon-btn"
               style={{ padding: "4px 6px" }}
               onClick={() => onSelectNode?.(null)}
-              aria-label="Close node details"
+              aria-label={t("applications_lineage.close_details", "Close node details")}
             >
               <Icon name="close" style={{ width: "12px", height: "12px" }} />
             </button>

@@ -33,7 +33,7 @@ export function ThroughputGainsCard({
             <span>{t("throughput_volume_legend", "Combined Rate")}</span>
           </div>
           <span className={`np-monitor-badge ${hasVolume ? "np-monitor-badge--live" : "np-monitor-badge--idle"}`}>
-            {hasVolume ? peakBadgeText : "Standby"}
+            {hasVolume ? peakBadgeText : t("engine_state.standby", "Standby")}
           </span>
         </div>
       </div>

@@ -82,6 +82,100 @@
     "evidence_backing": "Respaldo de Evidencia",
     "flow_sample": "{{count}} muestra de flujo",
     "flow_samples": "{{count}} muestras de flujo",
-    "close_inspection": "Cerrar inspección de etapa"
-  }
+    "close_inspection": "Cerrar inspección de etapa",
+    "probing": "Sondeando...",
+    "active_stage_probe": "Prueba Activa de Etapa",
+    "probeable": "SONDEABLE",
+    "non_probeable": "NO SONDEABLE",
+    "probe_desc_probeable": "Ejecutar sondeo de diagnóstico a petición contra el objetivo de esta etapa",
+    "probe_desc_non_probeable": "El SO del host local y las interfaces físicas se evalúan desde el kernel local y no se pueden sondear por red.",
+    "probe_target_label": "Objetivo de Sondeo (Predeterminado o Anulación):",
+    "target_placeholder": "ej. 1.1.1.1, IP del enrutador o dominio",
+    "run_stage_probe": "Ejecutar Prueba de Etapa",
+    "hops_aria_label": "Saltos de Diagnóstico",
+    "inspection_aria_label": "Inspección de {{stage}}",
+    "errors": {
+      "target_empty": "La dirección de destino no puede estar vacía",
+      "target_too_long": "El destino supera la longitud máxima de 253 caracteres",
+      "ipv4_octets": "Los octetos IPv4 deben ser números entre 0 y 255 sin ceros a la izquierda",
+      "ipv6_invalid": "El destino debe ser una dirección IPv6 válida",
+      "tld_numeric": "El dominio de nivel superior no puede ser completamente numérico",
+      "target_invalid": "El destino debe ser una dirección IPv4, IPv6 o un nombre de host RFC 1123 válido",
+      "specify_target": "Por favor especifica una dirección de destino para la prueba",
+      "invalid_target": "Destino no válido"
+    }
+  },
+  "applications_lineage": {
+    "title": "Aplicaciones y Linaje",
+    "aria_label": "Gráfico de Topología de Aplicaciones y Linaje",
+    "active_nodes": "{{count}} Nodos Activos",
+    "empty_standby": "Captura en Espera — Inicia una captura de paquetes para observar el linaje de flujos de red en vivo.",
+    "filter_aria_label": "Filtrar reglas de topología de linaje",
+    "options_aria_label": "Opciones de reglas de topología",
+    "close_details": "Cerrar detalles del nodo",
+    "nominal": "Nominal",
+    "active_flow": "Flujo Activo",
+    "details_with_bytes": "Clasificación: {{classification}} • {{bytes}} • Protocolo: {{protocol}} • Activo",
+    "details_without_bytes": "Clasificación: {{classification}} • Protocolo: {{protocol}} • Activo",
+    "filters": {
+      "all_endpoints": "Todos los Puntos de Destino",
+      "external_wan": "WAN Externa",
+      "local_subnet": "Subred Local",
+      "cdn_edge": "Borde CDN",
+      "multicast": "Multidifusión"
+    }
+  },
+  "capture_health_panel": {
+    "dissection_mode": "Modo de Disección del Motor",
+    "loss_detected": "Pérdida Detectada",
+    "zero_loss": "Cero Pérdida",
+    "drops_buffer_limit": "Paquetes descartados por límite de búfer",
+    "full_fidelity": "Fidelidad total de captura de paquetes"
+  },
+  "diagnostics": {
+    "subsystems_title": "Salud de Subsistemas del Sistema",
+    "subsystems_aria_label": "Salud de Subsistemas del Sistema",
+    "subsystems_healthy": "{{healthy}}/{{total}} Subsistemas Saludables",
+    "inspect_subsystem": "Inspeccionar estado de {{name}}: {{status}}, {{detail}}",
+    "subsystem_name": "Subsistema {{name}}",
+    "subsystem_status_metric": "Estado: {{status}} • Métrica: {{detail}}",
+    "close_details": "Cerrar detalles",
+    "alerts_title": "Alertas Activas",
+    "alerts_aria_label": "Alertas Activas del Sistema",
+    "alerts_active_count": "{{count}} Activas",
+    "no_alerts": "No se detectaron alertas de telemetría activas. Métricas nominales del sistema.",
+    "recommendations_title": "Recomendaciones Automatizadas",
+    "recommendations_aria_label": "Recomendaciones Inteligentes del Sistema",
+    "hypotheses_title": "Hipótesis de Diagnóstico",
+    "hypotheses_aria_label": "Hipótesis de Diagnóstico"
+  },
+  "process_attributes": {
+    "title": "Atributos de Procesos",
+    "aria_label": "Atributos de Procesos y Uso de Recursos",
+    "sort_aria_label": "Ordenar atributos de proceso",
+    "sort_bandwidth": "Ordenar: Ancho de Banda",
+    "sort_cpu": "Ordenar: CPU",
+    "sort_memory": "Ordenar: Memoria",
+    "sort_utilization": "Ordenar: Utilización",
+    "sort_name": "Ordenar: Nombre",
+    "pagination": "Página {{current}} de {{total}}",
+    "prev_page": "Página de procesos anterior",
+    "next_page": "Página de procesos siguiente",
+    "empty": "No hay flujos de procesos atribuidos activos en la ventana de tiempo actual.",
+    "unattributed": "Sin atribuir",
+    "cpu_label": "CPU:",
+    "ram_label": "RAM:",
+    "utilization_aria_label": "utilización de {{name}}"
+  },
+  "throughput_lineage": {
+    "title": "Rendimiento y Linaje",
+    "aria_label": "Gráfico de Rendimiento y Linaje",
+    "ingress": "Entrada (Descarga)",
+    "egress": "Salida (Subida)",
+    "active_telemetry": "Telemetría Activa",
+    "protocols_breakdown_aria_label": "Desglose de principales protocolos",
+    "protocols_distribution_aria_label": "Distribución de principales protocolos",
+    "no_activity": "No se observó actividad de protocolo"
+  },
+  "dimension_protocols": "Protocolos"
 }

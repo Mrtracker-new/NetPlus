@@ -919,5 +919,51 @@ describe("Monitoring Screen & useMonitoringController", () => {
       }
     });
   });
+
+  describe("Subcomponent Internationalization Coverage", () => {
+    it("translates all subcomponent titles, status tags, and labels in Spanish", async () => {
+      await i18n.changeLanguage("es");
+      setMonitor({
+        ...mockMonitorSnapshot,
+        throughput_history: [
+          {
+            timestamp_mono_nanos: 1000,
+            ingress_rate_bytes_sec: 400 * 1024,
+            egress_rate_bytes_sec: 200 * 1024,
+          },
+        ],
+      });
+      try {
+        render(<MonitoringTestWrapper />);
+
+        // Applications & Lineage
+        expect(screen.getByText("Aplicaciones y Linaje")).toBeInTheDocument();
+
+        // Throughput & Lineage
+        expect(screen.getByText("Rendimiento y Linaje")).toBeInTheDocument();
+        expect(screen.getByText("Entrada (Descarga)")).toBeInTheDocument();
+        expect(screen.getByText("Salida (Subida)")).toBeInTheDocument();
+        expect(screen.getByText("Telemetría Activa")).toBeInTheDocument();
+
+        // Capture Health Panel
+        expect(screen.getByText("Modo de Disección del Motor")).toBeInTheDocument();
+        expect(screen.getByText("Cero Pérdida")).toBeInTheDocument();
+
+        // Diagnostics Section
+        expect(screen.getByText("Salud de Subsistemas del Sistema")).toBeInTheDocument();
+        expect(screen.getByText("Recomendaciones Automatizadas")).toBeInTheDocument();
+        expect(screen.getByText("Hipótesis de Diagnóstico")).toBeInTheDocument();
+
+        // Process Attributes
+        expect(screen.getByText("Atributos de Procesos")).toBeInTheDocument();
+        expect(screen.getByText("Ordenar: Ancho de Banda")).toBeInTheDocument();
+
+        // Diagnostic Chain
+        expect(screen.getByLabelText("Saltos de Diagnóstico")).toBeInTheDocument();
+      } finally {
+        await i18n.changeLanguage("en");
+      }
+    });
+  });
 });
 

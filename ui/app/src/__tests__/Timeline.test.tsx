@@ -1150,5 +1150,75 @@ describe("TimelineInspector Metadata Header", () => {
     // formatWallTimeClock explicit string
     expect(formatWallTimeClock({ ...ev14s, ...({ wall_time: "12:00:00" } as any) })).toBe("12:00:00");
   });
+
+  it("renders stepper controls with np-timeline-inspector__btn-stepper class and correct accessibility", () => {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    const onNavigateEvidence = vi.fn();
+    const testEvent: TimelineEvent = {
+      headline: "Sample Event",
+      summary: "Sample Event Summary",
+      lines: [],
+      severity: "finding",
+      evidence: [],
+      at_mono_nanos: 1_000_000_000,
+      lane: "finding",
+      at: 1_000_000_000,
+      label: "Sample Event",
+    };
+
+    const { rerender } = render(
+      <TimelineInspector
+        event={testEvent}
+        currentIndex={1}
+        totalCount={3}
+        onPrev={onPrev}
+        onNext={onNext}
+        onNavigateEvidence={onNavigateEvidence}
+      />
+    );
+
+    const prevBtn = screen.getByRole("button", { name: /Previous event \(1 of 3\)/i });
+    const nextBtn = screen.getByRole("button", { name: /Next event \(3 of 3\)/i });
+
+    expect(prevBtn).toHaveClass("np-timeline-inspector__btn-stepper");
+    expect(nextBtn).toHaveClass("np-timeline-inspector__btn-stepper");
+    expect(prevBtn).not.toBeDisabled();
+    expect(nextBtn).not.toBeDisabled();
+
+    fireEvent.click(prevBtn);
+    expect(onPrev).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(nextBtn);
+    expect(onNext).toHaveBeenCalledTimes(1);
+
+    // Test first boundary (index 0 disables prev)
+    rerender(
+      <TimelineInspector
+        event={testEvent}
+        currentIndex={0}
+        totalCount={3}
+        onPrev={onPrev}
+        onNext={onNext}
+        onNavigateEvidence={onNavigateEvidence}
+      />
+    );
+    expect(screen.getByRole("button", { name: /Previous event/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Next event/i })).not.toBeDisabled();
+
+    // Test last boundary (index totalCount - 1 disables next)
+    rerender(
+      <TimelineInspector
+        event={testEvent}
+        currentIndex={2}
+        totalCount={3}
+        onPrev={onPrev}
+        onNext={onNext}
+        onNavigateEvidence={onNavigateEvidence}
+      />
+    );
+    expect(screen.getByRole("button", { name: /Previous event/i })).not.toBeDisabled();
+    expect(screen.getByRole("button", { name: /Next event/i })).toBeDisabled();
+  });
 });
 

@@ -82,6 +82,24 @@ export function TimelineSummary({
           <div className="np-timeline-kpi__value">{metrics.notableCount}</div>
         </button>
 
+        {/* Neutral Events KPI Tile */}
+        <button
+          type="button"
+          className="np-timeline-kpi"
+          data-sev="neutral"
+          data-has-count={metrics.neutralCount > 0 ? "true" : "false"}
+          data-active={activeSeverity === "neutral" ? "true" : "false"}
+          onClick={() => handleCardClick("neutral")}
+          aria-pressed={activeSeverity === "neutral"}
+          aria-label={`${t("summary_neutral")}: ${metrics.neutralCount}. Click to filter by neutral events.`}
+        >
+          <div className="np-timeline-kpi__top">
+            <span className="np-timeline-kpi__label">{t("summary_neutral")}</span>
+            <span className="np-timeline-kpi__gem" data-sev="neutral" aria-hidden="true" />
+          </div>
+          <div className="np-timeline-kpi__value">{metrics.neutralCount}</div>
+        </button>
+
         {/* Time Span KPI Tile */}
         <div
           className="np-timeline-kpi"

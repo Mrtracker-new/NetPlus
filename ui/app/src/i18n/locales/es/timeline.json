@@ -11,6 +11,7 @@
   "summary_events": "Eventos Totales",
   "summary_findings": "Hallazgos",
   "summary_notable": "Notables",
+  "summary_neutral": "Eventos Neutrales",
   "summary_span": "Intervalo de Tiempo",
   "inspector_title": "Inspector del Evento Seleccionado",
   "prev_event": "Evento Anterior",

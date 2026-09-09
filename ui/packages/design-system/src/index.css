@@ -3976,6 +3976,10 @@ button {
   background: var(--np-notable, #f2b64d);
 }
 
+.np-timeline-kpi__gem[data-sev="neutral"] {
+  background: var(--np-neutral, #8b93a8);
+}
+
 .np-timeline-kpi[data-has-count="true"][data-sev="finding"] {
   border-color: rgba(239, 97, 103, 0.3);
 }
@@ -3990,6 +3994,14 @@ button {
 
 .np-timeline-kpi[data-has-count="true"][data-sev="notable"] .np-timeline-kpi__value {
   color: var(--np-notable, #f2b64d);
+}
+
+.np-timeline-kpi[data-has-count="true"][data-sev="neutral"] {
+  border-color: rgba(139, 147, 168, 0.3);
+}
+
+.np-timeline-kpi[data-has-count="true"][data-sev="neutral"] .np-timeline-kpi__value {
+  color: var(--np-neutral, #8b93a8);
 }
 
 .np-timeline-kpi__value {

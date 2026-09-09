@@ -99,6 +99,7 @@ describe("Timeline Screen & useTimelineController", () => {
     // Check Summary KPIs
     expect(screen.getByText("Total Events")).toBeInTheDocument();
     expect(screen.getByText("Time Span")).toBeInTheDocument();
+    expect(screen.getByText("Neutral Events")).toBeInTheDocument();
 
     // Check ribbon buttons
     const markButtons = screen.getAllByRole("button", { name: /^Event \d+:/i });
@@ -266,6 +267,17 @@ describe("Timeline Screen & useTimelineController", () => {
 
     // Clicking again resets filter to all
     fireEvent.click(findingsKpi);
+    expect(screen.getByRole("button", { name: /Finding 1/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Neutral 1/i })).toBeInTheDocument();
+
+    // Clicking Neutral Events KPI tile filters to neutral events only
+    const neutralKpi = screen.getByRole("button", { name: /Neutral Events: 1/i });
+    fireEvent.click(neutralKpi);
+    expect(screen.queryByRole("button", { name: /Finding 1/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Neutral 1/i })).toBeInTheDocument();
+
+    // Clicking again resets filter to all
+    fireEvent.click(neutralKpi);
     expect(screen.getByRole("button", { name: /Finding 1/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Neutral 1/i })).toBeInTheDocument();
   });

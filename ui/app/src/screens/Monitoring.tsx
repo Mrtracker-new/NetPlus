@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Notice, Button } from "@netpulse/components";
+import { Notice, Button, Skeleton } from "@netpulse/components";
 import { useMonitoringController } from "../hooks/useMonitoringController";
 import { CaptureHealthPanel } from "./Monitoring/CaptureHealthPanel";
 import { DiagnosticChainCard } from "./Monitoring/DiagnosticChainCard";
@@ -12,6 +12,7 @@ import { DiagnosticsSection } from "./Monitoring/DiagnosticsSection";
 export function Monitoring() {
   const { t } = useTranslation(["monitoring", "common"]);
   const {
+    monitor,
     kpis,
     captureHealth,
     healthAnnouncement,
@@ -22,6 +23,8 @@ export function Monitoring() {
     isRetrying,
     actions,
   } = useMonitoringController();
+
+  const isLoading = monitor === null && !viewModel.error;
 
   const badgeClass =
     viewModel.engineState === "Live"
@@ -149,17 +152,28 @@ export function Monitoring() {
       )}
 
       {/* Headline KPI Metric Cards — Level 1 Raised Plates */}
-      <div className="np-kpis">
-        {displayKpis.map((k) => (
-          <div className="np-kpi-card" key={k.labelKey}>
-            <div className="np-kpi-card__header">
-              <span className="np-kpi-card__label">{t(k.labelKey as any)}</span>
-            </div>
-            <div className="np-kpi-card__main">
-              <span className="np-kpi-card__val">{k.value}</span>
-            </div>
-          </div>
-        ))}
+      <div
+        className="np-kpis"
+        role="region"
+        aria-label={isLoading ? t("loading_statistics", "Loading statistics") : undefined}
+      >
+        {isLoading
+          ? [1, 2, 3, 4].map((i) => (
+              <div className="np-kpi-card np-kpi-card--skeleton" key={i} data-testid="kpi-skeleton-card">
+                <Skeleton variant="text" width="60%" height="12px" style={{ marginBottom: "8px" }} />
+                <Skeleton variant="rounded" width="40%" height="24px" />
+              </div>
+            ))
+          : displayKpis.map((k) => (
+              <div className="np-kpi-card" key={k.labelKey}>
+                <div className="np-kpi-card__header">
+                  <span className="np-kpi-card__label">{t(k.labelKey as any)}</span>
+                </div>
+                <div className="np-kpi-card__main">
+                  <span className="np-kpi-card__val">{k.value}</span>
+                </div>
+              </div>
+            ))}
       </div>
 
       {/* Diagnostic Chain Card — Evidence-Grounded Hop Telemetry */}
@@ -176,23 +190,53 @@ export function Monitoring() {
       {captureHealth && <CaptureHealthPanel health={captureHealth} />}
 
       {/* Perfectly Symmetrical 2x2 Grid */}
-      <div className="np-monitor-grid">
-        <ThroughputLineageCard
-          series={viewModel.throughputSeries}
-          timestamps={viewModel.timestamps}
-        />
-        <ApplicationsLineageCard
-          nodes={viewModel.nodes}
-          edges={viewModel.edges}
-          selectedNodeId={preferences.selectedNodeId}
-          onSelectNode={actions.setSelectedNodeId}
-        />
-        <ThroughputGainsCard
-          series={viewModel.gainsSeries}
-          timestamps={viewModel.timestamps}
-          peakBadgeText={viewModel.peakGainBadge}
-        />
-        <ProcessAttributesCard processes={viewModel.processes} />
+      <div className="np-monitor-grid" data-testid={isLoading ? "monitor-grid-skeleton" : undefined}>
+        {isLoading ? (
+          [1, 2, 3, 4].map((i) => (
+            <div
+              className="np-monitor-card np-monitor-card--skeleton"
+              key={i}
+              data-testid="monitor-skeleton-card"
+              aria-label="Loading telemetry..."
+              style={{ minHeight: "260px" }}
+            >
+              <div className="np-monitor-card__header">
+                <Skeleton variant="text" width="45%" height="16px" />
+                <Skeleton variant="rounded" width="20%" height="16px" />
+              </div>
+              <div
+                style={{
+                  height: "180px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "100%",
+                }}
+              >
+                <Skeleton variant="rounded" width="100%" height="100%" />
+              </div>
+            </div>
+          ))
+        ) : (
+          <>
+            <ThroughputLineageCard
+              series={viewModel.throughputSeries}
+              timestamps={viewModel.timestamps}
+            />
+            <ApplicationsLineageCard
+              nodes={viewModel.nodes}
+              edges={viewModel.edges}
+              selectedNodeId={preferences.selectedNodeId}
+              onSelectNode={actions.setSelectedNodeId}
+            />
+            <ThroughputGainsCard
+              series={viewModel.gainsSeries}
+              timestamps={viewModel.timestamps}
+              peakBadgeText={viewModel.peakGainBadge}
+            />
+            <ProcessAttributesCard processes={viewModel.processes} />
+          </>
+        )}
       </div>
 
       {/* Subsystem Health, Active Alerts, Auto-Recommendations & Hypotheses */}

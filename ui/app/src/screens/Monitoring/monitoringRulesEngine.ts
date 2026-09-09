@@ -15,7 +15,8 @@ export interface DiagnosticsEvaluation {
  * Worker-ready pure evaluation function deriving diagnostic insights from raw telemetry.
  */
 export function evaluateDiagnosticsRules(
-  telemetry: DomainTelemetry
+  telemetry: DomainTelemetry,
+  awaitingInitialTelemetry?: boolean
 ): DiagnosticsEvaluation {
   const alerts: ActiveAlert[] = [];
   const subsystems: SubsystemStatus[] = [];
@@ -52,7 +53,7 @@ export function evaluateDiagnosticsRules(
     subsystems.push(...telemetry.subsystems);
   }
 
-  const highCpuProc = telemetry.processes.find((p) => p.cpuPercent != null && p.cpuPercent > 80);
+  const highCpuProc = telemetry.processes?.find((p) => p.cpuPercent != null && p.cpuPercent > 80);
   if (highCpuProc) {
     alerts.push({
       id: "alert-cpu-high",
@@ -86,8 +87,25 @@ export function evaluateDiagnosticsRules(
     });
   }
 
-  // Fallback nominal recommendation if clean
-  if (recommendations.length === 0) {
+  // Suppress nominal "Peak Efficiency" recommendation when awaiting initial telemetry
+  const isAwaiting =
+    awaitingInitialTelemetry ??
+    Boolean(
+      (telemetry as any).uninitialized ||
+      (telemetry as any).awaitingInitialTelemetry ||
+      (telemetry.bytesSeen === 0 &&
+        telemetry.activeFlows === 0 &&
+        telemetry.activeHosts === 0 &&
+        telemetry.activeProtocols === 0 &&
+        (!telemetry.processes || telemetry.processes.length === 0) &&
+        (!telemetry.subsystems || telemetry.subsystems.length === 0) &&
+        telemetry.bufferCapacity === 0 &&
+        (!telemetry.nodes || telemetry.nodes.length === 0) &&
+        (!telemetry.diagnoses || telemetry.diagnoses.length === 0))
+    );
+
+  // Fallback nominal recommendation if clean (suppressed when awaiting initial telemetry)
+  if (recommendations.length === 0 && !isAwaiting) {
     recommendations.push({
       id: "rec-nominal",
       title: "System Operating at Peak Efficiency",

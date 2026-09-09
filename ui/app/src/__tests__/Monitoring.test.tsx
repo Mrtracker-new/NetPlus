@@ -8,6 +8,8 @@ import i18n from "../i18n";
 import { setMonitor, setError, __resetForTest } from "../state/store";
 import { Monitoring } from "../screens/Monitoring";
 import { mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
+import { evaluateDiagnosticsRules } from "../screens/Monitoring/monitoringRulesEngine";
+import type { DomainTelemetry } from "../screens/Monitoring/monitoringTypes";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 
@@ -158,15 +160,94 @@ describe("Monitoring Screen & useMonitoringController", () => {
     expect(protocolColor("DNS", 2)).toBe("#7C83F7");
   });
 
-  it("renders simulation telemetry dashboard when monitor snapshot is null", () => {
+  it("renders pulse skeleton cards when monitor snapshot is null and no error exists", () => {
     render(<MonitoringTestWrapper />);
 
     expect(screen.getByRole("heading", { name: /Live Monitoring & System Health/i })).toBeTruthy();
-    expect(screen.getByText("Throughput & Lineage")).toBeTruthy();
-    expect(screen.getByText("Total Throughput Volume")).toBeTruthy();
-    expect(screen.getByText("Applications & Lineage")).toBeTruthy();
-    expect(screen.getByText("Process Attributes")).toBeTruthy();
-    expect(screen.getByText("System Subsystem Health")).toBeTruthy();
+    expect(screen.getByRole("region", { name: "Loading statistics" })).toBeInTheDocument();
+
+    // Pulse skeleton cards rendered across KPIs and 2x2 grid
+    const kpiSkeletons = screen.getAllByTestId("kpi-skeleton-card");
+    expect(kpiSkeletons).toHaveLength(4);
+    const gridSkeletons = screen.getAllByTestId("monitor-skeleton-card");
+    expect(gridSkeletons).toHaveLength(4);
+
+    // Populated card contents are withheld while uninitialized
+    expect(screen.queryByText("Throughput & Lineage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Total Throughput Volume")).not.toBeInTheDocument();
+    expect(screen.queryByText("Applications & Lineage")).not.toBeInTheDocument();
+    expect(screen.queryByText("Process Attributes")).not.toBeInTheDocument();
+
+    // "Peak Efficiency" text is suppressed when awaiting initial telemetry
+    expect(screen.queryByText(/Peak Efficiency/i)).not.toBeInTheDocument();
+  });
+
+  it("transitions from pulse skeleton cards to populated state once monitor snapshot arrives", () => {
+    const { rerender } = render(<MonitoringTestWrapper />);
+
+    expect(screen.getAllByTestId("monitor-skeleton-card")).toHaveLength(4);
+    expect(screen.queryByText("Throughput & Lineage")).not.toBeInTheDocument();
+
+    setMonitor(mockMonitorSnapshot);
+    rerender(<MonitoringTestWrapper />);
+
+    expect(screen.queryByTestId("monitor-skeleton-card")).not.toBeInTheDocument();
+    expect(screen.getByText("Throughput & Lineage")).toBeInTheDocument();
+    expect(screen.getByText("Total Throughput Volume")).toBeInTheDocument();
+    expect(screen.getByText("Applications & Lineage")).toBeInTheDocument();
+    expect(screen.getByText("Process Attributes")).toBeInTheDocument();
+  });
+
+  it("suppresses 'Peak Efficiency' recommendation in rules engine when awaiting initial telemetry", () => {
+    const emptyTelemetry: DomainTelemetry = {
+      timestampNanos: 0,
+      bytesSeen: 0,
+      activeFlows: 0,
+      activeHosts: 0,
+      activeProtocols: 0,
+      ingressHistory: Array(12).fill(0),
+      egressHistory: Array(12).fill(0),
+      gainsHistory: Array(12).fill(0),
+      nodes: [],
+      edges: [],
+      processes: [],
+      subsystems: [],
+      bufferPercent: 0,
+      bufferFrames: 0,
+      bufferCapacity: 0,
+      dropCount: 0,
+      networkLossCount: 0,
+      diagnoses: [],
+    };
+
+    const evalResult = evaluateDiagnosticsRules(emptyTelemetry);
+    expect(evalResult.recommendations.some((r) => r.title.includes("Peak Efficiency"))).toBe(false);
+
+    const explicitAwaitingResult = evaluateDiagnosticsRules(emptyTelemetry, true);
+    expect(explicitAwaitingResult.recommendations.some((r) => r.title.includes("Peak Efficiency"))).toBe(false);
+
+    const nominalTelemetry: DomainTelemetry = {
+      timestampNanos: 1000,
+      bytesSeen: 1024,
+      activeFlows: 2,
+      activeHosts: 1,
+      activeProtocols: 1,
+      ingressHistory: Array(12).fill(10),
+      egressHistory: Array(12).fill(10),
+      gainsHistory: Array(12).fill(20),
+      nodes: [],
+      edges: [],
+      processes: [],
+      subsystems: [{ name: "Capture Buffer", status: "healthy" }],
+      bufferPercent: 20,
+      bufferFrames: 10,
+      bufferCapacity: 1000,
+      dropCount: 0,
+      networkLossCount: 0,
+      diagnoses: [],
+    };
+    const nominalResult = evaluateDiagnosticsRules(nominalTelemetry);
+    expect(nominalResult.recommendations.some((r) => r.title === "System Operating at Peak Efficiency")).toBe(true);
   });
 
   it("renders populated snapshot KPIs, capture health, charts, and diagnostic cards", () => {
@@ -202,6 +283,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
   });
 
   it("updates chart timestamps and preferences when time-range toggle buttons are clicked", async () => {
+    setMonitor(mockMonitorSnapshot);
     const { fireEvent } = await import("@testing-library/react");
     render(<MonitoringTestWrapper />);
 
@@ -217,6 +299,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
   });
 
   it("preserves unrelated UI state (e.g. topology rules selection) when time range is toggled", async () => {
+    setMonitor(mockMonitorSnapshot);
     const { fireEvent } = await import("@testing-library/react");
     render(<MonitoringTestWrapper />);
 
@@ -591,6 +674,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
 
     it("translates Total Throughput Volume title, subtitle, and legend in Spanish", async () => {
       await i18n.changeLanguage("es");
+      setMonitor(mockMonitorSnapshot);
       try {
         render(<MonitoringTestWrapper />);
 

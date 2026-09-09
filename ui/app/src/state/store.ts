@@ -61,21 +61,47 @@ export function resetSession(newSessionId?: string): void {
   emit();
 }
 
+/** Merge an incoming card with an existing version: preserve richer detail (lines, summary, evidence)
+ *  so live deltas or differing projection streams never strip diagnostic output or cause flickering. */
+export function mergeCard(incoming: NarrativeCard, existing?: NarrativeCard): NarrativeCard {
+  if (!existing) return incoming;
+  const lines =
+    incoming.lines && incoming.lines.length > 0
+      ? incoming.lines
+      : existing.lines && existing.lines.length > 0
+      ? existing.lines
+      : [];
+  const summary =
+    incoming.summary && incoming.summary.trim().length > 0
+      ? incoming.summary
+      : existing.summary || "";
+  const evidence =
+    incoming.evidence && incoming.evidence.length >= (existing.evidence?.length ?? 0)
+      ? incoming.evidence
+      : existing.evidence;
+  return {
+    ...existing,
+    ...incoming,
+    lines,
+    summary,
+    evidence,
+  };
+}
+
 /** Apply a batch of new feed cards as a delta: prepend newest,
  *  bound the length. Replaces the array identity so `useSyncExternalStore`
  *  detects the change. Used by the live event channel. */
 export function pushCards(cards: NarrativeCard[]): void {
   if (cards.length === 0) return;
   const existingMap = new Map<string, NarrativeCard>();
-  for (const c of cards) {
+  for (const c of state.feed) {
     const key = `${c.at_mono_nanos}-${c.headline}`;
     existingMap.set(key, c);
   }
-  for (const c of state.feed) {
+  for (const c of cards) {
     const key = `${c.at_mono_nanos}-${c.headline}`;
-    if (!existingMap.has(key)) {
-      existingMap.set(key, c);
-    }
+    const existing = existingMap.get(key);
+    existingMap.set(key, mergeCard(c, existing));
   }
   const merged = Array.from(existingMap.values())
     .sort((a, b) => b.at_mono_nanos - a.at_mono_nanos)
@@ -97,7 +123,18 @@ export function setSnapshotBatch(
   let next = { ...state };
 
   if (cards != null) {
-    const feed = cards.slice(0, MAX_FEED);
+    const existingMap = new Map<string, NarrativeCard>();
+    for (const c of next.feed) {
+      const key = `${c.at_mono_nanos}-${c.headline}`;
+      existingMap.set(key, c);
+    }
+    const feed = cards
+      .map((c) => {
+        const key = `${c.at_mono_nanos}-${c.headline}`;
+        const existing = existingMap.get(key);
+        return mergeCard(c, existing);
+      })
+      .slice(0, MAX_FEED);
     const cardsHistory = [...next.cardsHistory, feed.length].slice(-MAX_SAMPLES);
     next = { ...next, feed, cardsHistory };
     hasChanges = true;
@@ -150,9 +187,11 @@ export function setError(error: string | null): void {
   setSnapshotBatch(null, null, error);
 }
 
-function getSnapshot(): State {
+export function getSnapshot(): State {
   return state;
 }
+
+export const getState = getSnapshot;
 
 /** Subscribe a component to the whole store. */
 export function useStore(): State {

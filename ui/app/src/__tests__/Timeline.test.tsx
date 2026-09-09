@@ -1075,6 +1075,40 @@ describe("TimelineInspector Metadata Header", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("omits protocol tag when protocol matches category to prevent duplicate badge rendering", () => {
+    const tlsEvent: TimelineEvent = {
+      headline: "Connected to notify.bugsnag.com",
+      summary: "15 KB from 1 server",
+      lines: [],
+      severity: "neutral",
+      category: "tls",
+      protocol: "TLS",
+      evidence: [],
+      at_mono_nanos: 4_200_000_000,
+      at: 4_200_000_000,
+      label: "Connected to notify.bugsnag.com",
+      lane: "neutral",
+    };
+
+    const { container } = render(
+      <TimelineInspector
+        event={tlsEvent}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={vi.fn()}
+        onNext={vi.fn()}
+        onNavigateEvidence={vi.fn()}
+      />
+    );
+
+    // Only one single "TLS" badge is rendered (the category badge)
+    expect(screen.getByText("TLS")).toBeInTheDocument();
+    expect(screen.getAllByText("TLS")).toHaveLength(1);
+    expect(
+      container.querySelector(".np-timeline-inspector__protocol-tag")
+    ).not.toBeInTheDocument();
+  });
+
   it("renders wall time clock and clock icon in the inspector metadata bar", () => {
     const eventWithWallTime: TimelineEvent = {
       headline: "Timestamped Event",
@@ -1219,6 +1253,60 @@ describe("TimelineInspector Metadata Header", () => {
     );
     expect(screen.getByRole("button", { name: /Previous event/i })).not.toBeDisabled();
     expect(screen.getByRole("button", { name: /Next event/i })).toBeDisabled();
+  });
+
+  it("renders diagnostic output when event.lines has items and hides it when empty", () => {
+    const onPrev = vi.fn();
+    const onNext = vi.fn();
+    const onNavigateEvidence = vi.fn();
+
+    const eventWithLines: TimelineEvent = {
+      headline: "Connected to notify.bugsnag.com",
+      summary: "15 KB from 1 server",
+      lines: ["15 KB from 1 server"],
+      severity: "neutral",
+      protocol: "TLS",
+      category: "network",
+      evidence: [{ kind: "flow", id: 14 }],
+      at_mono_nanos: 4_200_000_000,
+      at: 4_200_000_000,
+      label: "Connected to notify.bugsnag.com",
+      lane: "neutral",
+    };
+
+    const { rerender } = render(
+      <TimelineInspector
+        event={eventWithLines}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={onPrev}
+        onNext={onNext}
+        onNavigateEvidence={onNavigateEvidence}
+      />
+    );
+
+    expect(screen.getByText("Diagnostic Output")).toBeInTheDocument();
+    expect(screen.getAllByText("15 KB from 1 server")).toHaveLength(2);
+
+    // When lines is empty, diagnostic output well is omitted
+    const eventWithEmptyLines: TimelineEvent = {
+      ...eventWithLines,
+      lines: [],
+    };
+
+    rerender(
+      <TimelineInspector
+        event={eventWithEmptyLines}
+        currentIndex={0}
+        totalCount={1}
+        onPrev={onPrev}
+        onNext={onNext}
+        onNavigateEvidence={onNavigateEvidence}
+      />
+    );
+
+    expect(screen.queryByText("Diagnostic Output")).not.toBeInTheDocument();
+    expect(screen.getByText("15 KB from 1 server")).toBeInTheDocument();
   });
 });
 

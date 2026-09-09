@@ -8,6 +8,8 @@ import {
   setError,
   subscribe,
   useStore,
+  pushCards,
+  getState,
   __resetForTest,
 } from "../state/store";
 import * as ipc from "../ipc";
@@ -250,5 +252,36 @@ describe("Store Batching Performance & Atomicity (setSnapshotBatch)", () => {
 
     // The queued refresh should have executed, adding 2 more queries (total 4)
     expect(queryCallCount).toBe(4);
+  });
+
+  it("preserves lines and summary in pushCards when incoming delta has empty detail (prevents diagnostic flickering)", () => {
+    // Prime feed with rich detail (lines and summary)
+    setSnapshotBatch([
+      {
+        at_mono_nanos: 4_200_000_000,
+        headline: "Connected to notify.bugsnag.com",
+        summary: "15 KB from 1 server",
+        lines: ["15 KB from 1 server"],
+        severity: "neutral",
+        evidence: [{ kind: "flow", id: 14 }],
+      },
+    ]);
+
+    // Incoming delta arrives from a shallower projection with empty lines & summary
+    act(() => {
+      const deltaCard: NarrativeCard = {
+        at_mono_nanos: 4_200_000_000,
+        headline: "Connected to notify.bugsnag.com",
+        summary: "",
+        lines: [],
+        severity: "neutral",
+        evidence: [{ kind: "flow", id: 14 }],
+      };
+      pushCards([deltaCard]);
+      const current = getState().feed[0];
+      expect(current).toBeDefined();
+      expect(current!.lines).toEqual(["15 KB from 1 server"]);
+      expect(current!.summary).toBe("15 KB from 1 server");
+    });
   });
 });

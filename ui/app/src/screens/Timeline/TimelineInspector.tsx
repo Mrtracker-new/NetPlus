@@ -152,9 +152,11 @@ export function TimelineInspector({
   const wallTimeClock = formatWallTimeClock(event, captureSessionId);
   const category = resolveCategory(event);
 
+  const diagnosticLines = event.lines && event.lines.length > 0 ? event.lines : [];
+
   const handleCopyLogs = async () => {
-    if (!event.lines || event.lines.length === 0) return;
-    const logText = event.lines.join("\n");
+    if (diagnosticLines.length === 0) return;
+    const logText = diagnosticLines.join("\n");
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
         await navigator.clipboard.writeText(logText);
@@ -244,11 +246,12 @@ export function TimelineInspector({
           {category.label}
         </span>
 
-        {event.protocol && (
-          <span className="np-timeline-inspector__protocol-tag">
-            {event.protocol}
-          </span>
-        )}
+        {event.protocol &&
+          event.protocol.trim().toUpperCase() !== category.label.trim().toUpperCase() && (
+            <span className="np-timeline-inspector__protocol-tag">
+              {event.protocol}
+            </span>
+          )}
       </div>
 
       {/* Event Summary Narrative */}
@@ -283,7 +286,7 @@ export function TimelineInspector({
       )}
 
       {/* Event Log Lines / Telemetry Well */}
-      {event.lines && event.lines.length > 0 && (
+      {diagnosticLines.length > 0 && (
         <div>
           <div className="np-timeline-inspector__diagnostic-bar">
             <div className="np-timeline-inspector__section-label" style={{ margin: 0 }}>
@@ -314,7 +317,7 @@ export function TimelineInspector({
             </button>
           </div>
           <div className="np-timeline-inspector__log-well">
-            {event.lines.map((line, i) => (
+            {diagnosticLines.map((line, i) => (
               <div className="np-timeline-inspector__log-line" key={i}>
                 <span className="np-timeline-inspector__log-num">{i + 1}</span>
                 <span>{line}</span>

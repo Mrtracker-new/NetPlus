@@ -76,11 +76,18 @@ const EMPTY_DOMAIN_TELEMETRY: DomainTelemetry = {
   diagnosticChain: undefined,
 };
 
-function buildDomainFromSnapshot(monitor: MonitorSnapshot): DomainTelemetry {
-  const totalBytes = monitor.by_protocol.rows.reduce((sum, r) => sum + r.bytes, 0);
-  const activeFlows = monitor.by_host.rows.reduce((sum, r) => sum + r.flows, 0);
-  const activeHosts = monitor.by_host.rows.length;
-  const activeProtocols = monitor.by_protocol.rows.length;
+export function buildDomainFromSnapshot(
+  monitor: MonitorSnapshot,
+  processHistoryMap?: Map<string, number[]>
+): DomainTelemetry {
+  const totalBytes = monitor.by_protocol?.rows
+    ? monitor.by_protocol.rows.reduce((sum, r) => sum + (r.bytes || 0), 0)
+    : 0;
+  const activeFlows = monitor.by_host?.rows
+    ? monitor.by_host.rows.reduce((sum, r) => sum + (r.flows || 0), 0)
+    : 0;
+  const activeHosts = monitor.by_host?.rows?.length ?? 0;
+  const activeProtocols = monitor.by_protocol?.rows?.length ?? 0;
 
   // 1. Directional Throughput & Total Volume History from Rust Monotonic Bucket Series
   const numBuckets = 12;
@@ -102,29 +109,59 @@ function buildDomainFromSnapshot(monitor: MonitorSnapshot): DomainTelemetry {
     }
   }
 
-  // 2. Real OS Process Metrics
+  // 2. Real OS Process Metrics with Rolling Bandwidth History (up to 15 points)
+  if (processHistoryMap) {
+    const activeProcIds = new Set(
+      (monitor.processes || []).map((proc) =>
+        proc.pid != null ? `proc-${proc.pid}` : `proc-${proc.name || "unattributed"}`
+      )
+    );
+    for (const key of processHistoryMap.keys()) {
+      if (!activeProcIds.has(key)) {
+        processHistoryMap.delete(key);
+      }
+    }
+  }
+
   const processes: ProcessMetricRow[] = (monitor.processes || []).map((p, idx) => {
     const color = COLORS[idx % COLORS.length] || "var(--np-accent, #2fe0d6)";
-    const rateKb = Math.round(p.bytes / 1024);
+    const safeBytes =
+      typeof p.bytes === "number" && !isNaN(p.bytes) ? Math.max(0, p.bytes) : 0;
+    const rateKb = Math.round(safeBytes / 1024);
+    const procId = p.pid != null ? `proc-${p.pid}` : `proc-${p.name || "unattributed"}`;
+
+    let history: number[] = [rateKb];
+    if (processHistoryMap) {
+      const prev = processHistoryMap.get(procId) || [];
+      const updated = [...prev, rateKb].slice(-15);
+      processHistoryMap.set(procId, updated);
+      history = updated;
+    }
+
+    const safePackets =
+      typeof p.packets === "number" && !isNaN(p.packets) ? Math.max(0, p.packets) : 0;
+    const safeFlows =
+      typeof p.flows === "number" && !isNaN(p.flows) ? Math.max(0, p.flows) : 0;
 
     return {
-      id: p.pid ? `proc-${p.pid}` : `proc-${p.name}`,
+      id: procId,
       pid: p.pid ?? null,
       name: p.name,
       exePath: p.exe_path ?? null,
-      type: p.pid ? `PID ${p.pid}` : "Unattributed",
-      bandwidthBytes: p.bytes,
-      formattedBandwidth: humanBytes(p.bytes),
-      utilizationPercent: totalBytes > 0 ? Math.min(100, Number(((p.bytes / totalBytes) * 100).toFixed(1))) : 0,
+      type: p.pid != null ? `PID ${p.pid}` : "Unattributed",
+      bandwidthBytes: safeBytes,
+      formattedBandwidth: humanBytes(safeBytes),
+      utilizationPercent:
+        totalBytes > 0 ? Math.min(100, Number(((safeBytes / totalBytes) * 100).toFixed(1))) : 0,
       cpuPercent: p.cpu_percent != null ? p.cpu_percent : null,
       memoryMB: p.memory_bytes != null ? Math.round(p.memory_bytes / (1024 * 1024)) : null,
       packetsPerSec: 0,
-      packets: p.packets,
-      flows: p.flows,
+      packets: safePackets,
+      flows: safeFlows,
       rttMs: 0,
       errors: 0,
       color,
-      history: [rateKb],
+      history,
     };
   });
 
@@ -235,6 +272,7 @@ export function useMonitoringController() {
   const isRetryingRef = useRef(false);
   const isProbeRunningRef = useRef(false);
   const isMountedRef = useRef(true);
+  const processHistoryRef = useRef<Map<string, number[]>>(new Map());
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -246,8 +284,9 @@ export function useMonitoringController() {
   // Single Authoritative Pipeline: Synchronously derive domain telemetry directly from store snapshot
   const domainTelemetry: DomainTelemetry = useMemo(() => {
     if (monitor) {
-      return buildDomainFromSnapshot(monitor);
+      return buildDomainFromSnapshot(monitor, processHistoryRef.current);
     }
+    processHistoryRef.current.clear();
     return EMPTY_DOMAIN_TELEMETRY;
   }, [monitor]);
 

@@ -13,22 +13,30 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState<"bandwidth" | "cpu" | "memory" | "utilization" | "name">("bandwidth");
 
-  // Sort processes dynamically based on user selection
+  // Sort processes dynamically based on user selection with a deterministic tie-breaker
   const sortedProcesses = [...processes].sort((a, b) => {
+    let diff = 0;
     switch (sortBy) {
       case "bandwidth":
-        return b.bandwidthBytes - a.bandwidthBytes;
+        diff = (b.bandwidthBytes || 0) - (a.bandwidthBytes || 0);
+        break;
       case "cpu":
-        return (b.cpuPercent ?? -1) - (a.cpuPercent ?? -1);
+        diff = (b.cpuPercent ?? -1) - (a.cpuPercent ?? -1);
+        break;
       case "memory":
-        return (b.memoryMB ?? -1) - (a.memoryMB ?? -1);
+        diff = (b.memoryMB ?? -1) - (a.memoryMB ?? -1);
+        break;
       case "utilization":
-        return b.utilizationPercent - a.utilizationPercent;
+        diff = (b.utilizationPercent || 0) - (a.utilizationPercent || 0);
+        break;
       case "name":
-        return a.name.localeCompare(b.name);
+        diff = (a.name || "").localeCompare(b.name || "");
+        break;
       default:
-        return 0;
+        diff = 0;
     }
+    if (diff !== 0) return diff;
+    return (a.id || "").localeCompare(b.id || "");
   });
 
   const pageSize = 4;
@@ -41,12 +49,15 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
 
   return (
     <div className="np-monitor-card" aria-label={t("process_attributes.aria_label", "Process Attributes & Resource Usage")}>
-      <div className="np-monitor-card__header">
-        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+      <div className="np-monitor-card__header" style={{ flexWrap: "wrap", gap: "0.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
           <h3 className="np-monitor-card__title">{t("process_attributes.title", "Process Attributes")}</h3>
           <select
             value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
+            onChange={(e) => {
+              setSortBy(e.target.value as any);
+              setPage(0);
+            }}
             disabled={processes.length === 0}
             className="np-monitor-select"
             aria-label={t("process_attributes.sort_aria_label", "Sort process attributes")}
@@ -71,7 +82,7 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
           <button
             type="button"
             className="np-monitor-icon-btn"
-            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            onClick={() => setPage(Math.max(0, currentPage - 1))}
             disabled={currentPage === 0}
             aria-label={t("process_attributes.prev_page", "Previous process page")}
           >
@@ -80,7 +91,7 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
           <button
             type="button"
             className="np-monitor-icon-btn"
-            onClick={() => setPage((p) => Math.min(maxPage, p + 1))}
+            onClick={() => setPage(Math.min(maxPage, currentPage + 1))}
             disabled={currentPage >= maxPage}
             aria-label={t("process_attributes.next_page", "Next process page")}
           >
@@ -111,39 +122,68 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", marginTop: "0.5rem" }}>
           {visibleProcesses.map((p) => {
-            const cpuStr = p.cpuPercent != null ? `${p.cpuPercent.toFixed(1)}%` : "—";
-            const memStr = p.memoryMB != null ? `${p.memoryMB} MB` : "—";
-            const pidStr = p.pid != null ? `PID ${p.pid}` : t("process_attributes.unattributed", "Unattributed");
+            const cpuStr = typeof p.cpuPercent === "number" && !isNaN(p.cpuPercent) ? `${p.cpuPercent.toFixed(1)}%` : "—";
+            const memStr = typeof p.memoryMB === "number" && !isNaN(p.memoryMB) ? `${p.memoryMB} MB` : "—";
+            const pidStr = typeof p.pid === "number" && !isNaN(p.pid) ? `PID ${p.pid}` : t("process_attributes.unattributed", "Unattributed");
+            const pktsStr =
+              typeof p.packets === "number" && !isNaN(p.packets)
+                ? p.packets.toLocaleString()
+                : "—";
+            const flowsStr =
+              typeof p.flows === "number" && !isNaN(p.flows)
+                ? p.flows.toLocaleString()
+                : "—";
+            const safeUtil =
+              typeof p.utilizationPercent === "number" && !isNaN(p.utilizationPercent)
+                ? Math.min(100, Math.max(0, p.utilizationPercent))
+                : 0;
+            const displayName = p.name || t("process_attributes.unknown_process", "Unknown Process");
+            const validHistory = p.history?.filter((v) => typeof v === "number" && !isNaN(v));
 
             return (
-              <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: "0.3rem" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.825rem", fontWeight: 500 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0 }}>
+              <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.4rem 0.6rem", fontSize: "0.825rem", fontWeight: 500 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", minWidth: 0, flexShrink: 1 }}>
                     <span
                       style={{
                         width: "8px",
                         height: "8px",
                         borderRadius: "50%",
-                        backgroundColor: p.color,
+                        backgroundColor: p.color || "var(--np-accent, #2fe0d6)",
                         flexShrink: 0,
                       }}
                     />
-                    <span style={{ color: "var(--np-text)", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={p.exePath || p.name}>
-                      {p.name}
+                    <span
+                      style={{
+                        color: "var(--np-text)",
+                        fontWeight: 600,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                        minWidth: 0,
+                        maxWidth: "min(200px, 100%)",
+                      }}
+                      title={p.exePath || displayName}
+                    >
+                      {displayName}
                     </span>
-                    <span style={{ fontSize: "0.7rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)", background: "var(--np-surface-recessed)", padding: "1px 5px", borderRadius: "3px" }}>
+                    <span style={{ fontSize: "0.7rem", color: "var(--np-text-mute)", fontFamily: "var(--np-font-mono)", background: "var(--np-surface-recessed)", padding: "1px 5px", borderRadius: "3px", flexShrink: 0 }}>
                       {pidStr}
                     </span>
                   </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", fontFamily: "var(--np-font-mono)", fontSize: "0.75rem", flexShrink: 0 }}>
-                    <span style={{ color: "var(--np-text-mute)" }}>{t("process_attributes.cpu_label", "CPU:")} <strong style={{ color: "var(--np-text-dim)" }}>{cpuStr}</strong></span>
-                    <span style={{ color: "var(--np-text-mute)" }}>{t("process_attributes.ram_label", "RAM:")} <strong style={{ color: "var(--np-text-dim)" }}>{memStr}</strong></span>
-                    {p.history && p.history.length > 1 && (
-                      <Sparkline values={p.history} data={p.history} color={p.color} width={40} height={12} />
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.4rem 0.6rem", flexWrap: "wrap", fontFamily: "var(--np-font-mono)", fontSize: "0.75rem", minWidth: 0 }}>
+                    <span style={{ color: "var(--np-text-mute)", whiteSpace: "nowrap" }}>{t("process_attributes.cpu_label", "CPU:")} <strong style={{ color: "var(--np-text-dim)" }}>{cpuStr}</strong></span>
+                    <span style={{ color: "var(--np-text-mute)", whiteSpace: "nowrap" }}>{t("process_attributes.ram_label", "RAM:")} <strong style={{ color: "var(--np-text-dim)" }}>{memStr}</strong></span>
+                    <span style={{ color: "var(--np-text-mute)", whiteSpace: "nowrap" }}>{t("process_attributes.packets_label", "Pkts:")} <strong style={{ color: "var(--np-text-dim)" }}>{pktsStr}</strong></span>
+                    <span style={{ color: "var(--np-text-mute)", whiteSpace: "nowrap" }}>{t("process_attributes.flows_label", "Flows:")} <strong style={{ color: "var(--np-text-dim)" }}>{flowsStr}</strong></span>
+                    {validHistory && validHistory.length > 1 && (
+                      <span style={{ display: "inline-flex", alignItems: "center", flexShrink: 0 }}>
+                        <Sparkline values={validHistory} data={validHistory} color={p.color || "var(--np-accent)"} width={40} height={12} />
+                      </span>
                     )}
-                    <span style={{ color: "var(--np-text-dim)", fontWeight: 600 }}>{p.formattedBandwidth}</span>
-                    <span style={{ color: "var(--np-text)", fontWeight: 700, minWidth: "36px", textAlign: "right" }}>
-                      {p.utilizationPercent}%
+                    <span style={{ color: "var(--np-text-dim)", fontWeight: 600, whiteSpace: "nowrap" }}>{p.formattedBandwidth || "0 B"}</span>
+                    <span style={{ color: "var(--np-text)", fontWeight: 700, minWidth: "36px", textAlign: "right", whiteSpace: "nowrap" }}>
+                      {safeUtil}%
                     </span>
                   </div>
                 </div>
@@ -154,16 +194,16 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
                     className="np-process-fill"
                     role="progressbar"
                     aria-label={t("process_attributes.utilization_aria_label", {
-                      name: p.name,
-                      defaultValue: `${p.name} utilization`,
+                      name: displayName,
+                      defaultValue: `${displayName} utilization`,
                     })}
-                    aria-valuenow={p.utilizationPercent}
+                    aria-valuenow={safeUtil}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-valuetext={`${p.utilizationPercent}%`}
+                    aria-valuetext={`${safeUtil}%`}
                     style={{
-                      width: `${Math.min(100, Math.max(0, p.utilizationPercent))}%`,
-                      backgroundColor: p.color,
+                      width: `${safeUtil}%`,
+                      backgroundColor: p.color || "var(--np-accent, #2fe0d6)",
                     }}
                   />
                 </div>

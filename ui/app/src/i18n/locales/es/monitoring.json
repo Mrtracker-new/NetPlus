@@ -163,8 +163,11 @@
     "next_page": "Página de procesos siguiente",
     "empty": "No hay flujos de procesos atribuidos activos en la ventana de tiempo actual.",
     "unattributed": "Sin atribuir",
+    "unknown_process": "Proceso desconocido",
     "cpu_label": "CPU:",
     "ram_label": "RAM:",
+    "packets_label": "Pqts:",
+    "flows_label": "Flujos:",
     "utilization_aria_label": "utilización de {{name}}"
   },
   "throughput_lineage": {

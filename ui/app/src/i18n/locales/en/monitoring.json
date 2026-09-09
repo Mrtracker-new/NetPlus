@@ -163,8 +163,11 @@
     "next_page": "Next process page",
     "empty": "No attributed process flows active in current time window.",
     "unattributed": "Unattributed",
+    "unknown_process": "Unknown Process",
     "cpu_label": "CPU:",
     "ram_label": "RAM:",
+    "packets_label": "Pkts:",
+    "flows_label": "Flows:",
     "utilization_aria_label": "{{name}} utilization"
   },
   "throughput_lineage": {

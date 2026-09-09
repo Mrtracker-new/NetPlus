@@ -233,6 +233,7 @@ export function useMonitoringController() {
   const [probeResult, setProbeResult] = useState<StageProbeResult | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const isRetryingRef = useRef(false);
+  const isProbeRunningRef = useRef(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -316,6 +317,8 @@ export function useMonitoringController() {
 
   const runProbe = useCallback(
     async (stageKind: string, target?: string): Promise<StageProbeResult | null> => {
+      if (!isMountedRef.current || isProbeRunningRef.current) return null;
+      isProbeRunningRef.current = true;
       setProbeRunning(true);
       try {
         const res = await query({
@@ -324,7 +327,9 @@ export function useMonitoringController() {
           target: target || null,
         });
         if (res.kind === "stageProbeResult") {
-          setProbeResult(res.result);
+          if (isMountedRef.current) {
+            setProbeResult(res.result);
+          }
           return res.result;
         }
       } catch (err) {
@@ -337,10 +342,15 @@ export function useMonitoringController() {
           summary: `Stage probe failed: ${err}`,
           details: [],
         };
-        setProbeResult(errResult);
+        if (isMountedRef.current) {
+          setProbeResult(errResult);
+        }
         return errResult;
       } finally {
-        setProbeRunning(false);
+        isProbeRunningRef.current = false;
+        if (isMountedRef.current) {
+          setProbeRunning(false);
+        }
       }
       return null;
     },
@@ -348,7 +358,7 @@ export function useMonitoringController() {
   );
 
   const retryConnection = useCallback(async () => {
-    if (isRetryingRef.current) return;
+    if (!isMountedRef.current || isRetryingRef.current) return;
     isRetryingRef.current = true;
     setIsRetrying(true);
     try {

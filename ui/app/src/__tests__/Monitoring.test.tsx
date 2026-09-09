@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, renderHook, act, screen, within } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import "@testing-library/jest-dom";
 import { I18nextProvider } from "react-i18next";
@@ -7,18 +7,18 @@ import type { MonitorSnapshot } from "@netpulse/contract";
 import i18n from "../i18n";
 import { setMonitor, setError, __resetForTest } from "../state/store";
 import { Monitoring } from "../screens/Monitoring";
-import { mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
+import { useMonitoringController, mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
 import { evaluateDiagnosticsRules } from "../screens/Monitoring/monitoringRulesEngine";
 import type { DomainTelemetry } from "../screens/Monitoring/monitoringTypes";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 
-function MonitoringTestWrapper() {
+function MonitoringTestWrapper({ children }: { children?: React.ReactNode }) {
   return (
     <I18nextProvider i18n={i18n}>
       <DisclosureProvider>
         <EvidenceNavigationProvider>
-          <Monitoring />
+          {children ?? <Monitoring />}
         </EvidenceNavigationProvider>
       </DisclosureProvider>
     </I18nextProvider>
@@ -485,6 +485,152 @@ describe("Monitoring Screen & useMonitoringController", () => {
       expect(screen.getByText("1.8 ms")).toBeTruthy();
       expect(screen.getByText("Default gateway 192.168.1.1 reachable (1.8ms RTT)")).toBeTruthy();
     });
+  });
+
+  it("mount guard prevents probe state updates in runProbe when hook unmounts in-flight", async () => {
+    const ipc = await import("../ipc");
+    let resolveQuery!: (val: any) => void;
+    const queryPromise = new Promise((resolve) => {
+      resolveQuery = resolve;
+    });
+    vi.spyOn(ipc, "query").mockReturnValue(queryPromise as any);
+
+    const { result, unmount } = renderHook(() => useMonitoringController(), {
+      wrapper: MonitoringTestWrapper,
+    });
+
+    expect(result.current.probeState.running).toBe(false);
+    expect(result.current.probeState.result).toBeNull();
+
+    let probeResultPromise!: Promise<any>;
+    act(() => {
+      probeResultPromise = result.current.actions.runProbe("router", "192.168.1.1");
+    });
+
+    expect(result.current.probeState.running).toBe(true);
+
+    // Unmount while probe query is in-flight
+    unmount();
+
+    // Resolve the probe query
+    await act(async () => {
+      resolveQuery({
+        kind: "stageProbeResult",
+        result: {
+          stage: "router",
+          probe_type: "GatewayProbe",
+          target: "192.168.1.1",
+          status: "success",
+          latency_ms: 2.1,
+          summary: "Gateway reachable",
+          details: [],
+        },
+      });
+      const res = await probeResultPromise;
+      expect(res.status).toBe("success");
+    });
+
+    // Probe state remains guarded without memory leak / unmounted state update
+    expect(result.current.probeState.result).toBeNull();
+  });
+
+  it("mount guard prevents probe error state updates in runProbe when hook unmounts in-flight", async () => {
+    const ipc = await import("../ipc");
+    let rejectQuery!: (err: any) => void;
+    const queryPromise = new Promise((_, reject) => {
+      rejectQuery = reject;
+    });
+    vi.spyOn(ipc, "query").mockReturnValue(queryPromise as any);
+
+    const { result, unmount } = renderHook(() => useMonitoringController(), {
+      wrapper: MonitoringTestWrapper,
+    });
+
+    let probeResultPromise!: Promise<any>;
+    act(() => {
+      probeResultPromise = result.current.actions.runProbe("dns", "8.8.8.8");
+    });
+
+    expect(result.current.probeState.running).toBe(true);
+
+    // Unmount while probe query is in-flight
+    unmount();
+
+    // Reject the query
+    await act(async () => {
+      rejectQuery(new Error("Network timeout"));
+      const errRes = await probeResultPromise;
+      expect(errRes.status).toBe("error");
+    });
+
+    // Probe state remains guarded and was not updated after unmount
+    expect(result.current.probeState.result).toBeNull();
+  });
+
+  it("prevents concurrent probe execution while an active probe is in flight", async () => {
+    const ipc = await import("../ipc");
+    let resolveQuery!: (val: any) => void;
+    const queryPromise = new Promise((resolve) => {
+      resolveQuery = resolve;
+    });
+    vi.spyOn(ipc, "query").mockReturnValue(queryPromise as any);
+
+    const { result } = renderHook(() => useMonitoringController(), {
+      wrapper: MonitoringTestWrapper,
+    });
+
+    let firstProbePromise!: Promise<any>;
+    act(() => {
+      firstProbePromise = result.current.actions.runProbe("router", "192.168.1.1");
+    });
+
+    expect(result.current.probeState.running).toBe(true);
+
+    // Second concurrent probe call should be rejected immediately returning null
+    let secondProbeResult: any = "not_null";
+    await act(async () => {
+      secondProbeResult = await result.current.actions.runProbe("dns", "8.8.8.8");
+    });
+    expect(secondProbeResult).toBeNull();
+
+    // Resolve first probe
+    await act(async () => {
+      resolveQuery({
+        kind: "stageProbeResult",
+        result: {
+          stage: "router",
+          probe_type: "GatewayProbe",
+          target: "192.168.1.1",
+          status: "success",
+          latency_ms: 1.5,
+          summary: "Gateway OK",
+          details: [],
+        },
+      });
+      await firstProbePromise;
+    });
+
+    expect(result.current.probeState.running).toBe(false);
+    expect(result.current.probeState.result?.stage).toBe("router");
+  });
+
+  it("returns null and does not query backend when runProbe is called after unmount", async () => {
+    const ipc = await import("../ipc");
+    const querySpy = vi.spyOn(ipc, "query");
+
+    const { result, unmount } = renderHook(() => useMonitoringController(), {
+      wrapper: MonitoringTestWrapper,
+    });
+
+    unmount();
+
+    let probeResult: any;
+    await act(async () => {
+      probeResult = await result.current.actions.runProbe("router", "192.168.1.1");
+    });
+
+    expect(probeResult).toBeNull();
+    expect(querySpy).not.toHaveBeenCalled();
   });
 
   describe("Authoritative Telemetry State Binding & Header Badges", () => {

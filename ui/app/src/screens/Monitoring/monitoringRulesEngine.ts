@@ -5,6 +5,12 @@ import type {
   IntelligentRecommendation,
 } from "./monitoringTypes";
 
+/**
+ * @deprecated Client-side heuristic rules engine evaluation is deprecated.
+ * Authoritative diagnostic hypotheses and subsystem health are now produced directly
+ * by the Rust backend via `telemetry.diagnoses` and `telemetry.subsystems`.
+ * Synthetic alert and recommendation generators have been retired.
+ */
 export interface DiagnosticsEvaluation {
   alerts: ActiveAlert[];
   subsystems: SubsystemStatus[];
@@ -12,107 +18,27 @@ export interface DiagnosticsEvaluation {
 }
 
 /**
- * Worker-ready pure evaluation function deriving diagnostic insights from raw telemetry.
+ * @deprecated Client-side heuristic rules engine evaluation is deprecated.
+ * Authoritative diagnostic hypotheses and subsystem health are now produced directly
+ * by the Rust backend via `telemetry.diagnoses` and `telemetry.subsystems`.
+ * Synthetic alert and recommendation generators have been retired.
  */
 export function evaluateDiagnosticsRules(
   telemetry: DomainTelemetry,
-  awaitingInitialTelemetry?: boolean
+  _awaitingInitialTelemetry?: boolean
 ): DiagnosticsEvaluation {
-  const alerts: ActiveAlert[] = [];
-  const subsystems: SubsystemStatus[] = [];
-  const recommendations: IntelligentRecommendation[] = [];
-  const now = new Date().toLocaleTimeString();
+  // Authoritative Subsystem Health Checks from Rust Backend
+  const subsystems: SubsystemStatus[] =
+    telemetry?.subsystems && telemetry.subsystems.length > 0
+      ? [...telemetry.subsystems]
+      : [];
 
-  // 1. Buffer Saturation & Shed Stage Rules
-  if (telemetry.bufferPercent > 85) {
-    alerts.push({
-      id: "alert-buf-crit",
-      severity: "critical",
-      title: "Critical Buffer Saturation",
-      message: `Ring buffer is at ${telemetry.bufferPercent}% capacity. Dropped frames: ${telemetry.dropCount}`,
-      timestamp: now,
-    });
-    recommendations.push({
-      id: "rec-buf-expand",
-      title: "Expand Buffer Allocation",
-      action: "Increase ring buffer capacity or enable hardware packet drop filters.",
-      category: "buffer",
-    });
-  } else if (telemetry.bufferPercent > 60) {
-    alerts.push({
-      id: "alert-buf-warn",
-      severity: "warning",
-      title: "Elevated Ring Buffer Usage",
-      message: `Ring buffer saturation at ${telemetry.bufferPercent}%.`,
-      timestamp: now,
-    });
-  }
-
-  // 2. Subsystem Health Checks (Authoritative from Rust Backend)
-  if (telemetry.subsystems && telemetry.subsystems.length > 0) {
-    subsystems.push(...telemetry.subsystems);
-  }
-
-  const highCpuProc = telemetry.processes?.find((p) => p.cpuPercent != null && p.cpuPercent > 80);
-  if (highCpuProc) {
-    alerts.push({
-      id: "alert-cpu-high",
-      severity: "warning",
-      title: "Process CPU Spike",
-      message: `Process ${highCpuProc.name} is consuming ${highCpuProc.cpuPercent}% CPU.`,
-      timestamp: now,
-    });
-    recommendations.push({
-      id: "rec-proc-isolate",
-      title: "Disable Unused Protocol Dissectors",
-      action: "Turn off deep payload parsing for non-critical flows to reduce CPU overhead.",
-      category: "performance",
-    });
-  }
-
-  // 3. Loss Indicator Rules
-  if (telemetry.networkLossCount > 0) {
-    alerts.push({
-      id: "alert-loss-net",
-      severity: "warning",
-      title: "TCP Retransmission Burst Detected",
-      message: `Detected ${telemetry.networkLossCount} network packet loss indicators.`,
-      timestamp: now,
-    });
-    recommendations.push({
-      id: "rec-loss-diag",
-      title: "Run Hop Diagnostics",
-      action: "Execute traceroute to identify potential edge gateway interface congestion.",
-      category: "hardware",
-    });
-  }
-
-  // Suppress nominal "Peak Efficiency" recommendation when awaiting initial telemetry
-  const isAwaiting =
-    awaitingInitialTelemetry ??
-    Boolean(
-      (telemetry as any).uninitialized ||
-      (telemetry as any).awaitingInitialTelemetry ||
-      (telemetry.bytesSeen === 0 &&
-        telemetry.activeFlows === 0 &&
-        telemetry.activeHosts === 0 &&
-        telemetry.activeProtocols === 0 &&
-        (!telemetry.processes || telemetry.processes.length === 0) &&
-        (!telemetry.subsystems || telemetry.subsystems.length === 0) &&
-        telemetry.bufferCapacity === 0 &&
-        (!telemetry.nodes || telemetry.nodes.length === 0) &&
-        (!telemetry.diagnoses || telemetry.diagnoses.length === 0))
-    );
-
-  // Fallback nominal recommendation if clean (suppressed when awaiting initial telemetry)
-  if (recommendations.length === 0 && !isAwaiting) {
-    recommendations.push({
-      id: "rec-nominal",
-      title: "System Operating at Peak Efficiency",
-      action: "All packet capture pipelines and telemetry stream filters are operating normally.",
-      category: "performance",
-    });
-  }
-
-  return { alerts, subsystems, recommendations };
+  // Synthetic alert and recommendation generators are retired.
+  // Authoritative diagnoses are provided directly via telemetry.diagnoses.
+  return {
+    alerts: [],
+    subsystems,
+    recommendations: [],
+  };
 }
+

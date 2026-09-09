@@ -7,18 +7,18 @@ import { DiagnosisCard } from "./DiagnosisCard";
 import { Icon } from "../../icons";
 
 export interface DiagnosticsSectionProps {
-  alerts: ActiveAlert[];
+  /** @deprecated Synthetic alerts are retired in favor of authoritative Rust diagnoses */
+  alerts?: ActiveAlert[];
   subsystems: SubsystemStatus[];
-  recommendations: IntelligentRecommendation[];
+  /** @deprecated Synthetic recommendations are retired in favor of authoritative Rust diagnoses */
+  recommendations?: IntelligentRecommendation[];
   diagnoses: Diagnosis[];
   onNavigateEvidence: (ref: EvidenceRef) => void;
 }
 
 export function DiagnosticsSection({
-  alerts,
-  subsystems,
-  recommendations,
-  diagnoses,
+  subsystems = [],
+  diagnoses = [],
   onNavigateEvidence,
 }: DiagnosticsSectionProps) {
   const { t } = useTranslation(["monitoring"]);
@@ -42,7 +42,27 @@ export function DiagnosticsSection({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "0.5rem" }}>
-      {/* Subsystem Health Grid — True Neumorphic Tiles */}
+      {/* Diagnostic Hypotheses Cards — Prioritized Rust Engine Diagnoses */}
+      {diagnoses.length > 0 && (
+        <div className="np-monitor-card" aria-label={t("diagnostics.hypotheses_aria_label", "Diagnostic Hypotheses")}>
+          <div className="np-monitor-card__header">
+            <h3 className="np-monitor-card__title">{t("diagnostics.hypotheses_title", "Diagnostic Hypotheses")}</h3>
+            <span className="np-monitor-badge np-monitor-badge--warning">
+              {t("diagnostics.hypotheses_active_count", {
+                count: diagnoses.length,
+                defaultValue: `${diagnoses.length} Active`,
+              })}
+            </span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+            {diagnoses.map((d, i) => (
+              <DiagnosisCard key={i} diagnosis={d} onNavigateEvidence={onNavigateEvidence} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Subsystem Health Grid — True Neumorphic Tiles (Authoritative Rust Telemetry) */}
       <div className="np-monitor-card" aria-label={t("diagnostics.subsystems_aria_label", "System Subsystem Health")}>
         <div className="np-monitor-card__header">
           <h3 className="np-monitor-card__title">{t("diagnostics.subsystems_title", "System Subsystem Health")}</h3>
@@ -123,96 +143,6 @@ export function DiagnosticsSection({
           </div>
         )}
       </div>
-
-      {/* Active Alerts & Intelligent Recommendations Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(340px, 1fr))", gap: "1.25rem" }}>
-        {/* Active Alerts Card */}
-        <div className="np-monitor-card" aria-label={t("diagnostics.alerts_aria_label", "Active System Alerts")}>
-          <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">{t("diagnostics.alerts_title", "Active Alerts")}</h3>
-            {alerts.length > 0 && (
-              <span className="np-monitor-badge np-monitor-badge--warning">
-                {t("diagnostics.alerts_active_count", {
-                  count: alerts.length,
-                  defaultValue: `${alerts.length} Active`,
-                })}
-              </span>
-            )}
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
-            {alerts.length === 0 ? (
-              <p style={{ color: "var(--np-sem-nominal, var(--np-good))", fontSize: "0.85rem", margin: 0, display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                <Icon name="checkCircle" style={{ width: "14px", height: "14px" }} />
-                <span>{t("diagnostics.no_alerts", "No active telemetry alerts detected. System metrics nominal.")}</span>
-              </p>
-            ) : (
-              alerts.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    background:
-                      a.severity === "critical"
-                        ? "var(--np-finding-soft)"
-                        : "var(--np-notable-soft)",
-                    borderLeft: `3px solid ${
-                      a.severity === "critical" ? "var(--np-sem-failure, #ef4444)" : "var(--np-sem-investigate, #f59e0b)"
-                    }`,
-                    padding: "0.6rem 0.85rem",
-                    borderRadius: "var(--np-radius-xs)",
-                    boxShadow: "var(--np-neu-sm)",
-                    fontSize: "0.825rem",
-                  }}
-                >
-                  <div style={{ fontWeight: 600, color: "var(--np-text)" }}>{a.title}</div>
-                  <div style={{ color: "var(--np-text-dim)", marginTop: "2px" }}>{a.message}</div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Automated Recommendations Card */}
-        <div className="np-monitor-card" aria-label={t("diagnostics.recommendations_aria_label", "Intelligent System Recommendations")}>
-          <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">{t("diagnostics.recommendations_title", "Automated Recommendations")}</h3>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1, justifyContent: "center" }}>
-            {recommendations.map((r) => (
-              <div
-                key={r.id}
-                style={{
-                  background: "var(--np-surface-recessed)",
-                  padding: "0.65rem 0.85rem",
-                  borderRadius: "var(--np-radius-sm)",
-                  fontSize: "0.825rem",
-                  border: "1px solid var(--np-border)",
-                  boxShadow: "var(--np-neu-inset)",
-                }}
-              >
-                <div style={{ fontWeight: 600, color: "var(--np-accent-strong, var(--np-text))", display: "flex", alignItems: "center", gap: "0.35rem" }}>
-                  <Icon name="lightbulb" style={{ width: "13px", height: "13px" }} />
-                  <span>{r.title}</span>
-                </div>
-                <div style={{ color: "var(--np-text-dim)", marginTop: "3px" }}>{r.action}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Diagnostic Hypotheses Cards */}
-      {diagnoses.length > 0 && (
-        <div className="np-monitor-card" aria-label={t("diagnostics.hypotheses_aria_label", "Diagnostic Hypotheses")}>
-          <div className="np-monitor-card__header">
-            <h3 className="np-monitor-card__title">{t("diagnostics.hypotheses_title", "Diagnostic Hypotheses")}</h3>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-            {diagnoses.map((d, i) => (
-              <DiagnosisCard key={i} diagnosis={d} onNavigateEvidence={onNavigateEvidence} />
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -198,7 +198,7 @@ describe("Monitoring Screen & useMonitoringController", () => {
     expect(screen.getByText("Process Attributes")).toBeInTheDocument();
   });
 
-  it("suppresses 'Peak Efficiency' recommendation in rules engine when awaiting initial telemetry", () => {
+  it("retires synthetic alert and recommendation generators in deprecated rules engine while preserving authentic subsystems", () => {
     const emptyTelemetry: DomainTelemetry = {
       timestampNanos: 0,
       bytesSeen: 0,
@@ -221,10 +221,9 @@ describe("Monitoring Screen & useMonitoringController", () => {
     };
 
     const evalResult = evaluateDiagnosticsRules(emptyTelemetry);
-    expect(evalResult.recommendations.some((r) => r.title.includes("Peak Efficiency"))).toBe(false);
-
-    const explicitAwaitingResult = evaluateDiagnosticsRules(emptyTelemetry, true);
-    expect(explicitAwaitingResult.recommendations.some((r) => r.title.includes("Peak Efficiency"))).toBe(false);
+    expect(evalResult.alerts).toEqual([]);
+    expect(evalResult.recommendations).toEqual([]);
+    expect(evalResult.subsystems).toEqual([]);
 
     const nominalTelemetry: DomainTelemetry = {
       timestampNanos: 1000,
@@ -239,16 +238,21 @@ describe("Monitoring Screen & useMonitoringController", () => {
       edges: [],
       processes: [],
       subsystems: [{ name: "Capture Buffer", status: "healthy" }],
-      bufferPercent: 20,
+      bufferPercent: 90,
       bufferFrames: 10,
       bufferCapacity: 1000,
-      dropCount: 0,
-      networkLossCount: 0,
+      dropCount: 5,
+      networkLossCount: 2,
       diagnoses: [],
     };
     const nominalResult = evaluateDiagnosticsRules(nominalTelemetry);
-    expect(nominalResult.recommendations.some((r) => r.title === "System Operating at Peak Efficiency")).toBe(true);
+    // Synthetic buffer, CPU, and loss alerts and recommendations must remain retired
+    expect(nominalResult.alerts).toEqual([]);
+    expect(nominalResult.recommendations).toEqual([]);
+    // Authentic backend subsystems are faithfully preserved
+    expect(nominalResult.subsystems).toEqual([{ name: "Capture Buffer", status: "healthy" }]);
   });
+
 
   it("renders populated snapshot KPIs, capture health, charts, and diagnostic cards", () => {
     setMonitor(mockMonitorSnapshot);
@@ -265,6 +269,10 @@ describe("Monitoring Screen & useMonitoringController", () => {
       screen.getByText("Loss and jitter affecting several servers at once")
     ).toBeTruthy();
     expect(screen.getByText("85%")).toBeTruthy();
+
+    // Verify synthetic alert generator cards are retired
+    expect(screen.queryByText("Active Alerts")).toBeNull();
+    expect(screen.queryByText("Automated Recommendations")).toBeNull();
   });
 
   it("handles empty snapshot gracefully", () => {
@@ -949,10 +957,10 @@ describe("Monitoring Screen & useMonitoringController", () => {
         expect(screen.getByText("Modo de Disección del Motor")).toBeInTheDocument();
         expect(screen.getByText("Cero Pérdida")).toBeInTheDocument();
 
-        // Diagnostics Section
-        expect(screen.getByText("Salud de Subsistemas del Sistema")).toBeInTheDocument();
-        expect(screen.getByText("Recomendaciones Automatizadas")).toBeInTheDocument();
+        // Diagnostics Section (Prioritized Rust Hypotheses and Authentic Subsystems)
         expect(screen.getByText("Hipótesis de Diagnóstico")).toBeInTheDocument();
+        expect(screen.getByText("Salud de Subsistemas del Sistema")).toBeInTheDocument();
+        expect(screen.queryByText("Recomendaciones Automatizadas")).toBeNull();
 
         // Process Attributes
         expect(screen.getByText("Atributos de Procesos")).toBeInTheDocument();

@@ -147,7 +147,8 @@
     "recommendations_title": "Automated Recommendations",
     "recommendations_aria_label": "Intelligent System Recommendations",
     "hypotheses_title": "Diagnostic Hypotheses",
-    "hypotheses_aria_label": "Diagnostic Hypotheses"
+    "hypotheses_aria_label": "Diagnostic Hypotheses",
+    "hypotheses_active_count": "{{count}} Active"
   },
   "process_attributes": {
     "title": "Process Attributes",

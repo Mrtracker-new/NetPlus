@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { ConfidenceFilterOption } from "../../hooks/useAppsController";
 import { Icon } from "../../icons";
@@ -16,6 +17,7 @@ export function AppsFilters({
   onConfidenceChange,
 }: AppsFiltersProps) {
   const { t } = useTranslation(["apps"]);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const filters: Array<{ id: ConfidenceFilterOption; labelKey: string }> = [
     { id: "all", labelKey: "filter_all" },
@@ -24,10 +26,15 @@ export function AppsFilters({
     { id: "unknown", labelKey: "filter_unknown" },
   ];
 
+  const handleClear = () => {
+    onSearchChange("");
+    inputRef.current?.focus();
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape" && searchQuery.length > 0) {
       e.preventDefault();
-      onSearchChange("");
+      handleClear();
     }
   };
 
@@ -49,6 +56,7 @@ export function AppsFilters({
           <Icon name="search" style={{ width: "14px", height: "14px" }} />
         </span>
         <input
+          ref={inputRef}
           type="search"
           aria-label={t("search_placeholder")}
           placeholder={t("search_placeholder")}
@@ -61,7 +69,14 @@ export function AppsFilters({
           <button
             type="button"
             className="np-apps-filters__clear-search"
-            onClick={() => onSearchChange("")}
+            onClick={handleClear}
+            onMouseDown={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                handleClear();
+              }
+            }}
             aria-label={t("clear_search")}
             title={t("clear_search")}
           >

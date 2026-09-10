@@ -532,6 +532,7 @@ describe("Apps Screen & useAppsController", () => {
     const clearBtn = screen.getByRole("button", { name: "Clear search" });
     fireEvent.click(clearBtn);
 
+    expect(searchInput).toHaveFocus();
     expect(screen.getByText("alpha.exe")).toBeInTheDocument();
     expect(screen.getByText("beta.exe")).toBeInTheDocument();
 
@@ -541,6 +542,15 @@ describe("Apps Screen & useAppsController", () => {
     expect(screen.getByText("beta.exe")).toBeInTheDocument();
 
     fireEvent.keyDown(searchInput, { key: "Escape", code: "Escape" });
+    expect(searchInput).toHaveFocus();
+    expect(screen.getByText("alpha.exe")).toBeInTheDocument();
+    expect(screen.getByText("beta.exe")).toBeInTheDocument();
+
+    // Test Escape key clearing on clear button
+    fireEvent.change(searchInput, { target: { value: "alpha" } });
+    const clearBtnAgain = screen.getByRole("button", { name: "Clear search" });
+    fireEvent.keyDown(clearBtnAgain, { key: "Escape", code: "Escape" });
+    expect(searchInput).toHaveFocus();
     expect(screen.getByText("alpha.exe")).toBeInTheDocument();
     expect(screen.getByText("beta.exe")).toBeInTheDocument();
   });

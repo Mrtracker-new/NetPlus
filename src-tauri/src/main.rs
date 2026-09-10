@@ -140,10 +140,10 @@ impl Drop for CompletionGuard {
 /// Control handle for the background live-capture thread: a stop flag it polls
 /// between batches, a completion receiver, and its join handle so [`stop_capture`]
 /// can wait deterministically without indefinite blocking.
-struct CaptureControl {
-    stop: Arc<AtomicBool>,
-    done_rx: std::sync::mpsc::Receiver<()>,
-    handle: std::thread::JoinHandle<()>,
+pub(crate) struct CaptureControl {
+    pub(crate) stop: Arc<AtomicBool>,
+    pub(crate) done_rx: std::sync::mpsc::Receiver<()>,
+    pub(crate) handle: std::thread::JoinHandle<()>,
 }
 
 /// Resolve the canonical persistent file path for learning progress.

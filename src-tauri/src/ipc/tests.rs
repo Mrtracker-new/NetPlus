@@ -1154,3 +1154,288 @@ fn test_query_list_sessions() {
         _ => panic!("expected Sessions response"),
     }
 }
+
+fn make_dns_query_frame(domain: &str) -> Vec<u8> {
+    let mut dns_msg = vec![0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0];
+    for label in domain.split('.') {
+        dns_msg.push(label.len() as u8);
+        dns_msg.extend_from_slice(label.as_bytes());
+    }
+    dns_msg.push(0);
+    dns_msg.extend_from_slice(&[0x00, 0x01, 0x00, 0x01]); // A record, IN class
+
+    let mut udp = Vec::new();
+    udp.extend_from_slice(&53000u16.to_be_bytes()); // src port
+    udp.extend_from_slice(&53u16.to_be_bytes()); // dst port 53
+    udp.extend_from_slice(&((dns_msg.len() + 8) as u16).to_be_bytes());
+    udp.extend_from_slice(&[0, 0]); // checksum
+    udp.extend_from_slice(&dns_msg);
+
+    let mut ip = vec![0x45, 0x00];
+    ip.extend_from_slice(&((20 + udp.len()) as u16).to_be_bytes());
+    ip.extend_from_slice(&[0x00, 0x00, 0x40, 0x00, 0x40, 17, 0x00, 0x00]); // TTL=64, UDP
+    ip.extend_from_slice(&[192, 168, 1, 100]); // src
+    ip.extend_from_slice(&[8, 8, 8, 8]); // dst 8.8.8.8
+    ip.extend_from_slice(&udp);
+
+    let mut frame = vec![0; 12];
+    frame.extend_from_slice(&0x0800u16.to_be_bytes());
+    frame.extend_from_slice(&ip);
+    frame
+}
+
+fn make_http_get_frame(host: &str, path: &str) -> Vec<u8> {
+    let payload = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: NetPulse/1.0\r\n\r\n");
+    let payload_bytes = payload.as_bytes();
+
+    let mut tcp = Vec::new();
+    tcp.extend_from_slice(&49152u16.to_be_bytes()); // src port
+    tcp.extend_from_slice(&80u16.to_be_bytes()); // dst port 80
+    tcp.extend_from_slice(&100_000u32.to_be_bytes()); // seq
+    tcp.extend_from_slice(&0u32.to_be_bytes()); // ack
+    tcp.push(0x50); // data offset 5
+    tcp.push(0x18); // PSH + ACK
+    tcp.extend_from_slice(&65535u16.to_be_bytes()); // window
+    tcp.extend_from_slice(&[0, 0]); // checksum
+    tcp.extend_from_slice(&[0, 0]); // urgent
+    tcp.extend_from_slice(payload_bytes);
+
+    let mut ip = vec![0x45, 0x00];
+    ip.extend_from_slice(&((20 + tcp.len()) as u16).to_be_bytes());
+    ip.extend_from_slice(&[0x00, 0x01, 0x40, 0x00, 0x40, 6, 0x00, 0x00]); // TTL=64, TCP
+    ip.extend_from_slice(&[192, 168, 1, 100]);
+    ip.extend_from_slice(&[93, 184, 216, 34]); // example.com IP
+    ip.extend_from_slice(&tcp);
+
+    let mut frame = vec![0; 12];
+    frame.extend_from_slice(&0x0800u16.to_be_bytes());
+    frame.extend_from_slice(&ip);
+    frame
+}
+
+fn make_tls_client_hello_frame(sni_host: &str) -> Vec<u8> {
+    let mut sni_ext = Vec::new();
+    let server_name = sni_host.as_bytes();
+    let name_entry_len = 1 + 2 + server_name.len();
+    sni_ext.extend_from_slice(&(name_entry_len as u16).to_be_bytes());
+    sni_ext.push(0); // host_name
+    sni_ext.extend_from_slice(&(server_name.len() as u16).to_be_bytes());
+    sni_ext.extend_from_slice(server_name);
+
+    let mut alpn_ext = Vec::new();
+    let proto = b"h2";
+    let list_len = 1 + proto.len();
+    alpn_ext.extend_from_slice(&(list_len as u16).to_be_bytes());
+    alpn_ext.push(proto.len() as u8);
+    alpn_ext.extend_from_slice(proto);
+
+    let mut exts = Vec::new();
+    exts.extend_from_slice(&0u16.to_be_bytes()); // EXT_SNI
+    exts.extend_from_slice(&(sni_ext.len() as u16).to_be_bytes());
+    exts.extend_from_slice(&sni_ext);
+    exts.extend_from_slice(&16u16.to_be_bytes()); // EXT_ALPN
+    exts.extend_from_slice(&(alpn_ext.len() as u16).to_be_bytes());
+    exts.extend_from_slice(&alpn_ext);
+
+    let mut ch = Vec::new();
+    ch.extend_from_slice(&[0x03, 0x03]); // TLS 1.2
+    ch.extend_from_slice(&[0x42u8; 32]); // random
+    ch.push(0); // session id len
+    ch.extend_from_slice(&[0x00, 0x02, 0x13, 0x01]); // cipher suites
+    ch.extend_from_slice(&[0x01, 0x00]); // compression null
+    ch.extend_from_slice(&(exts.len() as u16).to_be_bytes());
+    ch.extend_from_slice(&exts);
+
+    let mut hs = vec![1u8]; // ClientHello
+    let l = ch.len();
+    hs.push((l >> 16) as u8);
+    hs.extend_from_slice(&(l as u16).to_be_bytes());
+    hs.extend_from_slice(&ch);
+
+    let mut rec = vec![22u8, 0x03, 0x01]; // Handshake, TLS 1.0
+    rec.extend_from_slice(&(hs.len() as u16).to_be_bytes());
+    rec.extend_from_slice(&hs);
+
+    let mut tcp = Vec::new();
+    tcp.extend_from_slice(&49153u16.to_be_bytes()); // src port
+    tcp.extend_from_slice(&443u16.to_be_bytes()); // dst port 443
+    tcp.extend_from_slice(&200_000u32.to_be_bytes()); // seq
+    tcp.extend_from_slice(&0u32.to_be_bytes()); // ack
+    tcp.push(0x50); // data offset 5
+    tcp.push(0x18); // PSH + ACK
+    tcp.extend_from_slice(&65535u16.to_be_bytes());
+    tcp.extend_from_slice(&[0, 0]);
+    tcp.extend_from_slice(&[0, 0]);
+    tcp.extend_from_slice(&rec);
+
+    let mut ip = vec![0x45, 0x00];
+    ip.extend_from_slice(&((20 + tcp.len()) as u16).to_be_bytes());
+    ip.extend_from_slice(&[0x00, 0x02, 0x40, 0x00, 0x40, 6, 0x00, 0x00]); // TCP
+    ip.extend_from_slice(&[192, 168, 1, 100]);
+    ip.extend_from_slice(&[104, 16, 132, 229]); // cloudflare IP
+    ip.extend_from_slice(&tcp);
+
+    let mut frame = vec![0; 12];
+    frame.extend_from_slice(&0x0800u16.to_be_bytes());
+    frame.extend_from_slice(&ip);
+    frame
+}
+
+#[test]
+fn test_full_slice_capture_to_presentation_lifecycle() {
+    use crate::CaptureControl;
+    use netpulse_api::dto::{DiagnosticChainStageKindDto, StageProbeStatusDto, TelemetryStateDto};
+    use netpulse_core::traits::RawFrame;
+    use netpulse_engine::pipeline::LivePipeline;
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+
+    let state = seeded_state();
+
+    // 1. Establish active capture control state
+    let stop = Arc::new(AtomicBool::new(false));
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let stop_thread = Arc::clone(&stop);
+    let handle = std::thread::spawn(move || {
+        let _guard = crate::CompletionGuard(Some(done_tx));
+        while !stop_thread.load(std::sync::atomic::Ordering::Relaxed) {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    });
+    *state.capture.lock().unwrap() = Some(CaptureControl {
+        stop,
+        done_rx,
+        handle,
+    });
+
+    // Verify StartCapture command dispatch honors active capture state
+    let dup_start = execute_command(&state, Command::StartCapture { iface_id: 0 });
+    assert!(dup_start.is_err(), "Duplicate start must be refused when capture is running");
+    assert!(state.capture.lock().unwrap().is_some(), "Capture handle must be active");
+
+    // 2. Generate network traffic (HTTP, DNS, TLS raw frames)
+    let dns_frame = make_dns_query_frame("api.example.com");
+    let http_frame = make_http_get_frame("api.example.com", "/v1/telemetry");
+    let tls_frame = make_tls_client_hello_frame("secure.example.com");
+
+    let raw_frames = vec![
+        RawFrame {
+            mono_nanos: 1_000_000,
+            iface_id: 1,
+            bytes: dns_frame,
+        },
+        RawFrame {
+            mono_nanos: 2_000_000,
+            iface_id: 1,
+            bytes: http_frame,
+        },
+        RawFrame {
+            mono_nanos: 3_000_000,
+            iface_id: 1,
+            bytes: tls_frame,
+        },
+    ];
+
+    // 3. Observe raw frames decoded in netpulse-decode, flow-tracked in netpulse-flow, committed in netpulse-storage
+    {
+        // Decode directly and verify L7 protocol resolution
+        let d_dns = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[0].bytes);
+        assert_eq!(d_dns.l7, netpulse_core::net::L7Proto::Dns);
+        assert_eq!(d_dns.events, vec![netpulse_core::ProtoEventKind::DnsQuery]);
+
+        let d_http = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[1].bytes);
+        assert_eq!(d_http.l7, netpulse_core::net::L7Proto::Http1);
+        assert_eq!(d_http.events, vec![netpulse_core::ProtoEventKind::HttpRequest]);
+
+        let d_tls = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[2].bytes);
+        assert_eq!(d_tls.l7, netpulse_core::net::L7Proto::Tls);
+        assert_eq!(d_tls.events, vec![netpulse_core::ProtoEventKind::TlsClientHello]);
+
+        // Ingest into LivePipeline and commit to store
+        let mut pipeline = LivePipeline::new(1, 16); // 1 = Ethernet DLT
+        pipeline.ingest_batch(&raw_frames);
+
+        let mut store = state.store.lock().unwrap();
+        pipeline.commit_to_store(&mut store, 3_000_000);
+        pipeline.finish(&mut store);
+
+        assert!(store.flow_count() >= 3, "All 3 flows must be committed into CaptureStore");
+    }
+
+    // Update capture stats with the processed frames
+    {
+        let mut stats = state.stats.lock().unwrap();
+        stats.received = 3;
+        stats.dropped = 0;
+    }
+
+    // 4. Verify Query::MonitorSnapshot returns populated MonitorSnapshotDto with telemetry_state: Active
+    let snap_res = execute_query(
+        &state,
+        Query::MonitorSnapshot {
+            from_mono_nanos: None,
+            to_mono_nanos: None,
+            time_range: None,
+        },
+    )
+    .expect("MonitorSnapshot query must succeed");
+
+    if let QueryResponse::MonitorSnapshot { snapshot } = snap_res {
+        assert_eq!(
+            snapshot.telemetry_state,
+            TelemetryStateDto::Active,
+            "Active capture with flows must report telemetry_state: Active"
+        );
+        assert!(!snapshot.by_protocol.rows.is_empty(), "Protocols breakdown must be populated");
+        assert!(!snapshot.by_host.rows.is_empty(), "Host breakdown must be populated");
+        assert!(snapshot.diagnostic_chain.is_some(), "Diagnostic chain must be present");
+        let chain = snapshot.diagnostic_chain.as_ref().unwrap();
+        assert_eq!(chain.stages.len(), 7, "Diagnostic chain must contain 7 grounded stages");
+    } else {
+        panic!("expected MonitorSnapshot response");
+    }
+
+    // 5. Stop capture; verify telemetry_state immediately updates to Standby
+    execute_command(&state, Command::StopCapture { iface_id: 0 }).expect("StopCapture command must succeed");
+    assert!(state.capture.lock().unwrap().is_none(), "Capture handle must be None after stop");
+
+    let standby_res = execute_query(
+        &state,
+        Query::MonitorSnapshot {
+            from_mono_nanos: None,
+            to_mono_nanos: None,
+            time_range: None,
+        },
+    )
+    .expect("MonitorSnapshot after stop must succeed");
+
+    if let QueryResponse::MonitorSnapshot { snapshot } = standby_res {
+        assert_eq!(
+            snapshot.telemetry_state,
+            TelemetryStateDto::Standby,
+            "After stop_capture, telemetry_state must immediately report Standby"
+        );
+    } else {
+        panic!("expected MonitorSnapshot response");
+    }
+
+    // 6. Run active stage probe; verify IPC result
+    let probe_res = execute_query(
+        &state,
+        Query::RunStageProbe {
+            stage: DiagnosticChainStageKindDto::Device,
+            target: None,
+        },
+    )
+    .expect("RunStageProbe for Device must succeed");
+
+    if let QueryResponse::StageProbeResult { result } = probe_res {
+        assert_eq!(result.stage, DiagnosticChainStageKindDto::Device);
+        assert_eq!(result.probe_type, "LocalStackProbe");
+        assert_eq!(result.status, StageProbeStatusDto::Success);
+        assert!(result.summary.contains("Local capture stack verified"));
+    } else {
+        panic!("expected StageProbeResult");
+    }
+}
+

@@ -79,7 +79,7 @@ export function Apps() {
 
   if (!loaded) {
     return (
-      <section className="np-apps" aria-label="Applications loading" aria-busy="true">
+      <section className="np-apps" aria-label={t("loading_aria")} aria-busy="true">
         <header className="np-apps__header">
           <Skeleton height={32} width={280} />
           <div className="np-apps-skeleton__sub">
@@ -141,7 +141,7 @@ export function Apps() {
       {rows.length === 0 ? (
         <EmptyState
           icon={<Icon name="apps" />}
-          title="Application Process Lineage"
+          title={t("empty_title")}
           description={targetFlowId !== null ? t("empty_filtered", { flowId: targetFlowId }) : t("empty_default")}
         />
       ) : (
@@ -168,7 +168,7 @@ export function Apps() {
             <div className="np-apps-empty-tray">
               <EmptyState
                 compact
-                title="No Matching Processes"
+                title={t("empty_search_title")}
                 description={t("empty_search")}
                 action={
                   hasActiveFilters ? (

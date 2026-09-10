@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, renderHook, waitFor, act, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import "../i18n";
+import i18n from "../i18n";
 import type { MonitorSnapshot } from "@netpulse/contract";
 import { Apps } from "../screens/Apps";
 import { AppsSummary } from "../screens/Apps/AppsSummary";
@@ -2323,5 +2323,146 @@ describe("Apps Screen & useAppsController", () => {
       expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
     });
   });
+
+  describe("Full Localization of Strings (apps.json and es/apps.json)", () => {
+    afterEach(async () => {
+      await act(async () => {
+        await i18n.changeLanguage("en");
+      });
+    });
+
+    it("renders empty state titles using localized strings in English and Spanish", async () => {
+      setMonitor(mockBaseSnapshot);
+      render(<AppsTestWrapper />);
+
+      // English empty title
+      expect(screen.getByText("Application Process Lineage")).toBeInTheDocument();
+
+      // Switch to Spanish
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      expect(screen.getByText("Linaje de Procesos de Aplicación")).toBeInTheDocument();
+      expect(
+        screen.getByText("Aún no se han capturado aplicaciones atribuidas. Inicia una captura para ver el linaje de procesos.")
+      ).toBeInTheDocument();
+    });
+
+    it("renders empty search title using localized string in English and Spanish", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "curl.exe",
+            pid: 1234,
+            flows: 1,
+            flowIds: [303],
+            confidence: "low",
+            bytes: 3000,
+            packets: 30,
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const searchInput = screen.getByPlaceholderText("Search applications by process name, PID, or flow ID...");
+      fireEvent.change(searchInput, { target: { value: "nonexistent" } });
+
+      expect(await screen.findByText("No Matching Processes")).toBeInTheDocument();
+      expect(screen.getByText("No applications match the current search query or confidence filter.")).toBeInTheDocument();
+
+      // Switch to Spanish
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      expect(screen.getByText("No Hay Procesos Coincidentes")).toBeInTheDocument();
+      expect(screen.getByText("Ninguna aplicación coincide con la búsqueda o el filtro de confianza actual.")).toBeInTheDocument();
+    });
+
+    it("renders Spanish localization for process row, flow counts, lineage tray, badges, and flow inspection plate", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "chrome.exe",
+            pid: 4092,
+            flows: 3,
+            flowIds: [101],
+            confidence: "high",
+            bytes: 1024,
+            packets: 10,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.50:52000",
+            destination: "google.com:443",
+            protocol: "HTTPS",
+            bytes: 1024,
+            packets: 10,
+            direction: "outbound",
+            flow_count: 3,
+            classification: "external_wan",
+            pid: 4092,
+            flow_id: 101,
+            state: "ESTABLISHED",
+            rtt_ms: 15.0,
+          } as any,
+        ],
+      });
+
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      render(<AppsTestWrapper />);
+
+      // Hero title & subtitle
+      expect(await screen.findByText("Aplicaciones y Linaje")).toBeInTheDocument();
+      expect(screen.getByText("chrome.exe")).toBeInTheDocument();
+      expect(screen.getByText("PID 4092")).toBeInTheDocument();
+      expect(screen.getByText("3 flujos")).toBeInTheDocument();
+
+      // High confidence badge in Spanish
+      expect(screen.getByLabelText("Confianza de atribución: Alta Confianza")).toBeInTheDocument();
+
+      // Expand row with Spanish aria-label
+      const expandBtn = screen.getByRole("button", { name: "Expandir chrome.exe" });
+      expect(expandBtn).toBeInTheDocument();
+      fireEvent.click(expandBtn);
+
+      // Verify lineage headers and conduit card in Spanish
+      expect(await screen.findByText("Linaje de flujos activos (3 flujos)")).toBeInTheDocument();
+      expect(screen.getByText("Linaje de extremos de comunicación (1)")).toBeInTheDocument();
+      expect(screen.getByText("Flujo #101")).toBeInTheDocument();
+      expect(screen.getByLabelText("Protocolo: HTTPS")).toBeInTheDocument();
+      expect(screen.getByLabelText("Dirección: Saliente")).toBeInTheDocument();
+      expect(screen.getByLabelText("Clasificación: WAN Externa")).toBeInTheDocument();
+
+      // Inspect flow button in Spanish
+      const inspectBtn = screen.getByRole("button", { name: "Inspeccionar Flujo #101" });
+      expect(inspectBtn).toBeInTheDocument();
+      fireEvent.click(inspectBtn);
+
+      // Verify Inspection plate in Spanish
+      const plate = screen.getByTestId("flow-inspection-plate");
+      expect(plate).toBeInTheDocument();
+      expect(within(plate).getByText("Panel de Inspección del Flujo #101")).toBeInTheDocument();
+      expect(within(plate).getByText("5-Tupla:")).toBeInTheDocument();
+      expect(within(plate).getByText("Dirección de Socket de Origen")).toBeInTheDocument();
+      expect(within(plate).getByText("Dirección de Socket de Destino")).toBeInTheDocument();
+      expect(within(plate).getByText("Estado y Clasificación")).toBeInTheDocument();
+      expect(within(plate).getByText("Métricas del Flujo")).toBeInTheDocument();
+      expect(within(plate).getByText("Bytes")).toBeInTheDocument();
+      expect(within(plate).getByText("Paquetes")).toBeInTheDocument();
+      expect(within(plate).getByText("Estimación RTT")).toBeInTheDocument();
+      expect(within(plate).getByRole("button", { name: "Cerrar inspección del flujo" })).toBeInTheDocument();
+    });
+  });
 });
+
 

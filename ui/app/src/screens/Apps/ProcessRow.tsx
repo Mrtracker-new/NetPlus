@@ -61,7 +61,11 @@ export function formatSocketAddr(address: string, port: number): string {
   return `${address}:${port}`;
 }
 
-export function resolveFlowDetails(flowId: number, group: GroupedProcess): FlowInspectionDetails {
+export function resolveFlowDetails(
+  flowId: number,
+  group: GroupedProcess,
+  t?: (key: any, options?: any) => any
+): FlowInspectionDetails {
   // 1. Locate conduit correlating to this flowId if possible
   const conduits = Array.isArray(group.lineage) ? group.lineage : [];
   let conduit = conduits.find((c: any) => {
@@ -183,8 +187,12 @@ export function resolveFlowDetails(flowId: number, group: GroupedProcess): FlowI
     }
   }
 
-  const direction = conduit?.direction ? formatDirection(conduit.direction).label : "Outbound";
-  const classification = formatClassification(conduit?.classification);
+  const direction = conduit?.direction
+    ? formatDirection(conduit.direction, t).label
+    : t
+    ? t("directions.outbound", "Outbound")
+    : "Outbound";
+  const classification = formatClassification(conduit?.classification, t);
 
   return {
     flowId,
@@ -205,34 +213,52 @@ export function resolveFlowDetails(flowId: number, group: GroupedProcess): FlowI
   };
 }
 
-function formatClassification(c?: string): string {
-  if (!c) return "External WAN";
+export function formatClassification(
+  c?: string,
+  t?: (key: any, options?: any) => any
+): string {
+  if (!c) return t ? t("classifications.external_wan", "External WAN") : "External WAN";
   switch (c.toLowerCase().replace(/_/g, "")) {
     case "localsubnet":
     case "local":
-      return "Local Subnet";
+      return t ? t("classifications.local_subnet", "Local Subnet") : "Local Subnet";
     case "gateway":
-      return "Gateway";
+      return t ? t("classifications.gateway", "Gateway") : "Gateway";
     case "cdnedge":
-      return "CDN Edge";
+      return t ? t("classifications.cdn_edge", "CDN Edge") : "CDN Edge";
     case "multicast":
-      return "Multicast";
+      return t ? t("classifications.multicast", "Multicast") : "Multicast";
     case "externalwan":
     case "external":
     default:
-      return "External WAN";
+      return t ? t("classifications.external_wan", "External WAN") : "External WAN";
   }
 }
 
-function formatDirection(d?: string): { label: string; icon: string; className: string } {
+export function formatDirection(
+  d?: string,
+  t?: (key: any, options?: any) => any
+): { label: string; icon: string; className: string } {
   const norm = (d || "").toLowerCase();
   if (norm === "inbound") {
-    return { label: "Inbound", icon: "↙", className: "np-apps-conduit-badge--inbound" };
+    return {
+      label: t ? t("directions.inbound", "Inbound") : "Inbound",
+      icon: "↙",
+      className: "np-apps-conduit-badge--inbound",
+    };
   }
   if (norm === "local") {
-    return { label: "Local", icon: "↔", className: "np-apps-conduit-badge--local" };
+    return {
+      label: t ? t("directions.local", "Local") : "Local",
+      icon: "↔",
+      className: "np-apps-conduit-badge--local",
+    };
   }
-  return { label: "Outbound", icon: "↗", className: "np-apps-conduit-badge--outbound" };
+  return {
+    label: t ? t("directions.outbound", "Outbound") : "Outbound",
+    icon: "↗",
+    className: "np-apps-conduit-badge--outbound",
+  };
 }
 
 export function ProcessRow({
@@ -332,18 +358,18 @@ export function ProcessRow({
         </td>
         <td className="np-apps-td">
           <span className="np-apps-pid-chip">
-            {group.pid !== null ? `PID ${group.pid}` : "—"}
+            {group.pid !== null ? t("pid_format", { pid: group.pid }) : "—"}
           </span>
         </td>
         <td className="np-apps-td">
           <span className="np-apps-flows-count">
-            {group.flowsCount} {group.flowsCount === 1 ? "flow" : "flows"}
+            {t("flows_count", { count: group.flowsCount })}
           </span>
         </td>
         <td className="np-apps-td">
           <span
             className={`np-apps-badge ${confidenceBadge.className}`}
-            aria-label={`Attribution confidence: ${confidenceBadge.label}`}
+            aria-label={t("attribution_confidence_aria", { label: confidenceBadge.label })}
           >
             <span className="np-apps-badge__glyph" aria-hidden="true">
               {confidenceBadge.glyph}
@@ -369,7 +395,9 @@ export function ProcessRow({
             }}
             aria-expanded={isExpanded}
             aria-controls={lineageRegionId}
-            aria-label={`${isExpanded ? t("collapse") : t("expand")} ${group.processName}`}
+            aria-label={t(isExpanded ? "collapse_process" : "expand_process", {
+              process: group.processName,
+            })}
           >
             <span>{isExpanded ? t("collapse") : t("expand")}</span>
             <span
@@ -391,7 +419,7 @@ export function ProcessRow({
               <div className="np-apps-lineage-tray__header">
                 <Icon name="timeline" style={{ width: "14px", height: "14px", color: "var(--np-accent)" }} />
                 <span>
-                  Active Flow Lineage ({group.flowsCount} {group.flowsCount === 1 ? "flow" : "flows"})
+                  {t("active_flow_lineage", { count: group.flowsCount })}
                 </span>
               </div>
 
@@ -399,12 +427,12 @@ export function ProcessRow({
               {hasLineage && (
                 <div className="np-apps-conduits-section">
                   <div className="np-apps-lineage-tray__section-title">
-                    <span>Communicating Endpoint Lineage ({group.lineage.length})</span>
+                    <span>{t("communicating_endpoint_lineage", { count: group.lineage.length })}</span>
                   </div>
                   <div className="np-apps-conduits-list" data-testid="lineage-conduits-list">
                     {group.lineage.map((conduit, idx) => {
-                      const dir = formatDirection(conduit.direction);
-                      const classificationLabel = formatClassification(conduit.classification);
+                      const dir = formatDirection(conduit.direction, t);
+                      const classificationLabel = formatClassification(conduit.classification, t);
                       const safeBytes =
                         typeof conduit.bytes === "number" && !isNaN(conduit.bytes)
                           ? Math.max(0, conduit.bytes)
@@ -424,16 +452,16 @@ export function ProcessRow({
                             <div className="np-apps-conduit-card__info">
                               <span
                                 className="np-apps-conduit-card__destination"
-                                title={`Destination: ${destinationText}`}
+                                title={t("destination_title", { destination: destinationText })}
                               >
                                 {destinationText}
                               </span>
                               {conduit.source && conduit.source !== conduit.destination && (
                                 <span
                                   className="np-apps-conduit-card__source"
-                                  title={`Source: ${conduit.source}`}
+                                  title={t("source_title", { source: conduit.source })}
                                 >
-                                  from {conduit.source}
+                                  {t("from_source", { source: conduit.source })}
                                 </span>
                               )}
                             </div>
@@ -443,7 +471,7 @@ export function ProcessRow({
                             {/* Protocol Badge */}
                             <span
                               className="np-apps-conduit-badge np-apps-conduit-badge--protocol"
-                              aria-label={`Protocol: ${protocolText}`}
+                              aria-label={t("protocol_aria", { protocol: protocolText })}
                             >
                               {protocolText}
                             </span>
@@ -451,7 +479,7 @@ export function ProcessRow({
                             {/* Direction Badge */}
                             <span
                               className={`np-apps-conduit-badge np-apps-conduit-badge--direction ${dir.className}`}
-                              aria-label={`Direction: ${dir.label}`}
+                              aria-label={t("direction_aria", { direction: dir.label })}
                             >
                               <span className="np-apps-conduit-badge__glyph" aria-hidden="true">
                                 {dir.icon}
@@ -462,7 +490,7 @@ export function ProcessRow({
                             {/* Classification Badge */}
                             <span
                               className="np-apps-conduit-badge np-apps-conduit-badge--classification"
-                              aria-label={`Classification: ${classificationLabel}`}
+                              aria-label={t("classification_aria", { classification: classificationLabel })}
                             >
                               {classificationLabel}
                             </span>
@@ -470,8 +498,8 @@ export function ProcessRow({
                             {/* Bandwidth Indicator */}
                             <span
                               className="np-apps-conduit-card__bandwidth"
-                              aria-label={`Bandwidth: ${bandwidthText}`}
-                              title={`Bandwidth: ${bandwidthText} (${safeBytes} bytes)`}
+                              aria-label={t("bandwidth_aria", { bandwidth: bandwidthText })}
+                              title={t("bandwidth_title", { bandwidth: bandwidthText, bytes: safeBytes })}
                             >
                               {bandwidthText}
                             </span>
@@ -491,7 +519,7 @@ export function ProcessRow({
                 >
                   {hasLineage && (
                     <div className="np-apps-lineage-tray__section-title">
-                      <span>Active Flow IDs ({group.flowIds.length})</span>
+                      <span>{t("active_flow_ids", { count: group.flowIds.length })}</span>
                     </div>
                   )}
                   <div className="np-apps-lineage-tray__list">
@@ -502,7 +530,7 @@ export function ProcessRow({
                           <div className="np-apps-flow-card" data-expanded={isInspecting}>
                             <span className="np-apps-flow-card__id">
                               <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
-                              Flow #{flowId}
+                              {t("flow_id_label", { flowId })}
                             </span>
                             <button
                               type="button"
@@ -513,29 +541,29 @@ export function ProcessRow({
                               }}
                               aria-expanded={isInspecting}
                               aria-controls={isInspecting ? `flow-inspection-plate-${flowId}` : undefined}
-                              aria-label={`${t("inspect_flow")} #${flowId}`}
+                              aria-label={t("inspect_flow_aria", { flowId })}
                             >
                               <Icon name={isInspecting ? "close" : "search"} style={{ width: "12px", height: "12px" }} />
-                              <span>{isInspecting ? t("common:close", "Close") : t("inspect_flow")}</span>
+                              <span>{isInspecting ? t("close") : t("inspect_flow")}</span>
                             </button>
                           </div>
 
                           {/* Inline Detailed Flow Inspection Plate */}
                           {isInspecting && (() => {
-                            const details = resolveFlowDetails(flowId, group);
+                            const details = resolveFlowDetails(flowId, group, t);
                             return (
                               <div
                                 id={`flow-inspection-plate-${flowId}`}
                                 className="np-apps-inspection-plate"
                                 role="region"
-                                aria-label={`Inspection details for Flow #${flowId}`}
+                                aria-label={t("inspection_details_aria", { flowId })}
                                 data-testid="flow-inspection-plate"
                               >
                                 <div className="np-apps-inspection-plate__header">
                                   <div className="np-apps-inspection-plate__title-wrap">
                                     <Icon name="search" style={{ width: "14px", height: "14px", color: "var(--np-accent)" }} />
                                     <span className="np-apps-inspection-plate__title">
-                                      Flow #{flowId} Inspection Plate
+                                      {t("inspection_plate_title", { flowId })}
                                     </span>
                                     <span className="np-apps-conduit-badge np-apps-conduit-badge--protocol">
                                       {details.protocol}
@@ -551,7 +579,7 @@ export function ProcessRow({
                                       e.stopPropagation();
                                       handleCloseInspect();
                                     }}
-                                    aria-label="Close flow inspection"
+                                    aria-label={t("close_flow_inspection")}
                                   >
                                     <Icon name="close" style={{ width: "12px", height: "12px" }} />
                                   </button>
@@ -559,7 +587,7 @@ export function ProcessRow({
 
                                 {/* 5-Tuple Summary Ribbon */}
                                 <div className="np-apps-inspection-plate__tuple-ribbon" data-testid="flow-5tuple">
-                                  <span className="np-apps-inspection-plate__label">5-Tuple:</span>
+                                  <span className="np-apps-inspection-plate__label">{t("five_tuple_label")}</span>
                                   <code className="np-apps-inspection-plate__code">{details.fiveTuple}</code>
                                 </div>
 
@@ -567,59 +595,59 @@ export function ProcessRow({
                                 <div className="np-apps-inspection-plate__grid">
                                   {/* Source Socket Address */}
                                   <div className="np-apps-inspection-plate__card">
-                                    <div className="np-apps-inspection-plate__field-label">Source Socket Address</div>
+                                    <div className="np-apps-inspection-plate__field-label">{t("source_socket_address")}</div>
                                     <div className="np-apps-inspection-plate__socket-addr" data-testid="flow-source-socket">
                                       {details.sourceSocket}
                                     </div>
                                     <div className="np-apps-inspection-plate__subfields">
-                                      <span>Address: <strong>{details.sourceAddress}</strong></span>
-                                      <span>Port: <strong>{details.sourcePort}</strong></span>
+                                      <span>{t("address_label")} <strong>{details.sourceAddress}</strong></span>
+                                      <span>{t("port_label")} <strong>{details.sourcePort}</strong></span>
                                     </div>
                                   </div>
 
                                   {/* Destination Socket Address */}
                                   <div className="np-apps-inspection-plate__card">
-                                    <div className="np-apps-inspection-plate__field-label">Destination Socket Address</div>
+                                    <div className="np-apps-inspection-plate__field-label">{t("destination_socket_address")}</div>
                                     <div className="np-apps-inspection-plate__socket-addr" data-testid="flow-destination-socket">
                                       {details.destinationSocket}
                                     </div>
                                     <div className="np-apps-inspection-plate__subfields">
-                                      <span>Address: <strong>{details.destinationAddress}</strong></span>
-                                      <span>Port: <strong>{details.destinationPort}</strong></span>
+                                      <span>{t("address_label")} <strong>{details.destinationAddress}</strong></span>
+                                      <span>{t("port_label")} <strong>{details.destinationPort}</strong></span>
                                     </div>
                                   </div>
 
                                   {/* Connection State & Classification */}
                                   <div className="np-apps-inspection-plate__card">
-                                    <div className="np-apps-inspection-plate__field-label">State & Classification</div>
+                                    <div className="np-apps-inspection-plate__field-label">{t("state_classification")}</div>
                                     <div className="np-apps-inspection-plate__value" data-testid="flow-state">
                                       {details.state}
                                     </div>
                                     <div className="np-apps-inspection-plate__subfields">
-                                      <span>Protocol: <strong>{details.protocol}</strong></span>
-                                      <span>Direction: <strong>{details.direction}</strong></span>
-                                      <span>Classification: <strong>{details.classification}</strong></span>
+                                      <span>{t("protocol_label")} <strong>{details.protocol}</strong></span>
+                                      <span>{t("direction_label")} <strong>{details.direction}</strong></span>
+                                      <span>{t("classification_label")} <strong>{details.classification}</strong></span>
                                     </div>
                                   </div>
 
                                   {/* Flow Metrics: Bytes, Packets, RTT */}
                                   <div className="np-apps-inspection-plate__card">
-                                    <div className="np-apps-inspection-plate__field-label">Flow Metrics</div>
+                                    <div className="np-apps-inspection-plate__field-label">{t("flow_metrics")}</div>
                                     <div className="np-apps-inspection-plate__metrics-row">
                                       <div className="np-apps-inspection-plate__metric">
-                                        <span className="np-apps-inspection-plate__metric-label">Bytes</span>
+                                        <span className="np-apps-inspection-plate__metric-label">{t("metric_bytes")}</span>
                                         <span className="np-apps-inspection-plate__metric-value" data-testid="flow-bytes">
                                           {humanBytes(details.bytes)} ({details.bytes.toLocaleString()} B)
                                         </span>
                                       </div>
                                       <div className="np-apps-inspection-plate__metric">
-                                        <span className="np-apps-inspection-plate__metric-label">Packets</span>
+                                        <span className="np-apps-inspection-plate__metric-label">{t("metric_packets")}</span>
                                         <span className="np-apps-inspection-plate__metric-value" data-testid="flow-packets">
                                           {details.packets.toLocaleString()}
                                         </span>
                                       </div>
                                       <div className="np-apps-inspection-plate__metric">
-                                        <span className="np-apps-inspection-plate__metric-label">RTT Estimate</span>
+                                        <span className="np-apps-inspection-plate__metric-label">{t("metric_rtt")}</span>
                                         <span className="np-apps-inspection-plate__metric-value" data-testid="flow-rtt">
                                           {details.rttEstimate}
                                         </span>
@@ -637,7 +665,7 @@ export function ProcessRow({
                       <div className="np-apps-flow-card" style={{ opacity: 0.75, fontStyle: "italic" }}>
                         <span className="np-apps-flow-card__id">
                           <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
-                          +{group.flowIds.length - visibleFlowIds.length} more active flows in this session
+                          {t("more_active_flows", { count: group.flowIds.length - visibleFlowIds.length })}
                         </span>
                       </div>
                     )}
@@ -650,7 +678,7 @@ export function ProcessRow({
                 <div className="np-apps-flow-card">
                   <span className="np-apps-flow-card__id" style={{ fontStyle: "italic", opacity: 0.85 }}>
                     <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
-                    {group.flowsCount} {group.flowsCount === 1 ? "active flow" : "active flows"} attributed
+                    {t("active_flows_attributed", { count: group.flowsCount })}
                   </span>
                 </div>
               )}

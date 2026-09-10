@@ -4,6 +4,7 @@
   "kpi_apps": "Aplicaciones Atribuidas",
   "kpi_flows": "Flujos Activos",
   "kpi_confident": "Alta Confianza",
+  "kpi_tentative": "Tentativa",
   "kpi_unattributed": "Sin Atribuir",
   "search_placeholder": "Buscar aplicaciones por nombre de proceso, PID o ID de flujo...",
   "filter_all": "Todas",

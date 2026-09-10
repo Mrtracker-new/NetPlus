@@ -83,6 +83,24 @@ export function AppsSummary({
           <div className="np-apps-kpi__value">{metrics.highConfidenceCount}</div>
         </button>
 
+        {/* Tentative / Low Confidence Tile */}
+        <button
+          type="button"
+          className="np-apps-kpi"
+          data-tier="low"
+          data-has-count={metrics.lowConfidenceCount > 0}
+          data-active={activeConfidence === "low"}
+          onClick={() => handleCardClick("low")}
+          aria-pressed={activeConfidence === "low"}
+          aria-label={`${t("kpi_tentative", "Tentative")}: ${metrics.lowConfidenceCount}. Click to filter by tentative confidence.`}
+        >
+          <div className="np-apps-kpi__top">
+            <span className="np-apps-kpi__label">{t("kpi_tentative", "Tentative")}</span>
+            <span className="np-apps-kpi__gem" data-tier="low" aria-hidden="true" />
+          </div>
+          <div className="np-apps-kpi__value">{metrics.lowConfidenceCount}</div>
+        </button>
+
         {/* Unattributed / Unknown Owner Tile */}
         <button
           type="button"

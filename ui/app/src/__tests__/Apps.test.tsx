@@ -246,6 +246,106 @@ describe("Apps Screen & useAppsController", () => {
     expect(screen.getByText("unknown owner")).toBeInTheDocument();
   });
 
+  it("computes lowConfidenceCount and renders interactive Tentative KPI tile with amber tier", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "secure.exe",
+          pid: 101,
+          flows: 2,
+          flowIds: [1001, 1002],
+          confidence: "high",
+          bytes: 2000,
+          packets: 20,
+        } as any,
+        {
+          name: "tentative.exe",
+          pid: 8990,
+          flows: 1,
+          flowIds: [1003],
+          confidence: "low",
+          bytes: 1000,
+          packets: 10,
+        } as any,
+        {
+          name: "unknown owner",
+          pid: null,
+          flows: 1,
+          flowIds: [1004],
+          confidence: "unknown",
+          bytes: 500,
+          packets: 5,
+        } as any,
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("secure.exe")).toBeInTheDocument();
+    expect(screen.getByText("tentative.exe")).toBeInTheDocument();
+    expect(screen.getByText("unknown owner")).toBeInTheDocument();
+
+    // Verify Tentative KPI tile exists, shows lowConfidenceCount = 1, and has data-tier="low"
+    const tentativeKpi = screen.getByRole("button", { name: /Tentative: 1/i });
+    expect(tentativeKpi).toBeInTheDocument();
+    expect(tentativeKpi).toHaveAttribute("data-tier", "low");
+    expect(tentativeKpi).toHaveAttribute("data-has-count", "true");
+    expect(tentativeKpi).toHaveAttribute("data-active", "false");
+    expect(tentativeKpi).toHaveAttribute("aria-pressed", "false");
+
+    // Click Tentative KPI tile to filter
+    fireEvent.click(tentativeKpi);
+
+    expect(tentativeKpi).toHaveAttribute("data-active", "true");
+    expect(tentativeKpi).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("tentative.exe")).toBeInTheDocument();
+    expect(screen.queryByText("secure.exe")).not.toBeInTheDocument();
+    expect(screen.queryByText("unknown owner")).not.toBeInTheDocument();
+
+    // Click Tentative tile again to toggle back to All
+    fireEvent.click(tentativeKpi);
+
+    expect(tentativeKpi).toHaveAttribute("data-active", "false");
+    expect(tentativeKpi).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("secure.exe")).toBeInTheDocument();
+    expect(screen.getByText("tentative.exe")).toBeInTheDocument();
+    expect(screen.getByText("unknown owner")).toBeInTheDocument();
+  });
+
+  it("computes summaryMetrics breakdown accurately including lowConfidenceCount", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        { name: "high1.exe", pid: 1, flows: 2, flowIds: [1, 2], confidence: "high", bytes: 100, packets: 1 } as any,
+        { name: "high2.exe", pid: 2, flows: 1, flowIds: [3], confidence: "high", bytes: 100, packets: 1 } as any,
+        { name: "low1.exe", pid: 3, flows: 1, flowIds: [4], confidence: "low", bytes: 100, packets: 1 } as any,
+        { name: "low2.exe", pid: 4, flows: 3, flowIds: [5, 6, 7], confidence: "low", bytes: 100, packets: 1 } as any,
+        { name: "unknown owner", pid: null, flows: 1, flowIds: [8], confidence: "unknown", bytes: 100, packets: 1 } as any,
+      ],
+    });
+
+    const { result } = renderHook(() => useAppsController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+
+    expect(result.current.summaryMetrics).toEqual({
+      totalApps: 5,
+      totalFlows: 8,
+      highConfidenceCount: 2,
+      lowConfidenceCount: 2,
+      unattributedCount: 1,
+    });
+  });
+
   it("supports search clear button and Escape key without resetting confidence filter", async () => {
     setMonitor({
       ...mockBaseSnapshot,

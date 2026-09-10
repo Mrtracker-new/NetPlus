@@ -9963,6 +9963,10 @@ svg path {
   background: var(--np-good);
 }
 
+.np-apps-kpi__gem[data-tier="low"] {
+  background: var(--np-notable);
+}
+
 .np-apps-kpi__gem[data-tier="unknown"] {
   background: var(--np-notable);
 }
@@ -9977,6 +9981,10 @@ svg path {
 
 .np-apps-kpi[data-tier="high"][data-has-count="true"] .np-apps-kpi__value {
   color: var(--np-good);
+}
+
+.np-apps-kpi[data-tier="low"][data-has-count="true"] .np-apps-kpi__value {
+  color: var(--np-notable);
 }
 
 .np-apps-kpi[data-tier="unknown"][data-has-count="true"] .np-apps-kpi__value {

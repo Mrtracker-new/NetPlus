@@ -4,6 +4,7 @@
   "kpi_apps": "Attributed Apps",
   "kpi_flows": "Active Flows",
   "kpi_confident": "High Confidence",
+  "kpi_tentative": "Tentative",
   "kpi_unattributed": "Unattributed",
   "search_placeholder": "Search applications by process name, PID, or flow ID...",
   "filter_all": "All Confidence",

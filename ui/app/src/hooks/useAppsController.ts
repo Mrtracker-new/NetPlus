@@ -32,6 +32,7 @@ export interface AppsSummaryMetrics {
   totalApps: number;
   totalFlows: number;
   highConfidenceCount: number;
+  lowConfidenceCount: number;
   unattributedCount: number;
 }
 
@@ -548,12 +549,14 @@ export function useAppsController() {
   // Summary Metrics Computation
   const summaryMetrics = useMemo<AppsSummaryMetrics>(() => {
     let highCount = 0;
+    let lowCount = 0;
     let unknownCount = 0;
     let totalFlows = 0;
 
     for (const group of activeGroupedProcesses) {
       totalFlows += group.flowsCount;
       if (group.confidence === "high") highCount++;
+      if (group.confidence === "low") lowCount++;
       if (group.confidence === "unknown") unknownCount++;
     }
 
@@ -561,6 +564,7 @@ export function useAppsController() {
       totalApps: activeGroupedProcesses.length,
       totalFlows,
       highConfidenceCount: highCount,
+      lowConfidenceCount: lowCount,
       unattributedCount: unknownCount,
     };
   }, [activeGroupedProcesses]);

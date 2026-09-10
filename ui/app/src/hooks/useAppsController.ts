@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { Attribution, AttributionConfidence, ProcessMetric } from "@netpulse/contract";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
@@ -40,14 +40,14 @@ function deriveConfidence(proc: ProcessMetric): AttributionConfidence {
   ) {
     return "unknown";
   }
-  if (proc.name.startsWith("PID ") && !proc.exe_path) {
+  if ((proc.name.startsWith("PID ") || name.startsWith("pid ")) && !proc.exe_path) {
     return "low";
   }
   return "high";
 }
 
 export function useAppsController() {
-  const { monitor } = useStore();
+  const { monitor, captureSessionId, snapshotSequence } = useStore();
   const { navigationTarget, clearNavigationTarget, navigateToEvidence } = useEvidenceNavigation();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,17 +55,35 @@ export function useAppsController() {
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
+  // In-memory attribution cache keyed by Flow ID (NET-DATA-003)
+  const attributionCacheRef = useRef<Map<number, Attribution>>(new Map());
+  const prevSessionIdRef = useRef<string | null>(captureSessionId);
+
+  // Invalidate in-memory attribution cache and expanded rows on capture session reset (NET-DATA-003)
+  useEffect(() => {
+    if (prevSessionIdRef.current !== captureSessionId) {
+      prevSessionIdRef.current = captureSessionId;
+      attributionCacheRef.current.clear();
+      setExpandedKeys(new Set());
+      setNotice(null);
+      if (navigationTarget?.screen === "apps") {
+        clearNavigationTarget();
+      }
+    }
+  }, [captureSessionId, navigationTarget?.screen, clearNavigationTarget]);
+
   const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
 
-  // Loading state clears when authoritative monitor snapshot is first populated
-  const loaded = monitor !== null;
+  // Loading state clears when authoritative monitor snapshot is first populated for active session
+  const effectiveMonitor = snapshotSequence > 0 ? monitor : null;
+  const loaded = effectiveMonitor !== null;
 
   // Derive grouped processes directly from monitor.processes and monitor.lineage
   const allGroupedProcesses = useMemo(() => {
-    if (!monitor) return [];
+    if (!effectiveMonitor) return [];
 
-    const rawProcesses = monitor.processes || [];
-    const rawLineage = monitor.lineage || [];
+    const rawProcesses = effectiveMonitor.processes || [];
+    const rawLineage = effectiveMonitor.lineage || [];
 
     let effectiveProcesses = rawProcesses;
     if (effectiveProcesses.length === 0 && rawLineage.length > 0) {
@@ -99,6 +117,15 @@ export function useAppsController() {
         typeof proc.flows === "number" ? proc.flows : 0,
         procFlowIds.length
       );
+
+      // Cache flow attributions in memory (NET-DATA-003)
+      for (const fid of procFlowIds) {
+        attributionCacheRef.current.set(fid, {
+          process_name: name,
+          pid,
+          confidence,
+        });
+      }
 
       let group = map.get(groupKey);
       if (!group) {
@@ -151,7 +178,7 @@ export function useAppsController() {
       if (flowDiff !== 0) return flowDiff;
       return a.processName.localeCompare(b.processName);
     });
-  }, [monitor, targetFlowId]);
+  }, [effectiveMonitor, targetFlowId]);
 
   // Target flow filtering
   const activeGroupedProcesses = useMemo(() => {
@@ -167,9 +194,10 @@ export function useAppsController() {
     for (const group of activeGroupedProcesses) {
       if (group.flowIds.length > 0) {
         for (const flowId of group.flowIds) {
+          const cached = attributionCacheRef.current.get(flowId);
           result.push({
             flowId,
-            attr: {
+            attr: cached ?? {
               process_name: group.processName,
               pid: group.pid,
               confidence: group.confidence,
@@ -193,14 +221,15 @@ export function useAppsController() {
   // Filtered Process Groups (Search + Confidence)
   const filteredGroupedProcesses = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
+    const terms = q ? q.split(/\s+/).filter(Boolean) : [];
 
     return activeGroupedProcesses.filter((group) => {
       // Confidence level filter
       if (confidenceFilter !== "all" && group.confidence !== confidenceFilter) {
         return false;
       }
-      // Normalized multi-field search
-      if (q && !group.normalizedSearch.includes(q)) {
+      // Normalized multi-field search (matches each space-separated token)
+      if (terms.length > 0 && !terms.every((term) => group.normalizedSearch.includes(term))) {
         return false;
       }
       return true;
@@ -269,5 +298,6 @@ export function useAppsController() {
     notice,
     setNotice,
     announcement,
+    captureSessionId,
   };
 }

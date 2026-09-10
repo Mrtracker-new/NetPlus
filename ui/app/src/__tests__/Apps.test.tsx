@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, renderHook, waitFor, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import type { MonitorSnapshot } from "@netpulse/contract";
@@ -7,7 +7,7 @@ import { Apps } from "../screens/Apps";
 import { useAppsController } from "../hooks/useAppsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-import { setMonitor, setFeed, __resetForTest } from "../state/store";
+import { setMonitor, setFeed, resetSession, __resetForTest } from "../state/store";
 import * as ipcModule from "../ipc";
 
 afterEach(() => {
@@ -567,5 +567,232 @@ describe("Apps Screen & useAppsController", () => {
     expect(result.current.groupedProcesses.length).toBe(1);
     expect(result.current.groupedProcesses[0]!.flowIds).toEqual([777]);
     expect(result.current.groupedProcesses[0]!.flowsCount).toBe(1);
+  });
+
+  it("invalidates in-memory attribution and flushes cached rows on capture session reset (NET-DATA-003)", async () => {
+    // Session A: populate with chrome.exe owning flow #1
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "chrome.exe",
+          pid: 1001,
+          flows: 1,
+          flowIds: [1],
+          bytes: 1000,
+          packets: 10,
+        } as any,
+      ],
+    });
+
+    const { result } = renderHook(() => useAppsController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+
+    expect(result.current.groupedProcesses.length).toBe(1);
+    expect(result.current.groupedProcesses[0]?.processName).toBe("chrome.exe");
+    expect(result.current.rows.length).toBe(1);
+    expect(result.current.rows[0]?.flowId).toBe(1);
+    expect(result.current.rows[0]?.attr.process_name).toBe("chrome.exe");
+
+    // Expand row in Session A
+    act(() => {
+      result.current.toggleExpandGroup("chrome.exe:1001");
+    });
+    expect(result.current.expandedKeys.has("chrome.exe:1001")).toBe(true);
+
+    // Reset session via resetSession(); verify all previous attributions and expansions are cleared
+    act(() => {
+      resetSession("session-B");
+    });
+
+    expect(result.current.groupedProcesses.length).toBe(0);
+    expect(result.current.rows.length).toBe(0);
+    expect(result.current.loaded).toBe(false);
+    expect(result.current.expandedKeys.size).toBe(0);
+
+    // Session B: telemetry arrives where flow #1 is reused by firefox.exe
+    act(() => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "firefox.exe",
+            pid: 2002,
+            flows: 1,
+            flowIds: [1],
+            bytes: 2000,
+            packets: 20,
+          } as any,
+        ],
+      });
+    });
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+
+    // Old attributions never display in new sessions; flow #1 in session B reflects session B's process
+    expect(result.current.groupedProcesses.length).toBe(1);
+    expect(result.current.groupedProcesses[0]?.processName).toBe("firefox.exe");
+    expect(result.current.groupedProcesses[0]?.pid).toBe(2002);
+    expect(result.current.rows.length).toBe(1);
+    expect(result.current.rows[0]?.flowId).toBe(1);
+    expect(result.current.rows[0]?.attr.process_name).toBe("firefox.exe");
+    expect(result.current.rows[0]?.attr.pid).toBe(2002);
+  });
+
+  it("ensures Apps screen never displays stale attributions across capture restarts (NET-DATA-003 component verification)", async () => {
+    // Session A active capture
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "curl.exe",
+          pid: 5555,
+          flows: 1,
+          flowIds: [42],
+          bytes: 500,
+          packets: 5,
+        } as any,
+      ],
+    });
+
+    const { rerender } = render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+    expect(screen.getByText("PID 5555")).toBeInTheDocument();
+
+    // Reset session
+    act(() => {
+      resetSession("session-restarted");
+    });
+
+    rerender(<AppsTestWrapper />);
+
+    // Old attributions immediately cleared, shows loading skeleton for fresh session
+    expect(screen.queryByText("curl.exe")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Applications loading")).toBeInTheDocument();
+
+    // Post-restart telemetry arrives
+    act(() => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "wget.exe",
+            pid: 6666,
+            flows: 1,
+            flowIds: [42],
+            bytes: 600,
+            packets: 6,
+          } as any,
+        ],
+      });
+    });
+
+    rerender(<AppsTestWrapper />);
+
+    expect(await screen.findByText("wget.exe")).toBeInTheDocument();
+    expect(screen.getByText("PID 6666")).toBeInTheDocument();
+    expect(screen.queryByText("curl.exe")).not.toBeInTheDocument();
+  });
+
+  it("filters processes using multi-term space-separated search queries", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "chrome.exe",
+          pid: 4092,
+          flows: 1,
+          flowIds: [101],
+          bytes: 1000,
+          packets: 10,
+        } as any,
+        {
+          name: "firefox.exe",
+          pid: 5012,
+          flows: 1,
+          flowIds: [102],
+          bytes: 2000,
+          packets: 20,
+        } as any,
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("chrome.exe")).toBeInTheDocument();
+    expect(screen.getByText("firefox.exe")).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText("Search applications by process name, PID, or flow ID...");
+    // Search with multi-term: name and pid
+    fireEvent.change(searchInput, { target: { value: "chrome 4092" } });
+
+    expect(screen.getByText("chrome.exe")).toBeInTheDocument();
+    expect(screen.queryByText("firefox.exe")).not.toBeInTheDocument();
+
+    // Search with multi-term: name and flow id
+    fireEvent.change(searchInput, { target: { value: "firefox 102" } });
+    expect(screen.queryByText("chrome.exe")).not.toBeInTheDocument();
+    expect(screen.getByText("firefox.exe")).toBeInTheDocument();
+  });
+
+  it("clears stale evidence navigation target when capture session resets", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "app.exe",
+          pid: 1111,
+          flows: 1,
+          flowIds: [99],
+          bytes: 100,
+          packets: 1,
+        } as any,
+      ],
+    });
+
+    let navContextRef: any = null;
+    function TargetWatcherWrapper() {
+      const nav = useEvidenceNavigation();
+      navContextRef = nav;
+      return <Apps />;
+    }
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <TargetWatcherWrapper />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    expect(await screen.findByText("app.exe")).toBeInTheDocument();
+
+    // Navigate to flow 99
+    act(() => {
+      navContextRef.navigateToEvidence({ kind: "flow", id: 99 }, "apps");
+    });
+
+    expect(navContextRef.navigationTarget).toEqual({ screen: "apps", flowId: 99 });
+    expect(screen.getByText("Filtered to target flow #99")).toBeInTheDocument();
+
+    // Session reset occurs
+    act(() => {
+      resetSession("session-fresh");
+    });
+
+    // Stale target flow should be cleared so new session isn't stuck on flow #99
+    expect(navContextRef.navigationTarget).toBeNull();
   });
 });

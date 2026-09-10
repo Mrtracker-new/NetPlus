@@ -214,8 +214,13 @@ export function useAppsController() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilterOption>("all");
+  const [sortByFlows, setSortByFlows] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
+
+  const toggleSortByFlows = useCallback(() => {
+    setSortByFlows((prev) => !prev);
+  }, []);
 
   // In-memory attribution cache keyed by Flow ID (NET-DATA-003)
   const attributionCacheRef = useRef<Map<number, Attribution>>(new Map());
@@ -228,6 +233,7 @@ export function useAppsController() {
       attributionCacheRef.current.clear();
       setExpandedKeys(new Set());
       setNotice(null);
+      setSortByFlows(false);
       if (navigationTarget?.screen === "apps") {
         clearNavigationTarget();
       }
@@ -472,7 +478,9 @@ export function useAppsController() {
       }
     }
 
-    // Multi-tier Sorting: High confidence first -> Most flows -> Alphabetical -> Group Key
+    // Multi-tier Sorting:
+    // When sortByFlows is true: Most flows first -> High confidence -> Alphabetical -> Group Key
+    // Default (sortByFlows false): High confidence first -> Most flows -> Alphabetical -> Group Key
     const confidenceRank: Record<AttributionConfidence, number> = {
       high: 0,
       low: 1,
@@ -480,6 +488,15 @@ export function useAppsController() {
     };
 
     return [...map.values()].sort((a, b) => {
+      if (sortByFlows) {
+        const flowDiff = b.flowsCount - a.flowsCount;
+        if (flowDiff !== 0) return flowDiff;
+        const confDiff = confidenceRank[a.confidence] - confidenceRank[b.confidence];
+        if (confDiff !== 0) return confDiff;
+        const nameDiff = a.processName.localeCompare(b.processName);
+        if (nameDiff !== 0) return nameDiff;
+        return a.key.localeCompare(b.key);
+      }
       const confDiff = confidenceRank[a.confidence] - confidenceRank[b.confidence];
       if (confDiff !== 0) return confDiff;
       const flowDiff = b.flowsCount - a.flowsCount;
@@ -488,7 +505,7 @@ export function useAppsController() {
       if (nameDiff !== 0) return nameDiff;
       return a.key.localeCompare(b.key);
     });
-  }, [effectiveMonitor, targetFlowId]);
+  }, [effectiveMonitor, targetFlowId, sortByFlows]);
 
   // Target flow filtering
   const activeGroupedProcesses = useMemo(() => {
@@ -602,6 +619,9 @@ export function useAppsController() {
     setSearchQuery,
     confidenceFilter,
     setConfidenceFilter,
+    sortByFlows,
+    toggleSortByFlows,
+    setSortByFlows,
     targetFlowId,
     clearTargetFlow: clearNavigationTarget,
     expandedKeys,

@@ -3,6 +3,7 @@
   "hero_subtitle": "Process attribution, socket lineage, and confidence scoring across active network flows.",
   "kpi_apps": "Attributed Apps",
   "kpi_flows": "Active Flows",
+  "kpi_flows_action": "Click to toggle sort by flow count.",
   "kpi_confident": "High Confidence",
   "kpi_tentative": "Tentative",
   "kpi_unattributed": "Unattributed",

@@ -4,6 +4,7 @@ import "@testing-library/jest-dom";
 import "../i18n";
 import type { MonitorSnapshot } from "@netpulse/contract";
 import { Apps } from "../screens/Apps";
+import { AppsSummary } from "../screens/Apps/AppsSummary";
 import { resolveFlowDetails } from "../screens/Apps/ProcessRow";
 import {
   useAppsController,
@@ -344,6 +345,151 @@ describe("Apps Screen & useAppsController", () => {
       lowConfidenceCount: 2,
       unattributedCount: 1,
     });
+  });
+
+  it("toggles sort by flow count on Active Flows KPI tile click without resetting confidence filter", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "high-few-flows.exe",
+          pid: 101,
+          flows: 2,
+          flowIds: [1001, 1002],
+          confidence: "high",
+          bytes: 2000,
+          packets: 20,
+        } as any,
+        {
+          name: "low-many-flows.exe",
+          pid: 102,
+          flows: 15,
+          flowIds: [2001, 2002],
+          confidence: "low",
+          bytes: 15000,
+          packets: 150,
+        } as any,
+        {
+          name: "unknown-top-flows",
+          pid: null,
+          flows: 30,
+          flowIds: [3001],
+          confidence: "unknown",
+          bytes: 30000,
+          packets: 300,
+        } as any,
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("high-few-flows.exe")).toBeInTheDocument();
+    expect(screen.getByText("low-many-flows.exe")).toBeInTheDocument();
+    expect(screen.getByText("unknown-top-flows")).toBeInTheDocument();
+
+    // Default multi-tier sorting: High confidence first -> Low -> Unknown
+    const rowsInitial = screen.getAllByRole("row");
+    expect(rowsInitial[1]).toHaveTextContent("high-few-flows.exe");
+    expect(rowsInitial[2]).toHaveTextContent("low-many-flows.exe");
+    expect(rowsInitial[3]).toHaveTextContent("unknown-top-flows");
+
+    // Locate Active Flows KPI tile
+    const activeFlowsKpi = screen.getByRole("button", { name: /Active Flows: 47/i });
+    expect(activeFlowsKpi).toBeInTheDocument();
+    expect(activeFlowsKpi).toHaveAttribute("data-tier", "flows");
+    expect(activeFlowsKpi).toHaveAttribute("data-active", "false");
+    expect(activeFlowsKpi).toHaveAttribute("aria-pressed", "false");
+    expect(activeFlowsKpi).toHaveAttribute(
+      "aria-label",
+      expect.stringContaining("Click to toggle sort by flow count.")
+    );
+
+    // Filter to tentative (low) confidence first to verify confidence is NOT reset
+    const tentativeKpi = screen.getByRole("button", { name: /Tentative: 1/i });
+    fireEvent.click(tentativeKpi);
+    expect(screen.getByText("low-many-flows.exe")).toBeInTheDocument();
+    expect(screen.queryByText("high-few-flows.exe")).not.toBeInTheDocument();
+    expect(screen.queryByText("unknown-top-flows")).not.toBeInTheDocument();
+
+    // Click Active Flows KPI tile: must NOT reset confidence filter to 'all'
+    fireEvent.click(activeFlowsKpi);
+
+    expect(activeFlowsKpi).toHaveAttribute("data-active", "true");
+    expect(activeFlowsKpi).toHaveAttribute("aria-pressed", "true");
+    // Confidence filter is still 'low'!
+    expect(screen.getByText("low-many-flows.exe")).toBeInTheDocument();
+    expect(screen.queryByText("high-few-flows.exe")).not.toBeInTheDocument();
+    expect(screen.queryByText("unknown-top-flows")).not.toBeInTheDocument();
+
+    // Clear confidence filter to 'all'
+    const totalAppsKpi = screen.getByRole("button", { name: /Attributed Apps: 3/i });
+    fireEvent.click(totalAppsKpi);
+
+    // When all processes visible and sortByFlows is true:
+    // Process with most flows ranks first: unknown-top-flows (30) -> low-many-flows (15) -> high-few-flows (2)
+    const rowsSorted = screen.getAllByRole("row");
+    expect(rowsSorted[1]).toHaveTextContent("unknown-top-flows");
+    expect(rowsSorted[2]).toHaveTextContent("low-many-flows.exe");
+    expect(rowsSorted[3]).toHaveTextContent("high-few-flows.exe");
+
+    // Click Active Flows tile again to toggle sort by flows off
+    fireEvent.click(activeFlowsKpi);
+    expect(activeFlowsKpi).toHaveAttribute("data-active", "false");
+    expect(activeFlowsKpi).toHaveAttribute("aria-pressed", "false");
+
+    // Restores default multi-tier confidence-first ordering
+    const rowsDefaultAgain = screen.getAllByRole("row");
+    expect(rowsDefaultAgain[1]).toHaveTextContent("high-few-flows.exe");
+    expect(rowsDefaultAgain[2]).toHaveTextContent("low-many-flows.exe");
+    expect(rowsDefaultAgain[3]).toHaveTextContent("unknown-top-flows");
+  });
+
+  it("AppsSummary component delegates Active Flows click to onToggleSortByFlows and displays active state", () => {
+    const onToggleSortByFlows = vi.fn();
+    const onSelectConfidence = vi.fn();
+    const metrics = {
+      totalApps: 3,
+      totalFlows: 42,
+      highConfidenceCount: 1,
+      lowConfidenceCount: 1,
+      unattributedCount: 1,
+    };
+
+    const { rerender } = render(
+      <AppsSummary
+        metrics={metrics}
+        activeConfidence="all"
+        onSelectConfidence={onSelectConfidence}
+        sortByFlows={false}
+        onToggleSortByFlows={onToggleSortByFlows}
+      />
+    );
+
+    const flowsBtn = screen.getByRole("button", { name: /Active Flows: 42/i });
+    expect(flowsBtn).toHaveAttribute("data-active", "false");
+    expect(flowsBtn).toHaveAttribute("aria-pressed", "false");
+    expect(flowsBtn).toHaveAttribute(
+      "aria-label",
+      "Active Flows: 42. Click to toggle sort by flow count."
+    );
+
+    fireEvent.click(flowsBtn);
+    expect(onToggleSortByFlows).toHaveBeenCalledTimes(1);
+    expect(onSelectConfidence).not.toHaveBeenCalled();
+
+    // Rerender with sortByFlows={true}
+    rerender(
+      <AppsSummary
+        metrics={metrics}
+        activeConfidence="all"
+        onSelectConfidence={onSelectConfidence}
+        sortByFlows={true}
+        onToggleSortByFlows={onToggleSortByFlows}
+      />
+    );
+
+    expect(flowsBtn).toHaveAttribute("data-active", "true");
+    expect(flowsBtn).toHaveAttribute("aria-pressed", "true");
   });
 
   it("supports search clear button and Escape key without resetting confidence filter", async () => {

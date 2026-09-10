@@ -5,14 +5,26 @@ export interface AppsSummaryProps {
   metrics: AppsSummaryMetrics;
   activeConfidence?: ConfidenceFilterOption;
   onSelectConfidence?: (option: ConfidenceFilterOption) => void;
+  sortByFlows?: boolean;
+  onToggleSortByFlows?: () => void;
+  sortByFlowCount?: boolean;
+  onToggleSortByFlowCount?: () => void;
+  onToggleSortFlows?: () => void;
 }
 
 export function AppsSummary({
   metrics,
   activeConfidence = "all",
   onSelectConfidence,
+  sortByFlows = false,
+  onToggleSortByFlows,
+  sortByFlowCount,
+  onToggleSortByFlowCount,
+  onToggleSortFlows,
 }: AppsSummaryProps) {
   const { t } = useTranslation(["apps"]);
+
+  const isFlowSortActive = Boolean(sortByFlowCount ?? sortByFlows);
 
   const handleCardClick = (targetOption: ConfidenceFilterOption) => {
     if (!onSelectConfidence) return;
@@ -22,6 +34,16 @@ export function AppsSummary({
       onSelectConfidence("all");
     } else {
       onSelectConfidence(targetOption);
+    }
+  };
+
+  const handleFlowsClick = () => {
+    if (onToggleSortByFlows) {
+      onToggleSortByFlows();
+    } else if (onToggleSortByFlowCount) {
+      onToggleSortByFlowCount();
+    } else if (onToggleSortFlows) {
+      onToggleSortFlows();
     }
   };
 
@@ -53,10 +75,10 @@ export function AppsSummary({
           type="button"
           className="np-apps-kpi"
           data-tier="flows"
-          data-active={false}
-          onClick={() => handleCardClick("all")}
-          aria-pressed={false}
-          aria-label={`${t("kpi_flows")}: ${metrics.totalFlows}. Click to reset confidence filter.`}
+          data-active={isFlowSortActive}
+          onClick={handleFlowsClick}
+          aria-pressed={isFlowSortActive}
+          aria-label={`${t("kpi_flows")}: ${metrics.totalFlows}. ${t("kpi_flows_action", "Click to toggle sort by flow count.")}`}
         >
           <div className="np-apps-kpi__top">
             <span className="np-apps-kpi__label">{t("kpi_flows")}</span>

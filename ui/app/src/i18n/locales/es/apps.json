@@ -3,6 +3,7 @@
   "hero_subtitle": "Atribución de procesos, linaje de sockets y puntuación de confianza en flujos de red activos.",
   "kpi_apps": "Aplicaciones Atribuidas",
   "kpi_flows": "Flujos Activos",
+  "kpi_flows_action": "Haz clic para alternar el orden por conteo de flujos.",
   "kpi_confident": "Alta Confianza",
   "kpi_tentative": "Tentativa",
   "kpi_unattributed": "Sin Atribuir",

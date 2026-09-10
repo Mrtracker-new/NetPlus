@@ -18,6 +18,8 @@ export function Apps() {
     setSearchQuery,
     confidenceFilter,
     setConfidenceFilter,
+    sortByFlows,
+    toggleSortByFlows,
     targetFlowId,
     clearTargetFlow,
     expandedKeys,
@@ -149,6 +151,8 @@ export function Apps() {
             metrics={summaryMetrics}
             activeConfidence={confidenceFilter}
             onSelectConfidence={setConfidenceFilter}
+            sortByFlows={sortByFlows}
+            onToggleSortByFlows={toggleSortByFlows}
           />
 
           {/* Search & Confidence Level Filter Bar */}

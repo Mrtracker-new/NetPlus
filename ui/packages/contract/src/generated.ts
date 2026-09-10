@@ -113,6 +113,7 @@ export interface ProcessMetric {
   flows: number;
   cpu_percent?: number | null;
   memory_bytes?: number | null;
+  flow_ids?: number[];
 }
 
 export interface FlowLineage {
@@ -124,6 +125,8 @@ export interface FlowLineage {
   direction: string;
   flow_count: number;
   classification: EndpointClassification;
+  pid?: number | null;
+  process_name?: string | null;
 }
 
 export interface SubsystemStatus {

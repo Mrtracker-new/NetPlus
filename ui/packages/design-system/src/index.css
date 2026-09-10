@@ -10435,6 +10435,155 @@ svg path {
   box-shadow: var(--np-neu-inset), 0 0 0 2px var(--np-accent);
 }
 
+/* ---- Socket Lineage Conduit Cards & Badges ---- */
+.np-apps-lineage-tray__section-title {
+  font-size: var(--np-fs-2xs, 0.5625rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.08em);
+  margin: 8px 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.np-apps-conduits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-apps-conduit-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  padding: 8px 14px;
+  border-radius: var(--np-radius-xs, 6px);
+  transition: transform var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease);
+}
+
+.np-apps-conduit-card:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-conduit-card__endpoint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.np-apps-conduit-card__gem {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--np-accent-2);
+  box-shadow: 0 0 5px var(--np-accent-2);
+  flex-shrink: 0;
+}
+
+.np-apps-conduit-card__info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.np-apps-conduit-card__destination {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-sm, 0.78rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text);
+  letter-spacing: -0.01em;
+  word-break: break-all;
+}
+
+.np-apps-conduit-card__source {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-2xs, 0.5625rem);
+  color: var(--np-text-mute);
+}
+
+.np-apps-conduit-card__badges {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.np-apps-conduit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--np-radius-pill, 999px);
+  font-size: var(--np-fs-2xs, 0.5625rem);
+  font-weight: var(--np-fw-semibold, 650);
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-border);
+  box-shadow: var(--np-neu-control);
+  color: var(--np-text-dim);
+  user-select: none;
+  letter-spacing: 0.03em;
+}
+
+.np-apps-conduit-badge--protocol {
+  font-family: var(--np-font-mono);
+  color: var(--np-accent-strong);
+  background: var(--np-accent-soft);
+  border-color: var(--np-accent-line);
+}
+
+.np-apps-conduit-badge--direction {
+  font-family: var(--np-font);
+}
+
+.np-apps-conduit-badge--outbound {
+  color: var(--np-accent-2);
+  background: var(--np-accent-2-soft);
+  border-color: rgba(124, 131, 247, 0.35);
+}
+
+.np-apps-conduit-badge--inbound {
+  color: var(--np-good);
+  background: var(--np-good-soft);
+  border-color: rgba(53, 176, 133, 0.35);
+}
+
+.np-apps-conduit-badge--local {
+  color: var(--np-neutral);
+  background: var(--np-surface-3);
+  border-color: var(--np-border-strong);
+}
+
+.np-apps-conduit-badge--classification {
+  color: var(--np-text-dim);
+  background: var(--np-surface-elevated, var(--np-surface-2));
+  border-color: var(--np-border);
+}
+
+.np-apps-conduit-badge__glyph {
+  font-size: 0.625rem;
+  line-height: 1;
+}
+
+.np-apps-conduit-card__bandwidth {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs, 0.6875rem);
+  font-weight: var(--np-fw-medium, 550);
+  color: var(--np-text);
+  padding: 3px 8px;
+  border-radius: var(--np-radius-xs, 4px);
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-hairline);
+}
+
 .np-apps-skeleton__sub {
   margin-top: 6px;
 }
@@ -10467,7 +10616,8 @@ svg path {
   .np-apps-row__toggle,
   .np-apps-row__chevron,
   .np-apps-flow-card,
-  .np-apps-flow-card__inspect {
+  .np-apps-flow-card__inspect,
+  .np-apps-conduit-card {
     transition: none !important;
     transform: none !important;
   }

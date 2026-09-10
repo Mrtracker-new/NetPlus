@@ -297,6 +297,8 @@ pub struct ProcessMetricDto {
     pub cpu_percent: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub memory_bytes: Option<u64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub flow_ids: Vec<u64>,
 }
 
 /// An observed communicating flow lineage pair.
@@ -310,6 +312,10 @@ pub struct FlowLineageDto {
     pub direction: String,
     pub flow_count: u32,
     pub classification: EndpointClassificationDto,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_name: Option<String>,
 }
 
 /// Authentic health status of an engine or platform subsystem.
@@ -1090,6 +1096,7 @@ mod tests {
                 flows: 1,
                 cpu_percent: None,
                 memory_bytes: None,
+                flow_ids: vec![],
             }],
             lineage: vec![FlowLineageDto {
                 source: "10.0.0.1".into(),
@@ -1100,6 +1107,8 @@ mod tests {
                 direction: "outbound".into(),
                 flow_count: 1,
                 classification: EndpointClassificationDto::LocalSubnet,
+                pid: None,
+                process_name: None,
             }],
             subsystems: vec![SubsystemStatusDto {
                 name: "Capture".into(),
@@ -1501,6 +1510,7 @@ mod tests {
             flows: 3,
             cpu_percent: Some(2.5),
             memory_bytes: Some(120_000_000),
+            flow_ids: vec![101, 102],
         });
         roundtrip(&FlowLineageDto {
             source: "192.168.1.100".into(),
@@ -1511,6 +1521,8 @@ mod tests {
             direction: "outbound".into(),
             flow_count: 2,
             classification: EndpointClassificationDto::ExternalWan,
+            pid: Some(1234),
+            process_name: Some("chrome.exe".into()),
         });
         roundtrip(&SubsystemStatusDto {
             name: "Capture Pipeline".into(),
@@ -1623,6 +1635,7 @@ mod tests {
                 flows: 45 - (i as u32 * 3),
                 cpu_percent: pid.map(|_| 12.5 + (i as f32 * 1.5)),
                 memory_bytes: pid.map(|_| 1024 * 1024 * 256 + (i as u64 * 1024 * 1024 * 32)),
+                flow_ids: vec![],
             })
             .collect();
 
@@ -1705,6 +1718,8 @@ mod tests {
                 },
                 flow_count: 6 + (i as u32),
                 classification: *class,
+                pid: None,
+                process_name: None,
             })
             .collect();
 

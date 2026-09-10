@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import type { Attribution, AttributionConfidence, ProcessMetric } from "@netpulse/contract";
+import type { Attribution, AttributionConfidence, FlowLineage, ProcessMetric } from "@netpulse/contract";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
@@ -18,6 +18,7 @@ export interface GroupedProcess {
   flowIds: number[];
   flowsCount: number;
   normalizedSearch: string;
+  lineage: FlowLineage[];
 }
 
 export interface AppsSummaryMetrics {
@@ -44,6 +45,104 @@ function deriveConfidence(proc: ProcessMetric): AttributionConfidence {
     return "low";
   }
   return "high";
+}
+
+function correlateLineageForProcess(
+  proc: ProcessMetric,
+  rawLineage: FlowLineage[],
+  procFlowIds: number[],
+  allProcesses: ProcessMetric[]
+): FlowLineage[] {
+  if (Array.isArray((proc as any).lineage) && (proc as any).lineage.length > 0) {
+    return (proc as any).lineage;
+  }
+
+  const name = (proc.name || "").toLowerCase();
+  const pid = proc.pid ?? null;
+
+  const hasExplicitTags = rawLineage.some(
+    (l: any) =>
+      l.pid != null ||
+      l.process_name != null ||
+      l.process != null ||
+      l.processName != null ||
+      l.name != null ||
+      l.flow_id != null ||
+      l.flowId != null ||
+      l.flow_ids != null ||
+      l.flowIds != null
+  );
+
+  if (hasExplicitTags) {
+    return rawLineage.filter((l: any) => {
+      // 1. Strict PID isolation: when both have a PID, they must match.
+      // Different PIDs sharing the same executable name (e.g. svchost.exe or chrome.exe) must never bleed conduits.
+      if (pid !== null && l.pid != null) {
+        return Number(l.pid) === Number(pid);
+      }
+
+      // 2. Flow ID correlation
+      if (procFlowIds.length > 0) {
+        if (l.flow_id != null && procFlowIds.includes(Number(l.flow_id))) return true;
+        if (l.flowId != null && procFlowIds.includes(Number(l.flowId))) return true;
+        if (Array.isArray(l.flow_ids) && l.flow_ids.some((fid: any) => procFlowIds.includes(Number(fid)))) return true;
+        if (Array.isArray(l.flowIds) && l.flowIds.some((fid: any) => procFlowIds.includes(Number(fid)))) return true;
+      }
+
+      // 3. Name-based attribution when PID is absent on conduit or process
+      if (l.pid == null || pid === null) {
+        const lName = (l.process_name || l.process || l.processName || l.name || "").toLowerCase();
+        if (lName && (lName === name || name.includes(lName) || lName.includes(name))) {
+          return true;
+        }
+      }
+
+      // 4. Fallback for unattributed/unknown owner bucket
+      if (
+        (name.includes("unattributed") || name === "unknown owner" || (pid === null && !proc.name)) &&
+        l.pid == null &&
+        !l.process_name &&
+        !l.process &&
+        !l.processName &&
+        !l.name &&
+        l.flow_id == null &&
+        l.flowId == null
+      ) {
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (allProcesses.length === 1) {
+    return rawLineage;
+  }
+
+  if (pid === null || name.includes("unattributed") || name === "unknown owner") {
+    return rawLineage;
+  }
+
+  return [];
+}
+
+function mergeLineage(existing: FlowLineage[] = [], incoming: FlowLineage[] = []): FlowLineage[] {
+  const map = new Map<string, FlowLineage>();
+  for (const item of existing || []) {
+    const key = `${item.source || ""}:${item.destination || ""}:${item.protocol || ""}:${item.direction || ""}:${item.classification || ""}`;
+    map.set(key, { ...item });
+  }
+  for (const item of incoming || []) {
+    const key = `${item.source || ""}:${item.destination || ""}:${item.protocol || ""}:${item.direction || ""}:${item.classification || ""}`;
+    const prev = map.get(key);
+    if (prev) {
+      prev.bytes = (prev.bytes || 0) + (item.bytes || 0);
+      prev.packets = (prev.packets || 0) + (item.packets || 0);
+      prev.flow_count = (prev.flow_count || 0) + (item.flow_count || 1);
+    } else {
+      map.set(key, { ...item });
+    }
+  }
+  return Array.from(map.values());
 }
 
 export function useAppsController() {
@@ -113,13 +212,42 @@ export function useAppsController() {
         ? (proc as any).flow_ids
         : [];
       const procFlowIds = Array.from(new Set(rawProcFlowIds));
+
+      const correlatedLineage = correlateLineageForProcess(
+        proc,
+        rawLineage,
+        procFlowIds,
+        effectiveProcesses
+      );
+
+      // Extract any flow IDs referenced inside correlated lineage conduits
+      const lineageFlowIds: number[] = [];
+      for (const lin of correlatedLineage as any[]) {
+        if (lin.flow_id != null && !isNaN(Number(lin.flow_id))) {
+          lineageFlowIds.push(Number(lin.flow_id));
+        }
+        if (lin.flowId != null && !isNaN(Number(lin.flowId))) {
+          lineageFlowIds.push(Number(lin.flowId));
+        }
+        if (Array.isArray(lin.flow_ids)) {
+          for (const fid of lin.flow_ids) {
+            if (fid != null && !isNaN(Number(fid))) lineageFlowIds.push(Number(fid));
+          }
+        }
+        if (Array.isArray(lin.flowIds)) {
+          for (const fid of lin.flowIds) {
+            if (fid != null && !isNaN(Number(fid))) lineageFlowIds.push(Number(fid));
+          }
+        }
+      }
+      const combinedFlowIds = Array.from(new Set([...procFlowIds, ...lineageFlowIds]));
       const flowsCount = Math.max(
         typeof proc.flows === "number" ? proc.flows : 0,
-        procFlowIds.length
+        combinedFlowIds.length
       );
 
       // Cache flow attributions in memory (NET-DATA-003)
-      for (const fid of procFlowIds) {
+      for (const fid of combinedFlowIds) {
         attributionCacheRef.current.set(fid, {
           process_name: name,
           pid,
@@ -134,22 +262,55 @@ export function useAppsController() {
           processName: name,
           pid,
           confidence,
-          flowIds: [...procFlowIds],
+          flowIds: [...combinedFlowIds],
           flowsCount,
+          lineage: mergeLineage([], correlatedLineage),
           normalizedSearch: `${name} ${pid !== null ? `pid ${pid}` : "none"} ${confidence}`.toLowerCase(),
         };
-        for (const fid of procFlowIds) {
+        for (const fid of combinedFlowIds) {
           group.normalizedSearch += ` ${fid}`;
+        }
+        for (const lin of group.lineage) {
+          const linTokens = [
+            lin.destination,
+            lin.protocol,
+            lin.classification,
+            lin.classification ? lin.classification.replace(/_/g, " ") : "",
+            lin.direction,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (linTokens) {
+            group.normalizedSearch += ` ${linTokens}`;
+          }
         }
         map.set(groupKey, group);
       } else {
-        group.flowsCount += flowsCount;
-        for (const fid of procFlowIds) {
+        group.flowsCount = Math.max(group.flowsCount + flowsCount, group.flowIds.length);
+        group.lineage = mergeLineage(group.lineage, correlatedLineage);
+        for (const fid of combinedFlowIds) {
           if (!group.flowIds.includes(fid)) {
             group.flowIds.push(fid);
             group.normalizedSearch += ` ${fid}`;
           }
         }
+        for (const lin of correlatedLineage) {
+          const linTokens = [
+            lin.destination,
+            lin.protocol,
+            lin.classification,
+            lin.classification ? lin.classification.replace(/_/g, " ") : "",
+            lin.direction,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          if (linTokens && !group.normalizedSearch.includes(linTokens)) {
+            group.normalizedSearch += ` ${linTokens}`;
+          }
+        }
+        group.flowsCount = Math.max(group.flowsCount, group.flowIds.length);
       }
     }
 

@@ -928,13 +928,18 @@ pub fn aggregate_processes(
         flows: u32,
         cpu_percent: Option<f32>,
         memory_bytes: Option<u64>,
+        flow_ids: Vec<u64>,
     }
 
     let mut map: HashMap<(Option<u64>, String), Agg> = HashMap::new();
     let mut proc_cache: HashMap<u64, Option<netpulse_core::Process>> = HashMap::new();
 
     for flow in flows {
-        let pid_opt = correlator.and_then(|c| c.attribute(&flow.key, flow.first_ts.mono_nanos).pid);
+        let pid_opt = correlator.and_then(|c| {
+            c.attribute(&flow.key, flow.first_ts.mono_nanos)
+                .pid
+                .or_else(|| c.attribute(&flow.key, flow.last_ts.mono_nanos).pid)
+        });
         let (pid, name, exe_path, cpu_percent, memory_bytes) = if let Some(pid) = pid_opt {
             let proc_info = proc_cache
                 .entry(pid)
@@ -967,10 +972,14 @@ pub fn aggregate_processes(
             flows: 0,
             cpu_percent,
             memory_bytes,
+            flow_ids: Vec::new(),
         });
         entry.bytes = entry.bytes.saturating_add(flow.stats.bytes);
         entry.packets = entry.packets.saturating_add(flow.stats.packets);
         entry.flows = entry.flows.saturating_add(1);
+        if !entry.flow_ids.contains(&flow.id) {
+            entry.flow_ids.push(flow.id);
+        }
     }
 
     let mut list: Vec<ProcessMetricDto> = map
@@ -984,6 +993,7 @@ pub fn aggregate_processes(
             flows: agg.flows,
             cpu_percent: agg.cpu_percent,
             memory_bytes: agg.memory_bytes,
+            flow_ids: agg.flow_ids,
         })
         .collect();
 
@@ -993,7 +1003,12 @@ pub fn aggregate_processes(
 }
 
 /// Aggregate communicating endpoints into flow lineage pairs.
-pub fn aggregate_lineage(flows: &[&Flow], names: &NameMap) -> Vec<FlowLineageDto> {
+pub fn aggregate_lineage(
+    flows: &[&Flow],
+    names: &NameMap,
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
+) -> Vec<FlowLineageDto> {
     if flows.is_empty() {
         return Vec::new();
     }
@@ -1007,11 +1022,32 @@ pub fn aggregate_lineage(flows: &[&Flow], names: &NameMap) -> Vec<FlowLineageDto
         direction: String,
         flow_count: u32,
         classification: EndpointClassificationDto,
+        pid: Option<u64>,
+        process_name: Option<String>,
     }
 
-    let mut map: HashMap<(String, String, String), LineageAgg> = HashMap::new();
+    let mut map: HashMap<(String, String, String, Option<u64>), LineageAgg> = HashMap::new();
+    let mut proc_cache: HashMap<u64, Option<netpulse_core::Process>> = HashMap::new();
 
     for flow in flows {
+        let pid_opt = correlator.and_then(|c| {
+            c.attribute(&flow.key, flow.first_ts.mono_nanos)
+                .pid
+                .or_else(|| c.attribute(&flow.key, flow.last_ts.mono_nanos).pid)
+        });
+        let (pid, process_name) = if let Some(pid) = pid_opt {
+            let proc_info = proc_cache
+                .entry(pid)
+                .or_insert_with(|| sockets.and_then(|s| s.process_info(pid).ok().flatten()));
+            if let Some(p) = proc_info {
+                (Some(pid), Some(p.name.clone()))
+            } else {
+                (Some(pid), Some(format!("PID {pid}")))
+            }
+        } else {
+            (None, None)
+        };
+
         let src_ip_str = flow.key.src_ip.to_string();
         let dst_ip = flow.key.dst_ip;
         let dst_name = names
@@ -1048,7 +1084,7 @@ pub fn aggregate_lineage(flows: &[&Flow], names: &NameMap) -> Vec<FlowLineageDto
             classify_endpoint(&dst_ip)
         };
 
-        let key = (src_ip_str.clone(), dst_name.clone(), proto_str.clone());
+        let key = (src_ip_str.clone(), dst_name.clone(), proto_str.clone(), pid);
         let entry = map.entry(key).or_insert_with(|| LineageAgg {
             source: src_ip_str,
             destination: dst_name,
@@ -1058,6 +1094,8 @@ pub fn aggregate_lineage(flows: &[&Flow], names: &NameMap) -> Vec<FlowLineageDto
             direction: direction.to_string(),
             flow_count: 0,
             classification,
+            pid,
+            process_name,
         });
 
         entry.bytes = entry.bytes.saturating_add(flow.stats.bytes);
@@ -1076,11 +1114,13 @@ pub fn aggregate_lineage(flows: &[&Flow], names: &NameMap) -> Vec<FlowLineageDto
             direction: a.direction,
             flow_count: a.flow_count,
             classification: a.classification,
+            pid: a.pid,
+            process_name: a.process_name,
         })
         .collect();
 
     list.sort_by_key(|b| std::cmp::Reverse(b.bytes));
-    list.truncate(10);
+    list.truncate(100);
     list
 }
 
@@ -1282,7 +1322,7 @@ pub fn snapshot_window(
         names,
     );
     let processes = aggregate_processes(flows, correlator, sockets);
-    let lineage = aggregate_lineage(flows, names);
+    let lineage = aggregate_lineage(flows, names, correlator, sockets);
     let subsystems = evaluate_subsystems(
         flows,
         capture_stats.as_ref(),
@@ -1602,7 +1642,7 @@ mod tests {
     #[test]
     fn empty_flows_yield_empty_aggregations() {
         assert!(aggregate_processes(&[], None, None).is_empty());
-        assert!(aggregate_lineage(&[], &NameMap::new()).is_empty());
+        assert!(aggregate_lineage(&[], &NameMap::new(), None, None).is_empty());
         assert!(bucket_throughput_series(&[], 0, 10_000_000_000).is_empty());
     }
 
@@ -1679,7 +1719,7 @@ mod tests {
     fn lineage_classifies_local_and_external_endpoints() {
         let f1 = flow(1, ip(192, 168, 1, 1), L7Proto::Unknown, 5_000, None, 0);
         let f2 = flow(2, ip(93, 184, 216, 34), L7Proto::Unknown, 15_000, None, 0);
-        let lineage = aggregate_lineage(&[&f1, &f2], &NameMap::new());
+        let lineage = aggregate_lineage(&[&f1, &f2], &NameMap::new(), None, None);
         assert_eq!(lineage.len(), 2);
         // Ordered by bytes descending
         assert_eq!(lineage[0].destination, "93.184.216.34");

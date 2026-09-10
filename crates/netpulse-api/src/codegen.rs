@@ -219,6 +219,7 @@ pub fn typescript_contract() -> String {
             ("flows", "number"),
             ("cpu_percent?", "number | null"),
             ("memory_bytes?", "number | null"),
+            ("flow_ids?", "number[]"),
         ],
     ));
     s.push_str(&iface(
@@ -232,6 +233,8 @@ pub fn typescript_contract() -> String {
             ("direction", "string"),
             ("flow_count", "number"),
             ("classification", "EndpointClassification"),
+            ("pid?", "number | null"),
+            ("process_name?", "string | null"),
         ],
     ));
     s.push_str(&iface(

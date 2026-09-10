@@ -795,4 +795,379 @@ describe("Apps Screen & useAppsController", () => {
     // Stale target flow should be cleared so new session isn't stuck on flow #99
     expect(navContextRef.navigationTarget).toBeNull();
   });
+
+  describe("Socket Lineage in Expanded Row Tray", () => {
+    it("displays communicating endpoint hostnames/IPs, protocol badges, direction badges, bandwidth, and classification", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "curl.exe",
+            pid: 4321,
+            flows: 1,
+            flowIds: [301],
+            bytes: 65536,
+            packets: 40,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.50",
+            destination: "api.github.com",
+            protocol: "HTTPS",
+            bytes: 65536,
+            packets: 40,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+          },
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const expandBtn = screen.getByRole("button", { name: /Expand curl.exe/i });
+      fireEvent.click(expandBtn);
+
+      // Acceptance Criteria 1: Expanded tray displays communicating endpoint hostnames/IPs
+      expect(screen.getByText("api.github.com")).toBeInTheDocument();
+      expect(screen.getByText("from 192.168.1.50")).toBeInTheDocument();
+
+      // Acceptance Criteria 2: Protocol and direction badges rendered for each lineage conduit
+      expect(screen.getByLabelText("Protocol: HTTPS")).toHaveTextContent("HTTPS");
+      expect(screen.getByLabelText("Direction: Outbound")).toHaveTextContent("Outbound");
+
+      // Required Change: display endpoint pairs (Destination, Protocol, Bandwidth, Classification)
+      expect(screen.getByLabelText("Classification: External WAN")).toHaveTextContent("External WAN");
+      expect(screen.getByLabelText("Bandwidth: 64 KB")).toHaveTextContent("64 KB");
+
+      // Active flow ID inspection preserved
+      expect(screen.getByText("Flow #301")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Inspect Flow #301/i })).toBeInTheDocument();
+    });
+
+    it("correlates lineage conduits to specific processes in multi-process snapshots", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "chrome.exe",
+            pid: 1001,
+            flows: 1,
+            flowIds: [10],
+            bytes: 1048576,
+            packets: 500,
+          } as any,
+          {
+            name: "spotify.exe",
+            pid: 2002,
+            flows: 1,
+            flowIds: [20],
+            bytes: 2097152,
+            packets: 1000,
+          } as any,
+          {
+            name: "slack.exe",
+            pid: 3003,
+            flows: 1,
+            flowIds: [30],
+            bytes: 5000,
+            packets: 10,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.100",
+            destination: "google.com",
+            protocol: "HTTPS",
+            bytes: 1048576,
+            packets: 500,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "cdn_edge",
+            process_name: "chrome.exe",
+            pid: 1001,
+          } as any,
+          {
+            source: "192.168.1.100",
+            destination: "audio-ak.spotify.com",
+            protocol: "TCP",
+            bytes: 2097152,
+            packets: 1000,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "cdn_edge",
+            process_name: "spotify.exe",
+            pid: 2002,
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("chrome.exe")).toBeInTheDocument();
+      expect(screen.getByText("spotify.exe")).toBeInTheDocument();
+      expect(screen.getByText("slack.exe")).toBeInTheDocument();
+
+      // Expand chrome.exe
+      const expandChrome = screen.getByRole("button", { name: /Expand chrome.exe/i });
+      fireEvent.click(expandChrome);
+
+      expect(screen.getByText("google.com")).toBeInTheDocument();
+      expect(screen.queryByText("audio-ak.spotify.com")).not.toBeInTheDocument();
+
+      // Expand spotify.exe
+      const expandSpotify = screen.getByRole("button", { name: /Expand spotify.exe/i });
+      fireEvent.click(expandSpotify);
+
+      expect(screen.getByText("audio-ak.spotify.com")).toBeInTheDocument();
+
+      // Expand slack.exe (has flow #30, but no socket lineage in rawLineage)
+      const expandSlack = screen.getByRole("button", { name: /Expand slack.exe/i });
+      fireEvent.click(expandSlack);
+
+      // Must display its own flow #30 and NEVER leak other processes' lineage
+      expect(screen.getByText("Flow #30")).toBeInTheDocument();
+      expect(screen.queryByText("slack.exe communicates with google.com")).not.toBeInTheDocument();
+    });
+
+    it("surfaces lineage for Unattributed Flows when processes array is empty", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [],
+        lineage: [
+          {
+            source: "192.168.1.15",
+            destination: "1.1.1.1",
+            protocol: "DNS",
+            bytes: 512,
+            packets: 2,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+          },
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("Unattributed Flows")).toBeInTheDocument();
+
+      const expandBtn = screen.getByRole("button", { name: /Expand Unattributed Flows/i });
+      fireEvent.click(expandBtn);
+
+      expect(screen.getByText("1.1.1.1")).toBeInTheDocument();
+      expect(screen.getByLabelText("Protocol: DNS")).toHaveTextContent("DNS");
+      expect(screen.getByLabelText("Direction: Outbound")).toHaveTextContent("Outbound");
+      expect(screen.getByLabelText("Classification: External WAN")).toHaveTextContent("External WAN");
+      expect(screen.getByLabelText("Bandwidth: 512 B")).toHaveTextContent("512 B");
+    });
+
+    it("allows searching processes by communicating endpoint destination and protocol", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "browser.exe",
+            pid: 1111,
+            flows: 1,
+            flowIds: [1],
+            bytes: 1000,
+            packets: 10,
+          } as any,
+          {
+            name: "downloader.exe",
+            pid: 2222,
+            flows: 1,
+            flowIds: [2],
+            bytes: 2000,
+            packets: 20,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "10.0.0.1",
+            destination: "cdn.cloudflare.net",
+            protocol: "HTTPS",
+            bytes: 1000,
+            packets: 10,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "cdn_edge",
+            pid: 1111,
+          } as any,
+          {
+            source: "10.0.0.1",
+            destination: "ftp.debian.org",
+            protocol: "FTP",
+            bytes: 2000,
+            packets: 20,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+            pid: 2222,
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("browser.exe")).toBeInTheDocument();
+      expect(screen.getByText("downloader.exe")).toBeInTheDocument();
+
+      const searchInput = screen.getByPlaceholderText("Search applications by process name, PID, or flow ID...");
+      
+      // Search by endpoint hostname
+      fireEvent.change(searchInput, { target: { value: "cloudflare" } });
+      expect(screen.getByText("browser.exe")).toBeInTheDocument();
+      expect(screen.queryByText("downloader.exe")).not.toBeInTheDocument();
+
+      // Search by protocol
+      fireEvent.change(searchInput, { target: { value: "FTP" } });
+      expect(screen.queryByText("browser.exe")).not.toBeInTheDocument();
+      expect(screen.getByText("downloader.exe")).toBeInTheDocument();
+    });
+
+    it("isolates untagged lineage to unattributed flows and prevents bleed into named processes in multi-process snapshots", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "isolated.exe",
+            pid: 9999,
+            flows: 1,
+            flowIds: [999],
+            bytes: 50000,
+            packets: 25,
+          } as any,
+          {
+            name: "Unattributed Flows",
+            pid: null,
+            flows: 2,
+            bytes: 1000,
+            packets: 10,
+          } as any,
+        ],
+        // Raw lineage has zero process or flow tags
+        lineage: [
+          {
+            source: "192.168.1.5",
+            destination: "untagged-conduit.internal",
+            protocol: "DNS",
+            bytes: 1000,
+            packets: 10,
+            direction: "outbound",
+            flow_count: 2,
+            classification: "local_subnet",
+          },
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("isolated.exe")).toBeInTheDocument();
+      expect(screen.getByText("Unattributed Flows")).toBeInTheDocument();
+
+      // Expand isolated.exe: should NOT show untagged-conduit.internal
+      const expandIsolated = screen.getByRole("button", { name: /Expand isolated.exe/i });
+      fireEvent.click(expandIsolated);
+
+      expect(screen.getByText("Flow #999")).toBeInTheDocument();
+      expect(screen.queryByText("untagged-conduit.internal")).not.toBeInTheDocument();
+
+      // Expand Unattributed Flows: MUST show untagged-conduit.internal
+      const expandUnattr = screen.getByRole("button", { name: /Expand Unattributed Flows/i });
+      fireEvent.click(expandUnattr);
+
+      expect(screen.getByText("untagged-conduit.internal")).toBeInTheDocument();
+      expect(screen.getByLabelText("Protocol: DNS")).toBeInTheDocument();
+    });
+
+    it("discovers and exposes flow IDs embedded within lineage conduits for inspection", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "service.exe",
+            pid: 7777,
+            flows: 1,
+            // process itself does not have flowIds array
+            bytes: 2048,
+            packets: 15,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.20",
+            destination: "service-api.domain.com",
+            protocol: "HTTPS",
+            bytes: 2048,
+            packets: 15,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+            pid: 7777,
+            flow_id: 888, // Discovered from conduit
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("service.exe")).toBeInTheDocument();
+
+      const expandBtn = screen.getByRole("button", { name: /Expand service.exe/i });
+      fireEvent.click(expandBtn);
+
+      // Lineage endpoint
+      expect(screen.getByText("service-api.domain.com")).toBeInTheDocument();
+
+      // Discovered active flow ID from conduit
+      expect(screen.getByText("Flow #888")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Inspect Flow #888/i })).toBeInTheDocument();
+    });
+
+    it("gracefully falls back when protocol is empty and formats bandwidth tooltip accurately", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "raw.exe",
+            pid: 5555,
+            flows: 1,
+            flowIds: [555],
+            bytes: 1024,
+            packets: 2,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "10.0.0.5",
+            destination: "raw-packet.net",
+            protocol: "", // empty protocol
+            bytes: 1024,
+            packets: 2,
+            direction: "local",
+            flow_count: 1,
+            classification: "local_subnet",
+            pid: 5555,
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("raw.exe")).toBeInTheDocument();
+
+      const expandBtn = screen.getByRole("button", { name: /Expand raw.exe/i });
+      fireEvent.click(expandBtn);
+
+      expect(screen.getByText("raw-packet.net")).toBeInTheDocument();
+      expect(screen.getByLabelText("Protocol: OTHER")).toHaveTextContent("OTHER");
+      expect(screen.getByLabelText("Direction: Local")).toHaveTextContent("Local");
+      expect(screen.getByTitle("Bandwidth: 1 KB (1024 bytes)")).toBeInTheDocument();
+    });
+  });
 });

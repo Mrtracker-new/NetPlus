@@ -24,7 +24,7 @@ export function ProcessRow({
       ? { label: t("confidence_labels.low"), glyph: "●", className: "np-apps-badge--low" }
       : { label: t("confidence_labels.unknown"), glyph: "○", className: "np-apps-badge--unknown" };
 
-  const lineageRegionId = `flow-lineage-${group.key}`;
+  const lineageRegionId = `flow-lineage-${group.key.replace(/\s+/g, "-")}`;
 
   const handleRowClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) {

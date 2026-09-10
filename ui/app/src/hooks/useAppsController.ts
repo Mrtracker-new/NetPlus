@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { Attribution, AttributionConfidence, ProcessMetric } from "@netpulse/contract";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-import { query } from "../ipc";
 
 export type ConfidenceFilterOption = "all" | "high" | "low" | "unknown";
 
@@ -56,50 +55,7 @@ export function useAppsController() {
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
-  // In-memory attribution cache keyed by Flow ID
-  const attributionCacheRef = useRef<Map<number, Attribution>>(new Map());
-  const [targetAttribution, setTargetAttribution] = useState<Attribution | null>(null);
-
   const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
-
-  // Single target flow query if navigated from evidence and not already in process metrics
-  useEffect(() => {
-    if (targetFlowId === null) {
-      setTargetAttribution(null);
-      return;
-    }
-
-    // If flow is already attributed in loaded monitor processes, skip IPC query
-    const alreadyAttributed = (monitor?.processes || []).some(
-      (p) =>
-        (Array.isArray((p as any).flowIds) && (p as any).flowIds.includes(targetFlowId)) ||
-        (Array.isArray((p as any).flow_ids) && (p as any).flow_ids.includes(targetFlowId))
-    );
-    if (alreadyAttributed) {
-      return;
-    }
-
-    if (attributionCacheRef.current.has(targetFlowId)) {
-      setTargetAttribution(attributionCacheRef.current.get(targetFlowId)!);
-      return;
-    }
-
-    let cancelled = false;
-    query({ kind: "attributionOfFlow", flow_id: targetFlowId })
-      .then((res) => {
-        if (!cancelled && res.kind === "attribution") {
-          attributionCacheRef.current.set(targetFlowId, res.attribution);
-          setTargetAttribution(res.attribution);
-        }
-      })
-      .catch((e) => {
-        if (!cancelled) setNotice(e instanceof Error ? e.message : String(e));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [targetFlowId, monitor?.processes]);
 
   // Loading state clears when authoritative monitor snapshot is first populated
   const loaded = monitor !== null;
@@ -133,12 +89,16 @@ export function useAppsController() {
       const pidStr = pid !== null ? String(pid) : "none";
       const groupKey = `${name}:${pidStr}`;
       const confidence = deriveConfidence(proc);
-      const procFlowIds: number[] = Array.isArray((proc as any).flowIds)
+      const rawProcFlowIds: number[] = Array.isArray((proc as any).flowIds)
         ? (proc as any).flowIds
         : Array.isArray((proc as any).flow_ids)
         ? (proc as any).flow_ids
         : [];
-      const flowsCount = typeof proc.flows === "number" ? proc.flows : procFlowIds.length;
+      const procFlowIds = Array.from(new Set(rawProcFlowIds));
+      const flowsCount = Math.max(
+        typeof proc.flows === "number" ? proc.flows : 0,
+        procFlowIds.length
+      );
 
       let group = map.get(groupKey);
       if (!group) {
@@ -166,43 +126,12 @@ export function useAppsController() {
       }
     }
 
-    // Attach target flow ID if navigated to
+    // Ensure target flow ID is indexed in search if navigated to
     if (targetFlowId !== null) {
-      if (targetAttribution) {
-        const name =
-          targetAttribution.process_name ||
-          (targetAttribution.pid !== null ? `PID ${targetAttribution.pid}` : "unknown owner");
-        const pid = targetAttribution.pid ?? null;
-        const pidStr = pid !== null ? String(pid) : "none";
-        const groupKey = `${name}:${pidStr}`;
-
-        let group = map.get(groupKey);
-        if (!group && pid !== null) {
-          group = [...map.values()].find((g) => g.pid === pid);
-        }
-
-        if (group) {
-          if (!group.flowIds.includes(targetFlowId)) {
-            group.flowIds.push(targetFlowId);
+      for (const group of map.values()) {
+        if (group.flowIds.includes(targetFlowId)) {
+          if (!group.normalizedSearch.includes(String(targetFlowId))) {
             group.normalizedSearch += ` ${targetFlowId}`;
-          }
-        } else {
-          map.set(groupKey, {
-            key: groupKey,
-            processName: name,
-            pid,
-            confidence: targetAttribution.confidence,
-            flowIds: [targetFlowId],
-            flowsCount: 1,
-            normalizedSearch: `${name} ${pid !== null ? `pid ${pid}` : "none"} ${targetAttribution.confidence} ${targetFlowId}`.toLowerCase(),
-          });
-        }
-      } else {
-        for (const group of map.values()) {
-          if (group.flowIds.includes(targetFlowId)) {
-            if (!group.normalizedSearch.includes(String(targetFlowId))) {
-              group.normalizedSearch += ` ${targetFlowId}`;
-            }
           }
         }
       }
@@ -222,7 +151,7 @@ export function useAppsController() {
       if (flowDiff !== 0) return flowDiff;
       return a.processName.localeCompare(b.processName);
     });
-  }, [monitor, targetFlowId, targetAttribution]);
+  }, [monitor, targetFlowId]);
 
   // Target flow filtering
   const activeGroupedProcesses = useMemo(() => {

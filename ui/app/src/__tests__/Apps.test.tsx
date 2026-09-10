@@ -8,6 +8,7 @@ import { useAppsController } from "../hooks/useAppsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setMonitor, setFeed, __resetForTest } from "../state/store";
+import * as ipcModule from "../ipc";
 
 afterEach(() => {
   cleanup();
@@ -423,5 +424,148 @@ describe("Apps Screen & useAppsController", () => {
 
     expect(await screen.findByText("Unattributed Flows")).toBeInTheDocument();
     expect(screen.getByText("2 flows")).toBeInTheDocument();
+  });
+
+  it("never executes attributionOfFlow or any IPC query on page render (NET-PERF-002)", async () => {
+    const ipcSpy = vi.spyOn(ipcModule, "query");
+
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "chrome.exe",
+          pid: 4092,
+          flows: 2,
+          flowIds: [101, 102],
+          bytes: 1024,
+          packets: 10,
+        } as any,
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("chrome.exe")).toBeInTheDocument();
+    expect(screen.getByText("PID 4092")).toBeInTheDocument();
+
+    // Confirm zero IPC queries on page render
+    expect(ipcSpy).not.toHaveBeenCalled();
+  });
+
+  it("never triggers attributionOfFlow IPC queries when navigating with target flow evidence (NET-PERF-002)", async () => {
+    const ipcSpy = vi.spyOn(ipcModule, "query");
+
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "firefox.exe",
+          pid: 5012,
+          flows: 1,
+          flowIds: [888],
+          bytes: 2048,
+          packets: 15,
+        } as any,
+      ],
+    });
+
+    function TargetNavTestWrapper() {
+      const nav = useEvidenceNavigation();
+      return (
+        <div>
+          <button
+            type="button"
+            data-testid="trigger-target-nav"
+            onClick={() => nav.navigateToEvidence({ kind: "flow", id: 888 }, "apps")}
+          >
+            Go to flow 888
+          </button>
+          <Apps />
+        </div>
+      );
+    }
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <TargetNavTestWrapper />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    expect(await screen.findByText("firefox.exe")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("trigger-target-nav"));
+
+    expect(screen.getByText("firefox.exe")).toBeInTheDocument();
+    // Verify zero attributionOfFlow calls
+    const attributionCalls = ipcSpy.mock.calls.filter(
+      ([req]) => (req as any)?.kind === "attributionOfFlow"
+    );
+    expect(attributionCalls).toHaveLength(0);
+    expect(ipcSpy).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes whitespace in aria-controls and row id for processes with spaces in their name", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "Google Chrome",
+          pid: 9001,
+          flows: 1,
+          flowIds: [901],
+          bytes: 1000,
+          packets: 10,
+        } as any,
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("Google Chrome")).toBeInTheDocument();
+
+    const expandBtn = screen.getByRole("button", { name: /Expand Google Chrome/i });
+    const ariaControls = expandBtn.getAttribute("aria-controls");
+    expect(ariaControls).toBeDefined();
+    // HTML id must not contain whitespace
+    expect(ariaControls).not.toMatch(/\s/);
+    expect(ariaControls).toBe("flow-lineage-Google-Chrome:9001");
+
+    fireEvent.click(expandBtn);
+    const expandedRow = document.getElementById(ariaControls!);
+    expect(expandedRow).toBeInTheDocument();
+  });
+
+  it("deduplicates flowIds when raw telemetry contains duplicate IDs", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "dup.exe",
+          pid: 8888,
+          flows: 1,
+          flowIds: [777, 777, 777],
+          bytes: 1000,
+          packets: 10,
+        } as any,
+      ],
+    });
+
+    const { result } = renderHook(() => useAppsController(), {
+      wrapper: ({ children }) => (
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+        </DisclosureProvider>
+      ),
+    });
+
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true);
+    });
+
+    expect(result.current.groupedProcesses.length).toBe(1);
+    expect(result.current.groupedProcesses[0]!.flowIds).toEqual([777]);
+    expect(result.current.groupedProcesses[0]!.flowsCount).toBe(1);
   });
 });

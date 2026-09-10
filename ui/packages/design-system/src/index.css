@@ -4896,9 +4896,30 @@ button {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
+  scrollbar-color: var(--np-surface-3) var(--np-surface-recessed, var(--np-surface-0));
   padding: var(--np-2) var(--np-1) var(--np-3) var(--np-1);
   margin-bottom: var(--np-2);
   max-width: 100%;
+}
+
+.np-jflow__track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.np-jflow__track::-webkit-scrollbar-track {
+  background: var(--np-surface-recessed, var(--np-surface-0));
+  box-shadow: var(--np-neu-inset);
+  border-radius: var(--np-radius-pill);
+}
+
+.np-jflow__track::-webkit-scrollbar-thumb {
+  background: var(--np-surface-3);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-control);
+}
+
+.np-jflow__track::-webkit-scrollbar-thumb:hover {
+  background: var(--np-surface-raised, var(--np-surface-2));
 }
 
 .np-jflow__node {
@@ -7631,6 +7652,27 @@ button {
   padding: var(--np-2) 0;
   position: relative;
   scrollbar-width: thin;
+  scrollbar-color: var(--np-surface-3) var(--np-surface-recessed, var(--np-surface-0));
+}
+
+.np-diagnostic-chain__track::-webkit-scrollbar {
+  height: 6px;
+}
+
+.np-diagnostic-chain__track::-webkit-scrollbar-track {
+  background: var(--np-surface-recessed, var(--np-surface-0));
+  box-shadow: var(--np-neu-inset);
+  border-radius: var(--np-radius-pill);
+}
+
+.np-diagnostic-chain__track::-webkit-scrollbar-thumb {
+  background: var(--np-surface-3);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-control);
+}
+
+.np-diagnostic-chain__track::-webkit-scrollbar-thumb:hover {
+  background: var(--np-surface-raised, var(--np-surface-2));
 }
 
 .np-diagnostic-chain__node {
@@ -8814,16 +8856,28 @@ svg path {
   overflow-y: hidden;
   padding: 0.35rem 0.15rem;
   scrollbar-width: thin;
+  scrollbar-color: var(--np-surface-3) var(--np-surface-recessed, var(--np-surface-0));
   width: 100%;
 }
 
 .np-diag-chain__track::-webkit-scrollbar {
-  height: 4px;
+  height: 6px;
+}
+
+.np-diag-chain__track::-webkit-scrollbar-track {
+  background: var(--np-surface-recessed, var(--np-surface-0));
+  box-shadow: var(--np-neu-inset);
+  border-radius: var(--np-radius-pill);
 }
 
 .np-diag-chain__track::-webkit-scrollbar-thumb {
-  background: var(--np-surface-2);
-  border-radius: 2px;
+  background: var(--np-surface-3);
+  border-radius: var(--np-radius-pill);
+  box-shadow: var(--np-neu-control);
+}
+
+.np-diag-chain__track::-webkit-scrollbar-thumb:hover {
+  background: var(--np-surface-raised, var(--np-surface-2));
 }
 
 .np-diag-chain__item {

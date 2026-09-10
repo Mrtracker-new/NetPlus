@@ -1,3 +1,4 @@
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { EmptyState, Notice, Skeleton } from "@netpulse/components";
 import { Icon } from "../icons";
@@ -21,12 +22,58 @@ export function Apps() {
     clearTargetFlow,
     expandedKeys,
     toggleExpandGroup,
-    inspectFlow,
     loaded,
     notice,
     setNotice,
     announcement,
   } = useAppsController();
+
+  const [inspectedFlowId, setInspectedFlowId] = useState<number | null>(targetFlowId ?? null);
+  const handledTargetFlowRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (targetFlowId !== null && handledTargetFlowRef.current !== targetFlowId) {
+      const targetGroup = groupedProcesses.find((g) => g.flowIds.includes(targetFlowId));
+      if (targetGroup) {
+        handledTargetFlowRef.current = targetFlowId;
+        setInspectedFlowId(targetFlowId);
+        if (!expandedKeys.has(targetGroup.key)) {
+          toggleExpandGroup(targetGroup.key);
+        }
+      }
+    } else if (targetFlowId === null) {
+      handledTargetFlowRef.current = null;
+    }
+  }, [targetFlowId, groupedProcesses, expandedKeys, toggleExpandGroup]);
+
+  const handleInspectFlow = useCallback((flowId: number) => {
+    setInspectedFlowId((prev) => (prev === flowId ? null : flowId));
+  }, []);
+
+  const handleCloseInspect = useCallback(() => {
+    setInspectedFlowId(null);
+  }, []);
+
+  const handleToggleExpand = useCallback(
+    (groupKey: string) => {
+      const group = groupedProcesses.find((g) => g.key === groupKey);
+      const hasInspected = Boolean(
+        group && inspectedFlowId !== null && group.flowIds.includes(inspectedFlowId)
+      );
+      const isInExpanded = expandedKeys.has(groupKey);
+
+      if (isInExpanded) {
+        toggleExpandGroup(groupKey);
+      } else if (!hasInspected) {
+        toggleExpandGroup(groupKey);
+      }
+
+      if (hasInspected) {
+        setInspectedFlowId(null);
+      }
+    },
+    [toggleExpandGroup, groupedProcesses, inspectedFlowId, expandedKeys]
+  );
 
   if (!loaded) {
     return (
@@ -159,9 +206,14 @@ export function Apps() {
                     <ProcessRow
                       key={group.key}
                       group={group}
-                      isExpanded={expandedKeys.has(group.key)}
-                      onToggleExpand={toggleExpandGroup}
-                      onInspectFlow={inspectFlow}
+                      isExpanded={
+                        expandedKeys.has(group.key) ||
+                        (inspectedFlowId !== null && group.flowIds.includes(inspectedFlowId))
+                      }
+                      onToggleExpand={handleToggleExpand}
+                      onInspectFlow={handleInspectFlow}
+                      inspectedFlowId={inspectedFlowId}
+                      onCloseInspect={handleCloseInspect}
                     />
                   ))}
                 </tbody>

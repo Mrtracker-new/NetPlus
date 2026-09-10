@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, renderHook, waitFor, act } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, renderHook, waitFor, act, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import type { MonitorSnapshot } from "@netpulse/contract";
 import { Apps } from "../screens/Apps";
+import { resolveFlowDetails } from "../screens/Apps/ProcessRow";
 import { useAppsController } from "../hooks/useAppsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
@@ -343,7 +344,7 @@ describe("Apps Screen & useAppsController", () => {
     expect(screen.getByText("Flow #602")).toBeInTheDocument();
   });
 
-  it("navigates to flow evidence when inspect button is clicked without collapsing the row", async () => {
+  it("opens detailed inspection plate when inspect button is clicked without circular navigation loop", async () => {
     setMonitor({
       ...mockBaseSnapshot,
       processes: [
@@ -355,6 +356,22 @@ describe("Apps Screen & useAppsController", () => {
           confidence: "high",
           bytes: 7000,
           packets: 70,
+        } as any,
+      ],
+      lineage: [
+        {
+          source: "192.168.1.45:51234",
+          destination: "api.inspectable.com:443",
+          protocol: "HTTPS",
+          bytes: 7000,
+          packets: 70,
+          direction: "outbound",
+          flow_count: 1,
+          classification: "external_wan",
+          pid: 7010,
+          flow_id: 701,
+          rtt_ms: 18.5,
+          state: "ESTABLISHED",
         } as any,
       ],
     });
@@ -396,10 +413,31 @@ describe("Apps Screen & useAppsController", () => {
     const inspectBtn = screen.getByRole("button", { name: /Inspect Flow #701/i });
     fireEvent.click(inspectBtn);
 
-    // Row should still be expanded and navigation target should be set
+    // Row should still be expanded and navigation target should NOT be set (no circular loop)
     expect(screen.getByText("Flow #701")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("check-nav"));
-    expect(capturedEvidence).toEqual({ screen: "apps", flowId: 701 });
+    expect(capturedEvidence).toBeNull();
+
+    // Verify detailed inspection plate is open
+    const plate = screen.getByTestId("flow-inspection-plate");
+    expect(plate).toBeInTheDocument();
+    expect(within(plate).getByText(/Flow #701 Inspection Plate/i)).toBeInTheDocument();
+
+    // Acceptance Criteria: User can see full socket addresses, ports, and metrics
+    expect(screen.getByTestId("flow-5tuple")).toHaveTextContent(
+      "192.168.1.45:51234 → api.inspectable.com:443 (HTTPS)"
+    );
+    expect(screen.getByTestId("flow-source-socket")).toHaveTextContent("192.168.1.45:51234");
+    expect(screen.getByTestId("flow-destination-socket")).toHaveTextContent("api.inspectable.com:443");
+    expect(screen.getByTestId("flow-state")).toHaveTextContent("ESTABLISHED");
+    expect(screen.getByTestId("flow-bytes")).toHaveTextContent(/7 KB/);
+    expect(screen.getByTestId("flow-packets")).toHaveTextContent("70");
+    expect(screen.getByTestId("flow-rtt")).toHaveTextContent("18.5 ms");
+
+    // Close button dismisses inspection plate
+    const closeBtn = within(plate).getByRole("button", { name: /Close flow inspection/i });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByTestId("flow-inspection-plate")).not.toBeInTheDocument();
   });
 
   it("derives fallback group from monitor.lineage when processes array is empty", async () => {
@@ -1168,6 +1206,271 @@ describe("Apps Screen & useAppsController", () => {
       expect(screen.getByLabelText("Protocol: OTHER")).toHaveTextContent("OTHER");
       expect(screen.getByLabelText("Direction: Local")).toHaveTextContent("Local");
       expect(screen.getByTitle("Bandwidth: 1 KB (1024 bytes)")).toBeInTheDocument();
+    });
+  });
+
+  describe("Inline Flow Inspection Drawer", () => {
+    it("opens detailed inspection plate when inspect flow is clicked in active flow IDs list", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "service.exe",
+            pid: 7777,
+            flows: 1,
+            bytes: 2048,
+            packets: 15,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.20:49210",
+            destination: "service-api.domain.com:443",
+            protocol: "HTTPS",
+            bytes: 2048,
+            packets: 15,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+            pid: 7777,
+            flow_id: 888,
+            rtt_ms: 24.6,
+            state: "ESTABLISHED",
+          } as any,
+        ],
+      });
+
+      render(<AppsTestWrapper />);
+
+      expect(await screen.findByText("service.exe")).toBeInTheDocument();
+
+      const expandBtn = screen.getByRole("button", { name: /Expand service.exe/i });
+      fireEvent.click(expandBtn);
+
+      const inspectBtn = screen.getByRole("button", { name: /Inspect Flow #888/i });
+      expect(inspectBtn).toBeInTheDocument();
+      fireEvent.click(inspectBtn);
+
+      // Acceptance criteria 1: Inspect Flow opens a detailed inspection plate.
+      const plate = screen.getByTestId("flow-inspection-plate");
+      expect(plate).toBeInTheDocument();
+      expect(within(plate).getByText(/Flow #888 Inspection Plate/i)).toBeInTheDocument();
+
+      // Acceptance criteria 2: User can see full socket addresses, ports, and metrics.
+      expect(screen.getByTestId("flow-5tuple")).toHaveTextContent(
+        "192.168.1.20:49210 → service-api.domain.com:443 (HTTPS)"
+      );
+      expect(screen.getByTestId("flow-source-socket")).toHaveTextContent("192.168.1.20:49210");
+      expect(screen.getByTestId("flow-destination-socket")).toHaveTextContent("service-api.domain.com:443");
+      expect(screen.getByTestId("flow-state")).toHaveTextContent("ESTABLISHED");
+      expect(screen.getByTestId("flow-bytes")).toHaveTextContent(/2 KB/);
+      expect(screen.getByTestId("flow-packets")).toHaveTextContent("15");
+      expect(screen.getByTestId("flow-rtt")).toHaveTextContent("24.6 ms");
+
+      // Toggling close button in plate
+      const closeBtn = within(plate).getByRole("button", { name: /Close flow inspection/i });
+      fireEvent.click(closeBtn);
+      expect(screen.queryByTestId("flow-inspection-plate")).not.toBeInTheDocument();
+
+      // Toggling inspect button again opens it back
+      fireEvent.click(inspectBtn);
+      expect(screen.getByTestId("flow-inspection-plate")).toBeInTheDocument();
+
+      // Clicking inspect button when open closes it
+      fireEvent.click(screen.getByRole("button", { name: /Inspect Flow #888/i }));
+      expect(screen.queryByTestId("flow-inspection-plate")).not.toBeInTheDocument();
+    });
+
+    it("auto-expands and displays inspection plate when navigated with targetFlowId", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "service.exe",
+            pid: 7777,
+            flows: 1,
+            bytes: 2048,
+            packets: 15,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "10.0.0.12:55000",
+            destination: "db.internal.net:5432",
+            protocol: "TCP",
+            bytes: 512,
+            packets: 4,
+            direction: "local",
+            flow_count: 1,
+            classification: "local_subnet",
+            pid: 7777,
+            flow_id: 999,
+          } as any,
+        ],
+      });
+
+      function NavWrapper() {
+        const nav = useEvidenceNavigation();
+        return (
+          <div>
+            <button
+              type="button"
+              data-testid="deep-link-trigger"
+              onClick={() => nav.navigateToEvidence({ kind: "flow", id: 999 }, "apps")}
+            >
+              Deep link to 999
+            </button>
+            <Apps />
+          </div>
+        );
+      }
+
+      render(
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>
+            <NavWrapper />
+          </EvidenceNavigationProvider>
+        </DisclosureProvider>
+      );
+
+      expect(await screen.findByText("service.exe")).toBeInTheDocument();
+
+      // Click deep link button to simulate navigation into apps with targetFlowId
+      fireEvent.click(screen.getByTestId("deep-link-trigger"));
+
+      // The process should auto-expand and the inspection plate for Flow #999 should be visible
+      const plate = await screen.findByTestId("flow-inspection-plate");
+      expect(plate).toBeInTheDocument();
+      expect(within(plate).getByText(/Flow #999 Inspection Plate/i)).toBeInTheDocument();
+      expect(screen.getByTestId("flow-source-socket")).toHaveTextContent("10.0.0.12:55000");
+      expect(screen.getByTestId("flow-destination-socket")).toHaveTextContent("db.internal.net:5432");
+
+      // Closing the inspection plate keeps the parent process row expanded
+      const closePlateBtn = within(plate).getByRole("button", { name: /Close flow inspection/i });
+      fireEvent.click(closePlateBtn);
+      expect(screen.queryByTestId("flow-inspection-plate")).not.toBeInTheDocument();
+      expect(screen.getByTestId("expanded-lineage-tray")).toBeInTheDocument();
+
+      // Clicking collapse on the process row collapses the tray cleanly in a single click
+      const collapseBtn = screen.getByRole("button", { name: /Collapse service\.exe/i });
+      fireEvent.click(collapseBtn);
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+    });
+
+    it("ensures flow card at index >= 24 remains visible and inspectable when selected", async () => {
+      // 30 flows for single process
+      const manyFlowIds = Array.from({ length: 30 }, (_, i) => 1000 + i);
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "batch-worker.exe",
+            pid: 5050,
+            flows: 30,
+            flow_ids: manyFlowIds,
+          } as any,
+        ],
+        lineage: [],
+      });
+
+      function NavWrapper() {
+        const nav = useEvidenceNavigation();
+        return (
+          <div>
+            <button
+              type="button"
+              data-testid="deep-link-28"
+              onClick={() => nav.navigateToEvidence({ kind: "flow", id: 1028 }, "apps")}
+            >
+              Inspect Flow 1028
+            </button>
+            <Apps />
+          </div>
+        );
+      }
+
+      render(
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>
+            <NavWrapper />
+          </EvidenceNavigationProvider>
+        </DisclosureProvider>
+      );
+
+      expect(await screen.findByText("batch-worker.exe")).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId("deep-link-28"));
+
+      // Flow #1028 (at index 28) should be rendered and inspected
+      const plate = await screen.findByTestId("flow-inspection-plate");
+      expect(plate).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /#1028/i })).toBeInTheDocument();
+    });
+
+    it("resolveFlowDetails properly derives full socket addresses and ports from raw endpoints", () => {
+      const mockGroup: any = {
+        key: "test:1",
+        processName: "test.exe",
+        pid: 1,
+        confidence: "high",
+        flowIds: [100],
+        flowsCount: 1,
+        normalizedSearch: "",
+        lineage: [
+          {
+            source: "192.168.1.10",
+            destination: "example.org",
+            protocol: "HTTPS",
+            bytes: 1000,
+            packets: 10,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+            pid: 1,
+          },
+        ],
+      };
+
+      const details = resolveFlowDetails(100, mockGroup);
+      expect(details.sourceAddress).toBe("192.168.1.10");
+      expect(details.sourcePort).toBeGreaterThan(0);
+      expect(details.destinationAddress).toBe("example.org");
+      expect(details.destinationPort).toBe(443);
+      expect(details.fiveTuple).toContain("192.168.1.10:");
+      expect(details.fiveTuple).toContain("example.org:443 (HTTPS)");
+      expect(details.state).toBe("ESTABLISHED");
+      expect(details.rttEstimate).toBe("28.4 ms");
+    });
+
+    it("resolveFlowDetails handles edge cases: string ports, unbracketed IPv6, and casing", () => {
+      const mockGroup: any = {
+        key: "edge:2",
+        processName: "edge.exe",
+        pid: 2,
+        confidence: "high",
+        flowIds: [200],
+        flowsCount: 1,
+        normalizedSearch: "",
+        lineage: [
+          {
+            source: "2001:db8::1",
+            destination: "[2001:db8::2]:8443",
+            src_port: "51234",
+            protocol: "tcp",
+            state: "established",
+            classification: "gateway",
+            pid: 2,
+            flow_id: 200,
+          },
+        ],
+      };
+
+      const details = resolveFlowDetails(200, mockGroup);
+      expect(details.sourceSocket).toBe("[2001:db8::1]:51234");
+      expect(details.sourcePort).toBe(51234);
+      expect(details.destinationSocket).toBe("[2001:db8::2]:8443");
+      expect(details.destinationPort).toBe(8443);
+      expect(details.state).toBe("ESTABLISHED");
+      expect(details.rttEstimate).toBe("2.4 ms");
     });
   });
 });

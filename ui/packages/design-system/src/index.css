@@ -10607,6 +10607,168 @@ svg path {
   border: none;
 }
 
+/* ---- Detailed Inline Flow Inspection Plate / Flyout Drawer ---- */
+.np-apps-inspection-plate {
+  margin-top: 10px;
+  background: var(--np-surface-1);
+  border: 1px solid var(--np-accent-line, var(--np-border));
+  border-radius: var(--np-radius-sm, 10px);
+  padding: 14px 18px;
+  box-shadow: var(--np-neu-card, 0 4px 16px rgba(0, 0, 0, 0.2));
+  animation: np-fade-in 150ms ease-out;
+}
+
+.np-apps-inspection-plate__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--np-hairline);
+  margin-bottom: 10px;
+}
+
+.np-apps-inspection-plate__title-wrap {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.np-apps-inspection-plate__title {
+  font-size: var(--np-fs-sm, 0.8125rem);
+  font-weight: var(--np-fw-bold, 700);
+  color: var(--np-text);
+  letter-spacing: -0.01em;
+}
+
+.np-apps-inspection-plate__close {
+  background: transparent;
+  border: none;
+  color: var(--np-text-dim);
+  cursor: pointer;
+  padding: 4px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--np-radius-xs, 4px);
+  transition: all var(--np-t, 0.15s ease);
+}
+
+.np-apps-inspection-plate__close:hover {
+  color: var(--np-text);
+  background: var(--np-surface-2);
+}
+
+.np-apps-inspection-plate__tuple-ribbon {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--np-surface-recessed, var(--np-surface-2));
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-xs, 6px);
+  margin-bottom: 12px;
+}
+
+.np-apps-inspection-plate__label {
+  font-size: var(--np-fs-2xs, 0.625rem);
+  font-weight: var(--np-fw-bold, 700);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.08em);
+  color: var(--np-text-mute);
+  flex-shrink: 0;
+}
+
+.np-apps-inspection-plate__code {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs, 0.75rem);
+  color: var(--np-accent);
+  font-weight: var(--np-fw-semibold, 600);
+  word-break: break-all;
+}
+
+.np-apps-inspection-plate__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.np-apps-inspection-plate__card {
+  background: var(--np-surface-2);
+  border: 1px solid var(--np-hairline);
+  border-radius: var(--np-radius-xs, 6px);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.np-apps-inspection-plate__field-label {
+  font-size: var(--np-fs-2xs, 0.625rem);
+  font-weight: var(--np-fw-bold, 700);
+  color: var(--np-text-dim);
+  text-transform: uppercase;
+  letter-spacing: var(--np-tracking-wide, 0.06em);
+}
+
+.np-apps-inspection-plate__socket-addr {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-sm, 0.8125rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text);
+  word-break: break-all;
+}
+
+.np-apps-inspection-plate__value {
+  font-size: var(--np-fs-sm, 0.8125rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text);
+}
+
+.np-apps-inspection-plate__subfields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--np-fs-2xs, 0.6875rem);
+  color: var(--np-text-dim);
+  margin-top: 2px;
+}
+
+.np-apps-inspection-plate__subfields strong {
+  font-family: var(--np-font-mono);
+  color: var(--np-text);
+}
+
+.np-apps-inspection-plate__metrics-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.np-apps-inspection-plate__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.np-apps-inspection-plate__metric-label {
+  font-size: var(--np-fs-2xs, 0.5625rem);
+  color: var(--np-text-mute);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.np-apps-inspection-plate__metric-value {
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs, 0.75rem);
+  font-weight: var(--np-fw-semibold, 650);
+  color: var(--np-text);
+}
+
 /* ---- Reduced Motion Support ---- */
 @media (prefers-reduced-motion: reduce) {
   .np-apps-kpi,
@@ -10617,9 +10779,11 @@ svg path {
   .np-apps-row__chevron,
   .np-apps-flow-card,
   .np-apps-flow-card__inspect,
-  .np-apps-conduit-card {
+  .np-apps-conduit-card,
+  .np-apps-inspection-plate {
     transition: none !important;
     transform: none !important;
+    animation: none !important;
   }
 }
 

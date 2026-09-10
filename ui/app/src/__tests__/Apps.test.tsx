@@ -1934,4 +1934,148 @@ describe("Apps Screen & useAppsController", () => {
       expect(rowB?.attr.confidence).toBe("unknown");
     });
   });
+
+  describe("Keyboard Accessibility on Expandable Process Rows", () => {
+    beforeEach(() => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "curl.exe",
+            pid: 4321,
+            flows: 1,
+            flowIds: [301],
+            bytes: 65536,
+            packets: 40,
+          } as any,
+        ],
+        lineage: [
+          {
+            source: "192.168.1.50",
+            destination: "api.github.com",
+            protocol: "HTTPS",
+            bytes: 65536,
+            packets: 40,
+            direction: "outbound",
+            flow_count: 1,
+            classification: "external_wan",
+            pid: 4321,
+            flow_id: 301,
+          } as any,
+        ],
+      });
+    });
+
+    it("assigns tabIndex={0} and aria-expanded to the process row", async () => {
+      const { container } = render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const row = container.querySelector(".np-apps-row");
+      expect(row).toBeInTheDocument();
+      expect(row).toHaveAttribute("tabindex", "0");
+      expect(row).toHaveAttribute("aria-expanded", "false");
+      expect(row).toHaveAttribute("data-expanded", "false");
+    });
+
+    it("expands and collapses process row when pressing Enter on the row", async () => {
+      const { container } = render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const row = container.querySelector(".np-apps-row")!;
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+
+      // Press Enter on the row to expand
+      fireEvent.keyDown(row, { key: "Enter" });
+      expect(await screen.findByTestId("expanded-lineage-tray")).toBeInTheDocument();
+      expect(row).toHaveAttribute("aria-expanded", "true");
+      expect(row).toHaveAttribute("data-expanded", "true");
+
+      // Press Enter on the row again to collapse
+      fireEvent.keyDown(row, { key: "Enter" });
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+      expect(row).toHaveAttribute("aria-expanded", "false");
+      expect(row).toHaveAttribute("data-expanded", "false");
+    });
+
+    it("expands and collapses process row when pressing Space on the row", async () => {
+      const { container } = render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const row = container.querySelector(".np-apps-row")!;
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+
+      // Press Space on the row to expand
+      fireEvent.keyDown(row, { key: " " });
+      expect(await screen.findByTestId("expanded-lineage-tray")).toBeInTheDocument();
+      expect(row).toHaveAttribute("aria-expanded", "true");
+
+      // Press Space on the row again to collapse
+      fireEvent.keyDown(row, { key: " " });
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+      expect(row).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("does not toggle expansion when pressing unrelated keys on the row", async () => {
+      const { container } = render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const row = container.querySelector(".np-apps-row")!;
+      fireEvent.keyDown(row, { key: "Tab" });
+      fireEvent.keyDown(row, { key: "ArrowDown" });
+      fireEvent.keyDown(row, { key: "Escape" });
+
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+      expect(row).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("delegates mouse click on the row cleanly to toggle expansion", async () => {
+      const { container } = render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const row = container.querySelector(".np-apps-row")!;
+      // Click row outside button
+      fireEvent.click(row);
+      expect(await screen.findByTestId("expanded-lineage-tray")).toBeInTheDocument();
+
+      fireEvent.click(row);
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+    });
+
+    it("supports keyboard navigation on the toggle button directly (Space & Enter)", async () => {
+      render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const toggleBtn = screen.getByRole("button", { name: /expand curl\.exe/i });
+      expect(toggleBtn).toBeInTheDocument();
+
+      // Press Enter directly on the button
+      fireEvent.keyDown(toggleBtn, { key: "Enter" });
+      expect(await screen.findByTestId("expanded-lineage-tray")).toBeInTheDocument();
+
+      // Button label switches to Collapse
+      const collapseBtn = screen.getByRole("button", { name: /collapse curl\.exe/i });
+      expect(collapseBtn).toBeInTheDocument();
+
+      // Press Space directly on the button to collapse
+      fireEvent.keyDown(collapseBtn, { key: " " });
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+    });
+
+    it("prevents double-toggling when child buttons inside the row are clicked or activated", async () => {
+      render(<AppsTestWrapper />);
+      expect(await screen.findByText("curl.exe")).toBeInTheDocument();
+
+      const toggleBtn = screen.getByRole("button", { name: /expand curl\.exe/i });
+      fireEvent.click(toggleBtn);
+
+      // Should be expanded (single toggle)
+      expect(await screen.findByTestId("expanded-lineage-tray")).toBeInTheDocument();
+
+      // Clicking child button again collapses (single toggle)
+      const collapseBtn = screen.getByRole("button", { name: /collapse curl\.exe/i });
+      fireEvent.click(collapseBtn);
+      expect(screen.queryByTestId("expanded-lineage-tray")).not.toBeInTheDocument();
+    });
+  });
 });
+

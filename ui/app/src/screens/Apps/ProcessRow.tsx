@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { humanBytes } from "@netpulse/viz";
 import type { GroupedProcess } from "../../hooks/useAppsController";
@@ -281,11 +281,31 @@ export function ProcessRow({
 
   const lineageRegionId = `flow-lineage-${group.key.replace(/\s+/g, "-")}`;
 
+  const toggleButtonRef = useRef<HTMLButtonElement>(null);
+
   const handleRowClick = (e: React.MouseEvent) => {
     if ((e.target as HTMLElement).closest("button")) {
       return;
     }
-    onToggleExpand(group.key);
+    if (toggleButtonRef.current) {
+      toggleButtonRef.current.click();
+    } else {
+      onToggleExpand(group.key);
+    }
+  };
+
+  const handleRowKeyDown = (e: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if ((e.target as HTMLElement).closest("button")) {
+      return;
+    }
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.key === "Space") {
+      e.preventDefault();
+      if (toggleButtonRef.current) {
+        toggleButtonRef.current.click();
+      } else {
+        onToggleExpand(group.key);
+      }
+    }
   };
 
   const hasLineage = Array.isArray(group.lineage) && group.lineage.length > 0;
@@ -297,7 +317,10 @@ export function ProcessRow({
       <tr
         className="np-apps-row"
         data-expanded={isExpanded}
+        tabIndex={0}
         onClick={handleRowClick}
+        onKeyDown={handleRowKeyDown}
+        aria-expanded={isExpanded}
       >
         <td className="np-apps-td np-apps-td--name">
           <div className="np-apps-process-cell">
@@ -330,11 +353,19 @@ export function ProcessRow({
         </td>
         <td className="np-apps-td np-apps-td--right">
           <button
+            ref={toggleButtonRef}
             type="button"
             className="np-apps-row__toggle"
             onClick={(e) => {
               e.stopPropagation();
               onToggleExpand(group.key);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " " || e.key === "Spacebar" || e.key === "Space") {
+                e.preventDefault();
+                e.stopPropagation();
+                onToggleExpand(group.key);
+              }
             }}
             aria-expanded={isExpanded}
             aria-controls={lineageRegionId}

@@ -10181,10 +10181,17 @@ svg path {
   background: transparent;
   transition: background var(--np-t, 0.15s ease);
   border-radius: var(--np-radius-sm, 12px);
+  cursor: pointer;
 }
 
 .np-apps-row:hover {
   background: var(--np-surface-2);
+}
+
+.np-apps-row:focus-visible {
+  outline: none;
+  background: var(--np-surface-2);
+  box-shadow: inset 0 0 0 1px var(--np-accent);
 }
 
 .np-apps-row[data-expanded="true"] {

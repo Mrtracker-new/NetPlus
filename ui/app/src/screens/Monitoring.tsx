@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Notice, Button, Skeleton } from "@netpulse/components";
 import { useMonitoringController } from "../hooks/useMonitoringController";
@@ -23,6 +24,30 @@ export function Monitoring() {
     isRetrying,
     actions,
   } = useMonitoringController();
+
+  const [isTimeRangeSwitching, setIsTimeRangeSwitching] = useState(false);
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (switchTimerRef.current) {
+        clearTimeout(switchTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleTimeRangeChange = (tr: (typeof preferences)["timeRange"]) => {
+    if (tr !== preferences.timeRange) {
+      setIsTimeRangeSwitching(true);
+      actions.setTimeRange(tr);
+      if (switchTimerRef.current) {
+        clearTimeout(switchTimerRef.current);
+      }
+      switchTimerRef.current = setTimeout(() => {
+        setIsTimeRangeSwitching(false);
+      }, 150);
+    }
+  };
 
   const isLoading = monitor === null && !viewModel.error;
 
@@ -92,7 +117,7 @@ export function Monitoring() {
                 className={`np-monitor-time-btn ${isSelected ? "np-monitor-time-btn--active" : ""}`}
                 aria-pressed={isSelected}
                 aria-label={`Set time range to ${tr}`}
-                onClick={() => actions.setTimeRange(tr)}
+                onClick={() => handleTimeRangeChange(tr)}
               >
                 {tr}
               </button>
@@ -212,7 +237,10 @@ export function Monitoring() {
       )}
 
       {/* Perfectly Symmetrical 2x2 Grid */}
-      <div className="np-monitor-grid" data-testid={isLoading ? "monitor-grid-skeleton" : undefined}>
+      <div
+        className={`np-monitor-grid ${isTimeRangeSwitching ? "np-monitor-grid--switching" : ""}`}
+        data-testid={isLoading ? "monitor-grid-skeleton" : undefined}
+      >
         {isLoading ? (
           [1, 2, 3, 4].map((i) => (
             <div

@@ -7241,7 +7241,8 @@ button {
   font-weight: var(--np-fw-medium);
   cursor: pointer;
   outline: none;
-  transition: all var(--np-t);
+  opacity: 0.8;
+  transition: opacity 150ms ease, background 150ms ease, color 150ms ease, box-shadow 150ms ease;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -7250,11 +7251,13 @@ button {
 .np-monitor-time-btn:hover:not(.np-monitor-time-btn--active) {
   color: var(--np-text);
   background: var(--np-surface-2);
+  opacity: 0.95;
 }
 
 .np-monitor-time-btn:focus-visible {
   outline: 2px solid var(--np-accent);
   outline-offset: 1px;
+  opacity: 1;
 }
 
 .np-monitor-time-btn--active {
@@ -7262,6 +7265,12 @@ button {
   color: var(--np-text);
   font-weight: var(--np-fw-bold);
   box-shadow: var(--np-neu-control);
+  opacity: 1;
+}
+
+.np-monitor-time-btn:disabled {
+  opacity: var(--np-opacity-disabled, 0.5);
+  cursor: not-allowed;
 }
 
 /* Soft LED Status Badge */
@@ -7404,6 +7413,18 @@ button {
   display: grid;
   gap: var(--np-4);
   width: 100%;
+  transition: opacity 150ms ease;
+}
+
+.np-monitor-grid--switching {
+  opacity: 0.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .np-monitor-time-btn,
+  .np-monitor-grid {
+    transition: none;
+  }
 }
 
 @media (min-width: 1200px) {

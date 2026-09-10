@@ -8,6 +8,7 @@ import i18n from "../i18n";
 import { setMonitor, setError, __resetForTest } from "../state/store";
 import { Monitoring } from "../screens/Monitoring";
 import { useMonitoringController, mapTelemetryStateToEngineState } from "../hooks/useMonitoringController";
+import { preferencesManager } from "../screens/Monitoring/MonitoringPreferences";
 import { evaluateDiagnosticsRules } from "../screens/Monitoring/monitoringRulesEngine";
 import type { DomainTelemetry } from "../screens/Monitoring/monitoringTypes";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
@@ -152,6 +153,7 @@ const mockMonitorSnapshot: MonitorSnapshot = {
 describe("Monitoring Screen & useMonitoringController", () => {
   beforeEach(() => {
     __resetForTest();
+    preferencesManager.reset();
   });
 
   it("protocolColor returns stable colors for TCP, UDP, and DNS", () => {
@@ -304,6 +306,37 @@ describe("Monitoring Screen & useMonitoringController", () => {
     // Timestamps for 5m range appear cleanly across charts without minus-sign clipping
     expect(screen.getAllByText("5m ago").length).toBeGreaterThan(0);
     expect(screen.getAllByText("1m ago").length).toBeGreaterThan(0);
+  });
+
+  it("applies subtle 150ms opacity transition class to grid when switching time ranges", async () => {
+    vi.useFakeTimers();
+    try {
+      preferencesManager.reset();
+      setMonitor(mockMonitorSnapshot);
+      const { fireEvent } = await import("@testing-library/react");
+      const { container } = render(<MonitoringTestWrapper />);
+
+      const grid = container.querySelector(".np-monitor-grid");
+      expect(grid).toBeInTheDocument();
+      expect(grid).not.toHaveClass("np-monitor-grid--switching");
+
+      // Switch time range from default 1h to 15m
+      const btn15m = screen.getByRole("button", { name: "Set time range to 15m" });
+      fireEvent.click(btn15m);
+
+      // Grid receives switching class during the 150ms transition
+      expect(grid).toHaveClass("np-monitor-grid--switching");
+
+      // Advance time by 150ms
+      act(() => {
+        vi.advanceTimersByTime(150);
+      });
+
+      // Switching class is removed after 150ms transition completes
+      expect(grid).not.toHaveClass("np-monitor-grid--switching");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("preserves unrelated UI state (e.g. topology rules selection) when time range is toggled", async () => {

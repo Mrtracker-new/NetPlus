@@ -10186,20 +10186,28 @@ svg path {
 }
 
 .np-apps-row {
-  background: transparent;
-  transition: background var(--np-t, 0.15s ease);
+  background: var(--np-surface-1);
+  box-shadow: var(--np-neu-control);
+  transition: transform var(--np-t, 0.15s ease), box-shadow var(--np-t, 0.15s ease), background var(--np-t, 0.15s ease);
   border-radius: var(--np-radius-sm, 12px);
   cursor: pointer;
 }
 
 .np-apps-row:hover {
   background: var(--np-surface-2);
+  transform: translateY(-1px);
+  box-shadow: var(--np-neu-control-hover);
+}
+
+.np-apps-row:active {
+  transform: translateY(0);
+  box-shadow: var(--np-neu-inset);
 }
 
 .np-apps-row:focus-visible {
   outline: none;
   background: var(--np-surface-2);
-  box-shadow: inset 0 0 0 1px var(--np-accent);
+  box-shadow: var(--np-neu-control), inset 0 0 0 1px var(--np-accent);
 }
 
 .np-apps-row[data-expanded="true"] {

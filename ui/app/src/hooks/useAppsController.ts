@@ -10,11 +10,18 @@ export interface FlowAttributionRow {
   attr: Attribution;
 }
 
+export interface ConfidenceBreakdown {
+  high: number;
+  low: number;
+  unknown: number;
+}
+
 export interface GroupedProcess {
   key: string;
   processName: string;
   pid: number | null;
   confidence: AttributionConfidence;
+  confidenceBreakdown?: ConfidenceBreakdown;
   flowIds: number[];
   flowsCount: number;
   normalizedSearch: string;
@@ -26,6 +33,24 @@ export interface AppsSummaryMetrics {
   totalFlows: number;
   highConfidenceCount: number;
   unattributedCount: number;
+}
+
+export function resolveConservativeConfidence(
+  a: AttributionConfidence,
+  b: AttributionConfidence
+): AttributionConfidence {
+  if (a === "unknown" || b === "unknown") return "unknown";
+  if (a === "low" || b === "low") return "low";
+  return "high";
+}
+
+export function aggregateConfidences(
+  confidences: AttributionConfidence[]
+): AttributionConfidence {
+  if (confidences.length === 0) return "unknown";
+  if (confidences.includes("unknown")) return "unknown";
+  if (confidences.includes("low")) return "low";
+  return "high";
 }
 
 function deriveConfidence(proc: ProcessMetric): AttributionConfidence {
@@ -45,6 +70,43 @@ function deriveConfidence(proc: ProcessMetric): AttributionConfidence {
     return "low";
   }
   return "high";
+}
+
+function deriveFlowConfidence(
+  fid: number,
+  proc: ProcessMetric,
+  procConfidence: AttributionConfidence,
+  correlatedLineage: FlowLineage[]
+): AttributionConfidence {
+  const flowConfidences = (proc as any).flowConfidences || (proc as any).flow_confidences;
+  if (flowConfidences) {
+    const c = typeof flowConfidences.get === "function" ? flowConfidences.get(fid) : flowConfidences[fid];
+    if (c === "high" || c === "low" || c === "unknown") {
+      return c;
+    }
+  }
+
+  if (Array.isArray((proc as any).flows)) {
+    const match = (proc as any).flows.find(
+      (f: any) => f && (f.id === fid || f.flowId === fid || f.flow_id === fid)
+    );
+    if (match && (match.confidence === "high" || match.confidence === "low" || match.confidence === "unknown")) {
+      return match.confidence;
+    }
+  }
+
+  for (const lin of correlatedLineage as any[]) {
+    const hasFlow =
+      (lin.flow_id != null && Number(lin.flow_id) === fid) ||
+      (lin.flowId != null && Number(lin.flowId) === fid) ||
+      (Array.isArray(lin.flow_ids) && lin.flow_ids.some((id: any) => Number(id) === fid)) ||
+      (Array.isArray(lin.flowIds) && lin.flowIds.some((id: any) => Number(id) === fid));
+    if (hasFlow && (lin.confidence === "high" || lin.confidence === "low" || lin.confidence === "unknown")) {
+      return lin.confidence;
+    }
+  }
+
+  return procConfidence;
 }
 
 function correlateLineageForProcess(
@@ -198,7 +260,18 @@ export function useAppsController() {
       ];
     }
 
-    const map = new Map<string, GroupedProcess>();
+    interface GroupAccumulator {
+      key: string;
+      processName: string;
+      pid: number | null;
+      unlistedFlows: number;
+      flowIds: Set<number>;
+      flowConfidences: Map<number, AttributionConfidence>;
+      procConfidences: AttributionConfidence[];
+      lineage: FlowLineage[];
+    }
+
+    const accMap = new Map<string, GroupAccumulator>();
 
     for (const proc of effectiveProcesses) {
       const name = proc.name || (proc.pid !== null ? `PID ${proc.pid}` : "unknown owner");
@@ -206,12 +279,18 @@ export function useAppsController() {
       const pidStr = pid !== null ? String(pid) : "none";
       const groupKey = `${name}:${pidStr}`;
       const confidence = deriveConfidence(proc);
-      const rawProcFlowIds: number[] = Array.isArray((proc as any).flowIds)
+      const rawProcFlowIds: any[] = Array.isArray((proc as any).flowIds)
         ? (proc as any).flowIds
         : Array.isArray((proc as any).flow_ids)
         ? (proc as any).flow_ids
         : [];
-      const procFlowIds = Array.from(new Set(rawProcFlowIds));
+      const procFlowIds: number[] = Array.from(
+        new Set(
+          rawProcFlowIds
+            .filter((fid: any) => fid != null && !isNaN(Number(fid)))
+            .map(Number)
+        )
+      );
 
       const correlatedLineage = correlateLineageForProcess(
         proc,
@@ -241,77 +320,144 @@ export function useAppsController() {
         }
       }
       const combinedFlowIds = Array.from(new Set([...procFlowIds, ...lineageFlowIds]));
-      const flowsCount = Math.max(
-        typeof proc.flows === "number" ? proc.flows : 0,
-        combinedFlowIds.length
+      const unlistedFlows = Math.max(
+        0,
+        (typeof proc.flows === "number" ? proc.flows : 0) - combinedFlowIds.length
       );
 
-      // Cache flow attributions in memory (NET-DATA-003)
+      // Cache flow attributions in memory with conservative resolution (NET-DATA-003)
       for (const fid of combinedFlowIds) {
+        const flowConf = deriveFlowConfidence(fid, proc, confidence, correlatedLineage);
+        const existing = attributionCacheRef.current.get(fid);
+        const resolvedFlowConf = existing
+          ? resolveConservativeConfidence(existing.confidence, flowConf)
+          : flowConf;
+
+        const resolvedName =
+          existing &&
+          existing.process_name &&
+          !existing.process_name.toLowerCase().includes("unattributed") &&
+          existing.process_name.toLowerCase() !== "unknown owner" &&
+          (name.toLowerCase().includes("unattributed") || name === "unknown owner")
+            ? existing.process_name
+            : name;
+
+        const resolvedPid = existing?.pid != null && pid === null ? existing.pid : pid;
+
         attributionCacheRef.current.set(fid, {
-          process_name: name,
-          pid,
-          confidence,
+          process_name: resolvedName,
+          pid: resolvedPid,
+          confidence: resolvedFlowConf,
         });
       }
 
-      let group = map.get(groupKey);
-      if (!group) {
-        group = {
+      let acc = accMap.get(groupKey);
+      if (!acc) {
+        acc = {
           key: groupKey,
           processName: name,
           pid,
-          confidence,
-          flowIds: [...combinedFlowIds],
-          flowsCount,
+          unlistedFlows,
+          flowIds: new Set(combinedFlowIds),
+          flowConfidences: new Map(),
+          procConfidences: [confidence],
           lineage: mergeLineage([], correlatedLineage),
-          normalizedSearch: `${name} ${pid !== null ? `pid ${pid}` : "none"} ${confidence}`.toLowerCase(),
         };
         for (const fid of combinedFlowIds) {
-          group.normalizedSearch += ` ${fid}`;
+          const flowConf = deriveFlowConfidence(fid, proc, confidence, correlatedLineage);
+          acc.flowConfidences.set(fid, flowConf);
         }
-        for (const lin of group.lineage) {
-          const linTokens = [
-            lin.destination,
-            lin.protocol,
-            lin.classification,
-            lin.classification ? lin.classification.replace(/_/g, " ") : "",
-            lin.direction,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          if (linTokens) {
-            group.normalizedSearch += ` ${linTokens}`;
-          }
-        }
-        map.set(groupKey, group);
+        accMap.set(groupKey, acc);
       } else {
-        group.flowsCount = Math.max(group.flowsCount + flowsCount, group.flowIds.length);
-        group.lineage = mergeLineage(group.lineage, correlatedLineage);
+        acc.unlistedFlows += unlistedFlows;
+        acc.lineage = mergeLineage(acc.lineage, correlatedLineage);
+        acc.procConfidences.push(confidence);
         for (const fid of combinedFlowIds) {
-          if (!group.flowIds.includes(fid)) {
-            group.flowIds.push(fid);
-            group.normalizedSearch += ` ${fid}`;
-          }
+          acc.flowIds.add(fid);
+          const flowConf = deriveFlowConfidence(fid, proc, confidence, correlatedLineage);
+          const prevConf = acc.flowConfidences.get(fid);
+          acc.flowConfidences.set(
+            fid,
+            prevConf ? resolveConservativeConfidence(prevConf, flowConf) : flowConf
+          );
         }
-        for (const lin of correlatedLineage) {
-          const linTokens = [
-            lin.destination,
-            lin.protocol,
-            lin.classification,
-            lin.classification ? lin.classification.replace(/_/g, " ") : "",
-            lin.direction,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase();
-          if (linTokens && !group.normalizedSearch.includes(linTokens)) {
-            group.normalizedSearch += ` ${linTokens}`;
-          }
-        }
-        group.flowsCount = Math.max(group.flowsCount, group.flowIds.length);
       }
+    }
+
+    const map = new Map<string, GroupedProcess>();
+
+    for (const [groupKey, acc] of accMap.entries()) {
+      const flowIds = Array.from(acc.flowIds).sort((a, b) => a - b);
+      const allConfidences: AttributionConfidence[] = [
+        ...acc.flowConfidences.values(),
+        ...acc.procConfidences,
+      ];
+      const resolvedConfidence = aggregateConfidences(allConfidences);
+
+      const breakdown: ConfidenceBreakdown = {
+        high: 0,
+        low: 0,
+        unknown: 0,
+      };
+
+      if (flowIds.length > 0) {
+        for (const fid of flowIds) {
+          const c = acc.flowConfidences.get(fid) ?? resolvedConfidence;
+          breakdown[c]++;
+        }
+      } else {
+        for (const c of acc.procConfidences) {
+          breakdown[c]++;
+        }
+      }
+
+      // Build normalized search string deterministically
+      const searchTokens: string[] = [
+        acc.processName,
+        acc.pid !== null ? `pid ${acc.pid}` : "none",
+        resolvedConfidence,
+      ];
+      if (breakdown.high > 0 && resolvedConfidence !== "high") {
+        searchTokens.push("high");
+      }
+      if (breakdown.low > 0 && resolvedConfidence !== "low") {
+        searchTokens.push("low");
+      }
+      if (breakdown.unknown > 0 && resolvedConfidence !== "unknown") {
+        searchTokens.push("unknown");
+      }
+      for (const fid of flowIds) {
+        searchTokens.push(String(fid));
+      }
+      for (const lin of acc.lineage) {
+        const linTokens = [
+          lin.destination,
+          lin.protocol,
+          lin.classification,
+          lin.classification ? lin.classification.replace(/_/g, " ") : "",
+          lin.direction,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        if (linTokens) {
+          searchTokens.push(linTokens);
+        }
+      }
+
+      const group: GroupedProcess = {
+        key: groupKey,
+        processName: acc.processName,
+        pid: acc.pid,
+        confidence: resolvedConfidence,
+        confidenceBreakdown: breakdown,
+        flowIds,
+        flowsCount: flowIds.length + acc.unlistedFlows,
+        lineage: acc.lineage,
+        normalizedSearch: searchTokens.join(" ").toLowerCase(),
+      };
+
+      map.set(groupKey, group);
     }
 
     // Ensure target flow ID is indexed in search if navigated to
@@ -325,7 +471,7 @@ export function useAppsController() {
       }
     }
 
-    // Multi-tier Sorting: High confidence first -> Most flows -> Alphabetical
+    // Multi-tier Sorting: High confidence first -> Most flows -> Alphabetical -> Group Key
     const confidenceRank: Record<AttributionConfidence, number> = {
       high: 0,
       low: 1,
@@ -337,7 +483,9 @@ export function useAppsController() {
       if (confDiff !== 0) return confDiff;
       const flowDiff = b.flowsCount - a.flowsCount;
       if (flowDiff !== 0) return flowDiff;
-      return a.processName.localeCompare(b.processName);
+      const nameDiff = a.processName.localeCompare(b.processName);
+      if (nameDiff !== 0) return nameDiff;
+      return a.key.localeCompare(b.key);
     });
   }, [effectiveMonitor, targetFlowId]);
 

@@ -5,7 +5,11 @@ import "../i18n";
 import type { MonitorSnapshot } from "@netpulse/contract";
 import { Apps } from "../screens/Apps";
 import { resolveFlowDetails } from "../screens/Apps/ProcessRow";
-import { useAppsController } from "../hooks/useAppsController";
+import {
+  useAppsController,
+  resolveConservativeConfidence,
+  aggregateConfidences,
+} from "../hooks/useAppsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { setMonitor, setFeed, resetSession, __resetForTest } from "../state/store";
@@ -1471,6 +1475,463 @@ describe("Apps Screen & useAppsController", () => {
       expect(details.destinationPort).toBe(8443);
       expect(details.state).toBe("ESTABLISHED");
       expect(details.rttEstimate).toBe("2.4 ms");
+    });
+  });
+
+  describe("Deterministic Confidence Aggregation & Ranking", () => {
+    it("resolveConservativeConfidence resolves conservatively (unknown overrides low & high, low overrides high)", () => {
+      expect(resolveConservativeConfidence("high", "high")).toBe("high");
+      expect(resolveConservativeConfidence("high", "low")).toBe("low");
+      expect(resolveConservativeConfidence("low", "high")).toBe("low");
+      expect(resolveConservativeConfidence("low", "low")).toBe("low");
+      expect(resolveConservativeConfidence("high", "unknown")).toBe("unknown");
+      expect(resolveConservativeConfidence("unknown", "high")).toBe("unknown");
+      expect(resolveConservativeConfidence("low", "unknown")).toBe("unknown");
+      expect(resolveConservativeConfidence("unknown", "low")).toBe("unknown");
+      expect(resolveConservativeConfidence("unknown", "unknown")).toBe("unknown");
+    });
+
+    it("aggregateConfidences resolves conservatively across arbitrary sets of confidences", () => {
+      expect(aggregateConfidences([])).toBe("unknown");
+      expect(aggregateConfidences(["high", "high", "high"])).toBe("high");
+      expect(aggregateConfidences(["high", "low", "high"])).toBe("low");
+      expect(aggregateConfidences(["high", "unknown", "high"])).toBe("unknown");
+      expect(aggregateConfidences(["low", "unknown"])).toBe("unknown");
+      expect(aggregateConfidences(["unknown"])).toBe("unknown");
+    });
+
+    it("ensures group confidence is order-invariant regardless of process array order", async () => {
+      const procHigh = {
+        name: "chrome.exe",
+        pid: 4092,
+        flows: 1,
+        flowIds: [101],
+        confidence: "high",
+        bytes: 1000,
+        packets: 10,
+      } as any;
+
+      const procUnknown = {
+        name: "chrome.exe",
+        pid: 4092,
+        flows: 1,
+        flowIds: [102],
+        confidence: "unknown",
+        bytes: 2000,
+        packets: 20,
+      } as any;
+
+      // Order A: [High, Unknown]
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [procHigh, procUnknown],
+      });
+
+      const { result: resultA } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(resultA.current.loaded).toBe(true);
+      });
+
+      expect(resultA.current.groupedProcesses.length).toBe(1);
+      const groupA = resultA.current.groupedProcesses[0]!;
+      expect(groupA.confidence).toBe("unknown");
+      expect(groupA.confidenceBreakdown).toEqual({ high: 1, low: 0, unknown: 1 });
+      expect(groupA.flowIds).toEqual([101, 102]);
+
+      // Order B: [Unknown, High]
+      act(() => {
+        setMonitor({
+          ...mockBaseSnapshot,
+          processes: [procUnknown, procHigh],
+        });
+      });
+
+      const { result: resultB } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(resultB.current.loaded).toBe(true);
+      });
+
+      expect(resultB.current.groupedProcesses.length).toBe(1);
+      const groupB = resultB.current.groupedProcesses[0]!;
+      expect(groupB.confidence).toBe("unknown");
+      expect(groupB.confidenceBreakdown).toEqual({ high: 1, low: 0, unknown: 1 });
+      expect(groupB.flowIds).toEqual([101, 102]);
+    });
+
+    it("ensures group confidence ranking is strictly deterministic across all permutations", async () => {
+      const procTrusted = {
+        name: "trusted.exe",
+        pid: 100,
+        flows: 1,
+        flowIds: [1],
+        confidence: "high",
+        bytes: 100,
+        packets: 1,
+      } as any;
+
+      const procLow = {
+        name: "pidapp.exe",
+        pid: 200,
+        flows: 1,
+        flowIds: [2],
+        confidence: "low",
+        bytes: 200,
+        packets: 2,
+      } as any;
+
+      const procMixedA = {
+        name: "mixed.exe",
+        pid: 300,
+        flows: 1,
+        flowIds: [3],
+        confidence: "high",
+        bytes: 300,
+        packets: 3,
+      } as any;
+
+      const procMixedB = {
+        name: "mixed.exe",
+        pid: 300,
+        flows: 1,
+        flowIds: [4],
+        confidence: "unknown",
+        bytes: 400,
+        packets: 4,
+      } as any;
+
+      // Generate different permutations of input processes
+      const permutation1 = [procTrusted, procLow, procMixedA, procMixedB];
+      const permutation2 = [procMixedB, procLow, procMixedA, procTrusted];
+      const permutation3 = [procMixedA, procMixedB, procLow, procTrusted];
+
+      for (const perm of [permutation1, permutation2, permutation3]) {
+        act(() => {
+          setMonitor({
+            ...mockBaseSnapshot,
+            processes: perm,
+          });
+        });
+
+        const { result } = renderHook(() => useAppsController(), {
+          wrapper: ({ children }) => (
+            <DisclosureProvider>
+              <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+            </DisclosureProvider>
+          ),
+        });
+
+        await waitFor(() => {
+          expect(result.current.loaded).toBe(true);
+        });
+
+        expect(result.current.groupedProcesses.length).toBe(3);
+        // Tier 0: High confidence first
+        expect(result.current.groupedProcesses[0]!.processName).toBe("trusted.exe");
+        expect(result.current.groupedProcesses[0]!.confidence).toBe("high");
+        // Tier 1: Low confidence second
+        expect(result.current.groupedProcesses[1]!.processName).toBe("pidapp.exe");
+        expect(result.current.groupedProcesses[1]!.confidence).toBe("low");
+        // Tier 2: Unknown confidence third (mixed resolved conservatively to unknown)
+        expect(result.current.groupedProcesses[2]!.processName).toBe("mixed.exe");
+        expect(result.current.groupedProcesses[2]!.confidence).toBe("unknown");
+        expect(result.current.groupedProcesses[2]!.confidenceBreakdown).toEqual({
+          high: 1,
+          low: 0,
+          unknown: 1,
+        });
+      }
+    });
+
+    it("resolves flow-level confidence breakdown from explicit flowConfidences map", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "daemon.exe",
+            pid: 500,
+            flows: 3,
+            flowIds: [10, 20, 30],
+            confidence: "high",
+            flowConfidences: {
+              10: "high",
+              20: "low",
+              30: "high",
+            },
+            bytes: 5000,
+            packets: 50,
+          } as any,
+        ],
+      });
+
+      const { result } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true);
+      });
+
+      expect(result.current.groupedProcesses.length).toBe(1);
+      const group = result.current.groupedProcesses[0]!;
+      // Because flow 20 is "low", group conservatively resolves to "low"
+      expect(group.confidence).toBe("low");
+      expect(group.confidenceBreakdown).toEqual({
+        high: 2,
+        low: 1,
+        unknown: 0,
+      });
+
+      // Individual flow rows reflect their respective flow confidences
+      expect(result.current.rows.length).toBe(3);
+      const row10 = result.current.rows.find((r) => r.flowId === 10);
+      const row20 = result.current.rows.find((r) => r.flowId === 20);
+      expect(row10?.attr.confidence).toBe("high");
+      expect(row20?.attr.confidence).toBe("low");
+    });
+
+    it("resolves flow-level confidence from flows object array", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "agent.exe",
+            pid: 600,
+            flows: [
+              { id: 91, confidence: "high" },
+              { id: 92, confidence: "unknown" },
+            ],
+            flowIds: [91, 92],
+            confidence: "high",
+            bytes: 2000,
+            packets: 20,
+          } as any,
+        ],
+      });
+
+      const { result } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true);
+      });
+
+      expect(result.current.groupedProcesses.length).toBe(1);
+      const group = result.current.groupedProcesses[0]!;
+      expect(group.confidence).toBe("unknown");
+      expect(group.confidenceBreakdown).toEqual({
+        high: 1,
+        low: 0,
+        unknown: 1,
+      });
+    });
+
+    it("resolves overlapping flow attributions conservatively in cache", async () => {
+      // Flow #77 appears in procA as high, but also in procB as unknown
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "app1.exe",
+            pid: 701,
+            flows: 1,
+            flowIds: [77],
+            confidence: "high",
+            bytes: 100,
+            packets: 1,
+          } as any,
+          {
+            name: "app2.exe",
+            pid: 702,
+            flows: 1,
+            flowIds: [77],
+            confidence: "unknown",
+            bytes: 200,
+            packets: 2,
+          } as any,
+        ],
+      });
+
+      const { result } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true);
+      });
+
+      // Flow 77's cached attribution resolves conservatively to "unknown"
+      const flow77Rows = result.current.rows.filter((r) => r.flowId === 77);
+      expect(flow77Rows.length).toBeGreaterThan(0);
+      expect(flow77Rows[0]!.attr.confidence).toBe("unknown");
+    });
+
+    it("ensures flowsCount is deduplicated when multiple records for the same process share flow IDs", async () => {
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "service.exe",
+            pid: 900,
+            flows: 1,
+            flowIds: [100],
+            confidence: "high",
+            bytes: 100,
+            packets: 1,
+          } as any,
+          {
+            name: "service.exe",
+            pid: 900,
+            flows: 1,
+            flowIds: [100], // Duplicate flow
+            confidence: "high",
+            bytes: 200,
+            packets: 2,
+          } as any,
+          {
+            name: "service.exe",
+            pid: 900,
+            flows: 1,
+            flowIds: [101], // Distinct flow
+            confidence: "high",
+            bytes: 300,
+            packets: 3,
+          } as any,
+        ],
+      });
+
+      const { result } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(result.current.loaded).toBe(true);
+      });
+
+      expect(result.current.groupedProcesses.length).toBe(1);
+      const group = result.current.groupedProcesses[0]!;
+      expect(group.flowIds).toEqual([100, 101]);
+      // Should be 2 distinct flows, not 3
+      expect(group.flowsCount).toBe(2);
+    });
+
+    it("deterministically preserves known process name and PID over fallback unattributed entries", async () => {
+      // Order A: Known process arrives first, generic fallback arrives second
+      setMonitor({
+        ...mockBaseSnapshot,
+        processes: [
+          {
+            name: "worker.exe",
+            pid: 950,
+            flows: 1,
+            flowIds: [888],
+            confidence: "high",
+            bytes: 500,
+            packets: 5,
+          } as any,
+          {
+            name: "unknown owner",
+            pid: null,
+            flows: 1,
+            flowIds: [888],
+            confidence: "unknown",
+            bytes: 500,
+            packets: 5,
+          } as any,
+        ],
+      });
+
+      const { result: resultA } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(resultA.current.loaded).toBe(true);
+      });
+
+      const rowA = resultA.current.rows.find((r) => r.flowId === 888);
+      expect(rowA?.attr.process_name).toBe("worker.exe");
+      expect(rowA?.attr.pid).toBe(950);
+      expect(rowA?.attr.confidence).toBe("unknown"); // Conservative confidence
+
+      // Order B: Generic fallback arrives first, known process arrives second
+      act(() => {
+        resetSession("session-order-b");
+        setMonitor({
+          ...mockBaseSnapshot,
+          processes: [
+            {
+              name: "unknown owner",
+              pid: null,
+              flows: 1,
+              flowIds: [888],
+              confidence: "unknown",
+              bytes: 500,
+              packets: 5,
+            } as any,
+            {
+              name: "worker.exe",
+              pid: 950,
+              flows: 1,
+              flowIds: [888],
+              confidence: "high",
+              bytes: 500,
+              packets: 5,
+            } as any,
+          ],
+        });
+      });
+
+      const { result: resultB } = renderHook(() => useAppsController(), {
+        wrapper: ({ children }) => (
+          <DisclosureProvider>
+            <EvidenceNavigationProvider>{children}</EvidenceNavigationProvider>
+          </DisclosureProvider>
+        ),
+      });
+
+      await waitFor(() => {
+        expect(resultB.current.loaded).toBe(true);
+      });
+
+      const rowB = resultB.current.rows.find((r) => r.flowId === 888);
+      expect(rowB?.attr.process_name).toBe("worker.exe");
+      expect(rowB?.attr.pid).toBe(950);
+      expect(rowB?.attr.confidence).toBe("unknown");
     });
   });
 });

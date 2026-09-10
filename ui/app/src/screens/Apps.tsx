@@ -27,7 +27,6 @@ export function Apps() {
     loaded,
     notice,
     setNotice,
-    announcement,
   } = useAppsController();
 
   const [inspectedFlowId, setInspectedFlowId] = useState<number | null>(targetFlowId ?? null);
@@ -113,11 +112,6 @@ export function Apps() {
         <h1 className="np-hero__title">{t("title")}</h1>
         <p className="np-hero__sub">{t("hero_subtitle")}</p>
       </header>
-
-      {/* Screen Reader Live Announcement Region */}
-      <div className="np-sr-only" aria-live="polite" aria-atomic="true">
-        {announcement}
-      </div>
 
       {/* Error Notice Banner */}
       <Notice message={notice} onDismiss={() => setNotice(null)} />

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import type { Attribution, AttributionConfidence } from "@netpulse/contract";
+import type { Attribution, AttributionConfidence, ProcessMetric } from "@netpulse/contract";
 import { useStore } from "../state/store";
 import { useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { query } from "../ipc";
@@ -28,132 +28,184 @@ export interface AppsSummaryMetrics {
   unattributedCount: number;
 }
 
-// Collect distinct flow IDs from feed cards
-function extractFlowIdsFromFeed(feed: ReturnType<typeof useStore>["feed"]): number[] {
-  const ids = new Set<number>();
-  for (const card of feed) {
-    for (const ev of card.evidence) {
-      if (ev.kind === "flow") ids.add(ev.id);
-    }
+function deriveConfidence(proc: ProcessMetric): AttributionConfidence {
+  if ((proc as any).confidence) {
+    return (proc as any).confidence;
   }
-  return [...ids];
+  const name = (proc.name || "").toLowerCase();
+  if (
+    proc.pid === null ||
+    !proc.name ||
+    name.includes("unattributed") ||
+    name === "unknown owner"
+  ) {
+    return "unknown";
+  }
+  if (proc.name.startsWith("PID ") && !proc.exe_path) {
+    return "low";
+  }
+  return "high";
 }
 
 export function useAppsController() {
-  const { feed } = useStore();
+  const { monitor } = useStore();
   const { navigationTarget, clearNavigationTarget, navigateToEvidence } = useEvidenceNavigation();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilterOption>("all");
-  const [rows, setRows] = useState<FlowAttributionRow[]>([]);
-  const [loaded, setLoaded] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
 
   // In-memory attribution cache keyed by Flow ID
   const attributionCacheRef = useRef<Map<number, Attribution>>(new Map());
+  const [targetAttribution, setTargetAttribution] = useState<Attribution | null>(null);
 
   const targetFlowId = navigationTarget?.screen === "apps" ? navigationTarget.flowId : null;
 
-  // IPC Data Fetching & Caching Pipeline
+  // Single target flow query if navigated from evidence and not already in process metrics
   useEffect(() => {
-    let cancelled = false;
-    const feedFlowIds = extractFlowIdsFromFeed(feed);
-    const flowIdsSet = new Set(feedFlowIds);
-    if (targetFlowId !== null) {
-      flowIdsSet.add(targetFlowId);
-    }
-    const flowIds = [...flowIdsSet];
-
-    // Determine which flow IDs need fresh IPC queries vs cached results
-    const missingIds = flowIds.filter((id) => !attributionCacheRef.current.has(id));
-
-    if (missingIds.length === 0) {
-      // All flow attributions exist in cache
-      const cachedRows = flowIds
-        .map((id) => {
-          const attr = attributionCacheRef.current.get(id);
-          return attr ? { flowId: id, attr } : null;
-        })
-        .filter((r): r is FlowAttributionRow => r !== null);
-
-      setRows(cachedRows);
-      setLoaded(true);
+    if (targetFlowId === null) {
+      setTargetAttribution(null);
       return;
     }
 
-    Promise.all(
-      missingIds.map(async (flowId) => {
-        try {
-          const res = await query({ kind: "attributionOfFlow", flow_id: flowId });
-          if (res.kind === "attribution") {
-            attributionCacheRef.current.set(flowId, res.attribution);
-            return { flowId, attr: res.attribution };
-          }
-        } catch (e) {
-          // Ignore individual flow query errors
-        }
-        return null;
-      })
-    )
-      .then(() => {
-        if (!cancelled) {
-          const currentRows = flowIds
-            .map((id) => {
-              const attr = attributionCacheRef.current.get(id);
-              return attr ? { flowId: id, attr } : null;
-            })
-            .filter((r): r is FlowAttributionRow => r !== null);
+    // If flow is already attributed in loaded monitor processes, skip IPC query
+    const alreadyAttributed = (monitor?.processes || []).some(
+      (p) =>
+        (Array.isArray((p as any).flowIds) && (p as any).flowIds.includes(targetFlowId)) ||
+        (Array.isArray((p as any).flow_ids) && (p as any).flow_ids.includes(targetFlowId))
+    );
+    if (alreadyAttributed) {
+      return;
+    }
 
-          setRows(currentRows);
+    if (attributionCacheRef.current.has(targetFlowId)) {
+      setTargetAttribution(attributionCacheRef.current.get(targetFlowId)!);
+      return;
+    }
+
+    let cancelled = false;
+    query({ kind: "attributionOfFlow", flow_id: targetFlowId })
+      .then((res) => {
+        if (!cancelled && res.kind === "attribution") {
+          attributionCacheRef.current.set(targetFlowId, res.attribution);
+          setTargetAttribution(res.attribution);
         }
       })
       .catch((e) => {
         if (!cancelled) setNotice(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoaded(true);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [feed, targetFlowId]);
+  }, [targetFlowId, monitor?.processes]);
 
-  // Target flow filtering
-  const activeRows = useMemo(() => {
-    if (targetFlowId !== null) {
-      return rows.filter((r) => r.flowId === targetFlowId);
-    }
-    return rows;
-  }, [rows, targetFlowId]);
+  // Loading state clears when authoritative monitor snapshot is first populated
+  const loaded = monitor !== null;
 
-  // Process Aggregation & Grouping
+  // Derive grouped processes directly from monitor.processes and monitor.lineage
   const allGroupedProcesses = useMemo(() => {
+    if (!monitor) return [];
+
+    const rawProcesses = monitor.processes || [];
+    const rawLineage = monitor.lineage || [];
+
+    let effectiveProcesses = rawProcesses;
+    if (effectiveProcesses.length === 0 && rawLineage.length > 0) {
+      const totalLineageFlows = rawLineage.reduce((sum, l) => sum + (l.flow_count || 1), 0);
+      effectiveProcesses = [
+        {
+          pid: null,
+          name: "Unattributed Flows",
+          flows: totalLineageFlows,
+          bytes: rawLineage.reduce((sum, l) => sum + (l.bytes || 0), 0),
+          packets: rawLineage.reduce((sum, l) => sum + (l.packets || 0), 0),
+        },
+      ];
+    }
+
     const map = new Map<string, GroupedProcess>();
 
-    for (const { flowId, attr } of activeRows) {
-      const name = attr.process_name || "unknown owner";
-      const pidStr = attr.pid !== null ? String(attr.pid) : "none";
+    for (const proc of effectiveProcesses) {
+      const name = proc.name || (proc.pid !== null ? `PID ${proc.pid}` : "unknown owner");
+      const pid = proc.pid ?? null;
+      const pidStr = pid !== null ? String(pid) : "none";
       const groupKey = `${name}:${pidStr}`;
+      const confidence = deriveConfidence(proc);
+      const procFlowIds: number[] = Array.isArray((proc as any).flowIds)
+        ? (proc as any).flowIds
+        : Array.isArray((proc as any).flow_ids)
+        ? (proc as any).flow_ids
+        : [];
+      const flowsCount = typeof proc.flows === "number" ? proc.flows : procFlowIds.length;
 
       let group = map.get(groupKey);
       if (!group) {
         group = {
           key: groupKey,
           processName: name,
-          pid: attr.pid,
-          confidence: attr.confidence,
-          flowIds: [],
-          flowsCount: 0,
-          normalizedSearch: `${name} ${pidStr} ${attr.confidence}`.toLowerCase(),
+          pid,
+          confidence,
+          flowIds: [...procFlowIds],
+          flowsCount,
+          normalizedSearch: `${name} ${pid !== null ? `pid ${pid}` : "none"} ${confidence}`.toLowerCase(),
         };
+        for (const fid of procFlowIds) {
+          group.normalizedSearch += ` ${fid}`;
+        }
         map.set(groupKey, group);
+      } else {
+        group.flowsCount += flowsCount;
+        for (const fid of procFlowIds) {
+          if (!group.flowIds.includes(fid)) {
+            group.flowIds.push(fid);
+            group.normalizedSearch += ` ${fid}`;
+          }
+        }
       }
+    }
 
-      group.flowIds.push(flowId);
-      group.flowsCount += 1;
-      group.normalizedSearch += ` ${flowId}`;
+    // Attach target flow ID if navigated to
+    if (targetFlowId !== null) {
+      if (targetAttribution) {
+        const name =
+          targetAttribution.process_name ||
+          (targetAttribution.pid !== null ? `PID ${targetAttribution.pid}` : "unknown owner");
+        const pid = targetAttribution.pid ?? null;
+        const pidStr = pid !== null ? String(pid) : "none";
+        const groupKey = `${name}:${pidStr}`;
+
+        let group = map.get(groupKey);
+        if (!group && pid !== null) {
+          group = [...map.values()].find((g) => g.pid === pid);
+        }
+
+        if (group) {
+          if (!group.flowIds.includes(targetFlowId)) {
+            group.flowIds.push(targetFlowId);
+            group.normalizedSearch += ` ${targetFlowId}`;
+          }
+        } else {
+          map.set(groupKey, {
+            key: groupKey,
+            processName: name,
+            pid,
+            confidence: targetAttribution.confidence,
+            flowIds: [targetFlowId],
+            flowsCount: 1,
+            normalizedSearch: `${name} ${pid !== null ? `pid ${pid}` : "none"} ${targetAttribution.confidence} ${targetFlowId}`.toLowerCase(),
+          });
+        }
+      } else {
+        for (const group of map.values()) {
+          if (group.flowIds.includes(targetFlowId)) {
+            if (!group.normalizedSearch.includes(String(targetFlowId))) {
+              group.normalizedSearch += ` ${targetFlowId}`;
+            }
+          }
+        }
+      }
     }
 
     // Multi-tier Sorting: High confidence first -> Most flows -> Alphabetical
@@ -170,13 +222,50 @@ export function useAppsController() {
       if (flowDiff !== 0) return flowDiff;
       return a.processName.localeCompare(b.processName);
     });
-  }, [activeRows]);
+  }, [monitor, targetFlowId, targetAttribution]);
+
+  // Target flow filtering
+  const activeGroupedProcesses = useMemo(() => {
+    if (targetFlowId !== null) {
+      return allGroupedProcesses.filter((g) => g.flowIds.includes(targetFlowId));
+    }
+    return allGroupedProcesses;
+  }, [allGroupedProcesses, targetFlowId]);
+
+  // Derive rows model for empty-state evaluation and downstream consumers
+  const rows = useMemo<FlowAttributionRow[]>(() => {
+    const result: FlowAttributionRow[] = [];
+    for (const group of activeGroupedProcesses) {
+      if (group.flowIds.length > 0) {
+        for (const flowId of group.flowIds) {
+          result.push({
+            flowId,
+            attr: {
+              process_name: group.processName,
+              pid: group.pid,
+              confidence: group.confidence,
+            },
+          });
+        }
+      } else {
+        result.push({
+          flowId: group.pid ?? 0,
+          attr: {
+            process_name: group.processName,
+            pid: group.pid,
+            confidence: group.confidence,
+          },
+        });
+      }
+    }
+    return result;
+  }, [activeGroupedProcesses]);
 
   // Filtered Process Groups (Search + Confidence)
   const filteredGroupedProcesses = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
 
-    return allGroupedProcesses.filter((group) => {
+    return activeGroupedProcesses.filter((group) => {
       // Confidence level filter
       if (confidenceFilter !== "all" && group.confidence !== confidenceFilter) {
         return false;
@@ -187,7 +276,7 @@ export function useAppsController() {
       }
       return true;
     });
-  }, [allGroupedProcesses, searchQuery, confidenceFilter]);
+  }, [activeGroupedProcesses, searchQuery, confidenceFilter]);
 
   // Summary Metrics Computation
   const summaryMetrics = useMemo<AppsSummaryMetrics>(() => {
@@ -195,19 +284,19 @@ export function useAppsController() {
     let unknownCount = 0;
     let totalFlows = 0;
 
-    for (const group of allGroupedProcesses) {
+    for (const group of activeGroupedProcesses) {
       totalFlows += group.flowsCount;
       if (group.confidence === "high") highCount++;
       if (group.confidence === "unknown") unknownCount++;
     }
 
     return {
-      totalApps: allGroupedProcesses.length,
+      totalApps: activeGroupedProcesses.length,
       totalFlows,
       highConfidenceCount: highCount,
       unattributedCount: unknownCount,
     };
-  }, [allGroupedProcesses]);
+  }, [activeGroupedProcesses]);
 
   // Expand / Collapse Group Actions
   const toggleExpandGroup = useCallback((groupKey: string) => {
@@ -235,7 +324,7 @@ export function useAppsController() {
   }, [loaded, filteredGroupedProcesses.length]);
 
   return {
-    rows: activeRows,
+    rows,
     groupedProcesses: filteredGroupedProcesses,
     summaryMetrics,
     searchQuery,

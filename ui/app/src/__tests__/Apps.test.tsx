@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, renderHook, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
+import type { MonitorSnapshot } from "@netpulse/contract";
 import { Apps } from "../screens/Apps";
 import { useAppsController } from "../hooks/useAppsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
-import { setFeed, __resetForTest } from "../state/store";
-import * as ipcModule from "../ipc";
+import { setMonitor, setFeed, __resetForTest } from "../state/store";
 
 afterEach(() => {
   cleanup();
@@ -24,12 +24,28 @@ function AppsTestWrapper() {
   );
 }
 
+const mockBaseSnapshot: MonitorSnapshot = {
+  by_protocol: { dimension: "protocol", rows: [] },
+  by_host: { dimension: "host", rows: [] },
+  diagnoses: [],
+  network_loss_indicators: 0,
+  capture_drops: 0,
+  processes: [],
+  lineage: [],
+};
+
 describe("Apps Screen & useAppsController", () => {
   beforeEach(() => {
     __resetForTest();
   });
 
-  it("renders empty state when feed contains no flows", async () => {
+  it("renders skeleton loading state when monitor has not arrived yet", () => {
+    render(<AppsTestWrapper />);
+    expect(screen.getByLabelText("Applications loading")).toBeInTheDocument();
+  });
+
+  it("renders empty state when monitor contains no processes", async () => {
+    setMonitor(mockBaseSnapshot);
     render(<AppsTestWrapper />);
 
     expect(
@@ -37,26 +53,44 @@ describe("Apps Screen & useAppsController", () => {
     ).toBeInTheDocument();
   });
 
-  it("controller hook caches IPC attribution results by flow ID and groups by process", async () => {
-    setFeed([
-      {
-        headline: "TLS Flow 101",
-        summary: "Chrome connection",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 101 }],
-        at_mono_nanos: 1000,
-      },
-    ]);
+  it("renders applications during active capture with zero narrative cards (NET-DATA-001 acceptance criteria)", async () => {
+    setFeed([]); // Zero narrative cards in feed
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          pid: 4092,
+          name: "chrome.exe",
+          flows: 3,
+          bytes: 1024,
+          packets: 10,
+        },
+      ],
+    });
 
-    const querySpy = vi.spyOn(ipcModule, "query").mockResolvedValue({
-      kind: "attribution",
-      attribution: {
-        process_name: "chrome.exe",
-        pid: 4092,
-        confidence: "high",
-      },
-    } as any);
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("Attributed Apps")).toBeInTheDocument();
+    expect(screen.getByText("chrome.exe")).toBeInTheDocument();
+    expect(screen.getByText("PID 4092")).toBeInTheDocument();
+    expect(screen.getByText("3 flows")).toBeInTheDocument();
+    expect(screen.queryByText("No attributed applications captured yet.")).not.toBeInTheDocument();
+  });
+
+  it("controller hook groups by process directly from authoritative monitor.processes", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "chrome.exe",
+          pid: 4092,
+          flows: 1,
+          flowIds: [101],
+          bytes: 1024,
+          packets: 10,
+        } as any,
+      ],
+    });
 
     const { result } = renderHook(() => useAppsController(), {
       wrapper: ({ children }) => (
@@ -76,30 +110,23 @@ describe("Apps Screen & useAppsController", () => {
     expect(group.pid).toBe(4092);
     expect(group.confidence).toBe("high");
     expect(group.flowIds).toEqual([101]);
-
-    querySpy.mockRestore();
   });
 
   it("renders summary KPIs, process table, and allows row expansion to inspect flows", async () => {
-    setFeed([
-      {
-        headline: "Flow 202",
-        summary: "Slack API call",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 202 }],
-        at_mono_nanos: 2000,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockResolvedValue({
-      kind: "attribution",
-      attribution: {
-        process_name: "slack.exe",
-        pid: 8192,
-        confidence: "high",
-      },
-    } as any);
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "slack.exe",
+          pid: 8192,
+          flows: 1,
+          flowIds: [202],
+          confidence: "high",
+          bytes: 2000,
+          packets: 20,
+        } as any,
+      ],
+    });
 
     render(<AppsTestWrapper />);
 
@@ -115,25 +142,20 @@ describe("Apps Screen & useAppsController", () => {
   });
 
   it("filters process groups by search query and confidence level buttons", async () => {
-    setFeed([
-      {
-        headline: "Flow 303",
-        summary: "Curl request",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 303 }],
-        at_mono_nanos: 3000,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockResolvedValue({
-      kind: "attribution",
-      attribution: {
-        process_name: "curl.exe",
-        pid: 1234,
-        confidence: "low",
-      },
-    } as any);
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "curl.exe",
+          pid: 1234,
+          flows: 1,
+          flowIds: [303],
+          confidence: "low",
+          bytes: 3000,
+          packets: 30,
+        } as any,
+      ],
+    });
 
     render(<AppsTestWrapper />);
 
@@ -153,36 +175,28 @@ describe("Apps Screen & useAppsController", () => {
   });
 
   it("supports interactive KPI tiles to filter by confidence and reset to all", async () => {
-    setFeed([
-      {
-        headline: "Flow 401",
-        summary: "High confidence app",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 401 }],
-        at_mono_nanos: 4000,
-      },
-      {
-        headline: "Flow 402",
-        summary: "Unknown owner app",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 402 }],
-        at_mono_nanos: 4001,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockImplementation(async (req: any) => {
-      if (req.flow_id === 401) {
-        return {
-          kind: "attribution",
-          attribution: { process_name: "trusted.exe", pid: 100, confidence: "high" },
-        } as any;
-      }
-      return {
-        kind: "attribution",
-        attribution: { process_name: "unknown owner", pid: null, confidence: "unknown" },
-      } as any;
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "trusted.exe",
+          pid: 100,
+          flows: 1,
+          flowIds: [401],
+          confidence: "high",
+          bytes: 4000,
+          packets: 40,
+        } as any,
+        {
+          name: "unknown owner",
+          pid: null,
+          flows: 1,
+          flowIds: [402],
+          confidence: "unknown",
+          bytes: 4001,
+          packets: 41,
+        } as any,
+      ],
     });
 
     render(<AppsTestWrapper />);
@@ -227,36 +241,28 @@ describe("Apps Screen & useAppsController", () => {
   });
 
   it("supports search clear button and Escape key without resetting confidence filter", async () => {
-    setFeed([
-      {
-        headline: "Flow 501",
-        summary: "Process Alpha",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 501 }],
-        at_mono_nanos: 5000,
-      },
-      {
-        headline: "Flow 502",
-        summary: "Process Beta",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 502 }],
-        at_mono_nanos: 5001,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockImplementation(async (req: any) => {
-      if (req.flow_id === 501) {
-        return {
-          kind: "attribution",
-          attribution: { process_name: "alpha.exe", pid: 5001, confidence: "high" },
-        } as any;
-      }
-      return {
-        kind: "attribution",
-        attribution: { process_name: "beta.exe", pid: 5002, confidence: "high" },
-      } as any;
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "alpha.exe",
+          pid: 5001,
+          flows: 1,
+          flowIds: [501],
+          confidence: "high",
+          bytes: 5000,
+          packets: 50,
+        } as any,
+        {
+          name: "beta.exe",
+          pid: 5002,
+          flows: 1,
+          flowIds: [502],
+          confidence: "high",
+          bytes: 5001,
+          packets: 51,
+        } as any,
+      ],
     });
 
     render(<AppsTestWrapper />);
@@ -288,36 +294,28 @@ describe("Apps Screen & useAppsController", () => {
   });
 
   it("supports independent multi-row expansion and collapse", async () => {
-    setFeed([
-      {
-        headline: "Flow 601",
-        summary: "Process One",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 601 }],
-        at_mono_nanos: 6000,
-      },
-      {
-        headline: "Flow 602",
-        summary: "Process Two",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 602 }],
-        at_mono_nanos: 6001,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockImplementation(async (req: any) => {
-      if (req.flow_id === 601) {
-        return {
-          kind: "attribution",
-          attribution: { process_name: "proc1.exe", pid: 6010, confidence: "high" },
-        } as any;
-      }
-      return {
-        kind: "attribution",
-        attribution: { process_name: "proc2.exe", pid: 6020, confidence: "high" },
-      } as any;
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "proc1.exe",
+          pid: 6010,
+          flows: 1,
+          flowIds: [601],
+          confidence: "high",
+          bytes: 6000,
+          packets: 60,
+        } as any,
+        {
+          name: "proc2.exe",
+          pid: 6020,
+          flows: 1,
+          flowIds: [602],
+          confidence: "high",
+          bytes: 6001,
+          packets: 61,
+        } as any,
+      ],
     });
 
     render(<AppsTestWrapper />);
@@ -345,21 +343,20 @@ describe("Apps Screen & useAppsController", () => {
   });
 
   it("navigates to flow evidence when inspect button is clicked without collapsing the row", async () => {
-    setFeed([
-      {
-        headline: "Flow 701",
-        summary: "Inspect flow app",
-        lines: [],
-        severity: "neutral",
-        evidence: [{ kind: "flow", id: 701 }],
-        at_mono_nanos: 7000,
-      },
-    ]);
-
-    vi.spyOn(ipcModule, "query").mockResolvedValue({
-      kind: "attribution",
-      attribution: { process_name: "inspectable.exe", pid: 7010, confidence: "high" },
-    } as any);
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [
+        {
+          name: "inspectable.exe",
+          pid: 7010,
+          flows: 1,
+          flowIds: [701],
+          confidence: "high",
+          bytes: 7000,
+          packets: 70,
+        } as any,
+      ],
+    });
 
     let capturedEvidence: any = null;
     function CustomWrapper() {
@@ -403,5 +400,28 @@ describe("Apps Screen & useAppsController", () => {
     fireEvent.click(screen.getByTestId("check-nav"));
     expect(capturedEvidence).toEqual({ screen: "apps", flowId: 701 });
   });
-});
 
+  it("derives fallback group from monitor.lineage when processes array is empty", async () => {
+    setMonitor({
+      ...mockBaseSnapshot,
+      processes: [],
+      lineage: [
+        {
+          source: "192.168.1.5",
+          destination: "1.1.1.1",
+          protocol: "UDP",
+          bytes: 500,
+          packets: 5,
+          direction: "outbound",
+          flow_count: 2,
+          classification: "ExternalWan" as any,
+        },
+      ],
+    });
+
+    render(<AppsTestWrapper />);
+
+    expect(await screen.findByText("Unattributed Flows")).toBeInTheDocument();
+    expect(screen.getByText("2 flows")).toBeInTheDocument();
+  });
+});

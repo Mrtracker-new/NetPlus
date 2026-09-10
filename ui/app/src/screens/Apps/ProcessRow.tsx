@@ -104,26 +104,35 @@ export function ProcessRow({
                 <span>Active Flow Lineage ({group.flowsCount})</span>
               </div>
               <div className="np-apps-lineage-tray__list">
-                {group.flowIds.map((flowId) => (
-                  <div key={`flow-${flowId}`} className="np-apps-flow-card">
-                    <span className="np-apps-flow-card__id">
+                {group.flowIds.length === 0 ? (
+                  <div className="np-apps-flow-card">
+                    <span className="np-apps-flow-card__id" style={{ fontStyle: "italic", opacity: 0.85 }}>
                       <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
-                      Flow #{flowId}
+                      {group.flowsCount} {group.flowsCount === 1 ? "active flow" : "active flows"} attributed
                     </span>
-                    <button
-                      type="button"
-                      className="np-apps-flow-card__inspect"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onInspectFlow(flowId);
-                      }}
-                      aria-label={`${t("inspect_flow")} #${flowId}`}
-                    >
-                      <Icon name="search" style={{ width: "12px", height: "12px" }} />
-                      <span>{t("inspect_flow")}</span>
-                    </button>
                   </div>
-                ))}
+                ) : (
+                  group.flowIds.map((flowId) => (
+                    <div key={`flow-${flowId}`} className="np-apps-flow-card">
+                      <span className="np-apps-flow-card__id">
+                        <span className="np-apps-flow-card__id-gem" aria-hidden="true" />
+                        Flow #{flowId}
+                      </span>
+                      <button
+                        type="button"
+                        className="np-apps-flow-card__inspect"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onInspectFlow(flowId);
+                        }}
+                        aria-label={`${t("inspect_flow")} #${flowId}`}
+                      >
+                        <Icon name="search" style={{ width: "12px", height: "12px" }} />
+                        <span>{t("inspect_flow")}</span>
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </td>

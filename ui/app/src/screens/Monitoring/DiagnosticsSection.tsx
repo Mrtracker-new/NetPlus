@@ -41,7 +41,7 @@ export function DiagnosticsSection({
   }, [selectedSubsystem]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem", marginTop: "0.5rem" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "var(--np-4)" }}>
       {/* Diagnostic Hypotheses Cards — Prioritized Rust Engine Diagnoses */}
       {diagnoses.length > 0 && (
         <div className="np-monitor-card" aria-label={t("diagnostics.hypotheses_aria_label", "Diagnostic Hypotheses")}>

@@ -57,7 +57,6 @@ export function ThroughputLineageCard({
       {/* Top Protocols Bar */}
       <div
         className="np-protocol-breakdown"
-        style={{ marginTop: "var(--np-3, 0.75rem)" }}
         aria-label={t("throughput_lineage.protocols_breakdown_aria_label", "Top protocols breakdown")}
         data-testid="top-protocols-bar"
       >

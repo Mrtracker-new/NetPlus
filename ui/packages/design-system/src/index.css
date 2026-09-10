@@ -7402,7 +7402,7 @@ button {
 /* Symmetrical 2x2 Grid */
 .np-monitor-grid {
   display: grid;
-  gap: 1.25rem;
+  gap: var(--np-4);
   width: 100%;
 }
 
@@ -7425,7 +7425,7 @@ button {
   padding: var(--np-4);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: var(--np-3);
   position: relative;
   overflow: hidden;

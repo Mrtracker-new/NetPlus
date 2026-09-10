@@ -62,7 +62,7 @@ export type LineageFilterMode =
   | "CDN Edge"
   | "Multicast";
 
-export const FILTER_MODES: readonly LineageFilterMode[] = [
+const FILTER_MODES: readonly LineageFilterMode[] = [
   "All Endpoints",
   "External WAN",
   "Local Subnet",
@@ -170,7 +170,6 @@ export function ApplicationsLineageCard({
     <div
       className="np-monitor-card"
       aria-label={t("applications_lineage.aria_label", "Applications & Lineage Topology Graph")}
-      style={{ justifyContent: "flex-start" }}
     >
       <div className="np-monitor-card__header">
         <h3 className="np-monitor-card__title">{t("applications_lineage.title", "Applications & Lineage")}</h3>

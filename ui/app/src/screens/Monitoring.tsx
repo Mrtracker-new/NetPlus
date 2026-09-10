@@ -195,7 +195,6 @@ export function Monitoring() {
           className="np-loss"
           aria-label="Loss telemetry"
           data-testid="monitoring-loss-counters"
-          style={{ marginBottom: "var(--np-4, 1rem)" }}
         >
           <span>
             {t("network_loss", {

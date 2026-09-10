@@ -120,7 +120,7 @@ export function ProcessAttributesCard({ processes = [] }: ProcessAttributesCardP
           <span>{t("process_attributes.empty", "No attributed process flows active in current time window.")}</span>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem", marginTop: "0.5rem" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
           {visibleProcesses.map((p) => {
             const cpuStr = typeof p.cpuPercent === "number" && !isNaN(p.cpuPercent) ? `${p.cpuPercent.toFixed(1)}%` : "—";
             const memStr = typeof p.memoryMB === "number" && !isNaN(p.memoryMB) ? `${p.memoryMB} MB` : "—";

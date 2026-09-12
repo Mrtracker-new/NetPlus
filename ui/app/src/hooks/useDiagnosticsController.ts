@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { PingResult, TracerouteHop, BufferbloatResult } from "@netpulse/contract";
+import type { PingResult, TracerouteHop, TracerouteResult, BufferbloatResult } from "@netpulse/contract";
 import { query } from "../ipc";
 import { executeDiagnosticPipeline, type DiagnosticSession } from "../diagnostic";
 
@@ -93,7 +93,7 @@ export function useDiagnosticsController() {
   const [announcement, setAnnouncement] = useState("");
 
   const [pingProbe, setPingProbe] = useState<ProbeState<ExtendedPingResult>>({ status: "idle" });
-  const [traceProbe, setTraceProbe] = useState<ProbeState<TracerouteHop[]>>({ status: "idle" });
+  const [traceProbe, setTraceProbe] = useState<ProbeState<TracerouteResult>>({ status: "idle" });
   const [bloatProbe, setBloatProbe] = useState<ProbeState<BufferbloatResult>>({ status: "idle" });
 
   const [deepSession, setDeepSession] = useState<DiagnosticSession | null>(null);
@@ -183,12 +183,17 @@ export function useDiagnosticsController() {
           source: h.source,
         }));
 
+        const normalizedResult: TracerouteResult = {
+          target: res.target || normalized,
+          hops: normalizedHops,
+        };
+
         setTraceProbe({
           status: "success",
-          result: normalizedHops,
+          result: normalizedResult,
           finishedAt: Date.now(),
         });
-        setAnnouncement(`Traceroute completed for ${normalized} with ${normalizedHops.length} hops.`);
+        setAnnouncement(`Traceroute completed for ${normalizedResult.target} with ${normalizedHops.length} hops.`);
       }
     } catch (e) {
       if (!isMountedRef.current) return;

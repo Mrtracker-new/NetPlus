@@ -19,6 +19,11 @@ export type {
   MonitorTimeRange,
 } from "./generated";
 
+export interface TracerouteResult {
+  target: string;
+  hops: TracerouteHop[];
+}
+
 import type {
   DiagnosticChainStageKind,
   MonitorSnapshot,
@@ -137,7 +142,7 @@ export type QueryResponse =
   | { kind: "handshake"; handshake: HandshakeResponse }
   | { kind: "capabilityRegistry"; registry: any }
   | { kind: "pingResult"; result: PingResult }
-  | { kind: "tracerouteResult"; hops: TracerouteHop[] }
+  | { kind: "tracerouteResult"; target: string; hops: TracerouteHop[] }
   | { kind: "bufferbloatResult"; result: BufferbloatResult }
   | { kind: "gatewayResult"; result: GatewayResult }
   | { kind: "dnsResult"; result: DnsResult }

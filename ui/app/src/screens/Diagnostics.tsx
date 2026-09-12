@@ -189,7 +189,11 @@ export function DiagnosticsScreen() {
             <Skeleton height={180} width="100%" style={{ marginBottom: "1.5rem", borderRadius: "var(--np-radius-lg)" }} />
           )}
           {probes.traceroute.result && (
-            <TracerouteCard target={target} hops={probes.traceroute.result} />
+            <TracerouteCard
+              target={probes.traceroute.result.target}
+              hops={probes.traceroute.result.hops}
+              result={probes.traceroute.result}
+            />
           )}
 
           {/* Bufferbloat Probe Result & Skeleton */}
@@ -197,7 +201,10 @@ export function DiagnosticsScreen() {
             <Skeleton height={140} width="100%" style={{ marginBottom: "1.5rem", borderRadius: "var(--np-radius-lg)" }} />
           )}
           {probes.bufferbloat.result && (
-            <BufferbloatCard target={target} result={probes.bufferbloat.result} />
+            <BufferbloatCard
+              target={probes.bufferbloat.result.target}
+              result={probes.bufferbloat.result}
+            />
           )}
         </div>
       )}

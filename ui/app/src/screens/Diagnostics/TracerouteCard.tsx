@@ -1,14 +1,18 @@
 import { useTranslation } from "react-i18next";
-import type { TracerouteHop } from "@netpulse/contract";
+import type { TracerouteHop, TracerouteResult } from "@netpulse/contract";
 import { formatMs } from "../../hooks/useDiagnosticsController";
 
 export interface TracerouteCardProps {
-  target: string;
-  hops: TracerouteHop[];
+  target?: string;
+  hops?: TracerouteHop[];
+  result?: TracerouteResult;
 }
 
-export function TracerouteCard({ target, hops }: TracerouteCardProps) {
+export function TracerouteCard({ target: propTarget, hops: propHops, result }: TracerouteCardProps) {
   const { t } = useTranslation(["diagnostics"]);
+
+  const target = result?.target ?? propTarget ?? "";
+  const hops = result?.hops ?? propHops ?? [];
 
   return (
     <article className="np-diagnostics__result" aria-label={t("traceroute.title", { target, count: hops.length })}>

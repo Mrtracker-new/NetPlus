@@ -396,7 +396,10 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                     source: Some(out.source.clone()),
                 })
                 .collect();
-            Ok(QueryResponse::TracerouteResult { hops })
+            Ok(QueryResponse::TracerouteResult {
+                target: out.target,
+                hops,
+            })
         }
         Query::RunBufferbloatTest { target } => {
             use netpulse_platform::diagnostics::{BufferbloatProbe, DiagnosticProbe};

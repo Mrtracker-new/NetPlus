@@ -3,7 +3,7 @@ import type { BufferbloatResult } from "@netpulse/contract";
 import { formatMs } from "../../hooks/useDiagnosticsController";
 
 export interface BufferbloatCardProps {
-  target: string;
+  target?: string;
   result: BufferbloatResult;
 }
 
@@ -16,8 +16,10 @@ const GRADE_COLORS: Record<string, string> = {
   F: "var(--np-finding)",
 };
 
-export function BufferbloatCard({ target, result }: BufferbloatCardProps) {
+export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardProps) {
   const { t } = useTranslation(["diagnostics"]);
+
+  const target = result.target || propTarget || "";
 
   const idleRttStr = formatMs(result.idleRttMs ?? 0);
   const loadedRttStr = formatMs(result.loadedRttMs ?? 0);

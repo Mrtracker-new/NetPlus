@@ -120,6 +120,68 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
     expect(screen.getByText("A+")).toBeInTheDocument();
   });
 
+  it("prevents target desynchronization when input field changes after probe execution", async () => {
+    vi.spyOn(ipcModule, "query").mockImplementation(async (q: any) => {
+      if (q.kind === "runTraceroute") {
+        return {
+          kind: "tracerouteResult",
+          target: "1.1.1.1",
+          hops: [
+            { ttl: 1, ip: "192.168.1.1", hostname: "gateway.local", rttMs: 2, source: "live" },
+            { ttl: 2, ip: "1.1.1.1", hostname: "one.one.one.one", rttMs: 14, source: "live" },
+          ],
+        } as any;
+      }
+      if (q.kind === "runBufferbloatTest") {
+        return {
+          kind: "bufferbloatResult",
+          result: {
+            target: "1.1.1.1",
+            grade: "A+",
+            idleRttMs: 12,
+            loadedRttMs: 18,
+            deltaRttMs: 6,
+            source: "live",
+          },
+        } as any;
+      }
+      return {} as any;
+    });
+
+    render(<DiagnosticsTestWrapper />);
+
+    // Run Traceroute on default 1.1.1.1
+    const traceBtn = screen.getByRole("button", { name: "Traceroute" });
+    fireEvent.click(traceBtn);
+    expect(await screen.findByText("Traceroute Hops for 1.1.1.1 (2 hops)")).toBeInTheDocument();
+
+    // Run Bufferbloat on default 1.1.1.1
+    const bloatBtn = screen.getByRole("button", { name: "Bufferbloat Test" });
+    fireEvent.click(bloatBtn);
+    expect(await screen.findByText("Bufferbloat Scorecard for 1.1.1.1")).toBeInTheDocument();
+
+    // Edit the input field to an unexecuted target
+    const input = screen.getByPlaceholderText("Target Host (e.g. 1.1.1.1, google.com)");
+    fireEvent.change(input, { target: { value: "8.8.8.8" } });
+
+    // Assert card titles remain bound to 1.1.1.1 and DO NOT adopt unexecuted 8.8.8.8
+    expect(screen.getByText("Traceroute Hops for 1.1.1.1 (2 hops)")).toBeInTheDocument();
+    expect(screen.queryByText("Traceroute Hops for 8.8.8.8 (2 hops)")).not.toBeInTheDocument();
+
+    expect(screen.getByText("Bufferbloat Scorecard for 1.1.1.1")).toBeInTheDocument();
+    expect(screen.queryByText("Bufferbloat Scorecard for 8.8.8.8")).not.toBeInTheDocument();
+
+    // Also assert clicking a preset button does not desynchronize existing cards
+    const presetBtn = screen.getByRole("button", { name: "localhost" });
+    fireEvent.click(presetBtn);
+
+    expect(screen.getByText("Traceroute Hops for 1.1.1.1 (2 hops)")).toBeInTheDocument();
+    expect(screen.queryByText("Traceroute Hops for localhost (2 hops)")).not.toBeInTheDocument();
+
+    expect(screen.getByText("Bufferbloat Scorecard for 1.1.1.1")).toBeInTheDocument();
+    expect(screen.queryByText("Bufferbloat Scorecard for localhost")).not.toBeInTheDocument();
+  });
+
   it("shows notice banner when invalid target is submitted", async () => {
     render(<DiagnosticsTestWrapper />);
 

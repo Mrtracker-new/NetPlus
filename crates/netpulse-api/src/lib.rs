@@ -383,6 +383,7 @@ pub enum QueryResponse {
         result: PingResultDto,
     },
     TracerouteResult {
+        target: String,
         hops: Vec<TracerouteHopDto>,
     },
     BufferbloatResult {
@@ -896,6 +897,23 @@ mod tests {
         assert_eq!(r5, back5);
         assert!(json5.contains("\"kind\":\"sessions\""));
         assert!(json5.contains("\"domain\":\"example.com\""));
+
+        let r6 = QueryResponse::TracerouteResult {
+            target: "1.1.1.1".into(),
+            hops: vec![TracerouteHopDto {
+                ttl: 1,
+                ip: "192.168.1.1".into(),
+                hostname: Some("gateway.local".into()),
+                rtt_ms: 1.5,
+                status: "Reached".into(),
+                source: Some("simulated".into()),
+            }],
+        };
+        let json6 = serde_json::to_string(&r6).unwrap();
+        let back6: QueryResponse = serde_json::from_str(&json6).unwrap();
+        assert_eq!(r6, back6);
+        assert!(json6.contains("\"kind\":\"tracerouteResult\""));
+        assert!(json6.contains("\"target\":\"1.1.1.1\""));
     }
 
     #[test]

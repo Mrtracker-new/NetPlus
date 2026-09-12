@@ -403,6 +403,7 @@ describe("Pipeline Execution & Cancellation", () => {
       case "runTraceroute":
         return {
           kind: "tracerouteResult",
+          target: query.target || "1.1.1.1",
           hops: [{ ttl: 1, ip: "192.168.1.1", rttMs: 1.0, status: "ok", source: "live" }],
         };
       case "runBufferbloatTest":

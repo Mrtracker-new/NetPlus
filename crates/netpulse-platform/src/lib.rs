@@ -14,7 +14,7 @@
 //! dependency-free — . When the feature is off, or on an OS without
 //! a backend yet, the functions fail closed with a [`NpError::Capability`]
 //! rather than pretend.
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 use netpulse_core::Result;
 // Only the fallback path references these directly; the live build routes through

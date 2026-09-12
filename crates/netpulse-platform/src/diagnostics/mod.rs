@@ -35,9 +35,71 @@ mod tests {
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 4);
         assert_eq!(out.received, 4);
+        assert_eq!(out.loss_pct, 0.0);
         assert!(out.avg_rtt_ms > 0.0);
-        assert_eq!(out.source, "simulated");
+        assert_eq!(out.source, "live");
     }
+
+    #[test]
+    fn test_ping_probe_public_target() {
+        let probe = PingProbe::new("1.1.1.1".into(), 2);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("ping probe run");
+        assert_eq!(out.sent, 2);
+        assert_eq!(out.source, "live");
+
+        if out.received > 0 {
+            assert!(out.avg_rtt_ms > 0.0);
+            assert!(out.loss_pct < 100.0);
+        } else {
+            assert_eq!(out.loss_pct, 100.0);
+        }
+    }
+
+    #[test]
+    fn test_ping_probe_invalid_target() {
+        let probe = PingProbe::new("invalid.nonexistent.domain.test".into(), 4);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("ping probe run");
+        assert_eq!(out.sent, 4);
+        assert_eq!(out.received, 0);
+        assert_eq!(out.loss_pct, 100.0);
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_ping_probe_cancellation() {
+        let probe = PingProbe::new("127.0.0.1".into(), 10);
+        let cancel = AtomicBool::new(true);
+        let out = probe.run(cancel).expect("ping probe run");
+        assert_eq!(out.sent, 0);
+        assert_eq!(out.received, 0);
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_ping_probe_url_sanitization() {
+        let probe = PingProbe::new("http://127.0.0.1:8080/path".into(), 2);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("ping probe run");
+        assert_eq!(out.sent, 2);
+        assert_eq!(out.received, 2);
+        assert_eq!(out.loss_pct, 0.0);
+        assert!(out.avg_rtt_ms > 0.0);
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_ping_probe_localhost_resolution() {
+        let probe = PingProbe::new("localhost".into(), 2);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("ping probe run");
+        assert_eq!(out.sent, 2);
+        assert_eq!(out.received, 2);
+        assert_eq!(out.loss_pct, 0.0);
+        assert_eq!(out.source, "live");
+    }
+
 
     #[test]
     fn test_traceroute_transports_cross_platform() {

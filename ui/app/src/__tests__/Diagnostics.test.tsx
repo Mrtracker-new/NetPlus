@@ -1440,5 +1440,44 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
       expect(article).toHaveAttribute("aria-labelledby", "ping-result-heading");
     });
   });
+
+  describe("Pipeline Stepper Progressbar ARIA Range Attributes", () => {
+    it("supplies mandatory aria-valuemin, aria-valuemax, and aria-valuenow during each in-flight stage and on completion", () => {
+      const runningSession: DiagnosticSession = {
+        sessionId: 201,
+        status: "running",
+        target: "1.1.1.1",
+        startedAt: Date.now(),
+        diagnoses: [],
+        observations: [],
+        recommendations: [],
+      };
+
+      const { rerender } = render(
+        <DeepDiagnosticCard session={runningSession} activeStage="gateway" />
+      );
+
+      const stepper = screen.getByRole("progressbar", { name: "Diagnostic pipeline progress" });
+      expect(stepper).toHaveAttribute("aria-valuemin", "0");
+      expect(stepper).toHaveAttribute("aria-valuemax", "6");
+      expect(stepper).toHaveAttribute("aria-valuenow", "0");
+
+      rerender(<DeepDiagnosticCard session={runningSession} activeStage="dns" />);
+      expect(stepper).toHaveAttribute("aria-valuenow", "1");
+
+      rerender(<DeepDiagnosticCard session={runningSession} activeStage="traceroute" />);
+      expect(stepper).toHaveAttribute("aria-valuenow", "3");
+
+      const completedSession: DiagnosticSession = {
+        ...runningSession,
+        status: "completed",
+      };
+      // Even if activeStage is still set to 'http' on completion, all steps should be complete and none running
+      rerender(<DeepDiagnosticCard session={completedSession} activeStage="http" />);
+      expect(stepper).toHaveAttribute("aria-valuenow", "6");
+      expect(document.querySelectorAll(".np-diagnostics-step--complete").length).toBe(6);
+      expect(document.querySelectorAll(".np-diagnostics-step--running").length).toBe(0);
+    });
+  });
 });
 

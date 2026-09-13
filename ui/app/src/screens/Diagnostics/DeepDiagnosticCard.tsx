@@ -166,8 +166,8 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
 
       {/* Progressive Stage Stepper rendered from domain session */}
       {(() => {
-        const currentStageIndex = activeStage ? STAGES.findIndex((s) => s.id === activeStage) : -1;
-        const progressValue = session?.status === "completed" ? STAGES.length : currentStageIndex >= 0 ? currentStageIndex : 0;
+        const stageIdx = activeStage ? STAGES.findIndex((s) => s.id === activeStage) : -1;
+        const currentStageIndex = session?.status === "completed" ? STAGES.length : stageIdx >= 0 ? stageIdx : 0;
         return (
           <div
             className="np-diagnostics-pipeline-stepper"
@@ -175,24 +175,22 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             aria-label={t("assessment.pipeline_progress", "Diagnostic pipeline progress")}
             aria-valuemin={0}
             aria-valuemax={STAGES.length}
-            aria-valuenow={progressValue}
+            aria-valuenow={currentStageIndex}
           >
             {STAGES.map((s, idx) => {
-              const isCurrent = activeStage === s.id;
+              const isCurrent = session?.status !== "completed" && activeStage === s.id;
               const isPast =
                 session?.status === "completed" ||
-                (activeStage
-                  ? STAGES.findIndex((x) => x.id === activeStage) > idx
-                  : false);
+                (stageIdx >= 0 && stageIdx > idx);
 
               return (
                 <div
                   key={s.id}
                   className={`np-diagnostics-step ${
-                    isCurrent
-                      ? "np-diagnostics-step--running"
-                      : isPast
+                    isPast
                       ? "np-diagnostics-step--complete"
+                      : isCurrent
+                      ? "np-diagnostics-step--running"
                       : ""
                   }`}
                 >

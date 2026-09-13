@@ -5,6 +5,7 @@ use super::DiagnosticProbe;
 use netpulse_core::Result;
 use std::net::ToSocketAddrs;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::Instant;
 
 #[derive(Debug, Clone)]
@@ -21,7 +22,7 @@ impl DnsProbe {
 impl DiagnosticProbe for DnsProbe {
     type Output = DnsProbeOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(DnsProbeOutput {
                 target: self.target.clone(),
@@ -130,7 +131,7 @@ mod tests {
     #[test]
     fn test_dns_probe_resolves_localhost() {
         let probe = DnsProbe::new("localhost".to_string());
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("dns probe run");
         assert_eq!(out.source, "live");
         assert!(out.error.is_none());
@@ -143,7 +144,7 @@ mod tests {
         let probe = DnsProbe::new(
             "this-is-a-definitely-nonexistent-domain-12345.netplus.invalid".to_string(),
         );
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("dns probe run");
         assert_eq!(out.source, "live");
         assert!(out.error.is_some());
@@ -154,7 +155,7 @@ mod tests {
     #[test]
     fn test_dns_probe_handles_ipv6_target() {
         let probe = DnsProbe::new("[::1]:8080".to_string());
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("dns probe run");
         assert_eq!(out.source, "live");
         assert!(out.error.is_none());

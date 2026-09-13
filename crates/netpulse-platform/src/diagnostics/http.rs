@@ -6,6 +6,7 @@ use netpulse_core::Result;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 const MAX_RESPONSE_BYTES: usize = 256 * 1024; // 256 KB bounded response limit
@@ -29,7 +30,7 @@ impl HttpProbe {
 impl DiagnosticProbe for HttpProbe {
     type Output = HttpProbeOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(HttpProbeOutput {
                 url: self.url.clone(),
@@ -224,19 +225,33 @@ impl DiagnosticProbe for HttpProbe {
         };
 
         // Read remaining response up to MAX_RESPONSE_BYTES
+        let _ = stream.set_read_timeout(Some(Duration::from_millis(100)));
         let transfer_start = Instant::now();
         let mut total_bytes = first_read;
-        while total_bytes < MAX_RESPONSE_BYTES {
+        while total_bytes < MAX_RESPONSE_BYTES && transfer_start.elapsed() < timeout {
             if cancel.load(std::sync::atomic::Ordering::Relaxed) {
                 break;
             }
             match stream.read(&mut buffer) {
                 Ok(0) => break,
                 Ok(n) => total_bytes += n,
+                Err(ref e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    continue;
+                }
                 Err(_) => break,
             }
         }
         let transfer_ms = transfer_start.elapsed().as_secs_f32() * 1000.0;
+
+        let cancelled = cancel.load(std::sync::atomic::Ordering::Relaxed);
+        let error = if cancelled {
+            Some("Operation cancelled".to_string())
+        } else {
+            None
+        };
 
         Ok(HttpProbeOutput {
             url: self.url.clone(),
@@ -245,7 +260,7 @@ impl DiagnosticProbe for HttpProbe {
             ttfb_ms: Some((ttfb_ms * 10.0).round() / 10.0),
             transfer_ms: Some((transfer_ms * 10.0).round() / 10.0),
             tls_ms: None,
-            error: None,
+            error,
             limitation: Some("TLS timing unavailable".to_string()),
             source: "live".to_string(),
         })
@@ -273,7 +288,7 @@ mod tests {
         });
 
         let probe = HttpProbe::new(format!("http://{}", local_addr));
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("http probe run");
 
         assert_eq!(out.source, "live");
@@ -289,7 +304,7 @@ mod tests {
     fn test_http_probe_connection_refused() {
         // Connect to a closed port on localhost
         let probe = HttpProbe::new("http://127.0.0.1:59999".to_string());
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("http probe run");
 
         assert_eq!(out.source, "live");
@@ -301,9 +316,59 @@ mod tests {
     #[test]
     fn test_http_probe_bracketed_ipv6() {
         let probe = HttpProbe::new("http://[::1]:59999/status".to_string());
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("http probe run");
         assert_eq!(out.source, "live");
         assert!(out.error.is_some());
+    }
+
+    #[test]
+    fn test_http_probe_mid_execution_cancellation() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind local test port");
+        let local_addr = listener.local_addr().expect("local addr");
+        let stop_server = std::sync::Arc::new(AtomicBool::new(false));
+        let stop_clone = stop_server.clone();
+
+        let server_thread = thread::spawn(move || {
+            if let Ok((mut stream, _)) = listener.accept() {
+                let mut buf = [0u8; 1024];
+                let _ = stream.read(&mut buf);
+                let response = "HTTP/1.1 200 OK\r\nContent-Length: 100000\r\nConnection: close\r\n\r\ninitial-chunk";
+                let _ = stream.write_all(response.as_bytes());
+                while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                    thread::sleep(Duration::from_millis(10));
+                }
+            }
+        });
+
+        let probe = HttpProbe::new(format!("http://{}", local_addr));
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
+        let cancel_clone = cancel.clone();
+
+        let flag_set_time = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let flag_set_time_clone = flag_set_time.clone();
+
+        let trigger = thread::spawn(move || {
+            thread::sleep(Duration::from_millis(50));
+            *flag_set_time_clone.lock().unwrap() = Some(Instant::now());
+            cancel_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+
+        let out = probe.run(cancel).expect("http probe run");
+        let finish_time = Instant::now();
+        trigger.join().expect("join trigger");
+        stop_server.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = server_thread.join();
+
+        let flag_time = flag_set_time.lock().unwrap().expect("flag set");
+        let halt_duration = finish_time.saturating_duration_since(flag_time);
+        println!("HTTP mid-execution halt latency: {:?}", halt_duration);
+
+        assert!(
+            halt_duration < Duration::from_millis(150),
+            "HTTP probe must halt promptly upon cancellation flag, took {:?}",
+            halt_duration
+        );
+        assert_eq!(out.error, Some("Operation cancelled".to_string()));
     }
 }

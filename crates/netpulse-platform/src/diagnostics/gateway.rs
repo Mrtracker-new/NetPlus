@@ -4,6 +4,7 @@ use super::models::GatewayDiscoveryOutput;
 use super::DiagnosticProbe;
 use netpulse_core::Result;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[derive(Debug, Default, Clone)]
 pub struct GatewayProbe;
@@ -83,7 +84,7 @@ impl GatewayProbe {
 impl DiagnosticProbe for GatewayProbe {
     type Output = GatewayDiscoveryOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
         if cancel.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(GatewayDiscoveryOutput {
                 gateway_ip: None,
@@ -123,7 +124,7 @@ mod tests {
     #[test]
     fn test_gateway_probe_execution() {
         let probe = GatewayProbe::new();
-        let cancel = AtomicBool::new(false);
+        let cancel = std::sync::Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("gateway probe run");
         // Must either find a valid IP or report status unavailable without crashing
         if let Some(gw) = &out.gateway_ip {

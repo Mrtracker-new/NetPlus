@@ -359,7 +359,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         Query::RunPing { target, count } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, PingProbe};
             let probe = PingProbe::new(target, count);
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::PingResult {
                 result: netpulse_api::PingResultDto {
@@ -382,7 +382,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, TracerouteProbe};
             let probe = TracerouteProbe::new(target, transport, max_hops);
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             let hops = out
                 .hops
@@ -404,7 +404,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         Query::RunBufferbloatTest { target } => {
             use netpulse_platform::diagnostics::{BufferbloatProbe, DiagnosticProbe};
             let probe = BufferbloatProbe::new(target);
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::BufferbloatResult {
                 result: netpulse_api::BufferbloatResultDto {
@@ -420,7 +420,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         Query::DiscoverGateway => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, GatewayProbe};
             let probe = GatewayProbe::new();
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::GatewayResult {
                 result: netpulse_api::GatewayResultDto {
@@ -434,7 +434,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         Query::RunDnsProbe { target } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, DnsProbe};
             let probe = DnsProbe::new(target);
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::DnsResult {
                 result: netpulse_api::DnsResultDto {
@@ -450,7 +450,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         Query::RunHttpProbe { url } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, HttpProbe};
             let probe = HttpProbe::new(url);
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::HttpResult {
                 result: netpulse_api::HttpResultDto {
@@ -511,7 +511,7 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             };
             use netpulse_platform::diagnostics::DiagnosticProbe;
 
-            let cancel = std::sync::atomic::AtomicBool::new(false);
+            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
 
             let result = match stage {
                 DiagnosticChainStageKindDto::Device | DiagnosticChainStageKindDto::Interface => {

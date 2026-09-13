@@ -13,6 +13,7 @@ use netpulse_core::Result;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 #[derive(Debug)]
@@ -526,7 +527,12 @@ mod platform {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn reverse_resolve_with_timeout(ip: Ipv4Addr) -> Option<String> {
+    reverse_resolve_with_timeout_and_cancel(ip, &AtomicBool::new(false))
+}
+
+pub(crate) fn reverse_resolve_with_timeout_and_cancel(ip: Ipv4Addr, cancel: &AtomicBool) -> Option<String> {
     use std::sync::mpsc;
     use std::thread;
 
@@ -538,13 +544,24 @@ pub(crate) fn reverse_resolve_with_timeout(ip: Ipv4Addr) -> Option<String> {
             let _ = tx.send(res);
         });
 
-    rx.recv_timeout(Duration::from_millis(600)).unwrap_or(None)
+    let start = std::time::Instant::now();
+    let total_timeout = Duration::from_millis(600);
+    while start.elapsed() < total_timeout && !cancel.load(Ordering::Relaxed) {
+        let remaining = total_timeout.saturating_sub(start.elapsed());
+        let step = Duration::from_millis(25).min(remaining);
+        match rx.recv_timeout(step) {
+            Ok(res) => return res,
+            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+            Err(mpsc::RecvTimeoutError::Disconnected) => return None,
+        }
+    }
+    None
 }
 
 impl DiagnosticProbe for TracerouteProbe {
     type Output = TracerouteOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
         let max = if self.max_hops == 0 {
             30
         } else {
@@ -589,7 +606,7 @@ impl DiagnosticProbe for TracerouteProbe {
                 | platform::HopProbeResult::IntermediateHop { ip, rtt_ms } => {
                     let hostname = dns_cache
                         .entry(ip)
-                        .or_insert_with(|| reverse_resolve_with_timeout(ip))
+                        .or_insert_with(|| reverse_resolve_with_timeout_and_cancel(ip, &cancel))
                         .clone();
                     hops.push(TracerouteHop {
                         ttl,

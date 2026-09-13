@@ -20,18 +20,19 @@ use netpulse_core::Result;
 
 pub trait DiagnosticProbe: Send + Sync {
     type Output;
-    fn run(&self, cancel: std::sync::atomic::AtomicBool) -> Result<Self::Output>;
+    fn run(&self, cancel: std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<Self::Output>;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
 
     #[test]
     fn test_ping_probe_cross_platform() {
         let probe = PingProbe::new("127.0.0.1".into(), 4);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 4);
         assert_eq!(out.received, 4);
@@ -43,7 +44,7 @@ mod tests {
     #[test]
     fn test_ping_probe_public_target() {
         let probe = PingProbe::new("1.1.1.1".into(), 2);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 2);
         assert_eq!(out.source, "live");
@@ -59,7 +60,7 @@ mod tests {
     #[test]
     fn test_ping_probe_invalid_target() {
         let probe = PingProbe::new("invalid.nonexistent.domain.test".into(), 4);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 4);
         assert_eq!(out.received, 0);
@@ -70,7 +71,7 @@ mod tests {
     #[test]
     fn test_ping_probe_cancellation() {
         let probe = PingProbe::new("127.0.0.1".into(), 10);
-        let cancel = AtomicBool::new(true);
+        let cancel = Arc::new(AtomicBool::new(true));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 0);
         assert_eq!(out.received, 0);
@@ -80,7 +81,7 @@ mod tests {
     #[test]
     fn test_ping_probe_url_sanitization() {
         let probe = PingProbe::new("http://127.0.0.1:8080/path".into(), 2);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 2);
         assert_eq!(out.received, 2);
@@ -92,7 +93,7 @@ mod tests {
     #[test]
     fn test_ping_probe_localhost_resolution() {
         let probe = PingProbe::new("localhost".into(), 2);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("ping probe run");
         assert_eq!(out.sent, 2);
         assert_eq!(out.received, 2);
@@ -100,12 +101,48 @@ mod tests {
         assert_eq!(out.source, "live");
     }
 
+    #[test]
+    fn test_ping_probe_mid_execution_cancellation() {
+        use std::thread;
+        use std::time::{Duration, Instant};
+
+        let probe = PingProbe::new("127.0.0.1".into(), 20);
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_clone = cancel.clone();
+
+        let flag_set_time = Arc::new(std::sync::Mutex::new(None));
+        let flag_set_time_clone = flag_set_time.clone();
+
+        let trigger_thread = thread::spawn(move || {
+            // Let the probe start and run initial ping(s)
+            thread::sleep(Duration::from_millis(80));
+            let now = Instant::now();
+            *flag_set_time_clone.lock().unwrap() = Some(now);
+            cancel_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+
+        let out = probe.run(cancel).expect("ping probe run");
+        let finish_time = Instant::now();
+        trigger_thread.join().expect("join trigger thread");
+
+        let flag_time = flag_set_time.lock().unwrap().expect("flag should be set");
+        let elapsed_after_cancel = finish_time.saturating_duration_since(flag_time);
+
+        println!("Ping probe mid-execution halt latency: {:?}", elapsed_after_cancel);
+        // Acceptance criteria: Long-running probes halt within 100ms of cancellation flag being set
+        assert!(
+            elapsed_after_cancel < Duration::from_millis(100),
+            "Probe must halt within 100ms of cancellation flag being set, took {:?}",
+            elapsed_after_cancel
+        );
+        assert!(out.sent < 20, "Probe should have stopped early, but sent {}", out.sent);
+    }
 
     #[test]
     fn test_traceroute_transports_cross_platform() {
         for transport in ["icmp", "udp", "tcp_syn"] {
             let probe = TracerouteProbe::new("1.1.1.1".into(), transport.into(), 3);
-            let cancel = AtomicBool::new(false);
+            let cancel = Arc::new(AtomicBool::new(false));
             let out = probe.run(cancel).expect("traceroute probe run");
             assert!(!out.hops.is_empty());
             assert!(out.hops.len() <= 3);
@@ -120,7 +157,7 @@ mod tests {
     #[test]
     fn test_traceroute_cancellation() {
         let probe = TracerouteProbe::new("1.1.1.1".into(), "icmp".into(), 10);
-        let cancel = AtomicBool::new(true);
+        let cancel = Arc::new(AtomicBool::new(true));
         let out = probe.run(cancel).expect("traceroute probe run");
         assert!(out.hops.is_empty());
         assert_eq!(out.source, "live");
@@ -129,7 +166,7 @@ mod tests {
     #[test]
     fn test_traceroute_invalid_target() {
         let probe = TracerouteProbe::new("invalid.nonexistent.domain.test".into(), "icmp".into(), 4);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("traceroute probe run");
         assert!(out.hops.is_empty());
         assert_eq!(out.source, "live");
@@ -138,7 +175,7 @@ mod tests {
     #[test]
     fn test_traceroute_unspecified_ip() {
         let probe = TracerouteProbe::new("0.0.0.0".into(), "icmp".into(), 4);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("traceroute probe run");
         assert!(out.hops.is_empty());
         assert_eq!(out.source, "live");
@@ -147,7 +184,7 @@ mod tests {
     #[test]
     fn test_traceroute_localhost() {
         let probe = TracerouteProbe::new("127.0.0.1".into(), "icmp".into(), 5);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("traceroute probe run");
         assert_eq!(out.source, "live");
         assert_eq!(out.hops.len(), 1);
@@ -159,7 +196,7 @@ mod tests {
     #[test]
     fn test_traceroute_live_network_hops_detail() {
         let probe = TracerouteProbe::new("1.1.1.1".into(), "icmp".into(), 12);
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("traceroute probe run");
         assert_eq!(out.source, "live");
         assert!(!out.hops.is_empty());
@@ -189,7 +226,7 @@ mod tests {
     #[test]
     fn test_bufferbloat_grading_cross_platform() {
         let probe = BufferbloatProbe::new(Some("1.1.1.1".into()));
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("bufferbloat probe run");
         assert!(out.delta_rtt_ms >= 0.0);
         assert!(["A+", "A", "B", "C", "F"].contains(&out.grade.as_str()));
@@ -215,7 +252,7 @@ mod tests {
     #[test]
     fn test_bufferbloat_cancellation() {
         let probe = BufferbloatProbe::new(Some("1.1.1.1".into()));
-        let cancel = AtomicBool::new(true);
+        let cancel = Arc::new(AtomicBool::new(true));
         let start = std::time::Instant::now();
         let out = probe.run(cancel).expect("bufferbloat probe run");
         assert!(start.elapsed().as_millis() < 500, "Should cancel immediately");
@@ -225,7 +262,7 @@ mod tests {
     #[test]
     fn test_bufferbloat_invalid_target() {
         let probe = BufferbloatProbe::new(Some("invalid.domain.target.nonexistent".into()));
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("bufferbloat probe run");
         assert_eq!(out.grade, "F");
         assert_eq!(out.delta_rtt_ms, 0.0);
@@ -268,7 +305,7 @@ mod tests {
             Some(format!("http://{}", local_addr)),
             Some(1),
         );
-        let cancel = AtomicBool::new(false);
+        let cancel = Arc::new(AtomicBool::new(false));
         let out = probe.run(cancel).expect("bufferbloat probe run");
 
         stop_server.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -296,7 +333,7 @@ mod tests {
         });
 
         let start = std::time::Instant::now();
-        let out = probe.run_with_cancel(cancel).expect("bufferbloat probe run");
+        let out = probe.run(cancel).expect("bufferbloat probe run");
         // Ensure that even with 3-second duration, cancellation aborted well before 3 seconds
         assert!(start.elapsed().as_millis() < 1500, "Should abort promptly upon mid-run cancellation");
         assert_eq!(out.source, "live");

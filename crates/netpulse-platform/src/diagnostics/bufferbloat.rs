@@ -371,7 +371,7 @@ fn run_saturation_stream(
 impl DiagnosticProbe for BufferbloatProbe {
     type Output = BufferbloatOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
-        self.run_with_cancel(Arc::new(cancel))
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
+        self.run_with_cancel(cancel)
     }
 }

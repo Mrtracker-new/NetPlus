@@ -9,6 +9,7 @@ use super::DiagnosticProbe;
 use netpulse_core::Result;
 use std::net::ToSocketAddrs;
 use std::sync::atomic::AtomicBool;
+use std::sync::Arc;
 
 #[derive(Debug)]
 pub struct PingProbe {
@@ -196,7 +197,11 @@ mod platform {
             }
 
             if i + 1 < count && !cancel.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(50));
+                let sleep_start = Instant::now();
+                while sleep_start.elapsed() < Duration::from_millis(50) && !cancel.load(Ordering::Relaxed) {
+                    let remaining = Duration::from_millis(50).saturating_sub(sleep_start.elapsed());
+                    std::thread::sleep(Duration::from_millis(10).min(remaining));
+                }
             }
         }
 
@@ -331,7 +336,11 @@ mod platform {
             }
 
             if i + 1 < count && !cancel.load(Ordering::Relaxed) {
-                std::thread::sleep(Duration::from_millis(50));
+                let sleep_start = Instant::now();
+                while sleep_start.elapsed() < Duration::from_millis(50) && !cancel.load(Ordering::Relaxed) {
+                    let remaining = Duration::from_millis(50).saturating_sub(sleep_start.elapsed());
+                    std::thread::sleep(Duration::from_millis(10).min(remaining));
+                }
             }
         }
 
@@ -358,7 +367,7 @@ pub(crate) use platform::ping_target;
 impl DiagnosticProbe for PingProbe {
     type Output = PingProbeOutput;
 
-    fn run(&self, cancel: AtomicBool) -> Result<Self::Output> {
+    fn run(&self, cancel: Arc<AtomicBool>) -> Result<Self::Output> {
         let count = if self.count == 0 {
             4
         } else {

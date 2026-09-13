@@ -97,6 +97,8 @@
     "session_target": "Sesión #{{session}} · Destino: {{target}}",
     "no_bottleneck_title": "No se detectó ningún cuello de botella evidente",
     "no_bottleneck_desc": "Todas las pruebas de diagnóstico operaron dentro de parámetros nominales. La evidencia no estableció un cuello de botella activo.",
+    "in_flight_title": "Análisis en Curso",
+    "evaluating_evidence": "Evaluando Evidencia...",
     "confidence_score": "Puntuación de Confianza",
     "remediations_title": "Acciones de Remediación Recomendadas",
     "view_evidence": "Ver {{count}} Señales de Evidencia Corroborante",

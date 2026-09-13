@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { DiagnosticsScreen } from "../screens/Diagnostics";
+import { DeepDiagnosticCard } from "../screens/Diagnostics/DeepDiagnosticCard";
+import type { DiagnosticSession } from "../diagnostic";
 import { validateAndNormalizeTarget } from "../hooks/useDiagnosticsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
@@ -389,5 +391,116 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
 
     expect(await screen.findByText("Ping Results for 2001:4860:4860::8888")).toBeInTheDocument();
     expect(capturedTarget).toBe("2001:4860:4860::8888");
+  });
+
+  it("eliminates premature nominal state: displays In-Flight Analysis banner and skeletons while running, and suppresses 'No bottleneck detected'", () => {
+    const runningSession: DiagnosticSession = {
+      sessionId: 42,
+      target: "1.1.1.1",
+      status: "running",
+      startedAt: Date.now(),
+      observations: [],
+      diagnoses: [],
+      recommendations: [],
+      currentStep: "gateway",
+    };
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={runningSession} activeStage="gateway" />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Verifies tactile in-flight banner is displayed with stage badge and analyzing status
+    const banner = screen.getByTestId("deep-diagnostics-analyzing-banner");
+    expect(banner).toBeInTheDocument();
+    expect(within(banner).getByText("In-Flight Analysis")).toBeInTheDocument();
+    expect(within(banner).getByText("Gateway")).toBeInTheDocument();
+    expect(within(banner).getByText("Analyzing")).toBeInTheDocument();
+    expect(within(banner).getByText("Evaluating Evidence...")).toBeInTheDocument();
+
+    // CRITICAL ACCEPTANCE CRITERIA: No nominal or healthy claim is displayed while session.status === "running"
+    expect(screen.queryByText("No clear bottleneck detected")).not.toBeInTheDocument();
+
+    // Observation cards do NOT prematurely display failure states (e.g. Timed Out, Unreachable)
+    expect(screen.queryByText("Timed Out")).not.toBeInTheDocument();
+    expect(screen.queryByText("Unreachable")).not.toBeInTheDocument();
+    expect(screen.getByText("Discovering default route...")).toBeInTheDocument();
+    expect(screen.getByText("Awaiting DNS query...")).toBeInTheDocument();
+  });
+
+  it("renders nominal state with green checkmark only when session status is completed with no findings", () => {
+    const completedNominalSession: DiagnosticSession = {
+      sessionId: 42,
+      target: "1.1.1.1",
+      status: "completed",
+      startedAt: Date.now() - 3000,
+      completedAt: Date.now(),
+      observations: [],
+      diagnoses: [],
+      recommendations: [],
+    };
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={completedNominalSession} activeStage={null} />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // In-flight banner is gone
+    expect(screen.queryByTestId("deep-diagnostics-analyzing-banner")).not.toBeInTheDocument();
+
+    // Nominal state checkmark & title are present
+    expect(screen.getByText("No clear bottleneck detected")).toBeInTheDocument();
+    expect(
+      screen.getByText("All diagnostic probes operated within nominal parameters. Available evidence did not establish an active bottleneck.")
+    ).toBeInTheDocument();
+  });
+
+  it("verifies in-flight analysis banner displays during live pipeline execution and only completes with nominal checkmark afterwards", async () => {
+    let resolveGateway!: (val: any) => void;
+    const gatewayPromise = new Promise((resolve) => {
+      resolveGateway = resolve;
+    });
+
+    vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+      switch (req.kind) {
+        case "discoverGateway":
+          return await gatewayPromise;
+        case "runDnsProbe":
+          return { kind: "dnsResult", result: { target: "1.1.1.1", resolvedIps: ["1.1.1.1"], resolutionRttMs: 12, status: "resolved", source: "live" } };
+        case "runPing":
+          return { kind: "pingResult", result: { target: "1.1.1.1", sent: 4, received: 4, lossPct: 0, minRttMs: 10, avgRttMs: 14, maxRttMs: 18, source: "live" } };
+        case "runTraceroute":
+          return { kind: "tracerouteResult", hops: [{ ttl: 1, ip: "192.168.1.1", rttMs: 2 }, { ttl: 2, ip: "1.1.1.1", rttMs: 14 }], target: "1.1.1.1", source: "live" };
+        case "runBufferbloatTest":
+          return { kind: "bufferbloatResult", result: { target: "1.1.1.1", grade: "A+", idleRttMs: 10, loadedRttMs: 15, deltaRttMs: 5, source: "live" } };
+        case "runHttpProbe":
+          return { kind: "httpResult", result: { url: "http://1.1.1.1", statusCode: 200, ttfbMs: 45, connectMs: 15, source: "live" } };
+        default:
+          return { kind: "success" };
+      }
+    }) as any);
+
+    render(<DiagnosticsTestWrapper />);
+
+    const fullAnalysisBtn = screen.getAllByRole("button", { name: "Run Full Analysis" })[0]!;
+    fireEvent.click(fullAnalysisBtn);
+
+    // In-flight: pipeline has started, discoverGateway is pending
+    expect(await screen.findByTestId("deep-diagnostics-analyzing-banner")).toBeInTheDocument();
+    expect(screen.getByText("In-Flight Analysis")).toBeInTheDocument();
+    expect(screen.queryByText("No clear bottleneck detected")).not.toBeInTheDocument();
+
+    // Now resolve gateway probe and complete pipeline
+    resolveGateway({ kind: "gatewayResult", result: { gatewayIp: "192.168.1.1", interfaceName: "eth0", status: "discovered", source: "live" } });
+
+    // Completed: nominal card is displayed
+    expect(await screen.findByText("No clear bottleneck detected")).toBeInTheDocument();
+    expect(screen.queryByTestId("deep-diagnostics-analyzing-banner")).not.toBeInTheDocument();
   });
 });

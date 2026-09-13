@@ -97,6 +97,8 @@
     "session_target": "Session #{{session}} · Target: {{target}}",
     "no_bottleneck_title": "No clear bottleneck detected",
     "no_bottleneck_desc": "All diagnostic probes operated within nominal parameters. Available evidence did not establish an active bottleneck.",
+    "in_flight_title": "In-Flight Analysis",
+    "evaluating_evidence": "Evaluating Evidence...",
     "confidence_score": "Confidence Score",
     "remediations_title": "Recommended Remediation Actions",
     "view_evidence": "View {{count}} Corroborating Evidence Signals",

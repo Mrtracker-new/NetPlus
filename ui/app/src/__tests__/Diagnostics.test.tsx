@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import "../i18n";
+import i18n from "../i18n";
 import { DiagnosticsScreen } from "../screens/Diagnostics";
 import { DeepDiagnosticCard } from "../screens/Diagnostics/DeepDiagnosticCard";
 import { PingResultCard, getJitterColor } from "../screens/Diagnostics/PingResultCard";
@@ -992,5 +992,226 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
     const jitterVal = screen.getByText("24.6ms");
     expect(jitterVal).toBeInTheDocument();
     expect(jitterVal).toHaveStyle({ color: "var(--np-finding)" });
+  });
+
+  it("decouples notice banner from empty state deck, keeping capabilities visible on validation notice", async () => {
+    render(<DiagnosticsTestWrapper />);
+
+    // Initially, empty capabilities deck is visible
+    expect(screen.getByRole("region", { name: "Diagnostic Capabilities" })).toBeInTheDocument();
+
+    const targetInput = screen.getByPlaceholderText("Target Host (e.g. 1.1.1.1, google.com)");
+    fireEvent.change(targetInput, { target: { value: "invalid target with spaces" } });
+
+    const pingBtn = screen.getByRole("button", { name: "Ping Probe" });
+    fireEvent.click(pingBtn);
+
+    // Notice banner appears
+    expect(await screen.findByText("Please enter a valid target hostname, IPv4, IPv6, or localhost address.")).toBeInTheDocument();
+
+    // Empty capability deck remains visible (decoupled from notice)
+    expect(screen.getByRole("region", { name: "Diagnostic Capabilities" })).toBeInTheDocument();
+    expect(screen.getByText("Multi-Stage Inference")).toBeInTheDocument();
+    expect(screen.getByText("ICMP / UDP Telemetry")).toBeInTheDocument();
+  });
+
+  it("translates 100% of text on Deep Diagnostic card into Spanish", async () => {
+    await act(async () => {
+      await i18n.changeLanguage("es");
+    });
+    try {
+      const nominalSession: DiagnosticSession = {
+        sessionId: 42,
+        target: "1.1.1.1",
+        status: "completed",
+        startedAt: Date.now() - 5000,
+        completedAt: Date.now(),
+        observations: [
+          {
+            key: "gateway_reachability",
+            metricName: "Default Gateway Reachability",
+            value: "192.168.1.1",
+            source: "live",
+            severity: "normal",
+            quality: "high",
+            rawDetails: { gatewayIp: "192.168.1.1", interfaceName: "eth0" },
+          },
+          {
+            key: "dns_rtt",
+            metricName: "DNS Resolution Latency",
+            value: 12.5,
+            unit: "ms",
+            source: "live",
+            severity: "normal",
+            quality: "high",
+            rawDetails: { resolvedIps: ["1.1.1.1", "1.0.0.1"] },
+          },
+          {
+            key: "http_ttfb",
+            metricName: "HTTP Time to First Byte",
+            value: 45.2,
+            unit: "ms",
+            source: "live",
+            severity: "normal",
+            quality: "high",
+            rawDetails: { connectMs: 15.0 },
+          },
+          {
+            key: "target_ping_rtt",
+            metricName: "Target Round-Trip Latency",
+            value: 18.4,
+            unit: "ms",
+            source: "live",
+            severity: "normal",
+            quality: "high",
+            rawDetails: { jitterMs: 2.1 },
+          },
+          {
+            key: "target_packet_loss",
+            metricName: "Target Packet Loss",
+            value: 0,
+            unit: "%",
+            source: "live",
+            severity: "normal",
+            quality: "high",
+          },
+        ],
+        diagnoses: [
+          {
+            category: "UNKNOWN",
+            confidence: 1.0,
+            summary: "All Network Diagnostics Healthy",
+            explanation: "All diagnostic probes reported nominal performance.",
+            evidence: [],
+            severity: "normal",
+          },
+        ],
+        recommendations: [
+          {
+            key: "nominal",
+            titleKey: "assessment.recommendations.nominal.title",
+            descriptionKey: "assessment.recommendations.nominal.desc",
+            title: "Network Operating Nominally",
+            description: "No remedial actions required. Continue monitoring traffic for transient anomalies.",
+            actionType: "info",
+            priority: "low",
+          },
+        ],
+      };
+
+      await act(async () => {
+        render(<DeepDiagnosticCard session={nominalSession} activeStage={null} />);
+      });
+
+      // Header & Status
+      expect(screen.getByText("Evaluación Diagnóstica y Hallazgos")).toBeInTheDocument();
+      expect(screen.getByText("Completado")).toBeInTheDocument();
+      expect(screen.getByText("Sesión #42 · Destino: 1.1.1.1")).toBeInTheDocument();
+
+      // Stages
+      expect(screen.getByText("Gateway")).toBeInTheDocument();
+      expect(screen.getByText("DNS")).toBeInTheDocument();
+      expect(screen.getByText("Ping")).toBeInTheDocument();
+      expect(screen.getByText("Traceroute")).toBeInTheDocument();
+      expect(screen.getByText("Bufferbloat")).toBeInTheDocument();
+      expect(screen.getByText("HTTP")).toBeInTheDocument();
+
+      // No bottleneck finding banner
+      expect(screen.getByText("No se detectó ningún cuello de botella evidente")).toBeInTheDocument();
+      expect(screen.getByText(/Todas las pruebas de diagnóstico operaron dentro de parámetros nominales/i)).toBeInTheDocument();
+
+      // Observation card titles in Spanish
+      expect(screen.getByText("Gateway Predeterminado")).toBeInTheDocument();
+      expect(screen.getByText("Resolución DNS")).toBeInTheDocument();
+      expect(screen.getByText("Prueba Web HTTP")).toBeInTheDocument();
+      expect(screen.getByText("Latencia de Ida y Vuelta")).toBeInTheDocument();
+
+      // Provenance in Spanish
+      const liveBadges = screen.getAllByText("EN VIVO");
+      expect(liveBadges.length).toBe(4);
+
+      // Observation subtitles / metrics in Spanish
+      expect(screen.getByText("Interfaz: eth0")).toBeInTheDocument();
+      expect(screen.getByText("1.1.1.1, 1.0.0.1")).toBeInTheDocument();
+      expect(screen.getByText(/Conexión: 15ms · TTFB: 45\.2ms/i)).toBeInTheDocument();
+      expect(screen.getByText(/Pérdida: 0% · Jitter: 2\.1ms/i)).toBeInTheDocument();
+
+      // Recommendations in Spanish
+      expect(screen.getByText("Acciones de Remediación Recomendadas")).toBeInTheDocument();
+      expect(screen.getByText("Red Operando Nominalmente")).toBeInTheDocument();
+      expect(screen.getByText("No se requieren acciones correctivas. Continúa monitoreando el tráfico para detectar anomalías transitorias.")).toBeInTheDocument();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage("en");
+      });
+    }
+  });
+
+  it("translates anomaly diagnoses, evidence roles, and recommendation templates in Spanish", async () => {
+    await act(async () => {
+      await i18n.changeLanguage("es");
+    });
+    try {
+      const anomalySession: DiagnosticSession = {
+        sessionId: 88,
+        target: "bad-dns.example.com",
+        status: "completed",
+        startedAt: Date.now() - 5000,
+        completedAt: Date.now(),
+        observations: [],
+        diagnoses: [
+          {
+            category: "DNS",
+            confidence: 0.95,
+            summary: "DNS Query Resolution Failure",
+            explanation: "Domain name resolution failed completely.",
+            evidence: [
+              {
+                observationKey: "dns_resolution",
+                role: "corroborating",
+                explanation: "DNS query timed out after 5000ms",
+                weight: 0.85,
+              },
+            ],
+            severity: "severe",
+          },
+        ],
+        recommendations: [
+          {
+            key: "dns",
+            titleKey: "assessment.recommendations.dns.title",
+            descriptionKey: "assessment.recommendations.dns.desc",
+            title: "Check DNS Resolver Configuration",
+            description: "Verify primary and secondary DNS server addresses.",
+            actionType: "settings",
+            priority: "high",
+          },
+        ],
+      };
+
+      await act(async () => {
+        render(<DeepDiagnosticCard session={anomalySession} activeStage={null} />);
+      });
+
+      expect(screen.getByText("SEVERO")).toBeInTheDocument();
+      expect(screen.getByText("Puntuación de Confianza")).toBeInTheDocument();
+      expect(screen.getByText("95%")).toBeInTheDocument();
+
+      // Evidence
+      const viewEvBtn = screen.getByRole("button", { name: /Ver 1 Señales de Evidencia Corroborante/i });
+      await act(async () => {
+        fireEvent.click(viewEvBtn);
+      });
+      expect(screen.getByText("corroborante")).toBeInTheDocument();
+      expect(screen.getByText("peso: 85%")).toBeInTheDocument();
+
+      // Recommendation
+      expect(screen.getByText("Verificar Configuración del Servidor DNS")).toBeInTheDocument();
+      expect(screen.getByText(/Verifica las direcciones de los servidores DNS primario y secundario/i)).toBeInTheDocument();
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage("en");
+      });
+    }
   });
 });

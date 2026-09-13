@@ -93,7 +93,13 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
     ? activeStage.toUpperCase()
     : t("assessment.status.analyzing");
 
-  const gatewayIp = (gatewayObs?.rawDetails?.gatewayIp as string) || (typeof gatewayObs?.value === "string" ? gatewayObs.value : gatewayObs?.value ? "Reachable" : "Unreachable");
+  const gatewayIp =
+    (gatewayObs?.rawDetails?.gatewayIp as string) ||
+    (typeof gatewayObs?.value === "string"
+      ? gatewayObs.value
+      : gatewayObs?.value
+      ? t("assessment.gateway.reachable", "Reachable")
+      : t("assessment.gateway.unreachable", "Unreachable"));
   const interfaceName = gatewayObs?.rawDetails?.interfaceName as string | undefined;
 
   const dnsRtt = typeof dnsObs?.value === "number" ? dnsObs.value : null;
@@ -164,7 +170,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           <div
             className="np-diagnostics-pipeline-stepper"
             role="progressbar"
-            aria-label="Diagnostic pipeline progress"
+            aria-label={t("assessment.pipeline_progress", "Diagnostic pipeline progress")}
             aria-valuemin={0}
             aria-valuemax={STAGES.length}
             aria-valuenow={progressValue}
@@ -267,7 +273,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                   border: `1px solid ${severityStyle.color}`,
                 }}
               >
-                {topDiagnosis.category}
+                {t("assessment.categories." + topDiagnosis.category.toLowerCase(), topDiagnosis.category)}
               </span>
               <span
                 style={{
@@ -277,11 +283,11 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                   color: severityStyle.color,
                 }}
               >
-                {topDiagnosis.severity}
+                {t("assessment.severity." + topDiagnosis.severity, topDiagnosis.severity)}
               </span>
             </div>
-            <h4 className="np-diagnostics-finding-title">{topDiagnosis.summary}</h4>
-            <p className="np-diagnostics-finding-desc">{topDiagnosis.explanation}</p>
+            <h4 className="np-diagnostics-finding-title">{t(topDiagnosis.summary, topDiagnosis.summary)}</h4>
+            <p className="np-diagnostics-finding-desc">{t(topDiagnosis.explanation, topDiagnosis.explanation)}</p>
           </div>
 
           <div className="np-diagnostics-confidence-meter">
@@ -366,7 +372,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                         color: ev.role === "corroborating" ? "var(--np-good)" : "var(--np-finding)",
                       }}
                     >
-                      {ev.role}
+                      {t("assessment.evidence_role." + ev.role, ev.role)}
                     </span>
                     <span style={{ color: "var(--np-text)" }}>{ev.explanation}</span>
                   </div>
@@ -385,12 +391,14 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
         {/* Gateway Card */}
         <div className="np-diagnostics-observation-card">
           <div className="np-diagnostics-observation-card__header">
-            <span className="np-diagnostics-observation-card__title">Default Gateway</span>
+            <span className="np-diagnostics-observation-card__title">
+              {t("assessment.observations.gateway", "Default Gateway")}
+            </span>
             <span
               className={`np-diagnostics-provenance ${gatewayObs?.source ? getProvenanceClass(gatewayObs.source) : ""}`}
               data-provenance={gatewayObs?.source ? gatewayObs.source : "pending"}
             >
-              {gatewayObs?.source ?? "PENDING"}
+              {gatewayObs?.source ? t(`provenance.${gatewayObs.source.toLowerCase()}`, gatewayObs.source.toUpperCase()) : t("provenance.pending", "PENDING")}
             </span>
           </div>
           <div
@@ -404,25 +412,27 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             }}
           >
             {!gatewayObs || (gatewayObs.value === null && session?.status !== "completed")
-              ? "Pending..."
+              ? t("assessment.pending", "Pending...")
               : gatewayIp}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             {gatewayObs && (gatewayObs.value !== null || session?.status === "completed")
-              ? (gatewayObs?.limitation || (interfaceName ? `Interface: ${interfaceName}` : "Direct default route"))
-              : "Discovering default route..."}
+              ? (gatewayObs?.limitation || (interfaceName ? t("assessment.gateway.interface", { name: interfaceName }) : t("assessment.gateway.direct_route", "Direct default route")))
+              : t("assessment.gateway.discovering", "Discovering default route...")}
           </span>
         </div>
 
         {/* DNS Resolver Card */}
         <div className="np-diagnostics-observation-card">
           <div className="np-diagnostics-observation-card__header">
-            <span className="np-diagnostics-observation-card__title">DNS Resolution</span>
+            <span className="np-diagnostics-observation-card__title">
+              {t("assessment.observations.dns", "DNS Resolution")}
+            </span>
             <span
               className={`np-diagnostics-provenance ${dnsObs?.source ? getProvenanceClass(dnsObs.source) : ""}`}
               data-provenance={dnsObs?.source ? dnsObs.source : "pending"}
             >
-              {dnsObs?.source ?? "PENDING"}
+              {dnsObs?.source ? t(`provenance.${dnsObs.source.toLowerCase()}`, dnsObs.source.toUpperCase()) : t("provenance.pending", "PENDING")}
             </span>
           </div>
           <div
@@ -436,33 +446,35 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             }}
           >
             {!dnsObs
-              ? "Pending..."
+              ? t("assessment.pending", "Pending...")
               : dnsRtt !== null
               ? `${formatMs(dnsRtt)} ${dnsObs.unit ?? "ms"}`
               : dnsObs.value === null && session?.status === "completed"
-              ? dnsObs.limitation || "Timed Out"
-              : "Pending..."}
+              ? dnsObs.limitation || t("assessment.timed_out", "Timed Out")
+              : t("assessment.pending", "Pending...")}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {dnsObs
               ? resolvedIps && resolvedIps.length > 0
                 ? resolvedIps.slice(0, 2).join(", ")
                 : session?.status === "completed"
-                ? dnsObs.limitation || "System resolver"
-                : "Awaiting DNS query..."
-              : "Awaiting DNS query..."}
+                ? dnsObs.limitation || t("assessment.dns.system_resolver", "System resolver")
+                : t("assessment.dns.awaiting", "Awaiting DNS query...")
+              : t("assessment.dns.awaiting", "Awaiting DNS query...")}
           </span>
         </div>
 
         {/* HTTP Web Probe Card */}
         <div className="np-diagnostics-observation-card">
           <div className="np-diagnostics-observation-card__header">
-            <span className="np-diagnostics-observation-card__title">HTTP Web Probe</span>
+            <span className="np-diagnostics-observation-card__title">
+              {t("assessment.observations.http", "HTTP Web Probe")}
+            </span>
             <span
               className={`np-diagnostics-provenance ${httpTtfbObs?.source ? getProvenanceClass(httpTtfbObs.source) : ""}`}
               data-provenance={httpTtfbObs?.source ? httpTtfbObs.source : "pending"}
             >
-              {httpTtfbObs?.source ?? "PENDING"}
+              {httpTtfbObs?.source ? t(`provenance.${httpTtfbObs.source.toLowerCase()}`, httpTtfbObs.source.toUpperCase()) : t("provenance.pending", "PENDING")}
             </span>
           </div>
           <div
@@ -481,34 +493,36 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                 : httpTtfb !== null
                 ? `${formatMs(httpTtfb)} ${httpTtfbObs?.unit ?? "ms"}`
                 : session?.status === "completed"
-                ? httpTtfbObs?.limitation || "Unavailable"
-                : "Pending..."
-              : "Pending..."}
+                ? httpTtfbObs?.limitation || t("assessment.unavailable", "Unavailable")
+                : t("assessment.pending", "Pending...")
+              : t("assessment.pending", "Pending...")}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             {httpTtfbObs || httpStatusObs
               ? httpConnectMs !== null && httpTtfb !== null
-                ? `Connect: ${formatMs(httpConnectMs)}ms · TTFB: ${formatMs(httpTtfb)}ms`
+                ? t("assessment.http.connect_ttfb", { connect: formatMs(httpConnectMs), ttfb: formatMs(httpTtfb) })
                 : httpConnectMs !== null
-                ? `Connect: ${formatMs(httpConnectMs)}ms`
+                ? t("assessment.http.connect_only", { connect: formatMs(httpConnectMs) })
                 : httpTtfb !== null
-                ? `TTFB: ${formatMs(httpTtfb)}ms`
+                ? t("assessment.http.ttfb_only", { ttfb: formatMs(httpTtfb) })
                 : session?.status === "completed"
-                ? httpTtfbObs?.limitation || httpStatusObs?.limitation || "Bounded connection"
-                : "Awaiting HTTP response..."
-              : "Awaiting HTTP response..."}
+                ? httpTtfbObs?.limitation || httpStatusObs?.limitation || t("assessment.http.bounded", "Bounded connection")
+                : t("assessment.http.awaiting", "Awaiting HTTP response...")
+              : t("assessment.http.awaiting", "Awaiting HTTP response...")}
           </span>
         </div>
 
         {/* Latency & Loss Card */}
         <div className="np-diagnostics-observation-card">
           <div className="np-diagnostics-observation-card__header">
-            <span className="np-diagnostics-observation-card__title">Round-Trip Latency</span>
+            <span className="np-diagnostics-observation-card__title">
+              {t("assessment.observations.latency", "Round-Trip Latency")}
+            </span>
             <span
               className={`np-diagnostics-provenance ${pingRttObs?.source ? getProvenanceClass(pingRttObs.source) : ""}`}
               data-provenance={pingRttObs?.source ? pingRttObs.source : "pending"}
             >
-              {pingRttObs?.source ?? "PENDING"}
+              {pingRttObs?.source ? t(`provenance.${pingRttObs.source.toLowerCase()}`, pingRttObs.source.toUpperCase()) : t("provenance.pending", "PENDING")}
             </span>
           </div>
           <div
@@ -522,19 +536,19 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             }}
           >
             {isPingPending
-              ? "Pending..."
+              ? t("assessment.pending", "Pending...")
               : pingRtt !== null
               ? `${formatMs(pingRtt)} ${pingRttObs?.unit ?? "ms"}`
               : session?.status === "completed"
-              ? "Timed Out"
-              : "Pending..."}
+              ? t("assessment.timed_out", "Timed Out")
+              : t("assessment.pending", "Pending...")}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             {pingRttObs && pingRtt !== null
-              ? `Loss: ${pingLoss}% · Jitter: ${formatMs(pingJitter)}ms`
+              ? t("assessment.latency.loss_jitter", { loss: pingLoss, jitter: formatMs(pingJitter) })
               : session?.status === "completed" && pingRttObs
-              ? `Loss: ${pingLoss}% · Jitter: ${formatMs(pingJitter)}ms`
-              : "Awaiting ICMP samples..."}
+              ? t("assessment.latency.loss_jitter", { loss: pingLoss, jitter: formatMs(pingJitter) })
+              : t("assessment.latency.awaiting", "Awaiting ICMP samples...")}
           </span>
         </div>
       </div>
@@ -559,8 +573,12 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                   }}
                 />
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, color: "var(--np-text)" }}>{rec.title}</div>
-                  <div style={{ color: "var(--np-text-dim)", fontSize: "0.8rem" }}>{rec.description}</div>
+                  <div style={{ fontWeight: 600, color: "var(--np-text)" }}>
+                    {rec.titleKey ? t(rec.titleKey, rec.title) : t(rec.title, rec.title)}
+                  </div>
+                  <div style={{ color: "var(--np-text-dim)", fontSize: "0.8rem" }}>
+                    {rec.descriptionKey ? t(rec.descriptionKey, rec.description) : t(rec.description, rec.description)}
+                  </div>
                 </div>
               </div>
             ))}

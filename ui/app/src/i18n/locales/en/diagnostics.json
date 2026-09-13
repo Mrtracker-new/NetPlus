@@ -15,7 +15,8 @@
     "live": "LIVE",
     "simulated": "SIMULATED",
     "derived": "DERIVED",
-    "unavailable": "UNAVAILABLE"
+    "unavailable": "UNAVAILABLE",
+    "pending": "PENDING"
   },
   "ping": {
     "title": "Ping Results for {{target}}",
@@ -116,6 +117,96 @@
       "traceroute": "Traceroute",
       "bufferbloat": "Bufferbloat",
       "http": "HTTP"
+    },
+    "pipeline_progress": "Diagnostic pipeline progress",
+    "pending": "Pending...",
+    "timed_out": "Timed Out",
+    "unavailable": "Unavailable",
+    "observations": {
+      "gateway": "Default Gateway",
+      "dns": "DNS Resolution",
+      "http": "HTTP Web Probe",
+      "latency": "Round-Trip Latency"
+    },
+    "recommendations": {
+      "dns": {
+        "title": "Check DNS Resolver Configuration",
+        "desc": "Verify primary and secondary DNS server addresses. Test using reliable public resolvers (such as 1.1.1.1 or 8.8.8.8) to isolate provider resolver slowdowns.",
+        "description": "Verify primary and secondary DNS server addresses. Test using reliable public resolvers (such as 1.1.1.1 or 8.8.8.8) to isolate provider resolver slowdowns."
+      },
+      "gateway": {
+        "title": "Inspect Local Router & Gateway Connection",
+        "desc": "Check physical cable connections or Wi-Fi signal strength to your local router/gateway. Restart the local router if the default route remains unreachable.",
+        "description": "Check physical cable connections or Wi-Fi signal strength to your local router/gateway. Restart the local router if the default route remains unreachable."
+      },
+      "bufferbloat": {
+        "title": "Enable Smart Queue Management (SQM)",
+        "desc": "Configure modern queue management (such as CAKE or fq_codel) on your router to prevent latency spikes during high-throughput downloads or uploads.",
+        "description": "Configure modern queue management (such as CAKE or fq_codel) on your router to prevent latency spikes during high-throughput downloads or uploads."
+      },
+      "loss": {
+        "title": "Isolate Packet Loss Location",
+        "desc": "Run continuous ping against your local gateway first. If gateway loss is 0%, contact your Internet Service Provider to investigate upstream packet drops.",
+        "description": "Run continuous ping against your local gateway first. If gateway loss is 0%, contact your Internet Service Provider to investigate upstream packet drops."
+      },
+      "http": {
+        "title": "Verify Remote Server Status",
+        "desc": "The remote application server is experiencing errors or high latency. Check status pages or contact the service administrator to determine if an outage is underway.",
+        "description": "The remote application server is experiencing errors or high latency. Check status pages or contact the service administrator to determine if an outage is underway."
+      },
+      "routing": {
+        "title": "Monitor Route Stability",
+        "desc": "An extended or suboptimal routing path was detected. If persistent, check if a VPN or proxy is causing traffic hair-pinning.",
+        "description": "An extended or suboptimal routing path was detected. If persistent, check if a VPN or proxy is causing traffic hair-pinning."
+      },
+      "nominal": {
+        "title": "Network Operating Nominally",
+        "desc": "No remedial actions required. Continue monitoring traffic for transient anomalies.",
+        "description": "No remedial actions required. Continue monitoring traffic for transient anomalies."
+      }
+    },
+    "gateway": {
+      "reachable": "Reachable",
+      "unreachable": "Unreachable",
+      "interface": "Interface: {{name}}",
+      "direct_route": "Direct default route",
+      "discovering": "Discovering default route..."
+    },
+    "dns": {
+      "awaiting": "Awaiting DNS query...",
+      "system_resolver": "System resolver"
+    },
+    "http": {
+      "awaiting": "Awaiting HTTP response...",
+      "connect_ttfb": "Connect: {{connect}}ms · TTFB: {{ttfb}}ms",
+      "connect_only": "Connect: {{connect}}ms",
+      "ttfb_only": "TTFB: {{ttfb}}ms",
+      "bounded": "Bounded connection"
+    },
+    "latency": {
+      "awaiting": "Awaiting ICMP samples...",
+      "loss_jitter": "Loss: {{loss}}% · Jitter: {{jitter}}ms"
+    },
+    "categories": {
+      "dns": "DNS",
+      "gateway": "GATEWAY",
+      "local_network": "LOCAL NETWORK",
+      "bufferbloat": "BUFFERBLOAT",
+      "packet_loss": "PACKET LOSS",
+      "remote_service_response": "REMOTE SERVICE",
+      "routing": "ROUTING",
+      "bandwidth": "BANDWIDTH",
+      "unknown": "UNKNOWN"
+    },
+    "severity": {
+      "normal": "NORMAL",
+      "elevated": "ELEVATED",
+      "severe": "SEVERE"
+    },
+    "evidence_role": {
+      "corroborating": "corroborating",
+      "contradicting": "contradicting",
+      "neutral": "neutral"
     }
   }
 }

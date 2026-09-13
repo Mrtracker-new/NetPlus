@@ -160,7 +160,7 @@ export function DiagnosticsScreen() {
       </div>
 
       {/* Probe Results & Empty State Deck */}
-      {!hasAnyResults && !isAnyBusy && !notice ? (
+      {!hasAnyResults && !isAnyBusy ? (
         <EmptyDiagnosticsState
           onRunPing={() => void actions.runPing()}
           onRunTraceroute={() => void actions.runTraceroute()}

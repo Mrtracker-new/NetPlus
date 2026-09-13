@@ -66,10 +66,13 @@ export interface Diagnosis {
 }
 
 export interface Recommendation {
+  key?: string;
   title: string;
   description: string;
   actionType: "recheck" | "settings" | "hardware" | "provider" | "info";
   priority: "high" | "medium" | "low";
+  titleKey?: string;
+  descriptionKey?: string;
 }
 
 export interface DiagnosticSession {

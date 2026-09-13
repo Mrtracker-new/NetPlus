@@ -15,7 +15,8 @@
     "live": "EN VIVO",
     "simulated": "SIMULADO",
     "derived": "DERIVADO",
-    "unavailable": "NO DISPONIBLE"
+    "unavailable": "NO DISPONIBLE",
+    "pending": "PENDIENTE"
   },
   "ping": {
     "title": "Resultados de Ping para {{target}}",
@@ -116,6 +117,96 @@
       "traceroute": "Traceroute",
       "bufferbloat": "Bufferbloat",
       "http": "HTTP"
+    },
+    "pipeline_progress": "Progreso del flujo de diagnóstico",
+    "pending": "Pendiente...",
+    "timed_out": "Tiempo Agotado",
+    "unavailable": "No disponible",
+    "observations": {
+      "gateway": "Gateway Predeterminado",
+      "dns": "Resolución DNS",
+      "http": "Prueba Web HTTP",
+      "latency": "Latencia de Ida y Vuelta"
+    },
+    "recommendations": {
+      "dns": {
+        "title": "Verificar Configuración del Servidor DNS",
+        "desc": "Verifica las direcciones de los servidores DNS primario y secundario. Prueba utilizando servidores públicos confiables (como 1.1.1.1 o 8.8.8.8) para aislar la lentitud del proveedor.",
+        "description": "Verifica las direcciones de los servidores DNS primario y secundario. Prueba utilizando servidores públicos confiables (como 1.1.1.1 o 8.8.8.8) para aislar la lentitud del proveedor."
+      },
+      "gateway": {
+        "title": "Inspeccionar Router Local y Conexión de Gateway",
+        "desc": "Revisa las conexiones físicas de cable o la intensidad de la señal Wi-Fi hacia tu router/gateway local. Reinicia el router local si la ruta predeterminada sigue siendo inaccesible.",
+        "description": "Revisa las conexiones físicas de cable o la intensidad de la señal Wi-Fi hacia tu router/gateway local. Reinicia el router local si la ruta predeterminada sigue siendo inaccesible."
+      },
+      "bufferbloat": {
+        "title": "Habilitar Gestión Inteligente de Colas (SQM)",
+        "desc": "Configura la gestión de colas moderna (como CAKE o fq_codel) en tu router para evitar picos de latencia durante descargas o subidas de alto rendimiento.",
+        "description": "Configura la gestión de colas moderna (como CAKE o fq_codel) en tu router para evitar picos de latencia durante descargas o subidas de alto rendimiento."
+      },
+      "loss": {
+        "title": "Aislar la Ubicación de la Pérdida de Paquetes",
+        "desc": "Ejecuta primero un ping continuo contra tu gateway local. Si la pérdida hacia el gateway es 0%, contacta a tu Proveedor de Servicios de Internet para investigar pérdidas de paquetes ascendentes.",
+        "description": "Ejecuta primero un ping continuo contra tu gateway local. Si la pérdida hacia el gateway es 0%, contacta a tu Proveedor de Servicios de Internet para investigar pérdidas de paquetes ascendentes."
+      },
+      "http": {
+        "title": "Verificar Estado del Servidor Remoto",
+        "desc": "El servidor de aplicaciones remoto está experimentando errores o alta latencia. Revisa las páginas de estado o contacta al administrador del servicio para determinar si hay una interrupción en curso.",
+        "description": "El servidor de aplicaciones remoto está experimentando errores o alta latencia. Revisa las páginas de estado o contacta al administrador del servicio para determinar si hay una interrupción en curso."
+      },
+      "routing": {
+        "title": "Monitorear Estabilidad de la Ruta",
+        "desc": "Se detectó una ruta de enrutamiento extendida o subóptima. Si persiste, verifica si una VPN o proxy está causando enrutamiento ineficiente del tráfico.",
+        "description": "Se detectó una ruta de enrutamiento extendida o subóptima. Si persiste, verifica si una VPN o proxy está causando enrutamiento ineficiente del tráfico."
+      },
+      "nominal": {
+        "title": "Red Operando Nominalmente",
+        "desc": "No se requieren acciones correctivas. Continúa monitoreando el tráfico para detectar anomalías transitorias.",
+        "description": "No se requieren acciones correctivas. Continúa monitoreando el tráfico para detectar anomalías transitorias."
+      }
+    },
+    "gateway": {
+      "reachable": "Accesible",
+      "unreachable": "Inaccesible",
+      "interface": "Interfaz: {{name}}",
+      "direct_route": "Ruta predeterminada directa",
+      "discovering": "Descubriendo ruta predeterminada..."
+    },
+    "dns": {
+      "awaiting": "Esperando consulta DNS...",
+      "system_resolver": "Resolutor del sistema"
+    },
+    "http": {
+      "awaiting": "Esperando respuesta HTTP...",
+      "connect_ttfb": "Conexión: {{connect}}ms · TTFB: {{ttfb}}ms",
+      "connect_only": "Conexión: {{connect}}ms",
+      "ttfb_only": "TTFB: {{ttfb}}ms",
+      "bounded": "Conexión limitada"
+    },
+    "latency": {
+      "awaiting": "Esperando muestras ICMP...",
+      "loss_jitter": "Pérdida: {{loss}}% · Jitter: {{jitter}}ms"
+    },
+    "categories": {
+      "dns": "DNS",
+      "gateway": "GATEWAY",
+      "local_network": "RED LOCAL",
+      "bufferbloat": "BUFFERBLOAT",
+      "packet_loss": "PÉRDIDA DE PAQUETES",
+      "remote_service_response": "SERVICIO REMOTO",
+      "routing": "ENRUTAMIENTO",
+      "bandwidth": "ANCHO DE BANDA",
+      "unknown": "DESCONOCIDO"
+    },
+    "severity": {
+      "normal": "NORMAL",
+      "elevated": "ELEVADO",
+      "severe": "SEVERO"
+    },
+    "evidence_role": {
+      "corroborating": "corroborante",
+      "contradicting": "contradictorio",
+      "neutral": "neutral"
     }
   }
 }

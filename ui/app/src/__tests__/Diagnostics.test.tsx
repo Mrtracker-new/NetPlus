@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within, act } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, act, renderHook } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import axe from "axe-core";
 import i18n from "../i18n";
@@ -9,7 +9,8 @@ import { PingResultCard, getJitterColor } from "../screens/Diagnostics/PingResul
 import { TracerouteCard } from "../screens/Diagnostics/TracerouteCard";
 import { BufferbloatCard } from "../screens/Diagnostics/BufferbloatCard";
 import type { DiagnosticSession } from "../diagnostic";
-import { validateAndNormalizeTarget } from "../hooks/useDiagnosticsController";
+import * as diagnosticModule from "../diagnostic";
+import { validateAndNormalizeTarget, useDiagnosticsController } from "../hooks/useDiagnosticsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
 import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
 import { __resetForTest } from "../state/store";
@@ -1477,6 +1478,257 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
       expect(stepper).toHaveAttribute("aria-valuenow", "6");
       expect(document.querySelectorAll(".np-diagnostics-step--complete").length).toBe(6);
       expect(document.querySelectorAll(".np-diagnostics-step--running").length).toBe(0);
+    });
+  });
+
+  describe("Screen Reader Live Announcements Localization", () => {
+    it("announces probe progress, success, and clear in English when in English mode", async () => {
+      vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+        if (req.kind === "runPing") {
+          return {
+            kind: "pingResult",
+            result: {
+              target: "1.1.1.1",
+              sent: 4,
+              received: 4,
+              lossPct: 0,
+              minRttMs: 10,
+              avgRttMs: 12,
+              maxRttMs: 14,
+              stddevRttMs: 1,
+              source: "live",
+            },
+          };
+        }
+        return { kind: "pingResult", result: {} };
+      }) as any);
+
+      const { container } = render(<DiagnosticsTestWrapper />);
+      const liveRegion = container.querySelector(".np-sr-only[aria-live='polite']");
+      expect(liveRegion).toBeInTheDocument();
+
+      const pingBtn = screen.getByRole("button", { name: "Ping Probe" });
+      await act(async () => {
+        fireEvent.click(pingBtn);
+      });
+
+      expect(liveRegion?.textContent).toBe("Ping probe completed for 1.1.1.1 with 0% loss.");
+
+      const clearBtn = screen.getByRole("button", { name: "Clear Results" });
+      await act(async () => {
+        fireEvent.click(clearBtn);
+      });
+      expect(liveRegion?.textContent).toBe("Diagnostic probe results cleared.");
+    });
+
+    it("announces probe progress, completion, and clear in Spanish when switched to Spanish mode", async () => {
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      try {
+        vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+          if (req.kind === "runPing") {
+            return {
+              kind: "pingResult",
+              result: {
+                target: "1.1.1.1",
+                sent: 4,
+                received: 4,
+                lossPct: 0,
+                minRttMs: 10,
+                avgRttMs: 12,
+                maxRttMs: 14,
+                stddevRttMs: 1,
+                source: "live",
+              },
+            };
+          }
+          if (req.kind === "runTraceroute") {
+            return {
+              kind: "tracerouteResult",
+              target: "1.1.1.1",
+              hops: [
+                { ttl: 1, ip: "192.168.1.1", hostname: "gw", rttMs: 1, status: "ok", source: "live" },
+                { ttl: 2, ip: "1.1.1.1", hostname: "one", rttMs: 10, status: "ok", source: "live" },
+              ],
+            };
+          }
+          if (req.kind === "runBufferbloatTest") {
+            return {
+              kind: "bufferbloatResult",
+              result: { target: "1.1.1.1", idleRttMs: 10, loadedRttMs: 15, deltaRttMs: 5, grade: "A+", source: "live" },
+            };
+          }
+          return { kind: "pingResult", result: {} };
+        }) as any);
+
+        const { container } = render(<DiagnosticsTestWrapper />);
+        const liveRegion = container.querySelector(".np-sr-only[aria-live='polite']");
+        expect(liveRegion).toBeInTheDocument();
+
+        // 1. Ping in Spanish
+        const pingBtn = screen.getByRole("button", { name: "Prueba Ping" });
+        await act(async () => {
+          fireEvent.click(pingBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Prueba ping completada para 1.1.1.1 con 0% de pérdida.");
+
+        // 2. Traceroute in Spanish
+        const traceBtn = screen.getByRole("button", { name: "Traceroute" });
+        await act(async () => {
+          fireEvent.click(traceBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Traceroute completado para 1.1.1.1 con 2 saltos.");
+
+        // 3. Bufferbloat in Spanish
+        const bloatBtn = screen.getByRole("button", { name: "Prueba Bufferbloat" });
+        await act(async () => {
+          fireEvent.click(bloatBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Prueba de bufferbloat completada con calificación A+.");
+
+        // 4. Clear results in Spanish
+        const clearBtn = screen.getByRole("button", { name: "Limpiar Resultados" });
+        await act(async () => {
+          fireEvent.click(clearBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Resultados de pruebas de diagnóstico eliminados.");
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage("en");
+        });
+      }
+    });
+
+    it("announces probe errors in Spanish mode", async () => {
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      try {
+        vi.spyOn(ipcModule, "query").mockRejectedValue(new Error("Connection timeout"));
+
+        const { container } = render(<DiagnosticsTestWrapper />);
+        const liveRegion = container.querySelector(".np-sr-only[aria-live='polite']");
+
+        // Ping error
+        const pingBtn = screen.getByRole("button", { name: "Prueba Ping" });
+        await act(async () => {
+          fireEvent.click(pingBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Error en la prueba ping: Connection timeout");
+
+        // Traceroute error
+        const traceBtn = screen.getByRole("button", { name: "Traceroute" });
+        await act(async () => {
+          fireEvent.click(traceBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Error en traceroute: Connection timeout");
+
+        // Bufferbloat error
+        const bloatBtn = screen.getByRole("button", { name: "Prueba Bufferbloat" });
+        await act(async () => {
+          fireEvent.click(bloatBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Error en la prueba de bufferbloat: Connection timeout");
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage("en");
+        });
+      }
+    });
+
+    it("announces deep diagnostics completion and error in Spanish mode", async () => {
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      try {
+        const dummySession: DiagnosticSession = {
+          sessionId: 101,
+          target: "1.1.1.1",
+          status: "completed",
+          startedAt: Date.now() - 2000,
+          completedAt: Date.now(),
+          diagnoses: [
+            {
+              category: "GATEWAY",
+              confidence: 0.9,
+              summary: "Gateway issue",
+              explanation: "Gateway unreachable",
+              evidence: [],
+              severity: "severe",
+            },
+          ],
+          observations: [],
+          recommendations: [],
+        };
+
+        vi.spyOn(diagnosticModule, "executeDiagnosticPipeline").mockResolvedValue(dummySession);
+
+        const { container } = render(<DiagnosticsTestWrapper />);
+        const liveRegion = container.querySelector(".np-sr-only[aria-live='polite']");
+
+        const fullAnalysisBtn = screen.getAllByRole("button", { name: "Ejecutar Análisis Completo" })[0]!;
+        await act(async () => {
+          fireEvent.click(fullAnalysisBtn);
+        });
+
+        expect(liveRegion?.textContent).toBe("Diagnóstico profundo completado con 1 hallazgos.");
+
+        // Failure case
+        vi.spyOn(diagnosticModule, "executeDiagnosticPipeline").mockRejectedValue(new Error("Pipeline aborted"));
+        await act(async () => {
+          fireEvent.click(fullAnalysisBtn);
+        });
+        expect(liveRegion?.textContent).toBe("Error en el flujo de diagnóstico profundo: Pipeline aborted");
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage("en");
+        });
+      }
+    });
+
+    it("directly formats announcement strings via useDiagnosticsController hook in Spanish", async () => {
+      await act(async () => {
+        await i18n.changeLanguage("es");
+      });
+
+      try {
+        vi.spyOn(ipcModule, "query").mockResolvedValue({
+          kind: "pingResult",
+          result: {
+            target: "1.1.1.1",
+            sent: 4,
+            received: 4,
+            lossPct: 25,
+            minRttMs: 10,
+            avgRttMs: 15,
+            maxRttMs: 20,
+            stddevRttMs: 1.5,
+            source: "live",
+          },
+        } as any);
+
+        const { result } = renderHook(() => useDiagnosticsController());
+
+        await act(async () => {
+          await result.current.actions.runPing();
+        });
+
+        expect(result.current.announcement).toBe("Prueba ping completada para 1.1.1.1 con 25% de pérdida.");
+
+        await act(async () => {
+          result.current.actions.clearResults();
+        });
+
+        expect(result.current.announcement).toBe("Resultados de pruebas de diagnóstico eliminados.");
+      } finally {
+        await act(async () => {
+          await i18n.changeLanguage("en");
+        });
+      }
     });
   });
 });

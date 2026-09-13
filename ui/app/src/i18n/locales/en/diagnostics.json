@@ -208,5 +208,20 @@
       "contradicting": "contradicting",
       "neutral": "neutral"
     }
+  },
+  "announcements": {
+    "ping_running": "Running ping probe to {{target}}...",
+    "ping_completed": "Ping probe completed for {{target}} with {{loss}}% loss.",
+    "ping_failed": "Ping probe failed: {{error}}",
+    "traceroute_running": "Running traceroute to {{target}}...",
+    "traceroute_completed": "Traceroute completed for {{target}} with {{count}} hops.",
+    "traceroute_failed": "Traceroute failed: {{error}}",
+    "bufferbloat_running": "Running bufferbloat test against {{target}}...",
+    "bufferbloat_completed": "Bufferbloat test completed with grade {{grade}}.",
+    "bufferbloat_failed": "Bufferbloat test failed: {{error}}",
+    "deep_running": "Initiating full deep diagnostic pipeline for {{target}}...",
+    "deep_completed": "Deep diagnostic completed with {{count}} findings.",
+    "deep_failed": "Deep diagnostic pipeline failed: {{error}}",
+    "cleared": "Diagnostic probe results cleared."
   }
 }

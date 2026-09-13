@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import type { PingResult, TracerouteHop, TracerouteResult, BufferbloatResult } from "@netpulse/contract";
 import { query } from "../ipc";
 import { executeDiagnosticPipeline, type DiagnosticSession } from "../diagnostic";
@@ -80,6 +81,7 @@ export function validateAndNormalizeTarget(rawInput: string): { isValid: boolean
 }
 
 export function useDiagnosticsController() {
+  const { t } = useTranslation(["diagnostics", "common"]);
   const isMountedRef = useRef(true);
   const cancelRef = useRef(false);
   const pipelineRunIdRef = useRef(0);
@@ -120,7 +122,7 @@ export function useDiagnosticsController() {
     }
 
     setPingProbe({ status: "running", startedAt: Date.now() });
-    setAnnouncement(`Running ping probe to ${normalized}...`);
+    setAnnouncement(t("announcements.ping_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runPing", target: normalized, count: 4 });
@@ -151,16 +153,16 @@ export function useDiagnosticsController() {
           result: extendedResult,
           finishedAt: Date.now(),
         });
-        setAnnouncement(`Ping probe completed for ${normalized} with ${lossPct}% loss.`);
+        setAnnouncement(t("announcements.ping_completed", { target: normalized, loss: lossPct }));
       }
     } catch (e) {
       if (!isMountedRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setPingProbe({ status: "error", error: errMsg });
       setNotice(errMsg);
-      setAnnouncement(`Ping probe failed: ${errMsg}`);
+      setAnnouncement(t("announcements.ping_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy]);
+  }, [target, isAnyBusy, t]);
 
   const runTraceroute = useCallback(async () => {
     if (isAnyBusy) return;
@@ -172,7 +174,7 @@ export function useDiagnosticsController() {
     }
 
     setTraceProbe({ status: "running", startedAt: Date.now() });
-    setAnnouncement(`Running traceroute to ${normalized}...`);
+    setAnnouncement(t("announcements.traceroute_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runTraceroute", target: normalized, transport: "icmp", max_hops: 30 });
@@ -197,16 +199,21 @@ export function useDiagnosticsController() {
           result: normalizedResult,
           finishedAt: Date.now(),
         });
-        setAnnouncement(`Traceroute completed for ${normalizedResult.target} with ${normalizedHops.length} hops.`);
+        setAnnouncement(
+          t("announcements.traceroute_completed", {
+            target: normalizedResult.target,
+            count: normalizedHops.length,
+          })
+        );
       }
     } catch (e) {
       if (!isMountedRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setTraceProbe({ status: "error", error: errMsg });
       setNotice(errMsg);
-      setAnnouncement(`Traceroute failed: ${errMsg}`);
+      setAnnouncement(t("announcements.traceroute_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy]);
+  }, [target, isAnyBusy, t]);
 
   const runBufferbloat = useCallback(async () => {
     if (isAnyBusy) return;
@@ -218,7 +225,7 @@ export function useDiagnosticsController() {
     }
 
     setBloatProbe({ status: "running", startedAt: Date.now() });
-    setAnnouncement(`Running bufferbloat test against ${normalized}...`);
+    setAnnouncement(t("announcements.bufferbloat_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runBufferbloatTest", target: normalized });
@@ -243,16 +250,18 @@ export function useDiagnosticsController() {
           result: normalizedResult,
           finishedAt: Date.now(),
         });
-        setAnnouncement(`Bufferbloat test completed with grade ${normalizedResult.grade}.`);
+        setAnnouncement(
+          t("announcements.bufferbloat_completed", { grade: normalizedResult.grade })
+        );
       }
     } catch (e) {
       if (!isMountedRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setBloatProbe({ status: "error", error: errMsg });
       setNotice(errMsg);
-      setAnnouncement(`Bufferbloat test failed: ${errMsg}`);
+      setAnnouncement(t("announcements.bufferbloat_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy]);
+  }, [target, isAnyBusy, t]);
 
   const runDeepDiagnostics = useCallback(async () => {
     if (isAnyBusy) return;
@@ -267,7 +276,7 @@ export function useDiagnosticsController() {
     cancelRef.current = false;
     setIsDeepBusy(true);
     setDeepStage("gateway");
-    setAnnouncement(`Initiating full deep diagnostic pipeline for ${normalized}...`);
+    setAnnouncement(t("announcements.deep_running", { target: normalized }));
 
     try {
       const session = await executeDiagnosticPipeline({
@@ -284,18 +293,18 @@ export function useDiagnosticsController() {
       if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       setDeepSession(session);
       setDeepStage(null);
-      setAnnouncement(`Deep diagnostic completed with ${session.diagnoses.length} findings.`);
+      setAnnouncement(t("announcements.deep_completed", { count: session.diagnoses.length }));
     } catch (e) {
       if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setNotice(errMsg);
-      setAnnouncement(`Deep diagnostic pipeline failed: ${errMsg}`);
+      setAnnouncement(t("announcements.deep_failed", { error: errMsg }));
     } finally {
       if (isMountedRef.current && runId === pipelineRunIdRef.current) {
         setIsDeepBusy(false);
       }
     }
-  }, [target, isAnyBusy]);
+  }, [target, isAnyBusy, t]);
 
   const clearResults = useCallback(() => {
     cancelRef.current = true;
@@ -307,8 +316,8 @@ export function useDiagnosticsController() {
     setDeepStage(null);
     setIsDeepBusy(false);
     setNotice(null);
-    setAnnouncement("Diagnostic probe results cleared.");
-  }, []);
+    setAnnouncement(t("announcements.cleared"));
+  }, [t]);
 
   const hasAnyResults =
     pingProbe.status === "success" ||

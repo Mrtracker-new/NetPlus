@@ -208,5 +208,20 @@
       "contradicting": "contradictorio",
       "neutral": "neutral"
     }
+  },
+  "announcements": {
+    "ping_running": "Ejecutando prueba ping a {{target}}...",
+    "ping_completed": "Prueba ping completada para {{target}} con {{loss}}% de pérdida.",
+    "ping_failed": "Error en la prueba ping: {{error}}",
+    "traceroute_running": "Ejecutando traceroute a {{target}}...",
+    "traceroute_completed": "Traceroute completado para {{target}} con {{count}} saltos.",
+    "traceroute_failed": "Error en traceroute: {{error}}",
+    "bufferbloat_running": "Ejecutando prueba de bufferbloat contra {{target}}...",
+    "bufferbloat_completed": "Prueba de bufferbloat completada con calificación {{grade}}.",
+    "bufferbloat_failed": "Error en la prueba de bufferbloat: {{error}}",
+    "deep_running": "Iniciando flujo completo de diagnóstico profundo para {{target}}...",
+    "deep_completed": "Diagnóstico profundo completado con {{count}} hallazgos.",
+    "deep_failed": "Error en el flujo de diagnóstico profundo: {{error}}",
+    "cleared": "Resultados de pruebas de diagnóstico eliminados."
   }
 }

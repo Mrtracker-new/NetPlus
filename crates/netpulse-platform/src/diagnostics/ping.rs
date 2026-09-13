@@ -353,6 +353,8 @@ mod platform {
     }
 }
 
+pub(crate) use platform::ping_target;
+
 impl DiagnosticProbe for PingProbe {
     type Output = PingProbeOutput;
 

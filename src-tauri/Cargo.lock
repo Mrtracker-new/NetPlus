@@ -2295,6 +2295,7 @@ name = "netpulse-platform"
 version = "0.1.0"
 dependencies = [
  "httparse",
+ "libc",
  "netpulse-core",
  "netstat2",
  "pcap",

@@ -193,6 +193,112 @@ mod tests {
         let out = probe.run(cancel).expect("bufferbloat probe run");
         assert!(out.delta_rtt_ms >= 0.0);
         assert!(["A+", "A", "B", "C", "F"].contains(&out.grade.as_str()));
-        assert_eq!(out.source, "simulated");
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_bufferbloat_grade_ranges() {
+        use super::bufferbloat::calculate_grade;
+        assert_eq!(calculate_grade(0.0, true), "A+");
+        assert_eq!(calculate_grade(9.99, true), "A+");
+        assert_eq!(calculate_grade(10.0, true), "A");
+        assert_eq!(calculate_grade(24.99, true), "A");
+        assert_eq!(calculate_grade(25.0, true), "B");
+        assert_eq!(calculate_grade(59.99, true), "B");
+        assert_eq!(calculate_grade(60.0, true), "C");
+        assert_eq!(calculate_grade(149.99, true), "C");
+        assert_eq!(calculate_grade(150.0, true), "F");
+        assert_eq!(calculate_grade(500.0, true), "F");
+        assert_eq!(calculate_grade(0.0, false), "F");
+    }
+
+    #[test]
+    fn test_bufferbloat_cancellation() {
+        let probe = BufferbloatProbe::new(Some("1.1.1.1".into()));
+        let cancel = AtomicBool::new(true);
+        let start = std::time::Instant::now();
+        let out = probe.run(cancel).expect("bufferbloat probe run");
+        assert!(start.elapsed().as_millis() < 500, "Should cancel immediately");
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_bufferbloat_invalid_target() {
+        let probe = BufferbloatProbe::new(Some("invalid.domain.target.nonexistent".into()));
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("bufferbloat probe run");
+        assert_eq!(out.grade, "F");
+        assert_eq!(out.delta_rtt_ms, 0.0);
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_bufferbloat_with_mock_server() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:0").expect("bind local mock server");
+        let local_addr = listener.local_addr().expect("local addr");
+
+        let stop_server = std::sync::Arc::new(AtomicBool::new(false));
+        let stop_clone = stop_server.clone();
+
+        let server_thread = thread::spawn(move || {
+            let _ = listener.set_nonblocking(true);
+            while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                if let Ok((mut stream, _)) = listener.accept() {
+                    let mut req_buf = [0u8; 1024];
+                    let _ = stream.read(&mut req_buf);
+                    let header = "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nConnection: close\r\n\r\n";
+                    let _ = stream.write_all(header.as_bytes());
+                    let chunk = [0xAAu8; 8192];
+                    while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
+                        if stream.write_all(&chunk).is_err() {
+                            break;
+                        }
+                    }
+                }
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+        });
+
+        let probe = BufferbloatProbe::with_options(
+            Some("127.0.0.1".into()),
+            Some(format!("http://{}", local_addr)),
+            Some(1),
+        );
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("bufferbloat probe run");
+
+        stop_server.store(true, std::sync::atomic::Ordering::Relaxed);
+        let _ = server_thread.join();
+
+        assert_eq!(out.source, "live");
+        assert_eq!(out.target, "127.0.0.1");
+        assert!(out.delta_rtt_ms >= 0.0);
+        assert!(["A+", "A", "B", "C", "F"].contains(&out.grade.as_str()));
+    }
+
+    #[test]
+    fn test_bufferbloat_mid_run_cancellation() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let probe = BufferbloatProbe::new(Some("1.1.1.1".into()));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let cancel_clone = cancel.clone();
+
+        thread::spawn(move || {
+            // Trigger cancellation after 150ms during baseline idle or saturation ramp
+            thread::sleep(std::time::Duration::from_millis(150));
+            cancel_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+
+        let start = std::time::Instant::now();
+        let out = probe.run_with_cancel(cancel).expect("bufferbloat probe run");
+        // Ensure that even with 3-second duration, cancellation aborted well before 3 seconds
+        assert!(start.elapsed().as_millis() < 1500, "Should abort promptly upon mid-run cancellation");
+        assert_eq!(out.source, "live");
     }
 }

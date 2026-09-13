@@ -81,10 +81,14 @@ export function validateAndNormalizeTarget(rawInput: string): { isValid: boolean
 
 export function useDiagnosticsController() {
   const isMountedRef = useRef(true);
+  const cancelRef = useRef(false);
+  const pipelineRunIdRef = useRef(0);
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      cancelRef.current = true;
+      pipelineRunIdRef.current++;
     };
   }, []);
 
@@ -259,6 +263,8 @@ export function useDiagnosticsController() {
       return;
     }
 
+    const runId = ++pipelineRunIdRef.current;
+    cancelRef.current = false;
     setIsDeepBusy(true);
     setDeepStage("gateway");
     setAnnouncement(`Initiating full deep diagnostic pipeline for ${normalized}...`);
@@ -267,30 +273,33 @@ export function useDiagnosticsController() {
       const session = await executeDiagnosticPipeline({
         target: normalized,
         executor: query,
+        checkCancelled: () => cancelRef.current || !isMountedRef.current || runId !== pipelineRunIdRef.current,
         onProgress: (currentSession) => {
-          if (!isMountedRef.current) return;
+          if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
           setDeepStage(currentSession.currentStep ?? null);
           setDeepSession({ ...currentSession });
         },
       });
 
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       setDeepSession(session);
       setDeepStage(null);
       setAnnouncement(`Deep diagnostic completed with ${session.diagnoses.length} findings.`);
     } catch (e) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setNotice(errMsg);
       setAnnouncement(`Deep diagnostic pipeline failed: ${errMsg}`);
     } finally {
-      if (isMountedRef.current) {
+      if (isMountedRef.current && runId === pipelineRunIdRef.current) {
         setIsDeepBusy(false);
       }
     }
   }, [target, isAnyBusy]);
 
   const clearResults = useCallback(() => {
+    cancelRef.current = true;
+    pipelineRunIdRef.current++;
     setPingProbe({ status: "idle" });
     setTraceProbe({ status: "idle" });
     setBloatProbe({ status: "idle" });

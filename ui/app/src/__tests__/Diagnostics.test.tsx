@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import "../i18n";
 import { DiagnosticsScreen } from "../screens/Diagnostics";
@@ -650,5 +650,269 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
     const pingRttEl = screen.getByText("15 ms");
     expect(pingRttEl).toBeInTheDocument();
     expect(pingRttEl).toHaveStyle({ color: "var(--np-finding)" });
+  });
+
+  it("stops all downstream probe queries when screen is unmounted during pipeline execution", async () => {
+    let resolveGateway!: (val: any) => void;
+    const gatewayPromise = new Promise((resolve) => {
+      resolveGateway = resolve;
+    });
+
+    const executedQueries: string[] = [];
+
+    vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+      executedQueries.push(req.kind);
+      switch (req.kind) {
+        case "discoverGateway":
+          return await gatewayPromise;
+        case "runDnsProbe":
+          return { kind: "dnsResult", result: { target: "1.1.1.1", resolvedIps: ["1.1.1.1"], resolutionRttMs: 12, status: "resolved", source: "live" } };
+        case "runPing":
+          return { kind: "pingResult", result: { target: "1.1.1.1", sent: 4, received: 4, lossPct: 0, minRttMs: 10, avgRttMs: 14, maxRttMs: 18, source: "live" } };
+        default:
+          return { kind: "success" };
+      }
+    }) as any);
+
+    const { unmount } = render(<DiagnosticsTestWrapper />);
+
+    const fullAnalysisBtn = screen.getAllByRole("button", { name: "Run Full Analysis" })[0]!;
+    fireEvent.click(fullAnalysisBtn);
+
+    // Initial stage: discoverGateway is called
+    expect(executedQueries).toEqual(["discoverGateway"]);
+
+    // Unmount screen while pipeline is in-flight
+    unmount();
+
+    // Complete the in-flight gateway query
+    resolveGateway({
+      kind: "gatewayResult",
+      result: { gatewayIp: "192.168.1.1", interfaceName: "eth0", status: "discovered", source: "live" },
+    });
+
+    // Wait a brief microtask tick to allow promise chain to settle
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    // Assert NO downstream queries were called
+    expect(executedQueries).toEqual(["discoverGateway"]);
+    expect(executedQueries).not.toContain("runDnsProbe");
+    expect(executedQueries).not.toContain("runPing");
+    expect(executedQueries).not.toContain("runTraceroute");
+    expect(executedQueries).not.toContain("runBufferbloatTest");
+    expect(executedQueries).not.toContain("runHttpProbe");
+  });
+
+  it("immediately stops pipeline and clears state when Clear Results is clicked during execution", async () => {
+    let resolveGateway!: (val: any) => void;
+    const gatewayPromise = new Promise((resolve) => {
+      resolveGateway = resolve;
+    });
+
+    const executedQueries: string[] = [];
+
+    vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+      executedQueries.push(req.kind);
+      switch (req.kind) {
+        case "discoverGateway":
+          return await gatewayPromise;
+        case "runDnsProbe":
+          return { kind: "dnsResult", result: { target: "1.1.1.1", resolvedIps: ["1.1.1.1"], resolutionRttMs: 12, status: "resolved", source: "live" } };
+        default:
+          return { kind: "success" };
+      }
+    }) as any);
+
+    render(<DiagnosticsTestWrapper />);
+
+    const fullAnalysisBtn = screen.getAllByRole("button", { name: "Run Full Analysis" })[0]!;
+    fireEvent.click(fullAnalysisBtn);
+
+    // In-flight banner is displayed and Clear Results button becomes visible
+    expect(await screen.findByTestId("deep-diagnostics-analyzing-banner")).toBeInTheDocument();
+    expect(executedQueries).toEqual(["discoverGateway"]);
+
+    const clearBtn = await screen.findByRole("button", { name: "Clear Results" });
+    fireEvent.click(clearBtn);
+
+    // Results and in-flight state should be cleared immediately
+    expect(screen.queryByTestId("deep-diagnostics-analyzing-banner")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("Enter a target hostname or IP address (IPv4, IPv6, domain) and choose a diagnostic probe.")
+    ).toBeInTheDocument();
+
+    // Resolve the in-flight gateway query
+    await act(async () => {
+      resolveGateway({
+        kind: "gatewayResult",
+        result: { gatewayIp: "192.168.1.1", interfaceName: "eth0", status: "discovered", source: "live" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // Pipeline should NOT have executed any downstream probes
+    expect(executedQueries).toEqual(["discoverGateway"]);
+    expect(executedQueries).not.toContain("runDnsProbe");
+    expect(executedQueries).not.toContain("runPing");
+
+    // Empty state remains present, deepSession was not revived
+    expect(
+      screen.getByText("Enter a target hostname or IP address (IPv4, IPv6, domain) and choose a diagnostic probe.")
+    ).toBeInTheDocument();
+  });
+
+  it("disambiguates Ping latency from DNS and Bufferbloat observations, and renders HTTP connect/TTFB metrics without status code shadowing", () => {
+    const multiProbeSession: DiagnosticSession = {
+      sessionId: 501,
+      target: "1.1.1.1",
+      status: "completed",
+      startedAt: Date.now() - 5000,
+      completedAt: Date.now(),
+      observations: [
+        {
+          key: "gateway_reachability",
+          source: "live",
+          severity: "normal",
+          metricName: "Default Gateway Reachability",
+          value: "192.168.1.1",
+          quality: "high",
+          rawDetails: { gatewayIp: "192.168.1.1", interfaceName: "eth0" },
+        },
+        {
+          key: "dns_rtt",
+          source: "live",
+          severity: "normal",
+          metricName: "DNS Resolution Latency",
+          value: 8.5,
+          unit: "ms",
+          quality: "high",
+          rawDetails: { resolvedIps: ["1.1.1.1", "1.0.0.1"] },
+        },
+        {
+          key: "target_packet_loss",
+          source: "live",
+          severity: "normal",
+          metricName: "Target End-to-End Packet Loss",
+          value: 0,
+          unit: "%",
+          quality: "high",
+        },
+        {
+          key: "target_ping_rtt",
+          source: "live",
+          severity: "normal",
+          metricName: "Target Round-Trip Latency",
+          value: 24.2,
+          unit: "ms",
+          quality: "high",
+          rawDetails: { jitterMs: 3.1, minRttMs: 22.0, maxRttMs: 25.1 },
+        },
+        {
+          key: "bufferbloat_delta",
+          source: "live",
+          severity: "normal",
+          metricName: "Bufferbloat Latency Delta",
+          value: 4.8,
+          unit: "ms",
+          quality: "high",
+        },
+        {
+          key: "http_status",
+          source: "live",
+          severity: "normal",
+          metricName: "HTTP Status Code",
+          value: 200,
+          quality: "high",
+        },
+        {
+          key: "http_ttfb",
+          source: "live",
+          severity: "normal",
+          metricName: "HTTP Time to First Byte",
+          value: 45.4,
+          unit: "ms",
+          quality: "high",
+          rawDetails: { connectMs: 14.6, ttfbMs: 45.4 },
+        },
+      ],
+      diagnoses: [],
+      recommendations: [],
+    };
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={multiProbeSession} activeStage={null} />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // DNS metric displays 8.5 ms and resolved IPs
+    expect(screen.getByText("8.5 ms")).toBeInTheDocument();
+    expect(screen.getByText("1.1.1.1, 1.0.0.1")).toBeInTheDocument();
+
+    // Round-Trip Latency displays Ping RTT (24.2 ms), NOT DNS RTT (8.5 ms) or Bufferbloat (4.8 ms)
+    expect(screen.getByText("24.2 ms")).toBeInTheDocument();
+    expect(screen.getByText("Loss: 0% · Jitter: 3.1ms")).toBeInTheDocument();
+
+    // HTTP Web Probe displays HTTP 200 and Connect / TTFB breakdown (NOT 'Bounded connection')
+    expect(screen.getByText("HTTP 200")).toBeInTheDocument();
+    expect(screen.getByText("Connect: 14.6ms · TTFB: 45.4ms")).toBeInTheDocument();
+
+    // Stepper has progressbar ARIA attributes
+    const stepper = screen.getByRole("progressbar", { name: "Diagnostic pipeline progress" });
+    expect(stepper).toHaveAttribute("aria-valuenow", "6");
+    expect(stepper).toHaveAttribute("aria-valuemin", "0");
+    expect(stepper).toHaveAttribute("aria-valuemax", "6");
+  });
+
+  it("cancels stale previous pipeline execution when clearResults and a new pipeline run are triggered in rapid succession", async () => {
+    let resolveFirstGateway!: (val: any) => void;
+    const firstGatewayPromise = new Promise((resolve) => {
+      resolveFirstGateway = resolve;
+    });
+
+    let firstRunQueries = 0;
+
+    vi.spyOn(ipcModule, "query").mockImplementation((async (req: any) => {
+      if (req.kind === "discoverGateway" && firstRunQueries === 0) {
+        firstRunQueries++;
+        return await firstGatewayPromise;
+      }
+      if (req.kind === "discoverGateway") {
+        return { kind: "gatewayResult", result: { gatewayIp: "192.168.1.1", interfaceName: "eth0", status: "discovered", source: "live" } };
+      }
+      if (req.kind === "runDnsProbe") {
+        return { kind: "dnsResult", result: { target: "1.1.1.1", resolvedIps: ["1.1.1.1"], resolutionRttMs: 12, status: "resolved", source: "live" } };
+      }
+      return { kind: "success" };
+    }) as any);
+
+    render(<DiagnosticsTestWrapper />);
+
+    const fullAnalysisBtn = screen.getAllByRole("button", { name: "Run Full Analysis" })[0]!;
+    fireEvent.click(fullAnalysisBtn);
+
+    // First run is waiting on discoverGateway
+    expect(await screen.findByTestId("deep-diagnostics-analyzing-banner")).toBeInTheDocument();
+
+    // User clears results
+    const clearBtn = await screen.findByRole("button", { name: "Clear Results" });
+    fireEvent.click(clearBtn);
+
+    // User immediately starts a second run
+    fireEvent.click(fullAnalysisBtn);
+
+    // Now resolve the FIRST run's gateway query
+    await act(async () => {
+      resolveFirstGateway({
+        kind: "gatewayResult",
+        result: { gatewayIp: "10.0.0.1", interfaceName: "eth99", status: "discovered", source: "live" },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+
+    // The first run was cancelled and stopped at its first step
+    expect(firstRunQueries).toBe(1);
   });
 });

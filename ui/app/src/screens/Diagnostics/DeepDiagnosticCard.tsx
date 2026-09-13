@@ -63,13 +63,22 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
     (o) => o.key === "dns_rtt" || o.key === "dns_resolution" || o.metricName?.toLowerCase().includes("dns")
   );
   const pingRttObs: Observation | undefined = observations.find(
-    (o) => o.key === "target_ping_rtt" || o.key === "ping_rtt" || o.metricName?.toLowerCase().includes("latency") || o.metricName?.toLowerCase().includes("rtt")
+    (o) =>
+      o.key === "target_ping_rtt" ||
+      o.key === "ping_rtt" ||
+      (Boolean(o.metricName?.toLowerCase().includes("ping")) &&
+        (Boolean(o.metricName?.toLowerCase().includes("latency")) || Boolean(o.metricName?.toLowerCase().includes("rtt")))) ||
+      Boolean(o.metricName?.toLowerCase().includes("round-trip"))
   );
   const pingLossObs: Observation | undefined = observations.find(
     (o) => o.key === "target_packet_loss" || o.key === "packet_loss" || o.metricName?.toLowerCase().includes("loss")
   );
   const httpTtfbObs: Observation | undefined = observations.find(
-    (o) => o.key === "http_ttfb" || o.key === "http_availability" || o.metricName?.toLowerCase().includes("http")
+    (o) =>
+      o.key === "http_ttfb" ||
+      o.key === "http_availability" ||
+      Boolean(o.metricName?.toLowerCase().includes("ttfb")) ||
+      Boolean(o.metricName?.toLowerCase().includes("time to first byte"))
   );
   const httpStatusObs: Observation | undefined = observations.find(
     (o) => o.key === "http_status_code" || o.key === "http_status" || o.metricName?.toLowerCase().includes("status")
@@ -88,7 +97,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
   const interfaceName = gatewayObs?.rawDetails?.interfaceName as string | undefined;
 
   const dnsRtt = typeof dnsObs?.value === "number" ? dnsObs.value : null;
-  const resolvedIps = (gatewayObs?.rawDetails?.resolvedIps || dnsObs?.rawDetails?.resolvedIps) as string[] | undefined;
+  const resolvedIps = (dnsObs?.rawDetails?.resolvedIps || gatewayObs?.rawDetails?.resolvedIps) as string[] | undefined;
 
   const httpStatusCode = typeof httpStatusObs?.value === "number" ? httpStatusObs.value : null;
   const httpTtfb = typeof httpTtfbObs?.value === "number" ? httpTtfbObs.value : null;
@@ -148,35 +157,48 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
       </div>
 
       {/* Progressive Stage Stepper rendered from domain session */}
-      <div className="np-diagnostics-pipeline-stepper" role="progressbar" aria-label="Diagnostic pipeline progress">
-        {STAGES.map((s, idx) => {
-          const isCurrent = activeStage === s.id;
-          const isPast =
-            session?.status === "completed" ||
-            (activeStage
-              ? STAGES.findIndex((x) => x.id === activeStage) > idx
-              : false);
+      {(() => {
+        const currentStageIndex = activeStage ? STAGES.findIndex((s) => s.id === activeStage) : -1;
+        const progressValue = session?.status === "completed" ? STAGES.length : currentStageIndex >= 0 ? currentStageIndex : 0;
+        return (
+          <div
+            className="np-diagnostics-pipeline-stepper"
+            role="progressbar"
+            aria-label="Diagnostic pipeline progress"
+            aria-valuemin={0}
+            aria-valuemax={STAGES.length}
+            aria-valuenow={progressValue}
+          >
+            {STAGES.map((s, idx) => {
+              const isCurrent = activeStage === s.id;
+              const isPast =
+                session?.status === "completed" ||
+                (activeStage
+                  ? STAGES.findIndex((x) => x.id === activeStage) > idx
+                  : false);
 
-          return (
-            <div
-              key={s.id}
-              className={`np-diagnostics-step ${
-                isCurrent
-                  ? "np-diagnostics-step--running"
-                  : isPast
-                  ? "np-diagnostics-step--complete"
-                  : ""
-              }`}
-            >
-              <Icon
-                name={isPast ? "check" : isCurrent ? "activity" : "circleDot"}
-                style={{ width: "12px", height: "12px" }}
-              />
-              <span>{t(s.labelKey)}</span>
-            </div>
-          );
-        })}
-      </div>
+              return (
+                <div
+                  key={s.id}
+                  className={`np-diagnostics-step ${
+                    isCurrent
+                      ? "np-diagnostics-step--running"
+                      : isPast
+                      ? "np-diagnostics-step--complete"
+                      : ""
+                  }`}
+                >
+                  <Icon
+                    name={isPast ? "check" : isCurrent ? "activity" : "circleDot"}
+                    style={{ width: "12px", height: "12px" }}
+                  />
+                  <span>{t(s.labelKey)}</span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* 2. Primary Diagnosis (or In-Flight Analysis, or No Bottleneck Detected) */}
       {session?.status === "running" ? (
@@ -464,11 +486,15 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
               : "Pending..."}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
-            {httpTtfbObs
-              ? httpConnectMs !== null
-                ? `Connect: ${formatMs(httpConnectMs)}ms · TTFB: ${formatMs(httpTtfb ?? 0)}ms`
+            {httpTtfbObs || httpStatusObs
+              ? httpConnectMs !== null && httpTtfb !== null
+                ? `Connect: ${formatMs(httpConnectMs)}ms · TTFB: ${formatMs(httpTtfb)}ms`
+                : httpConnectMs !== null
+                ? `Connect: ${formatMs(httpConnectMs)}ms`
+                : httpTtfb !== null
+                ? `TTFB: ${formatMs(httpTtfb)}ms`
                 : session?.status === "completed"
-                ? httpTtfbObs.limitation || "Bounded connection"
+                ? httpTtfbObs?.limitation || httpStatusObs?.limitation || "Bounded connection"
                 : "Awaiting HTTP response..."
               : "Awaiting HTTP response..."}
           </span>

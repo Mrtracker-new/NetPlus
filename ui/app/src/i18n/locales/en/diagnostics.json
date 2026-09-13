@@ -37,7 +37,12 @@
     "ttl": "TTL",
     "ip": "IP Address",
     "hostname": "Hostname",
-    "rtt": "RTT (ms)"
+    "rtt": "RTT (ms)",
+    "view_timeline": "Timeline",
+    "view_table": "Table",
+    "view_toggle_aria": "Traceroute view format",
+    "no_hops": "No hops recorded",
+    "progression_aria": "Hop Progression"
   },
   "bufferbloat": {
     "title": "Bufferbloat Scorecard for {{target}}",

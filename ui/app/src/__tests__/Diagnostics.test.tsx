@@ -260,6 +260,96 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
     expect(screen.getAllByText("timeout")[0]).toBeInTheDocument();
   });
 
+  it("deduplicates Traceroute timeline and table via segmented toggle control and merges details", async () => {
+    const { container } = render(
+      <TracerouteCard
+        target="1.1.1.1"
+        hops={[
+          { ttl: 1, ip: "192.168.1.1", hostname: "router.lan", rttMs: 2.4, source: "live" },
+          { ttl: 2, ip: "1.1.1.1", hostname: "one.one.one.one", rttMs: 14.1, source: "live" },
+        ]}
+      />
+    );
+
+    // Initial state: Timeline view active by default
+    const timelineBtn = screen.getByRole("button", { name: "Timeline" });
+    const tableBtn = screen.getByRole("button", { name: "Table" });
+    expect(timelineBtn).toHaveAttribute("aria-pressed", "true");
+    expect(tableBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Timeline track is visible, table is not rendered
+    expect(screen.getByRole("region", { name: "Hop Progression" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    // Tactile timeline nodes merge both hostname and IP
+    expect(screen.getByText("router.lan")).toBeInTheDocument();
+    expect(screen.getByText("192.168.1.1")).toBeInTheDocument();
+    expect(screen.getByText("one.one.one.one")).toBeInTheDocument();
+    expect(screen.getByText("1.1.1.1")).toBeInTheDocument();
+
+    // Toggle to Table view
+    fireEvent.click(tableBtn);
+    expect(tableBtn).toHaveAttribute("aria-pressed", "true");
+    expect(timelineBtn).toHaveAttribute("aria-pressed", "false");
+
+    // Table is now visible, timeline track is unmounted (eliminating vertical duplication)
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Hop Progression" })).not.toBeInTheDocument();
+
+    // Switch back to Timeline
+    fireEvent.click(timelineBtn);
+    expect(timelineBtn).toHaveAttribute("aria-pressed", "true");
+    expect(tableBtn).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("region", { name: "Hop Progression" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    // Verify Spanish translations for toggle buttons
+    await act(async () => {
+      await i18n.changeLanguage("es");
+    });
+    expect(screen.getByRole("button", { name: "Cronología" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Tabla" })).toBeInTheDocument();
+
+    // Revert language to en
+    await act(async () => {
+      await i18n.changeLanguage("en");
+    });
+
+    // Verify axe-core accessibility
+    const axeResults = await axe.run(container);
+    expect(axeResults.violations).toEqual([]);
+  });
+
+  it("TracerouteCard renders empty state message when hops array is empty across timeline and table", () => {
+    const { rerender } = render(<TracerouteCard target="1.1.1.1" hops={[]} initialView="timeline" />);
+
+    // In timeline view
+    expect(screen.getByText("No hops recorded")).toBeInTheDocument();
+
+    // Switch to table view
+    const tableBtn = screen.getByRole("button", { name: "Table" });
+    fireEvent.click(tableBtn);
+    expect(screen.getByText("No hops recorded")).toBeInTheDocument();
+
+    // Initial table view test
+    rerender(<TracerouteCard target="1.1.1.1" hops={[]} initialView="table" />);
+    expect(screen.getByText("No hops recorded")).toBeInTheDocument();
+  });
+
+  it("TracerouteCard avoids repeating IP when hostname equals IP address", () => {
+    render(
+      <TracerouteCard
+        target="10.0.0.1"
+        hops={[{ ttl: 1, ip: "10.0.0.1", hostname: "10.0.0.1", rttMs: 1.5, source: "live" }]}
+      />
+    );
+
+    // Only one instance of 10.0.0.1 should be rendered in the hop details
+    const hopDetail = screen.getByText("10.0.0.1");
+    expect(hopDetail).toBeInTheDocument();
+    expect(screen.queryAllByText("10.0.0.1")).toHaveLength(1);
+  });
+
   it("capability cards in empty state trigger contextual probe execution", async () => {
     const querySpy = vi.spyOn(ipcModule, "query").mockResolvedValue({
       kind: "pingResult",

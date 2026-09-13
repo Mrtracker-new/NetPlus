@@ -37,7 +37,12 @@
     "ttl": "TTL",
     "ip": "Dirección IP",
     "hostname": "Nombre de Host",
-    "rtt": "RTT (ms)"
+    "rtt": "RTT (ms)",
+    "view_timeline": "Cronología",
+    "view_table": "Tabla",
+    "view_toggle_aria": "Formato de visualización de traceroute",
+    "no_hops": "No se registraron saltos",
+    "progression_aria": "Progresión de saltos"
   },
   "bufferbloat": {
     "title": "Tarjeta de Calificación Bufferbloat para {{target}}",

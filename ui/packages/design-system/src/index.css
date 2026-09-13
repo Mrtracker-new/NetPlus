@@ -6502,6 +6502,56 @@ button {
 }
 
 /* Traceroute Timeline Track & Table */
+.np-diagnostics__segmented {
+  display: inline-flex;
+  align-items: center;
+  background: var(--np-surface-recessed);
+  border: 1px solid var(--np-border);
+  border-radius: var(--np-radius-sm);
+  padding: 2px;
+  gap: 2px;
+  box-shadow: var(--np-neu-inset);
+  box-sizing: border-box;
+}
+
+.np-diagnostics__segmented-btn {
+  background: transparent;
+  color: var(--np-text-dim);
+  border: none;
+  border-radius: calc(var(--np-radius-sm) - 2px);
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: var(--np-fw-medium);
+  cursor: pointer;
+  outline: none;
+  opacity: 0.85;
+  transition: opacity 150ms ease, background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.np-diagnostics__segmented-btn:hover:not(.np-diagnostics__segmented-btn--active) {
+  color: var(--np-text);
+  background: var(--np-surface-2);
+  opacity: 1;
+}
+
+.np-diagnostics__segmented-btn:focus-visible {
+  outline: 2px solid var(--np-accent);
+  outline-offset: 1px;
+  opacity: 1;
+}
+
+.np-diagnostics__segmented-btn--active {
+  background: var(--np-surface-raised, var(--np-surface-1));
+  color: var(--np-text);
+  font-weight: var(--np-fw-bold);
+  box-shadow: var(--np-neu-control);
+  opacity: 1;
+}
+
 .np-diagnostics__timeline-v {
   display: flex;
   flex-direction: column;
@@ -6511,7 +6561,7 @@ button {
   border-radius: var(--np-radius-md);
   border: 1px solid var(--np-border);
   box-shadow: var(--np-neu-inset);
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
   max-height: 260px;
   overflow-y: auto;
 }
@@ -6521,6 +6571,20 @@ button {
   gap: 0.75rem;
   font-size: 0.82rem;
   font-family: var(--np-font-mono);
+}
+.np-diagnostics__hop-details {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  min-width: 0;
+  overflow: hidden;
+}
+.np-diagnostics__hop-ip {
+  font-size: 0.75rem;
+  color: var(--np-text-mute);
+  font-family: var(--np-font-mono);
+  flex-shrink: 0;
 }
 .np-diagnostics__hop-dot {
   width: 10px;

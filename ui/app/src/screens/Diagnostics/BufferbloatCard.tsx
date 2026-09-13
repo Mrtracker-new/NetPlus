@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { BufferbloatResult } from "@netpulse/contract";
 import { formatMs } from "../../hooks/useDiagnosticsController";
@@ -16,7 +17,7 @@ const GRADE_COLORS: Record<string, string> = {
   F: "var(--np-finding)",
 };
 
-export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardProps) {
+export const BufferbloatCard = memo(function BufferbloatCard({ target: propTarget, result }: BufferbloatCardProps) {
   const { t } = useTranslation(["diagnostics"]);
 
   const target = result.target || propTarget || "";
@@ -156,4 +157,4 @@ export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardP
       </div>
     </article>
   );
-}
+});

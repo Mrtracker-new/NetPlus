@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Skeleton } from "@netpulse/components";
 import type { DiagnosticSession, Diagnosis, Observation } from "../../diagnostic";
@@ -41,9 +41,13 @@ function getProvenanceClass(source?: string) {
   }
 }
 
-export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardProps) {
+export const DeepDiagnosticCard = memo(function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardProps) {
   const { t } = useTranslation(["diagnostics"]);
   const [showEvidence, setShowEvidence] = useState(false);
+
+  const handleToggleEvidence = useCallback(() => {
+    setShowEvidence((prev) => !prev);
+  }, []);
 
   const diagnoses = session?.diagnoses ?? [];
   const observations = session?.observations ?? [];
@@ -325,8 +329,9 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             type="button"
             className="np-btn np-btn--ghost"
             style={{ fontSize: "0.78rem", padding: "0.3rem 0.6rem" }}
-            onClick={() => setShowEvidence((prev) => !prev)}
+            onClick={handleToggleEvidence}
             aria-expanded={showEvidence}
+            aria-controls="deep-diagnostics-evidence-list"
           >
             <Icon
               name="chevronRight"
@@ -343,7 +348,10 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           </button>
 
           {showEvidence && (
-            <div style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}>
+            <div
+              id="deep-diagnostics-evidence-list"
+              style={{ marginTop: "0.5rem", display: "flex", flexDirection: "column", gap: "0.35rem" }}
+            >
               {topDiagnosis.evidence.map((ev, i) => (
                 <div
                   key={i}
@@ -586,4 +594,4 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
       )}
     </article>
   );
-}
+});

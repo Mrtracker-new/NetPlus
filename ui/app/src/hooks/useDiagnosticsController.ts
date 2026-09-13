@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import type { PingResult, TracerouteHop, TracerouteResult, BufferbloatResult } from "@netpulse/contract";
 import { query } from "../ipc";
@@ -105,6 +105,9 @@ export function useDiagnosticsController() {
     return "1.1.1.1";
   });
 
+  const targetRef = useRef(target);
+  targetRef.current = target;
+
   useEffect(() => {
     if (navigationTarget?.screen === "diagnostics" && navigationTarget.target?.trim()) {
       setTarget(navigationTarget.target.trim());
@@ -130,7 +133,7 @@ export function useDiagnosticsController() {
   const runPing = useCallback(async () => {
     if (isAnyBusy) return;
     setNotice(null);
-    const { isValid, normalized } = validateAndNormalizeTarget(target);
+    const { isValid, normalized } = validateAndNormalizeTarget(targetRef.current);
     if (!isValid) {
       setNotice("invalid_target");
       return;
@@ -177,12 +180,12 @@ export function useDiagnosticsController() {
       setNotice(errMsg);
       setAnnouncement(t("announcements.ping_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy, t]);
+  }, [isAnyBusy, t]);
 
   const runTraceroute = useCallback(async () => {
     if (isAnyBusy) return;
     setNotice(null);
-    const { isValid, normalized } = validateAndNormalizeTarget(target);
+    const { isValid, normalized } = validateAndNormalizeTarget(targetRef.current);
     if (!isValid) {
       setNotice("invalid_target");
       return;
@@ -228,12 +231,12 @@ export function useDiagnosticsController() {
       setNotice(errMsg);
       setAnnouncement(t("announcements.traceroute_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy, t]);
+  }, [isAnyBusy, t]);
 
   const runBufferbloat = useCallback(async () => {
     if (isAnyBusy) return;
     setNotice(null);
-    const { isValid, normalized } = validateAndNormalizeTarget(target);
+    const { isValid, normalized } = validateAndNormalizeTarget(targetRef.current);
     if (!isValid) {
       setNotice("invalid_target");
       return;
@@ -276,12 +279,12 @@ export function useDiagnosticsController() {
       setNotice(errMsg);
       setAnnouncement(t("announcements.bufferbloat_failed", { error: errMsg }));
     }
-  }, [target, isAnyBusy, t]);
+  }, [isAnyBusy, t]);
 
   const runDeepDiagnostics = useCallback(async () => {
     if (isAnyBusy) return;
     setNotice(null);
-    const { isValid, normalized } = validateAndNormalizeTarget(target);
+    const { isValid, normalized } = validateAndNormalizeTarget(targetRef.current);
     if (!isValid) {
       setNotice("invalid_target");
       return;
@@ -319,7 +322,7 @@ export function useDiagnosticsController() {
         setIsDeepBusy(false);
       }
     }
-  }, [target, isAnyBusy, t]);
+  }, [isAnyBusy, t]);
 
   const clearResults = useCallback(() => {
     cancelRef.current = true;
@@ -339,6 +342,17 @@ export function useDiagnosticsController() {
     traceProbe.status === "success" ||
     bloatProbe.status === "success" ||
     deepSession !== null;
+
+  const actions = useMemo(
+    () => ({
+      runPing,
+      runTraceroute,
+      runBufferbloat,
+      runDeepDiagnostics,
+      clearResults,
+    }),
+    [runPing, runTraceroute, runBufferbloat, runDeepDiagnostics, clearResults]
+  );
 
   return {
     target,
@@ -361,12 +375,6 @@ export function useDiagnosticsController() {
     },
     hasAnyResults,
     isAnyBusy,
-    actions: {
-      runPing,
-      runTraceroute,
-      runBufferbloat,
-      runDeepDiagnostics,
-      clearResults,
-    },
+    actions,
   };
 }

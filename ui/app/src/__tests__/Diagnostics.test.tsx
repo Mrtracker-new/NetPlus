@@ -8,6 +8,7 @@ import { DeepDiagnosticCard } from "../screens/Diagnostics/DeepDiagnosticCard";
 import { PingResultCard, getJitterColor } from "../screens/Diagnostics/PingResultCard";
 import { TracerouteCard } from "../screens/Diagnostics/TracerouteCard";
 import { BufferbloatCard } from "../screens/Diagnostics/BufferbloatCard";
+import { EmptyDiagnosticsState } from "../screens/Diagnostics/EmptyDiagnosticsState";
 import type { DiagnosticSession } from "../diagnostic";
 import * as diagnosticModule from "../diagnostic";
 import { validateAndNormalizeTarget, useDiagnosticsController } from "../hooks/useDiagnosticsController";
@@ -1944,6 +1945,162 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
       });
 
       expect(result.current.diag.target).toBe("1.1.1.1");
+    });
+  });
+
+  describe("Diagnostics Result Cards Memoization & Callback Invariants", () => {
+    it("wraps PingResultCard, TracerouteCard, BufferbloatCard, DeepDiagnosticCard, and EmptyDiagnosticsState in React.memo", () => {
+      const memoSymbol = Symbol.for("react.memo");
+      expect((PingResultCard as any).$$typeof).toBe(memoSymbol);
+      expect((TracerouteCard as any).$$typeof).toBe(memoSymbol);
+      expect((BufferbloatCard as any).$$typeof).toBe(memoSymbol);
+      expect((DeepDiagnosticCard as any).$$typeof).toBe(memoSymbol);
+      expect((EmptyDiagnosticsState as any).$$typeof).toBe(memoSymbol);
+    });
+
+    it("TracerouteCard stabilizes viewMode toggling across timeline and table", () => {
+      const mockResult: any = {
+        target: "1.1.1.1",
+        hops: [
+          { ttl: 1, ip: "192.168.1.1", hostname: "router.local", rttMs: 2, status: "ok" },
+          { ttl: 2, ip: "1.1.1.1", hostname: "one.one.one.one", rttMs: 14, status: "ok" },
+        ],
+      };
+
+      render(<TracerouteCard result={mockResult} initialView="timeline" />);
+      expect(screen.getByRole("region", { name: "Hop Progression" })).toBeInTheDocument();
+
+      const tableBtn = screen.getByRole("button", { name: "Table" });
+      fireEvent.click(tableBtn);
+      expect(screen.getByRole("table")).toBeInTheDocument();
+
+      const timelineBtn = screen.getByRole("button", { name: "Timeline" });
+      fireEvent.click(timelineBtn);
+      expect(screen.getByRole("region", { name: "Hop Progression" })).toBeInTheDocument();
+    });
+
+    it("DeepDiagnosticCard stabilizes evidence toggling without re-instantiating callback", () => {
+      const sessionWithEvidence: DiagnosticSession = {
+        sessionId: 99,
+        target: "example.com",
+        startedAt: Date.now(),
+        status: "completed",
+        diagnoses: [
+          {
+            category: "DNS",
+            severity: "severe",
+            summary: "DNS Server Timeout",
+            explanation: "Nameserver failed to respond.",
+            confidence: 0.95,
+            evidence: [
+              {
+                observationKey: "dns_rtt",
+                role: "corroborating",
+                weight: 0.9,
+                explanation: "DNS query timed out after 4000ms",
+              },
+            ],
+          },
+        ],
+        observations: [],
+        recommendations: [],
+      };
+
+      render(<DeepDiagnosticCard session={sessionWithEvidence} />);
+      const toggleBtn = screen.getByRole("button", { name: /View.*Evidence/i });
+      expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
+
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByText("DNS query timed out after 4000ms")).toBeInTheDocument();
+
+      fireEvent.click(toggleBtn);
+      expect(toggleBtn).toHaveAttribute("aria-expanded", "false");
+    });
+
+    it("preserves render output and prevents unnecessary re-renders with identical props", () => {
+      const pingResult = {
+        target: "1.1.1.1",
+        sent: 4,
+        received: 4,
+        lossPct: 0,
+        minRttMs: 10,
+        avgRttMs: 12,
+        maxRttMs: 15,
+        jitterMs: 1.2,
+      };
+
+      const { container, rerender } = render(<PingResultCard result={pingResult} />);
+      const firstArticle = container.querySelector("article");
+
+      rerender(<PingResultCard result={pingResult} />);
+      const secondArticle = container.querySelector("article");
+
+      expect(firstArticle).toBe(secondArticle);
+    });
+
+    it("DeepDiagnosticCard connects evidence button to container via aria-controls and id", () => {
+      const sessionWithEvidence: DiagnosticSession = {
+        sessionId: 101,
+        target: "example.com",
+        startedAt: Date.now(),
+        status: "completed",
+        diagnoses: [
+          {
+            category: "DNS",
+            severity: "severe",
+            summary: "DNS Server Timeout",
+            explanation: "Nameserver failed to respond.",
+            confidence: 0.95,
+            evidence: [
+              {
+                observationKey: "dns_rtt",
+                role: "corroborating",
+                weight: 0.9,
+                explanation: "DNS query timed out after 4000ms",
+              },
+            ],
+          },
+        ],
+        observations: [],
+        recommendations: [],
+      };
+
+      render(<DeepDiagnosticCard session={sessionWithEvidence} />);
+      const toggleBtn = screen.getByRole("button", { name: /View.*Evidence/i });
+      expect(toggleBtn).toHaveAttribute("aria-controls", "deep-diagnostics-evidence-list");
+
+      fireEvent.click(toggleBtn);
+      const evidenceList = document.getElementById("deep-diagnostics-evidence-list");
+      expect(evidenceList).toBeInTheDocument();
+    });
+
+    it("TracerouteCard correctly renders 0ms local hops without falsely marking as timeout", () => {
+      const mockResult: any = {
+        target: "localhost",
+        hops: [
+          { ttl: 1, ip: "127.0.0.1", hostname: "localhost", rttMs: 0, status: "ok" },
+        ],
+      };
+
+      const { container } = render(<TracerouteCard result={mockResult} initialView="timeline" />);
+      expect(screen.getByText("0 ms")).toBeInTheDocument();
+      expect(screen.queryByText("timeout")).not.toBeInTheDocument();
+
+      const dot = container.querySelector(".np-diagnostics__hop-dot") as HTMLElement;
+      expect(dot.style.background).toBe("var(--np-good)");
+    });
+
+    it("stabilizes useDiagnosticsController actions reference across target updates", () => {
+      const { result } = renderHook(() => useDiagnosticsController());
+
+      const initialActions = result.current.actions;
+
+      act(() => {
+        result.current.setTarget("8.8.8.8");
+      });
+
+      expect(result.current.actions).toBe(initialActions);
     });
   });
 });

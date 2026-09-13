@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { formatMs, type ExtendedPingResult } from "../../hooks/useDiagnosticsController";
 
@@ -13,7 +14,7 @@ export function getJitterColor(jitterMs: number, isUnreachable = false): string 
   return "var(--np-finding)";
 }
 
-export function PingResultCard({ result }: PingResultCardProps) {
+export const PingResultCard = memo(function PingResultCard({ result }: PingResultCardProps) {
   const { t } = useTranslation(["diagnostics"]);
 
   const isUnreachable = (result.received ?? 0) === 0 && (result.sent ?? 0) > 0;
@@ -104,4 +105,4 @@ export function PingResultCard({ result }: PingResultCardProps) {
       </div>
     </article>
   );
-}
+});

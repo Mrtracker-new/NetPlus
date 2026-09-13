@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Notice, Skeleton } from "@netpulse/components";
 import { Icon } from "../icons";
@@ -32,6 +33,22 @@ export function DiagnosticsScreen() {
     isAnyBusy,
     actions,
   } = useDiagnosticsController();
+
+  const handleRunPing = useCallback(() => {
+    void actions.runPing();
+  }, [actions.runPing]);
+
+  const handleRunTraceroute = useCallback(() => {
+    void actions.runTraceroute();
+  }, [actions.runTraceroute]);
+
+  const handleRunBufferbloat = useCallback(() => {
+    void actions.runBufferbloat();
+  }, [actions.runBufferbloat]);
+
+  const handleRunDeepDiagnostics = useCallback(() => {
+    void actions.runDeepDiagnostics();
+  }, [actions.runDeepDiagnostics]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !isAnyBusy) {
@@ -162,10 +179,10 @@ export function DiagnosticsScreen() {
       {/* Probe Results & Empty State Deck */}
       {!hasAnyResults && !isAnyBusy ? (
         <EmptyDiagnosticsState
-          onRunPing={() => void actions.runPing()}
-          onRunTraceroute={() => void actions.runTraceroute()}
-          onRunBufferbloat={() => void actions.runBufferbloat()}
-          onRunDeepDiagnostics={() => void actions.runDeepDiagnostics()}
+          onRunPing={handleRunPing}
+          onRunTraceroute={handleRunTraceroute}
+          onRunBufferbloat={handleRunBufferbloat}
+          onRunDeepDiagnostics={handleRunDeepDiagnostics}
           disabled={isAnyBusy}
         />
       ) : (

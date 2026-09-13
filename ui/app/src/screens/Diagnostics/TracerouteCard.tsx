@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import type { TracerouteHop, TracerouteResult } from "@netpulse/contract";
 import { formatMs } from "../../hooks/useDiagnosticsController";
@@ -10,9 +10,17 @@ export interface TracerouteCardProps {
   initialView?: "timeline" | "table";
 }
 
-export function TracerouteCard({ target: propTarget, hops: propHops, result, initialView = "timeline" }: TracerouteCardProps) {
+export const TracerouteCard = memo(function TracerouteCard({ target: propTarget, hops: propHops, result, initialView = "timeline" }: TracerouteCardProps) {
   const { t } = useTranslation(["diagnostics"]);
   const [viewMode, setViewMode] = useState<"timeline" | "table">(initialView);
+
+  const handleSelectTimeline = useCallback(() => {
+    setViewMode("timeline");
+  }, []);
+
+  const handleSelectTable = useCallback(() => {
+    setViewMode("table");
+  }, []);
 
   const target = result?.target ?? propTarget ?? "";
   const hops = result?.hops ?? propHops ?? [];
@@ -36,7 +44,7 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
               type="button"
               className={`np-diagnostics__segmented-btn ${viewMode === "timeline" ? "np-diagnostics__segmented-btn--active" : ""}`}
               aria-pressed={viewMode === "timeline"}
-              onClick={() => setViewMode("timeline")}
+              onClick={handleSelectTimeline}
             >
               {t("traceroute.view_timeline", "Timeline")}
             </button>
@@ -44,7 +52,7 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
               type="button"
               className={`np-diagnostics__segmented-btn ${viewMode === "table" ? "np-diagnostics__segmented-btn--active" : ""}`}
               aria-pressed={viewMode === "table"}
-              onClick={() => setViewMode("table")}
+              onClick={handleSelectTable}
             >
               {t("traceroute.view_table", "Table")}
             </button>
@@ -75,7 +83,7 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
             </div>
           ) : (
             hops.map((h, i) => {
-              const isTimeout = h.status === "timeout" || h.ip === "*" || (h.rttMs ?? 0) === 0;
+              const isTimeout = h.status === "timeout" || h.ip === "*" || (!h.ip && !h.rttMs);
               const rtt = h.rttMs ?? 0;
               const nodeColorVar = isTimeout
                 ? "var(--np-neutral)"
@@ -90,7 +98,7 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
               const hopSource = h.source ? h.source.toLowerCase() : "";
 
               return (
-                <div key={i} className="np-diagnostics__hop-row-v">
+                <div key={h.ttl ?? i} className="np-diagnostics__hop-row-v">
                   <div
                     className="np-diagnostics__hop-dot"
                     style={{
@@ -170,10 +178,10 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
               ) : (
                 hops.map((h, i) => {
                   const rttStr = formatMs(h.rttMs ?? 0);
-                  const isTimeout = h.status === "timeout" || h.ip === "*" || (h.rttMs ?? 0) === 0;
+                  const isTimeout = h.status === "timeout" || h.ip === "*" || (!h.ip && !h.rttMs);
                   const hopSource = h.source ? h.source.toLowerCase() : "";
                   return (
-                    <tr key={i}>
+                    <tr key={h.ttl ?? i}>
                       <td style={{ fontWeight: 600, fontFamily: "var(--np-font-mono)" }}>{h.ttl ?? i + 1}</td>
                       <td style={{ fontFamily: "var(--np-font-mono)", color: "var(--np-text)" }}>{h.ip}</td>
                       <td style={{ color: h.hostname ? "var(--np-text)" : "var(--np-text-dim)" }}>
@@ -211,4 +219,4 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result, ini
       )}
     </article>
   );
-}
+});

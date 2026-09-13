@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../icons";
 
@@ -9,7 +10,7 @@ export interface EmptyDiagnosticsStateProps {
   disabled?: boolean;
 }
 
-export function EmptyDiagnosticsState({
+export const EmptyDiagnosticsState = memo(function EmptyDiagnosticsState({
   onRunPing,
   onRunTraceroute,
   onRunBufferbloat,
@@ -183,4 +184,4 @@ export function EmptyDiagnosticsState({
       </div>
     </div>
   );
-}
+});

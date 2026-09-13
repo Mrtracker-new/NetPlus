@@ -50,7 +50,6 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
   const recommendations = session?.recommendations ?? [];
 
   const topDiagnosis: Diagnosis | undefined = diagnoses[0];
-  const hasAnomaly = Boolean(topDiagnosis && topDiagnosis.severity !== "normal");
   const severityStyle = topDiagnosis
     ? SEVERITY_COLORS[topDiagnosis.severity] ?? SEVERITY_COLORS.normal!
     : SEVERITY_COLORS.normal!;
@@ -258,7 +257,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
             <Skeleton variant="rounded" width="100px" height="6px" />
           </div>
         </div>
-      ) : hasAnomaly && topDiagnosis ? (
+      ) : topDiagnosis ? (
         <div className="np-diagnostics-finding-banner">
           <div style={{ flex: 1 }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.35rem" }}>

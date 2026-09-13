@@ -151,24 +151,6 @@ export function inferDiagnoses(observations: Observation[]): Diagnosis[] {
     });
   }
 
-  // --------------------------------------------------------------------------
-  // Rule 7: Fallback to UNKNOWN if healthy or no candidate matched
-  // --------------------------------------------------------------------------
-  if (diagnoses.length === 0) {
-    // If all available metrics were normal, output a healthy summary
-    const allNormal = observations.length > 0 && observations.every((o) => o.severity === "normal");
-    diagnoses.push({
-      category: allNormal ? "UNKNOWN" : "UNKNOWN",
-      confidence: allNormal ? 1.0 : 0.3,
-      summary: allNormal ? "All Network Diagnostics Healthy" : "No Critical Anomalies Detected",
-      explanation: allNormal
-        ? "All diagnostic probes (Gateway, DNS, Ping, Routing, Bufferbloat, HTTP) reported nominal performance within baseline thresholds."
-        : "Diagnostic observations were inconclusive or within acceptable operating tolerances.",
-      evidence: [],
-      severity: "normal",
-    });
-  }
-
   // Sort deterministically: confidence descending, then category name
   diagnoses.sort((a, b) => {
     if (b.confidence !== a.confidence) {

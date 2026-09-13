@@ -1080,16 +1080,7 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
             quality: "high",
           },
         ],
-        diagnoses: [
-          {
-            category: "UNKNOWN",
-            confidence: 1.0,
-            summary: "All Network Diagnostics Healthy",
-            explanation: "All diagnostic probes reported nominal performance.",
-            evidence: [],
-            severity: "normal",
-          },
-        ],
+        diagnoses: [],
         recommendations: [
           {
             key: "nominal",

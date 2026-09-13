@@ -44,7 +44,7 @@ describe("Diagnostic Baselines & Anomaly Normalization", () => {
 });
 
 describe("Deterministic Diagnostic Rule Inference Engine", () => {
-  it("Fixture 1: Clean / Healthy Network outputs nominal status", () => {
+  it("Fixture 1: Nominal Network produces clean empty diagnoses array", () => {
     const observations: Observation[] = [
       observationFromGateway({
         gatewayIp: "192.168.1.1",
@@ -90,11 +90,7 @@ describe("Deterministic Diagnostic Rule Inference Engine", () => {
     ];
 
     const diagnoses = inferDiagnoses(observations);
-    expect(diagnoses.length).toBeGreaterThan(0);
-    expect(diagnoses[0]!.category).toBe("UNKNOWN");
-    expect(diagnoses[0]!.summary).toBe("All Network Diagnostics Healthy");
-    expect(diagnoses[0]!.severity).toBe("normal");
-    expect(diagnoses[0]!.confidence).toBe(1.0);
+    expect(diagnoses).toEqual([]);
   });
 
   it("Fixture 2: DNS Failure diagnoses DNS with high confidence", () => {
@@ -210,7 +206,7 @@ describe("Deterministic Diagnostic Rule Inference Engine", () => {
     // Must NOT have PACKET_LOSS in top diagnoses
     const packetLossDiagnosis = diagnoses.find((d) => d.category === "PACKET_LOSS");
     expect(packetLossDiagnosis).toBeUndefined();
-    expect(diagnoses[0]!.category).not.toBe("PACKET_LOSS");
+    expect(diagnoses[0]?.category).not.toBe("PACKET_LOSS");
   });
 
   it("Hard Invariant 2: Gateway loss vs target loss separation", () => {
@@ -442,8 +438,9 @@ describe("Pipeline Execution & Cancellation", () => {
 
     expect(session.status).toBe("completed");
     expect(session.observations.length).toBeGreaterThanOrEqual(5);
-    expect(session.diagnoses.length).toBeGreaterThan(0);
+    expect(session.diagnoses).toEqual([]);
     expect(session.recommendations.length).toBeGreaterThan(0);
+    expect(session.recommendations[0]!.key).toBe("nominal");
   });
 
   it("handles non-destructive cancellation cleanly", async () => {
@@ -463,6 +460,6 @@ describe("Pipeline Execution & Cancellation", () => {
     expect(session.isCancelled).toBe(true);
     // Partial observations should be preserved and inference still run
     expect(session.observations.length).toBeGreaterThan(0);
-    expect(session.diagnoses.length).toBeGreaterThan(0);
+    expect(session.diagnoses).toEqual([]);
   });
 });

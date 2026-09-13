@@ -139,12 +139,14 @@ export function useDiagnosticsController() {
       return;
     }
 
+    const runId = ++pipelineRunIdRef.current;
+    cancelRef.current = false;
     setPingProbe({ status: "running", startedAt: Date.now() });
     setAnnouncement(t("announcements.ping_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runPing", target: normalized, count: 4 });
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       if (res.kind === "pingResult") {
         const raw = res.result;
         const minRttMs = Number(raw.minRttMs ?? 0);
@@ -172,9 +174,11 @@ export function useDiagnosticsController() {
           finishedAt: Date.now(),
         });
         setAnnouncement(t("announcements.ping_completed", { target: normalized, loss: lossPct }));
+      } else {
+        throw new Error(`Unexpected query response: ${res.kind}`);
       }
     } catch (e) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setPingProbe({ status: "error", error: errMsg });
       setNotice(errMsg);
@@ -191,12 +195,14 @@ export function useDiagnosticsController() {
       return;
     }
 
+    const runId = ++pipelineRunIdRef.current;
+    cancelRef.current = false;
     setTraceProbe({ status: "running", startedAt: Date.now() });
     setAnnouncement(t("announcements.traceroute_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runTraceroute", target: normalized, transport: "icmp", max_hops: 30 });
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       if (res.kind === "tracerouteResult") {
         const normalizedHops: TracerouteHop[] = res.hops.map((h: TracerouteHop) => ({
           ttl: Number(h.ttl ?? 0),
@@ -223,9 +229,11 @@ export function useDiagnosticsController() {
             count: normalizedHops.length,
           })
         );
+      } else {
+        throw new Error(`Unexpected query response: ${res.kind}`);
       }
     } catch (e) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setTraceProbe({ status: "error", error: errMsg });
       setNotice(errMsg);
@@ -242,12 +250,14 @@ export function useDiagnosticsController() {
       return;
     }
 
+    const runId = ++pipelineRunIdRef.current;
+    cancelRef.current = false;
     setBloatProbe({ status: "running", startedAt: Date.now() });
     setAnnouncement(t("announcements.bufferbloat_running", { target: normalized }));
 
     try {
       const res = await query({ kind: "runBufferbloatTest", target: normalized });
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       if (res.kind === "bufferbloatResult") {
         const raw = res.result;
         const idleRttMs = Number(raw.idleRttMs ?? 0);
@@ -271,9 +281,11 @@ export function useDiagnosticsController() {
         setAnnouncement(
           t("announcements.bufferbloat_completed", { grade: normalizedResult.grade })
         );
+      } else {
+        throw new Error(`Unexpected query response: ${res.kind}`);
       }
     } catch (e) {
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || cancelRef.current || runId !== pipelineRunIdRef.current) return;
       const errMsg = e instanceof Error ? e.message : String(e);
       setBloatProbe({ status: "error", error: errMsg });
       setNotice(errMsg);

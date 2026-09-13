@@ -57,6 +57,15 @@
       "gaming": "Gaming:",
       "voip": "VoIP & Calls:",
       "uploads": "Large Uploads:"
+    },
+    "quality": {
+      "excellent": "Excellent",
+      "moderate": "Moderate",
+      "good": "Good",
+      "acceptable": "Acceptable",
+      "poor": "Poor",
+      "degraded": "Degraded",
+      "severe_lag": "Severe Lag"
     }
   },
   "capabilities": {

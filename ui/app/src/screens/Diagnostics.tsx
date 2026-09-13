@@ -123,7 +123,7 @@ export function DiagnosticsScreen() {
             variant="primary"
             busy={busy.deep}
             disabled={isAnyBusy}
-            onClick={() => void actions.runDeepDiagnostics()}
+            onClick={handleRunDeepDiagnostics}
             aria-label={t("full_analysis_btn")}
           >
             <Icon name="microscope" style={{ width: "14px", height: "14px", marginRight: "4px" }} />
@@ -135,7 +135,7 @@ export function DiagnosticsScreen() {
             variant="standard"
             busy={busy.ping}
             disabled={isAnyBusy}
-            onClick={() => void actions.runPing()}
+            onClick={handleRunPing}
             aria-label={t("ping_btn")}
           >
             {t("ping_btn")}
@@ -145,7 +145,7 @@ export function DiagnosticsScreen() {
             variant="standard"
             busy={busy.traceroute}
             disabled={isAnyBusy}
-            onClick={() => void actions.runTraceroute()}
+            onClick={handleRunTraceroute}
             aria-label={t("traceroute_btn")}
           >
             {t("traceroute_btn")}
@@ -155,7 +155,7 @@ export function DiagnosticsScreen() {
             variant="standard"
             busy={busy.bufferbloat}
             disabled={isAnyBusy}
-            onClick={() => void actions.runBufferbloat()}
+            onClick={handleRunBufferbloat}
             aria-label={t("bufferbloat_btn")}
           >
             {t("bufferbloat_btn")}

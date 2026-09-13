@@ -40,12 +40,28 @@ export const BufferbloatCard = memo(function BufferbloatCard({ target: propTarge
       ? "np-diagnostics-provenance--unavailable"
       : "";
 
-  const recommendations =
+  const recKeys =
     result.grade === "A+" || result.grade === "A"
-      ? { gaming: "Excellent", voip: "Excellent", uploads: "Excellent" }
+      ? { gaming: "excellent", voip: "excellent", uploads: "excellent" }
       : result.grade === "B" || result.grade === "C"
-      ? { gaming: "Moderate", voip: "Good", uploads: "Acceptable" }
-      : { gaming: "Poor", voip: "Degraded", uploads: "Severe Lag" };
+      ? { gaming: "moderate", voip: "good", uploads: "acceptable" }
+      : { gaming: "poor", voip: "degraded", uploads: "severe_lag" };
+
+  const defaultValues: Record<string, string> = {
+    excellent: "Excellent",
+    moderate: "Moderate",
+    good: "Good",
+    acceptable: "Acceptable",
+    poor: "Poor",
+    degraded: "Degraded",
+    severe_lag: "Severe Lag",
+  };
+
+  const recommendations = {
+    gaming: t(`bufferbloat.quality.${recKeys.gaming}`, defaultValues[recKeys.gaming]!),
+    voip: t(`bufferbloat.quality.${recKeys.voip}`, defaultValues[recKeys.voip]!),
+    uploads: t(`bufferbloat.quality.${recKeys.uploads}`, defaultValues[recKeys.uploads]!),
+  };
 
   const headingId = "bufferbloat-card-title";
 

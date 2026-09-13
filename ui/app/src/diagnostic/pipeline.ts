@@ -232,6 +232,17 @@ export async function executeDiagnosticPipeline(
 
     notifyProgress(step.name);
     await step.action();
+
+    if (isCancelled()) {
+      session.isCancelled = true;
+      session.status = "cancelled";
+      break;
+    }
+  }
+
+  if (isCancelled()) {
+    session.isCancelled = true;
+    session.status = "cancelled";
   }
 
   // Final Inference & Recommendations on collected observations

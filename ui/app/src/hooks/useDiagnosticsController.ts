@@ -131,7 +131,7 @@ export function useDiagnosticsController() {
         const avgRttMs = Number(raw.avgRttMs ?? 0);
         const maxRttMs = Number(raw.maxRttMs ?? 0);
         const lossPct = Number(raw.lossPct ?? 0);
-        const jitterMs = Math.round(Math.max(0, maxRttMs - minRttMs) * 10) / 10;
+        const jitterMs = Number(raw.stddevRttMs ?? 0);
 
         const extendedResult: ExtendedPingResult = {
           target: raw.target || normalized,

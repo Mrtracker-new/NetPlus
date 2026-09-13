@@ -105,7 +105,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
 
   const pingRtt = typeof pingRttObs?.value === "number" ? pingRttObs.value : null;
   const pingLoss = typeof pingLossObs?.value === "number" ? pingLossObs.value : 0;
-  const pingJitter = typeof pingRttObs?.rawDetails?.jitterMs === "number" ? pingRttObs.rawDetails.jitterMs : (typeof pingRttObs?.rawDetails?.stddevRttMs === "number" ? pingRttObs.rawDetails.stddevRttMs : 0);
+  const pingJitter = typeof pingRttObs?.rawDetails?.stddevRttMs === "number" ? pingRttObs.rawDetails.stddevRttMs : (typeof pingRttObs?.rawDetails?.jitterMs === "number" ? pingRttObs.rawDetails.jitterMs : 0);
 
   const isHttpPending =
     (!httpTtfbObs && !httpStatusObs) ||

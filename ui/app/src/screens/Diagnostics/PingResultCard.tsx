@@ -5,6 +5,13 @@ export interface PingResultCardProps {
   result: ExtendedPingResult;
 }
 
+export function getJitterColor(jitterMs: number): string {
+  const val = isNaN(jitterMs) ? 0 : jitterMs;
+  if (val < 5) return "var(--np-good)";
+  if (val < 20) return "var(--np-notable)";
+  return "var(--np-finding)";
+}
+
 export function PingResultCard({ result }: PingResultCardProps) {
   const { t } = useTranslation(["diagnostics"]);
 
@@ -13,6 +20,7 @@ export function PingResultCard({ result }: PingResultCardProps) {
   const minRttStr = formatMs(result.minRttMs ?? 0);
   const maxRttStr = formatMs(result.maxRttMs ?? 0);
   const jitterStr = formatMs(result.jitterMs ?? 0);
+  const jitterColor = getJitterColor(Number(result.jitterMs ?? 0));
 
   const sourceNormalized = (result.source ?? "").toLowerCase();
   const provenanceClass =
@@ -73,7 +81,7 @@ export function PingResultCard({ result }: PingResultCardProps) {
 
         <div className="np-diagnostics-kpi-pod">
           <div className="np-diagnostics-kpi-pod__label">{t("ping.jitter")}</div>
-          <div className="np-diagnostics-kpi-pod__value" style={{ color: "var(--np-notable)" }}>
+          <div className="np-diagnostics-kpi-pod__value" style={{ color: jitterColor }}>
             {jitterStr}ms
           </div>
         </div>

@@ -4,6 +4,7 @@ import "@testing-library/jest-dom";
 import "../i18n";
 import { DiagnosticsScreen } from "../screens/Diagnostics";
 import { DeepDiagnosticCard } from "../screens/Diagnostics/DeepDiagnosticCard";
+import { PingResultCard, getJitterColor } from "../screens/Diagnostics/PingResultCard";
 import type { DiagnosticSession } from "../diagnostic";
 import { validateAndNormalizeTarget } from "../hooks/useDiagnosticsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
@@ -67,6 +68,7 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
         minRttMs: 12,
         avgRttMs: 15,
         maxRttMs: 18,
+        stddevRttMs: 2.1,
         source: "live",
       },
     } as any);
@@ -78,7 +80,9 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
 
     expect(await screen.findByText("Ping Results for 1.1.1.1")).toBeInTheDocument();
     expect(screen.getByText("15ms")).toBeInTheDocument(); // Avg RTT
-    expect(screen.getByText("6ms")).toBeInTheDocument(); // Jitter = 18 - 12
+    const jitterElem = screen.getByText("2.1ms"); // Jitter = stddevRttMs
+    expect(jitterElem).toBeInTheDocument();
+    expect(jitterElem).toHaveStyle({ color: "var(--np-good)" }); // < 5ms is green
     expect(screen.getByText("live")).toBeInTheDocument(); // Provenance
   });
 
@@ -914,5 +918,79 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
 
     // The first run was cancelled and stopped at its first step
     expect(firstRunQueries).toBe(1);
+  });
+});
+
+describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
+  it("computes jitter color based on severity thresholds (<5ms green, <20ms notable, >=20ms finding)", () => {
+    expect(getJitterColor(0)).toBe("var(--np-good)");
+    expect(getJitterColor(4.9)).toBe("var(--np-good)");
+    expect(getJitterColor(5.0)).toBe("var(--np-notable)");
+    expect(getJitterColor(19.9)).toBe("var(--np-notable)");
+    expect(getJitterColor(20.0)).toBe("var(--np-finding)");
+    expect(getJitterColor(35.2)).toBe("var(--np-finding)");
+  });
+
+  it("renders nominal jitter (<5ms) with green semantic color", () => {
+    render(
+      <PingResultCard
+        result={{
+          target: "1.1.1.1",
+          sent: 4,
+          received: 4,
+          lossPct: 0,
+          minRttMs: 10,
+          avgRttMs: 12,
+          maxRttMs: 15,
+          stddevRttMs: 1.8,
+          jitterMs: 1.8,
+        }}
+      />
+    );
+    const jitterVal = screen.getByText("1.8ms");
+    expect(jitterVal).toBeInTheDocument();
+    expect(jitterVal).toHaveStyle({ color: "var(--np-good)" });
+  });
+
+  it("renders notable jitter (5ms - 19.9ms) with notable semantic color", () => {
+    render(
+      <PingResultCard
+        result={{
+          target: "1.1.1.1",
+          sent: 4,
+          received: 4,
+          lossPct: 0,
+          minRttMs: 10,
+          avgRttMs: 25,
+          maxRttMs: 40,
+          stddevRttMs: 12.4,
+          jitterMs: 12.4,
+        }}
+      />
+    );
+    const jitterVal = screen.getByText("12.4ms");
+    expect(jitterVal).toBeInTheDocument();
+    expect(jitterVal).toHaveStyle({ color: "var(--np-notable)" });
+  });
+
+  it("renders elevated/finding jitter (>=20ms) with finding semantic color", () => {
+    render(
+      <PingResultCard
+        result={{
+          target: "1.1.1.1",
+          sent: 4,
+          received: 4,
+          lossPct: 0,
+          minRttMs: 10,
+          avgRttMs: 40,
+          maxRttMs: 90,
+          stddevRttMs: 24.6,
+          jitterMs: 24.6,
+        }}
+      />
+    );
+    const jitterVal = screen.getByText("24.6ms");
+    expect(jitterVal).toBeInTheDocument();
+    expect(jitterVal).toHaveStyle({ color: "var(--np-finding)" });
   });
 });

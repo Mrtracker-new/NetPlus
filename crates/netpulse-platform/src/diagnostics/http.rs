@@ -527,7 +527,7 @@ impl DiagnosticProbe for HttpProbe {
         };
 
         // Read remaining response up to MAX_RESPONSE_BYTES or expected_total_bytes
-        let _ = transport.set_read_timeout(Some(Duration::from_millis(100)));
+        let _ = transport.set_read_timeout(Some(Duration::from_millis(50)));
         let transfer_start = Instant::now();
         let mut total_bytes = first_read;
 
@@ -558,8 +558,12 @@ impl DiagnosticProbe for HttpProbe {
                         if e.kind() == std::io::ErrorKind::WouldBlock
                             || e.kind() == std::io::ErrorKind::TimedOut =>
                     {
-                        // 100ms elapsed with no incoming bytes: finish read to avoid blocking full timeout
-                        break;
+                        if expected_total_bytes.is_some() {
+                            continue;
+                        } else {
+                            // Without Content-Length, socket inactivity indicates server has finished sending
+                            break;
+                        }
                     }
                     Err(_) => break,
                 }
@@ -570,6 +574,10 @@ impl DiagnosticProbe for HttpProbe {
         let cancelled = cancel.load(std::sync::atomic::Ordering::Relaxed);
         let error = if cancelled {
             Some("Operation cancelled".to_string())
+        } else if transfer_start.elapsed() >= timeout
+            && expected_total_bytes.is_some_and(|expected| total_bytes < expected)
+        {
+            Some("Response transfer timed out".to_string())
         } else {
             None
         };
@@ -754,6 +762,8 @@ mod tests {
         let local_addr = listener.local_addr().expect("local addr");
         let stop_server = std::sync::Arc::new(AtomicBool::new(false));
         let stop_clone = stop_server.clone();
+        let chunk_sent = std::sync::Arc::new(AtomicBool::new(false));
+        let chunk_sent_clone = chunk_sent.clone();
 
         let server_thread = thread::spawn(move || {
             if let Ok((mut stream, _)) = listener.accept() {
@@ -761,6 +771,7 @@ mod tests {
                 let _ = stream.read(&mut buf);
                 let response = "HTTP/1.1 200 OK\r\nContent-Length: 100000\r\nConnection: close\r\n\r\ninitial-chunk";
                 let _ = stream.write_all(response.as_bytes());
+                chunk_sent_clone.store(true, std::sync::atomic::Ordering::Release);
                 while !stop_clone.load(std::sync::atomic::Ordering::Relaxed) {
                     thread::sleep(Duration::from_millis(10));
                 }
@@ -775,7 +786,14 @@ mod tests {
         let flag_set_time_clone = flag_set_time.clone();
 
         let trigger = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(50));
+            let wait_start = Instant::now();
+            while !chunk_sent.load(std::sync::atomic::Ordering::Acquire)
+                && wait_start.elapsed() < Duration::from_millis(500)
+            {
+                thread::sleep(Duration::from_millis(5));
+            }
+            // Allow probe client to receive the chunk and enter mid-execution body read
+            thread::sleep(Duration::from_millis(20));
             *flag_set_time_clone.lock().unwrap() = Some(Instant::now());
             cancel_clone.store(true, std::sync::atomic::Ordering::Relaxed);
         });

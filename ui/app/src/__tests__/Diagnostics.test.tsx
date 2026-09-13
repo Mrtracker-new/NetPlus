@@ -503,4 +503,152 @@ describe("DiagnosticsScreen & useDiagnosticsController", () => {
     expect(await screen.findByText("No clear bottleneck detected")).toBeInTheDocument();
     expect(screen.queryByTestId("deep-diagnostics-analyzing-banner")).not.toBeInTheDocument();
   });
+
+  it("displays Pending... with neutral badge for unrun/uncollected observations and only displays Timed Out when completed with null value", () => {
+    // 1. Unrun DNS stage (!dnsObs) in running session
+    const unrunSession: DiagnosticSession = {
+      sessionId: 101,
+      target: "1.1.1.1",
+      status: "running",
+      startedAt: Date.now(),
+      observations: [],
+      diagnoses: [],
+      recommendations: [],
+    };
+
+    const { unmount, rerender } = render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={unrunSession} activeStage="gateway" />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Grid shows Pending... with neutral styling and no false "Timed Out"
+    expect(screen.queryByText("Timed Out")).not.toBeInTheDocument();
+    const pendingMetrics = screen.getAllByText("Pending...");
+    expect(pendingMetrics.length).toBe(4);
+    expect(pendingMetrics[1]).toHaveStyle({ color: "var(--np-text-dim)" });
+
+    // Provenance badges are neutral PENDING
+    const pendingBadges = screen.getAllByText("PENDING");
+    expect(pendingBadges.length).toBe(4);
+    expect(pendingBadges[1]).toHaveAttribute("data-provenance", "pending");
+    expect(pendingBadges[1]).not.toHaveClass("np-diagnostics-provenance--live");
+    expect(pendingBadges[1]).not.toHaveClass("np-diagnostics-provenance--unavailable");
+
+    // 2. In-flight session with dnsObs.value === null (still running)
+    const inFlightNullSession: DiagnosticSession = {
+      ...unrunSession,
+      observations: [
+        {
+          key: "dns_resolution",
+          source: "live",
+          severity: "severe",
+          metricName: "DNS Resolution",
+          value: null,
+          quality: "unverified",
+          limitation: "Timed Out",
+        },
+      ],
+    };
+
+    rerender(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={inFlightNullSession} activeStage="dns" />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Since session is still running, "Timed Out" is suppressed and "Pending..." is displayed
+    expect(screen.queryByText("Timed Out")).not.toBeInTheDocument();
+
+    // 3. Completed session with dnsObs.value === null
+    const completedTimedOutSession: DiagnosticSession = {
+      ...inFlightNullSession,
+      status: "completed",
+    };
+
+    rerender(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={completedTimedOutSession} activeStage={null} />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // Now that session is completed with null value, "Timed Out" is legitimately displayed
+    const timedOutElements = screen.getAllByText("Timed Out");
+    expect(timedOutElements.length).toBeGreaterThanOrEqual(1);
+    expect(timedOutElements[0]).toHaveStyle({ color: "var(--np-finding)" });
+    unmount();
+  });
+
+  it("accurately colors HTTP 500 as finding even if TTFB is normal, and colors Ping as finding if packet loss is severe", () => {
+    const errorSession: DiagnosticSession = {
+      sessionId: 102,
+      target: "example.com",
+      status: "completed",
+      startedAt: Date.now() - 5000,
+      completedAt: Date.now(),
+      observations: [
+        {
+          key: "http_status",
+          source: "live",
+          severity: "severe",
+          metricName: "HTTP Status Code",
+          value: 500,
+          quality: "high",
+        },
+        {
+          key: "http_ttfb",
+          source: "live",
+          severity: "normal",
+          metricName: "HTTP Time to First Byte",
+          value: 45,
+          unit: "ms",
+          quality: "high",
+        },
+        {
+          key: "target_ping_rtt",
+          source: "live",
+          severity: "normal",
+          metricName: "Target Round-Trip Latency",
+          value: 15,
+          unit: "ms",
+          quality: "high",
+        },
+        {
+          key: "target_packet_loss",
+          source: "live",
+          severity: "severe",
+          metricName: "Target End-to-End Packet Loss",
+          value: 75,
+          unit: "%",
+          quality: "high",
+        },
+      ],
+      diagnoses: [],
+      recommendations: [],
+    };
+
+    render(
+      <DisclosureProvider>
+        <EvidenceNavigationProvider>
+          <DeepDiagnosticCard session={errorSession} activeStage={null} />
+        </EvidenceNavigationProvider>
+      </DisclosureProvider>
+    );
+
+    // HTTP 500 must have finding/red color, not normal/green
+    const httpStatusEl = screen.getByText("HTTP 500");
+    expect(httpStatusEl).toBeInTheDocument();
+    expect(httpStatusEl).toHaveStyle({ color: "var(--np-finding)" });
+
+    // Ping latency metric with 75% severe packet loss must have finding/red color
+    const pingRttEl = screen.getByText("15 ms");
+    expect(pingRttEl).toBeInTheDocument();
+    expect(pingRttEl).toHaveStyle({ color: "var(--np-finding)" });
+  });
 });

@@ -98,6 +98,22 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
   const pingLoss = typeof pingLossObs?.value === "number" ? pingLossObs.value : 0;
   const pingJitter = typeof pingRttObs?.rawDetails?.jitterMs === "number" ? pingRttObs.rawDetails.jitterMs : (typeof pingRttObs?.rawDetails?.stddevRttMs === "number" ? pingRttObs.rawDetails.stddevRttMs : 0);
 
+  const isHttpPending =
+    (!httpTtfbObs && !httpStatusObs) ||
+    (httpStatusCode === null && httpTtfb === null && session?.status !== "completed");
+  const httpSeverity =
+    httpStatusCode !== null
+      ? (httpStatusObs?.severity ?? "normal")
+      : (httpTtfbObs?.severity ?? "normal");
+
+  const isPingPending = !pingRttObs || (pingRtt === null && session?.status !== "completed");
+  const pingSeverity =
+    pingRttObs?.severity === "severe" || pingLossObs?.severity === "severe"
+      ? "severe"
+      : pingRttObs?.severity === "elevated" || pingLossObs?.severity === "elevated"
+      ? "elevated"
+      : "normal";
+
   return (
     <article className="np-diagnostics-assessment" aria-label={t("assessment.title")}>
       {/* 1. Header: Session & Stage Status */}
@@ -349,21 +365,30 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           <div className="np-diagnostics-observation-card__header">
             <span className="np-diagnostics-observation-card__title">Default Gateway</span>
             <span
-              className={`np-diagnostics-provenance ${getProvenanceClass(gatewayObs?.source)}`}
-              data-provenance={gatewayObs?.source ?? (session?.status === "running" ? "pending" : "unavailable")}
+              className={`np-diagnostics-provenance ${gatewayObs?.source ? getProvenanceClass(gatewayObs.source) : ""}`}
+              data-provenance={gatewayObs?.source ? gatewayObs.source : "pending"}
             >
-              {gatewayObs?.source ?? (session?.status === "running" ? "PENDING" : "UNAVAILABLE")}
+              {gatewayObs?.source ?? "PENDING"}
             </span>
           </div>
-          <div className="np-diagnostics-observation-card__metric">
-            {gatewayObs ? gatewayIp : session?.status === "running" ? "—" : "Unreachable"}
+          <div
+            className="np-diagnostics-observation-card__metric"
+            style={{
+              color: !gatewayObs || (gatewayObs.value === null && session?.status !== "completed")
+                ? "var(--np-text-dim)"
+                : gatewayObs.severity === "normal"
+                ? "var(--np-good)"
+                : "var(--np-finding)",
+            }}
+          >
+            {!gatewayObs || (gatewayObs.value === null && session?.status !== "completed")
+              ? "Pending..."
+              : gatewayIp}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
-            {gatewayObs
+            {gatewayObs && (gatewayObs.value !== null || session?.status === "completed")
               ? (gatewayObs?.limitation || (interfaceName ? `Interface: ${interfaceName}` : "Direct default route"))
-              : session?.status === "running"
-              ? "Discovering default route..."
-              : "Gateway unreachable"}
+              : "Discovering default route..."}
           </span>
         </div>
 
@@ -372,38 +397,38 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           <div className="np-diagnostics-observation-card__header">
             <span className="np-diagnostics-observation-card__title">DNS Resolution</span>
             <span
-              className={`np-diagnostics-provenance ${getProvenanceClass(dnsObs?.source)}`}
-              data-provenance={dnsObs?.source ?? (session?.status === "running" ? "pending" : "live")}
+              className={`np-diagnostics-provenance ${dnsObs?.source ? getProvenanceClass(dnsObs.source) : ""}`}
+              data-provenance={dnsObs?.source ? dnsObs.source : "pending"}
             >
-              {dnsObs?.source ?? (session?.status === "running" ? "PENDING" : "LIVE")}
+              {dnsObs?.source ?? "PENDING"}
             </span>
           </div>
           <div
             className="np-diagnostics-observation-card__metric"
             style={{
-              color: dnsObs
-                ? dnsObs.severity === "normal"
-                  ? "var(--np-good)"
-                  : "var(--np-finding)"
-                : "var(--np-text-dim)",
+              color: !dnsObs || (dnsObs.value === null && session?.status !== "completed")
+                ? "var(--np-text-dim)"
+                : dnsObs.severity === "normal"
+                ? "var(--np-good)"
+                : "var(--np-finding)",
             }}
           >
-            {dnsObs
-              ? dnsRtt !== null
-                ? `${formatMs(dnsRtt)} ${dnsObs.unit ?? "ms"}`
-                : dnsObs.limitation || "Timed Out"
-              : session?.status === "running"
-              ? "—"
-              : "Timed Out"}
+            {!dnsObs
+              ? "Pending..."
+              : dnsRtt !== null
+              ? `${formatMs(dnsRtt)} ${dnsObs.unit ?? "ms"}`
+              : dnsObs.value === null && session?.status === "completed"
+              ? dnsObs.limitation || "Timed Out"
+              : "Pending..."}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {dnsObs
               ? resolvedIps && resolvedIps.length > 0
                 ? resolvedIps.slice(0, 2).join(", ")
-                : dnsObs.limitation || "System resolver"
-              : session?.status === "running"
-              ? "Awaiting DNS query..."
-              : "System resolver"}
+                : session?.status === "completed"
+                ? dnsObs.limitation || "System resolver"
+                : "Awaiting DNS query..."
+              : "Awaiting DNS query..."}
           </span>
         </div>
 
@@ -412,31 +437,40 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           <div className="np-diagnostics-observation-card__header">
             <span className="np-diagnostics-observation-card__title">HTTP Web Probe</span>
             <span
-              className={`np-diagnostics-provenance ${getProvenanceClass(httpTtfbObs?.source)}`}
-              data-provenance={httpTtfbObs?.source ?? (session?.status === "running" ? "pending" : "live")}
+              className={`np-diagnostics-provenance ${httpTtfbObs?.source ? getProvenanceClass(httpTtfbObs.source) : ""}`}
+              data-provenance={httpTtfbObs?.source ? httpTtfbObs.source : "pending"}
             >
-              {httpTtfbObs?.source ?? (session?.status === "running" ? "PENDING" : "LIVE")}
+              {httpTtfbObs?.source ?? "PENDING"}
             </span>
           </div>
-          <div className="np-diagnostics-observation-card__metric">
+          <div
+            className="np-diagnostics-observation-card__metric"
+            style={{
+              color: isHttpPending
+                ? "var(--np-text-dim)"
+                : httpSeverity === "normal"
+                ? "var(--np-good)"
+                : "var(--np-finding)",
+            }}
+          >
             {httpTtfbObs || httpStatusObs
               ? httpStatusCode
                 ? `HTTP ${httpStatusCode}`
                 : httpTtfb !== null
                 ? `${formatMs(httpTtfb)} ${httpTtfbObs?.unit ?? "ms"}`
-                : httpTtfbObs?.limitation || "Unavailable"
-              : session?.status === "running"
-              ? "—"
-              : "Unavailable"}
+                : session?.status === "completed"
+                ? httpTtfbObs?.limitation || "Unavailable"
+                : "Pending..."
+              : "Pending..."}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             {httpTtfbObs
               ? httpConnectMs !== null
                 ? `Connect: ${formatMs(httpConnectMs)}ms · TTFB: ${formatMs(httpTtfb ?? 0)}ms`
-                : httpTtfbObs.limitation || "Bounded connection"
-              : session?.status === "running"
-              ? "Awaiting HTTP response..."
-              : "Bounded connection"}
+                : session?.status === "completed"
+                ? httpTtfbObs.limitation || "Bounded connection"
+                : "Awaiting HTTP response..."
+              : "Awaiting HTTP response..."}
           </span>
         </div>
 
@@ -445,23 +479,36 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
           <div className="np-diagnostics-observation-card__header">
             <span className="np-diagnostics-observation-card__title">Round-Trip Latency</span>
             <span
-              className={`np-diagnostics-provenance ${getProvenanceClass(pingRttObs?.source)}`}
-              data-provenance={pingRttObs?.source ?? (session?.status === "running" ? "pending" : "simulated")}
+              className={`np-diagnostics-provenance ${pingRttObs?.source ? getProvenanceClass(pingRttObs.source) : ""}`}
+              data-provenance={pingRttObs?.source ? pingRttObs.source : "pending"}
             >
-              {pingRttObs?.source ?? (session?.status === "running" ? "PENDING" : "SIMULATED")}
+              {pingRttObs?.source ?? "PENDING"}
             </span>
           </div>
-          <div className="np-diagnostics-observation-card__metric">
-            {pingRttObs && pingRtt !== null
-              ? `${formatMs(pingRtt)} ${pingRttObs.unit ?? "ms"}`
-              : "—"}
+          <div
+            className="np-diagnostics-observation-card__metric"
+            style={{
+              color: isPingPending
+                ? "var(--np-text-dim)"
+                : pingSeverity === "normal"
+                ? "var(--np-good)"
+                : "var(--np-finding)",
+            }}
+          >
+            {isPingPending
+              ? "Pending..."
+              : pingRtt !== null
+              ? `${formatMs(pingRtt)} ${pingRttObs?.unit ?? "ms"}`
+              : session?.status === "completed"
+              ? "Timed Out"
+              : "Pending..."}
           </div>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
-            {pingRttObs
+            {pingRttObs && pingRtt !== null
               ? `Loss: ${pingLoss}% · Jitter: ${formatMs(pingJitter)}ms`
-              : session?.status === "running"
-              ? "Awaiting ICMP samples..."
-              : `Loss: ${pingLoss}% · Jitter: ${formatMs(pingJitter)}ms`}
+              : session?.status === "completed" && pingRttObs
+              ? `Loss: ${pingLoss}% · Jitter: ${formatMs(pingJitter)}ms`
+              : "Awaiting ICMP samples..."}
           </span>
         </div>
       </div>

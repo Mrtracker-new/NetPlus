@@ -37,7 +37,7 @@ pub(crate) fn parse_http_target(raw_url: &str) -> Option<ParsedHttpUrl<'_>> {
     };
 
     // Separate host_port from path / query / fragment
-    let delim_idx = rest.find(|c| c == '/' || c == '?' || c == '#');
+    let delim_idx = rest.find(['/', '?', '#']);
     let (raw_host_port, raw_path) = match delim_idx {
         Some(idx) => (&rest[..idx], &rest[idx..]),
         None => (rest, "/"),
@@ -138,7 +138,7 @@ fn get_tls_client_config() -> std::result::Result<Arc<ClientConfig>, String> {
 
 enum HttpTransport {
     Plain(TcpStream),
-    Tls(StreamOwned<ClientConnection, TcpStream>),
+    Tls(Box<StreamOwned<ClientConnection, TcpStream>>),
 }
 
 impl Read for HttpTransport {
@@ -243,7 +243,11 @@ impl DiagnosticProbe for HttpProbe {
                     transfer_ms: None,
                     tls_ms: None,
                     error: Some(format!("DNS resolution failed: {e}")),
-                    limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                    limitation: if is_tls {
+                        None
+                    } else {
+                        Some("TLS timing unavailable".to_string())
+                    },
                     source: "live".to_string(),
                 });
             }
@@ -260,7 +264,11 @@ impl DiagnosticProbe for HttpProbe {
                     transfer_ms: None,
                     tls_ms: None,
                     error: Some("No socket addresses found for host".to_string()),
-                    limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                    limitation: if is_tls {
+                        None
+                    } else {
+                        Some("TLS timing unavailable".to_string())
+                    },
                     source: "live".to_string(),
                 });
             }
@@ -279,7 +287,11 @@ impl DiagnosticProbe for HttpProbe {
                     transfer_ms: None,
                     tls_ms: None,
                     error: Some(format!("TCP connection failed: {e}")),
-                    limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                    limitation: if is_tls {
+                        None
+                    } else {
+                        Some("TLS timing unavailable".to_string())
+                    },
                     source: "live".to_string(),
                 });
             }
@@ -297,7 +309,11 @@ impl DiagnosticProbe for HttpProbe {
                 transfer_ms: None,
                 tls_ms: None,
                 error: Some("Operation cancelled".to_string()),
-                limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                limitation: if is_tls {
+                    None
+                } else {
+                    Some("TLS timing unavailable".to_string())
+                },
                 source: "live".to_string(),
             });
         }
@@ -403,7 +419,10 @@ impl DiagnosticProbe for HttpProbe {
                 }
             }
             let tls_ms = tls_start.elapsed().as_secs_f32() * 1000.0;
-            (HttpTransport::Tls(StreamOwned::new(conn, stream)), Some(tls_ms))
+            (
+                HttpTransport::Tls(Box::new(StreamOwned::new(conn, stream))),
+                Some(tls_ms),
+            )
         } else {
             (HttpTransport::Plain(stream), None)
         };
@@ -434,7 +453,11 @@ impl DiagnosticProbe for HttpProbe {
                 transfer_ms: None,
                 tls_ms: tls_ms_opt.map(|m| (m * 10.0).round() / 10.0),
                 error: Some(format!("Failed to write HTTP request: {e}")),
-                limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                limitation: if is_tls {
+                    None
+                } else {
+                    Some("TLS timing unavailable".to_string())
+                },
                 source: "live".to_string(),
             });
         }
@@ -452,7 +475,11 @@ impl DiagnosticProbe for HttpProbe {
                     transfer_ms: None,
                     tls_ms: tls_ms_opt.map(|m| (m * 10.0).round() / 10.0),
                     error: Some("Server closed connection without response".to_string()),
-                    limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                    limitation: if is_tls {
+                        None
+                    } else {
+                        Some("TLS timing unavailable".to_string())
+                    },
                     source: "live".to_string(),
                 });
             }
@@ -466,7 +493,11 @@ impl DiagnosticProbe for HttpProbe {
                     transfer_ms: None,
                     tls_ms: tls_ms_opt.map(|m| (m * 10.0).round() / 10.0),
                     error: Some(format!("Failed reading response: {e}")),
-                    limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+                    limitation: if is_tls {
+                        None
+                    } else {
+                        Some("TLS timing unavailable".to_string())
+                    },
                     source: "live".to_string(),
                 });
             }
@@ -501,7 +532,7 @@ impl DiagnosticProbe for HttpProbe {
         let mut total_bytes = first_read;
 
         // If the complete response was already contained in the first read, finish immediately
-        let already_complete = expected_total_bytes.map_or(false, |expected| total_bytes >= expected);
+        let already_complete = expected_total_bytes.is_some_and(|expected| total_bytes >= expected);
 
         if !already_complete {
             while total_bytes < MAX_RESPONSE_BYTES && transfer_start.elapsed() < timeout {
@@ -551,7 +582,11 @@ impl DiagnosticProbe for HttpProbe {
             transfer_ms: Some((transfer_ms * 10.0).round() / 10.0),
             tls_ms: tls_ms_opt.map(|m| (m * 10.0).round() / 10.0),
             error,
-            limitation: if is_tls { None } else { Some("TLS timing unavailable".to_string()) },
+            limitation: if is_tls {
+                None
+            } else {
+                Some("TLS timing unavailable".to_string())
+            },
             source: "live".to_string(),
         })
     }
@@ -617,13 +652,15 @@ mod tests {
         assert!(p.is_tls);
 
         // Query string and fragment handling
-        let p = parse_http_target("https://example.com?query=1#section").expect("parse query no slash");
+        let p =
+            parse_http_target("https://example.com?query=1#section").expect("parse query no slash");
         assert_eq!(p.host, "example.com");
         assert_eq!(p.port, 443);
         assert_eq!(p.path, "/?query=1");
         assert!(p.is_tls);
 
-        let p = parse_http_target("https://example.com/api/v1?search=test#details").expect("parse query slash");
+        let p = parse_http_target("https://example.com/api/v1?search=test#details")
+            .expect("parse query slash");
         assert_eq!(p.host, "example.com");
         assert_eq!(p.path, "/api/v1?search=test");
 
@@ -771,16 +808,25 @@ mod tests {
         if out.error.is_none() {
             assert!(out.status_code.is_some(), "Expected HTTP status code");
             assert!(out.connect_ms.is_some(), "Expected TCP connect time");
-            assert!(out.tls_ms.is_some(), "Expected discrete TLS handshake duration");
+            assert!(
+                out.tls_ms.is_some(),
+                "Expected discrete TLS handshake duration"
+            );
             assert!(out.ttfb_ms.is_some(), "Expected TTFB duration");
             assert!(out.transfer_ms.is_some(), "Expected transfer duration");
-            assert_eq!(out.limitation, None, "Limitation must be cleared when TLS succeeds");
+            assert_eq!(
+                out.limitation, None,
+                "Limitation must be cleared when TLS succeeds"
+            );
             println!(
                 "Cloudflare probe success: status={:?} connect_ms={:?} tls_ms={:?} ttfb_ms={:?}",
                 out.status_code, out.connect_ms, out.tls_ms, out.ttfb_ms
             );
         } else {
-            println!("Cloudflare live probe skipped or network error: {:?}", out.error);
+            println!(
+                "Cloudflare live probe skipped or network error: {:?}",
+                out.error
+            );
         }
     }
 
@@ -793,15 +839,24 @@ mod tests {
         assert_eq!(out.source, "live");
         if out.error.is_none() {
             assert!(out.connect_ms.is_some(), "Expected TCP connect time");
-            assert!(out.tls_ms.is_some(), "Expected discrete TLS handshake duration for 1.1.1.1");
+            assert!(
+                out.tls_ms.is_some(),
+                "Expected discrete TLS handshake duration for 1.1.1.1"
+            );
             assert!(out.ttfb_ms.is_some(), "Expected TTFB duration");
-            assert_eq!(out.limitation, None, "Limitation must be cleared when TLS succeeds");
+            assert_eq!(
+                out.limitation, None,
+                "Limitation must be cleared when TLS succeeds"
+            );
             println!(
                 "1.1.1.1 probe success: status={:?} connect_ms={:?} tls_ms={:?} ttfb_ms={:?}",
                 out.status_code, out.connect_ms, out.tls_ms, out.ttfb_ms
             );
         } else {
-            println!("1.1.1.1 live probe skipped or network error: {:?}", out.error);
+            println!(
+                "1.1.1.1 live probe skipped or network error: {:?}",
+                out.error
+            );
         }
     }
 }

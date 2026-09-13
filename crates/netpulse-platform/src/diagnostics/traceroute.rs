@@ -204,9 +204,8 @@ mod platform {
         };
         let elapsed_ms = start.elapsed().as_secs_f32() * 1000.0;
 
-        let reply = unsafe {
-            std::ptr::read_unaligned(reply_buffer.as_ptr() as *const IcmpEchoReply)
-        };
+        let reply =
+            unsafe { std::ptr::read_unaligned(reply_buffer.as_ptr() as *const IcmpEchoReply) };
 
         let last_err = if replies == 0 {
             unsafe { GetLastError() }
@@ -363,12 +362,7 @@ mod platform {
             }
         }
 
-        fn probe_hop(
-            &self,
-            dest_ip: Ipv4Addr,
-            ttl: u8,
-            timeout_ms: u32,
-        ) -> HopProbeResult {
+        fn probe_hop(&self, dest_ip: Ipv4Addr, ttl: u8, timeout_ms: u32) -> HopProbeResult {
             let timeout = libc::timeval {
                 tv_sec: (timeout_ms / 1000) as libc::time_t,
                 tv_usec: ((timeout_ms % 1000) * 1000) as libc::suseconds_t,
@@ -532,7 +526,10 @@ pub(crate) fn reverse_resolve_with_timeout(ip: Ipv4Addr) -> Option<String> {
     reverse_resolve_with_timeout_and_cancel(ip, &AtomicBool::new(false))
 }
 
-pub(crate) fn reverse_resolve_with_timeout_and_cancel(ip: Ipv4Addr, cancel: &AtomicBool) -> Option<String> {
+pub(crate) fn reverse_resolve_with_timeout_and_cancel(
+    ip: Ipv4Addr,
+    cancel: &AtomicBool,
+) -> Option<String> {
     use std::sync::mpsc;
     use std::thread;
 

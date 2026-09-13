@@ -32,11 +32,7 @@ pub(crate) fn resolve_target_ipv4(target: &str) -> Option<std::net::Ipv4Addr> {
         trimmed
     };
 
-    let without_path = without_scheme
-        .split('/')
-        .next()
-        .unwrap_or("")
-        .trim();
+    let without_path = without_scheme.split('/').next().unwrap_or("").trim();
 
     let cleaned = if without_path.starts_with('[') {
         if let Some(end) = without_path.find(']') {
@@ -136,11 +132,7 @@ mod platform {
         }
     }
 
-    pub fn ping_target(
-        dest_ip: Ipv4Addr,
-        count: u32,
-        cancel: &AtomicBool,
-    ) -> (u32, Vec<f32>) {
+    pub fn ping_target(dest_ip: Ipv4Addr, count: u32, cancel: &AtomicBool) -> (u32, Vec<f32>) {
         let handle = unsafe { IcmpCreateFile() };
         if handle == INVALID_HANDLE_VALUE || handle.is_null() {
             return (count, Vec::new());
@@ -198,7 +190,9 @@ mod platform {
 
             if i + 1 < count && !cancel.load(Ordering::Relaxed) {
                 let sleep_start = Instant::now();
-                while sleep_start.elapsed() < Duration::from_millis(50) && !cancel.load(Ordering::Relaxed) {
+                while sleep_start.elapsed() < Duration::from_millis(50)
+                    && !cancel.load(Ordering::Relaxed)
+                {
                     let remaining = Duration::from_millis(50).saturating_sub(sleep_start.elapsed());
                     std::thread::sleep(Duration::from_millis(10).min(remaining));
                 }
@@ -242,11 +236,7 @@ mod platform {
         !(sum as u16)
     }
 
-    pub fn ping_target(
-        dest_ip: Ipv4Addr,
-        count: u32,
-        cancel: &AtomicBool,
-    ) -> (u32, Vec<f32>) {
+    pub fn ping_target(dest_ip: Ipv4Addr, count: u32, cancel: &AtomicBool) -> (u32, Vec<f32>) {
         // Create unprivileged ICMP datagram socket
         let fd = unsafe { libc::socket(libc::AF_INET, libc::SOCK_DGRAM, libc::IPPROTO_ICMP) };
         if fd < 0 {
@@ -337,7 +327,9 @@ mod platform {
 
             if i + 1 < count && !cancel.load(Ordering::Relaxed) {
                 let sleep_start = Instant::now();
-                while sleep_start.elapsed() < Duration::from_millis(50) && !cancel.load(Ordering::Relaxed) {
+                while sleep_start.elapsed() < Duration::from_millis(50)
+                    && !cancel.load(Ordering::Relaxed)
+                {
                     let remaining = Duration::from_millis(50).saturating_sub(sleep_start.elapsed());
                     std::thread::sleep(Duration::from_millis(10).min(remaining));
                 }
@@ -353,11 +345,7 @@ mod platform {
     use std::net::Ipv4Addr;
     use std::sync::atomic::AtomicBool;
 
-    pub fn ping_target(
-        _dest_ip: Ipv4Addr,
-        count: u32,
-        _cancel: &AtomicBool,
-    ) -> (u32, Vec<f32>) {
+    pub fn ping_target(_dest_ip: Ipv4Addr, count: u32, _cancel: &AtomicBool) -> (u32, Vec<f32>) {
         (count, Vec::new())
     }
 }
@@ -445,11 +433,8 @@ impl DiagnosticProbe for PingProbe {
         let stddev_rtt_ms = if samples.len() <= 1 {
             0.0
         } else {
-            let variance = samples
-                .iter()
-                .map(|&x| (x - raw_avg).powi(2))
-                .sum::<f32>()
-                / samples.len() as f32;
+            let variance =
+                samples.iter().map(|&x| (x - raw_avg).powi(2)).sum::<f32>() / samples.len() as f32;
             round2(variance.sqrt())
         };
 
@@ -466,4 +451,3 @@ impl DiagnosticProbe for PingProbe {
         })
     }
 }
-

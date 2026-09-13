@@ -12,7 +12,7 @@ import type { DiagnosticSession } from "../diagnostic";
 import * as diagnosticModule from "../diagnostic";
 import { validateAndNormalizeTarget, useDiagnosticsController } from "../hooks/useDiagnosticsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
-import { EvidenceNavigationProvider } from "../context/EvidenceNavigationContext";
+import { EvidenceNavigationProvider, useEvidenceNavigation } from "../context/EvidenceNavigationContext";
 import { __resetForTest } from "../state/store";
 import * as ipcModule from "../ipc";
 
@@ -1729,6 +1729,140 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
           await i18n.changeLanguage("en");
         });
       }
+    });
+  });
+
+  describe("Cross-Screen Evidence Navigation Integration", () => {
+    it("initializes target from navigationTarget when screen is diagnostics", () => {
+      const { result } = renderHook(
+        () => {
+          const nav = useEvidenceNavigation();
+          const diag = useDiagnosticsController();
+          return { nav, diag };
+        },
+        {
+          wrapper: EvidenceNavigationProvider,
+        }
+      );
+
+      expect(result.current.diag.target).toBe("1.1.1.1");
+
+      act(() => {
+        result.current.nav.setNavigationTarget({ screen: "diagnostics", target: "192.168.1.50" });
+      });
+
+      expect(result.current.diag.target).toBe("192.168.1.50");
+    });
+
+    it("pre-populates target input on DiagnosticsScreen when navigated with target host", () => {
+      function TestHost() {
+        const { setNavigationTarget } = useEvidenceNavigation();
+        return (
+          <div>
+            <button
+              onClick={() =>
+                setNavigationTarget({ screen: "diagnostics", target: "10.200.1.1" })
+              }
+            >
+              Run Diagnostic Probe
+            </button>
+            <DiagnosticsScreen />
+          </div>
+        );
+      }
+
+      render(
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>
+            <TestHost />
+          </EvidenceNavigationProvider>
+        </DisclosureProvider>
+      );
+
+      const input = screen.getByLabelText("Target Host (e.g. 1.1.1.1, google.com)") as HTMLInputElement;
+      expect(input.value).toBe("1.1.1.1");
+
+      // Click "Run Diagnostic Probe" (e.g. from Dashboard cross-screen navigation)
+      fireEvent.click(screen.getByRole("button", { name: "Run Diagnostic Probe" }));
+
+      // Target input now pre-populated with target host
+      expect(input.value).toBe("10.200.1.1");
+    });
+
+    it("defaults to 1.1.1.1 when navigationTarget does not specify a target host", () => {
+      const { result } = renderHook(
+        () => {
+          const nav = useEvidenceNavigation();
+          const diag = useDiagnosticsController();
+          return { nav, diag };
+        },
+        {
+          wrapper: EvidenceNavigationProvider,
+        }
+      );
+
+      act(() => {
+        result.current.nav.setNavigationTarget({ screen: "diagnostics" });
+      });
+
+      expect(result.current.diag.target).toBe("1.1.1.1");
+    });
+
+    it("ignores navigationTarget targeting another screen", () => {
+      const { result } = renderHook(
+        () => {
+          const nav = useEvidenceNavigation();
+          const diag = useDiagnosticsController();
+          return { nav, diag };
+        },
+        {
+          wrapper: EvidenceNavigationProvider,
+        }
+      );
+
+      act(() => {
+        result.current.nav.setNavigationTarget({ screen: "apps", flowId: 101 });
+      });
+
+      expect(result.current.diag.target).toBe("1.1.1.1");
+    });
+
+    it("trims whitespace from target host in navigationTarget", () => {
+      const { result } = renderHook(
+        () => {
+          const nav = useEvidenceNavigation();
+          const diag = useDiagnosticsController();
+          return { nav, diag };
+        },
+        {
+          wrapper: EvidenceNavigationProvider,
+        }
+      );
+
+      act(() => {
+        result.current.nav.setNavigationTarget({ screen: "diagnostics", target: "  192.168.1.100  " });
+      });
+
+      expect(result.current.diag.target).toBe("192.168.1.100");
+    });
+
+    it("falls back to default 1.1.1.1 when target host is whitespace-only", () => {
+      const { result } = renderHook(
+        () => {
+          const nav = useEvidenceNavigation();
+          const diag = useDiagnosticsController();
+          return { nav, diag };
+        },
+        {
+          wrapper: EvidenceNavigationProvider,
+        }
+      );
+
+      act(() => {
+        result.current.nav.setNavigationTarget({ screen: "diagnostics", target: "   " });
+      });
+
+      expect(result.current.diag.target).toBe("1.1.1.1");
     });
   });
 });

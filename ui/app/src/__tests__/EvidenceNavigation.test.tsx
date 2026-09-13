@@ -39,6 +39,13 @@ describe("EvidenceNavigationContext", () => {
     expect(result.current.screen).toBe("timeline");
     expect(result.current.navigationTarget).toEqual({ screen: "timeline", packetId: 303 });
 
+    // Navigate to diagnostics
+    act(() => {
+      result.current.setNavigationTarget({ screen: "diagnostics", target: "10.0.0.1" });
+    });
+    expect(result.current.screen).toBe("diagnostics");
+    expect(result.current.navigationTarget).toEqual({ screen: "diagnostics", target: "10.0.0.1" });
+
     // Clear navigation target
     act(() => {
       result.current.clearNavigationTarget();

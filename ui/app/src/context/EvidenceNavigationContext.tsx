@@ -25,6 +25,7 @@ export type NavigationTarget =
   | { screen: "apps"; flowId: number }
   | { screen: "journey"; sessionId: number }
   | { screen: "timeline"; packetId?: number; timestamp?: number }
+  | { screen: "diagnostics"; target?: string }
   | null;
 
 export type NavigationSource =
@@ -42,6 +43,7 @@ export interface EvidenceNavigationContextValue {
   screen: Screen;
   navigationTarget: NavigationTarget;
   setScreen: (screen: Screen) => void;
+  setNavigationTarget: (target: NavigationTarget) => void;
   navigateToEvidence: (ref: EvidenceRef, source?: NavigationSource) => void;
   clearNavigationTarget: () => void;
 }
@@ -50,27 +52,34 @@ export const EvidenceNavigationContext = createContext<EvidenceNavigationContext
 
 export function EvidenceNavigationProvider({ children }: { children: ReactNode }) {
   const [screen, setScreenState] = useState<Screen>("dashboard");
-  const [navigationTarget, setNavigationTarget] = useState<NavigationTarget>(null);
+  const [navigationTarget, setNavigationTargetState] = useState<NavigationTarget>(null);
 
   const setScreen = useCallback((newScreen: Screen) => {
     setScreenState(newScreen);
   }, []);
 
+  const setNavigationTarget = useCallback((target: NavigationTarget) => {
+    setNavigationTargetState(target);
+    if (target?.screen) {
+      setScreenState(target.screen);
+    }
+  }, []);
+
   const navigateToEvidence = useCallback((ref: EvidenceRef, _source?: NavigationSource) => {
     if (ref.kind === "flow") {
-      setNavigationTarget({ screen: "apps", flowId: ref.id });
+      setNavigationTargetState({ screen: "apps", flowId: ref.id });
       setScreenState("apps");
     } else if (ref.kind === "session") {
-      setNavigationTarget({ screen: "journey", sessionId: ref.id });
+      setNavigationTargetState({ screen: "journey", sessionId: ref.id });
       setScreenState("journey");
     } else if (ref.kind === "packet") {
-      setNavigationTarget({ screen: "timeline", packetId: ref.id });
+      setNavigationTargetState({ screen: "timeline", packetId: ref.id });
       setScreenState("timeline");
     }
   }, []);
 
   const clearNavigationTarget = useCallback(() => {
-    setNavigationTarget(null);
+    setNavigationTargetState(null);
   }, []);
 
   const value = useMemo(
@@ -78,10 +87,11 @@ export function EvidenceNavigationProvider({ children }: { children: ReactNode }
       screen,
       navigationTarget,
       setScreen,
+      setNavigationTarget,
       navigateToEvidence,
       clearNavigationTarget,
     }),
-    [screen, navigationTarget, setScreen, navigateToEvidence, clearNavigationTarget]
+    [screen, navigationTarget, setScreen, setNavigationTarget, navigateToEvidence, clearNavigationTarget]
   );
 
   return (

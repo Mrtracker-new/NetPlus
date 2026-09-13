@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { PingResult, TracerouteHop, TracerouteResult, BufferbloatResult } from "@netpulse/contract";
 import { query } from "../ipc";
 import { executeDiagnosticPipeline, type DiagnosticSession } from "../diagnostic";
+import { useOptionalEvidenceNavigation } from "../context/EvidenceNavigationContext";
 
 export type ProbeStatus = "idle" | "running" | "success" | "error";
 
@@ -82,6 +83,9 @@ export function validateAndNormalizeTarget(rawInput: string): { isValid: boolean
 
 export function useDiagnosticsController() {
   const { t } = useTranslation(["diagnostics", "common"]);
+  const navContext = useOptionalEvidenceNavigation();
+  const navigationTarget = navContext?.navigationTarget;
+
   const isMountedRef = useRef(true);
   const cancelRef = useRef(false);
   const pipelineRunIdRef = useRef(0);
@@ -94,7 +98,18 @@ export function useDiagnosticsController() {
     };
   }, []);
 
-  const [target, setTarget] = useState("1.1.1.1");
+  const [target, setTarget] = useState(() => {
+    if (navigationTarget?.screen === "diagnostics" && navigationTarget.target?.trim()) {
+      return navigationTarget.target.trim();
+    }
+    return "1.1.1.1";
+  });
+
+  useEffect(() => {
+    if (navigationTarget?.screen === "diagnostics" && navigationTarget.target?.trim()) {
+      setTarget(navigationTarget.target.trim());
+    }
+  }, [navigationTarget]);
   const [notice, setNotice] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
 

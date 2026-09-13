@@ -6348,7 +6348,7 @@ button {
   text-align: left;
 }
 .np-diagnostics__capability-card {
-  background: var(--np-surface-1);
+  background: var(--np-surface-elevated);
   border: 1px solid var(--np-border);
   border-radius: var(--np-radius);
   padding: var(--np-4);

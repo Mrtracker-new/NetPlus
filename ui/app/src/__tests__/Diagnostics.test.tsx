@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, within, act } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import axe from "axe-core";
 import i18n from "../i18n";
 import { DiagnosticsScreen } from "../screens/Diagnostics";
 import { DeepDiagnosticCard } from "../screens/Diagnostics/DeepDiagnosticCard";
 import { PingResultCard, getJitterColor } from "../screens/Diagnostics/PingResultCard";
+import { TracerouteCard } from "../screens/Diagnostics/TracerouteCard";
+import { BufferbloatCard } from "../screens/Diagnostics/BufferbloatCard";
 import type { DiagnosticSession } from "../diagnostic";
 import { validateAndNormalizeTarget } from "../hooks/useDiagnosticsController";
 import { DisclosureProvider } from "../modes/DisclosureContext";
@@ -1214,4 +1217,228 @@ describe("PingResultCard Jitter Standard Deviation & Semantic Coloring", () => {
       });
     }
   });
+
+  describe("Accessibility & Document Heading Hierarchy", () => {
+    it("Empty state has valid heading hierarchy under h1 with no skipped levels according to axe-core", async () => {
+      const { container } = render(<DiagnosticsTestWrapper />);
+
+      // Document title is h1
+      const h1 = screen.getByRole("heading", { level: 1 });
+      expect(h1).toHaveTextContent("Active Network Diagnostics");
+
+      // Empty state title is h2 (promoted from h3)
+      const h2s = screen.getAllByRole("heading", { level: 2 });
+      expect(h2s.map((h) => h.textContent)).toContain("Active Network Diagnostics");
+
+      // Capability card titles are h3 (promoted from h4)
+      const h3s = screen.getAllByRole("heading", { level: 3 });
+      expect(h3s.map((h) => h.textContent)).toEqual([
+        "Full Analysis",
+        "Ping Probe",
+        "Traceroute",
+        "Bufferbloat Test",
+      ]);
+
+      // Confirm no h4 or h5 in empty state
+      expect(screen.queryAllByRole("heading", { level: 4 })).toHaveLength(0);
+
+      // Run axe-core heading-order audit
+      const axeResults = await axe.run(container, { runOnly: ["heading-order"] });
+      expect(axeResults.violations).toEqual([]);
+    });
+
+    it("Probe result cards and deep assessment cards have valid h2 headings with no skipped levels according to axe-core", async () => {
+      const sessionWithAnomaly: DiagnosticSession = {
+        sessionId: 101,
+        status: "completed",
+        target: "1.1.1.1",
+        startedAt: Date.now() - 5000,
+        completedAt: Date.now(),
+        diagnoses: [
+          {
+            category: "GATEWAY",
+            severity: "elevated",
+            confidence: 0.88,
+            summary: "High Gateway Latency",
+            explanation: "Gateway RTT exceeds baseline threshold.",
+            evidence: [],
+          },
+        ],
+        observations: [
+          { key: "target_ping_rtt", severity: "elevated", value: 85, metricName: "RTT", source: "live", quality: "high" },
+          { key: "target_packet_loss", severity: "normal", value: 0, metricName: "Loss", source: "live", quality: "high" },
+        ],
+        recommendations: [
+          {
+            key: "reboot_router",
+            title: "Reboot Primary Gateway",
+            description: "Power cycle your router to clear state.",
+            actionType: "hardware",
+            priority: "high",
+          },
+        ],
+      };
+
+      const { container } = render(
+        <DisclosureProvider>
+          <EvidenceNavigationProvider>
+            <section className="np-diagnostics">
+              <header>
+                <h1 className="np-hero__title">Active Network Diagnostics</h1>
+              </header>
+              <div className="np-diagnostics-results-flow">
+                <DeepDiagnosticCard session={sessionWithAnomaly} activeStage={null} />
+                <PingResultCard
+                  result={{
+                    target: "1.1.1.1",
+                    sent: 4,
+                    received: 4,
+                    lossPct: 0,
+                    minRttMs: 10,
+                    avgRttMs: 14,
+                    maxRttMs: 18,
+                    jitterMs: 1.2,
+                    source: "live",
+                  }}
+                />
+                <TracerouteCard
+                  target="1.1.1.1"
+                  hops={[
+                    { ttl: 1, ip: "192.168.1.1", hostname: "router.local", rttMs: 2, source: "live" },
+                    { ttl: 2, ip: "1.1.1.1", hostname: "one.one.one.one", rttMs: 14, source: "live" },
+                  ]}
+                />
+                <BufferbloatCard
+                  target="1.1.1.1"
+                  result={{
+                    target: "1.1.1.1",
+                    grade: "A",
+                    idleRttMs: 12,
+                    loadedRttMs: 16,
+                    deltaRttMs: 4,
+                    source: "live",
+                  }}
+                />
+              </div>
+            </section>
+          </EvidenceNavigationProvider>
+        </DisclosureProvider>
+      );
+
+      // Verify all card titles are h2
+      const h2Headings = screen.getAllByRole("heading", { level: 2 });
+      const h2Texts = h2Headings.map((h) => h.textContent);
+      expect(h2Texts).toContain("Diagnostic Assessment & Findings");
+      expect(h2Texts).toContain("Ping Results for 1.1.1.1");
+      expect(h2Texts).toContain("Traceroute Hops for 1.1.1.1 (2 hops)");
+      expect(h2Texts).toContain("Bufferbloat Scorecard for 1.1.1.1");
+
+      // Verify sub-finding is h3 under DeepDiagnosticCard
+      const h3Headings = screen.getAllByRole("heading", { level: 3 });
+      expect(h3Headings.map((h) => h.textContent)).toContain("High Gateway Latency");
+
+      // Verify remediation is h4 under DeepDiagnosticCard
+      const h4Headings = screen.getAllByRole("heading", { level: 4 });
+      expect(h4Headings.map((h) => h.textContent)).toContain("Recommended Remediation Actions");
+
+      // Run axe-core heading-order audit
+      const axeResults = await axe.run(container, { runOnly: ["heading-order"] });
+      expect(axeResults.violations).toEqual([]);
+    });
+
+    it("In-flight analysis state satisfies axe-core heading-order", async () => {
+      const runningSession: DiagnosticSession = {
+        sessionId: 102,
+        status: "running",
+        target: "1.1.1.1",
+        startedAt: Date.now(),
+        diagnoses: [],
+        observations: [],
+        recommendations: [],
+      };
+
+      const { container } = render(
+        <section className="np-diagnostics">
+          <h1>Active Network Diagnostics</h1>
+          <DeepDiagnosticCard session={runningSession} activeStage="dns" />
+        </section>
+      );
+
+      const h2 = screen.getByRole("heading", { level: 2 });
+      expect(h2).toHaveTextContent("Diagnostic Assessment & Findings");
+
+      const h3 = screen.getByRole("heading", { level: 3 });
+      expect(h3).toHaveTextContent("In-Flight Analysis");
+
+      const axeResults = await axe.run(container, { runOnly: ["heading-order"] });
+      expect(axeResults.violations).toEqual([]);
+    });
+
+    it("Nominal (no bottleneck detected) state satisfies axe-core heading-order", async () => {
+      const nominalSession: DiagnosticSession = {
+        sessionId: 103,
+        status: "completed",
+        target: "1.1.1.1",
+        startedAt: Date.now() - 3000,
+        completedAt: Date.now(),
+        diagnoses: [],
+        observations: [],
+        recommendations: [],
+      };
+
+      const { container } = render(
+        <section className="np-diagnostics">
+          <h1>Active Network Diagnostics</h1>
+          <DeepDiagnosticCard session={nominalSession} activeStage={null} />
+        </section>
+      );
+
+      const h2 = screen.getByRole("heading", { level: 2 });
+      expect(h2).toHaveTextContent("Diagnostic Assessment & Findings");
+
+      const h3 = screen.getByRole("heading", { level: 3 });
+      expect(h3).toHaveTextContent("No clear bottleneck detected");
+
+      const axeResults = await axe.run(container, { runOnly: ["heading-order"] });
+      expect(axeResults.violations).toEqual([]);
+    });
+
+    it("handles 100% packet loss unreachable ping probe safely without false green 0ms jitter", () => {
+      render(
+        <PingResultCard
+          result={{
+            target: "10.255.255.1",
+            sent: 4,
+            received: 0,
+            lossPct: 100,
+            minRttMs: 0,
+            avgRttMs: 0,
+            maxRttMs: 0,
+            jitterMs: 0,
+            source: "live",
+          }}
+        />
+      );
+
+      // Packet loss pod is finding color
+      expect(screen.getByText("100%")).toHaveStyle({ color: "var(--np-finding)" });
+
+      // Sent / Received
+      expect(screen.getByText("4 / 0")).toBeInTheDocument();
+
+      // Avg RTT and Jitter display as em-dash with muted color instead of green 0ms
+      const dashes = screen.getAllByText("—");
+      expect(dashes.length).toBeGreaterThanOrEqual(2);
+
+      // Provenance attribute is normalized
+      const badge = screen.getByText("live");
+      expect(badge).toHaveAttribute("data-provenance", "live");
+      expect(badge).toHaveClass("np-diagnostics-provenance--live");
+
+      // Article is properly labelled by heading
+      const article = document.querySelector("article");
+      expect(article).toHaveAttribute("aria-labelledby", "ping-result-heading");
+    });
+  });
 });
+

@@ -14,12 +14,14 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result }: T
   const target = result?.target ?? propTarget ?? "";
   const hops = result?.hops ?? propHops ?? [];
 
+  const headingId = "traceroute-card-title";
+
   return (
-    <article className="np-diagnostics__result" aria-label={t("traceroute.title", { target, count: hops.length })}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem" }}>
-        <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
+    <article className="np-diagnostics__result" aria-labelledby={headingId}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
+        <h2 id={headingId} style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
           {t("traceroute.title", { target, count: hops.length })}
-        </h3>
+        </h2>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
           <span
             style={{
@@ -79,7 +81,7 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result }: T
               </span>
 
               {/* Per-hop provenance badge if exposed */}
-              {h.source && (
+              {h.source ? (
                 <span
                   className={`np-diagnostics-provenance ${
                     hopSource === "live"
@@ -89,13 +91,13 @@ export function TracerouteCard({ target: propTarget, hops: propHops, result }: T
                       : hopSource === "derived"
                       ? "np-diagnostics-provenance--derived"
                       : "np-diagnostics-provenance--unavailable"
-                  }`}
+                  }`.trim()}
                   style={{ fontSize: "0.6rem", padding: "0.1rem 0.35rem" }}
-                  data-provenance={h.source}
+                  data-provenance={hopSource}
                 >
                   {h.source}
                 </span>
-              )}
+              ) : null}
 
               <span style={{ color: nodeColorVar, fontWeight: 600, fontFamily: "var(--np-font-mono)" }}>
                 {isTimeout ? "timeout" : `${formatMs(rtt)} ms`}

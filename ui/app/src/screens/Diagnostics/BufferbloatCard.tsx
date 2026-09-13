@@ -46,13 +46,15 @@ export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardP
       ? { gaming: "Moderate", voip: "Good", uploads: "Acceptable" }
       : { gaming: "Poor", voip: "Degraded", uploads: "Severe Lag" };
 
+  const headingId = "bufferbloat-card-title";
+
   return (
-    <article className="np-diagnostics__result" aria-label={t("bufferbloat.title", { target })}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+    <article className="np-diagnostics__result" aria-labelledby={headingId}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem", marginBottom: "0.75rem" }}>
         <div>
-          <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
+          <h2 id={headingId} style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600, color: "var(--np-text)" }}>
             {t("bufferbloat.title", { target })}
-          </h3>
+          </h2>
           <span style={{ fontSize: "0.75rem", color: "var(--np-text-dim)" }}>
             {t("bufferbloat.subtitle")}
           </span>
@@ -60,14 +62,14 @@ export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardP
 
         {/* Tactile Grade Medallion & Provenance Badge */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-          {result.source && (
+          {result.source ? (
             <span
-              className={`np-diagnostics-provenance ${provenanceClass}`}
-              data-provenance={result.source}
+              className={`np-diagnostics-provenance ${provenanceClass}`.trim()}
+              data-provenance={sourceNormalized}
             >
               {result.source}
             </span>
-          )}
+          ) : null}
           <span style={{ fontSize: "0.85rem", color: "var(--np-text-dim)", fontWeight: 500 }}>
             {t("bufferbloat.grade")}
           </span>
@@ -91,9 +93,9 @@ export function BufferbloatCard({ target: propTarget, result }: BufferbloatCardP
           style={{ marginBottom: "0.75rem" }}
         >
           <span>{t("bufferbloat.idle_rtt", { idle: idleRttStr })}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
+          <span style={{ opacity: 0.4 }} aria-hidden="true">·</span>
           <span>{t("bufferbloat.loaded_rtt", { loaded: loadedRttStr })}</span>
-          <span style={{ opacity: 0.4 }}>·</span>
+          <span style={{ opacity: 0.4 }} aria-hidden="true">·</span>
           <span style={{ color: "var(--np-notable)", fontWeight: 600 }}>
             {t("bufferbloat.delta_rtt", { delta: deltaRttStr })}
           </span>

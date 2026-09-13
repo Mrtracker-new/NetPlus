@@ -24,7 +24,7 @@ export function EmptyDiagnosticsState({
         <Icon name="diagnostics" />
       </div>
 
-      <h3
+      <h2
         style={{
           margin: "0 0 0.4rem 0",
           fontSize: "1.15rem",
@@ -33,7 +33,7 @@ export function EmptyDiagnosticsState({
         }}
       >
         {t("title")}
-      </h3>
+      </h2>
 
       <p
         style={{
@@ -56,7 +56,7 @@ export function EmptyDiagnosticsState({
               <Icon name="microscope" />
             </div>
             <div>
-              <h4 className="np-diagnostics__capability-title">{t("capabilities.full_analysis.title")}</h4>
+              <h3 className="np-diagnostics__capability-title">{t("capabilities.full_analysis.title")}</h3>
               <span style={{ fontSize: "0.72rem", color: "var(--np-text-mute)" }}>{t("capabilities.full_analysis.subtitle")}</span>
             </div>
           </div>
@@ -89,7 +89,7 @@ export function EmptyDiagnosticsState({
               <Icon name="radio" />
             </div>
             <div>
-              <h4 className="np-diagnostics__capability-title">{t("capabilities.ping.title")}</h4>
+              <h3 className="np-diagnostics__capability-title">{t("capabilities.ping.title")}</h3>
               <span style={{ fontSize: "0.72rem", color: "var(--np-text-mute)" }}>{t("capabilities.ping.subtitle")}</span>
             </div>
           </div>
@@ -122,7 +122,7 @@ export function EmptyDiagnosticsState({
               <Icon name="timeline" />
             </div>
             <div>
-              <h4 className="np-diagnostics__capability-title">{t("capabilities.traceroute.title")}</h4>
+              <h3 className="np-diagnostics__capability-title">{t("capabilities.traceroute.title")}</h3>
               <span style={{ fontSize: "0.72rem", color: "var(--np-text-mute)" }}>{t("capabilities.traceroute.subtitle")}</span>
             </div>
           </div>
@@ -155,7 +155,7 @@ export function EmptyDiagnosticsState({
               <Icon name="zap" />
             </div>
             <div>
-              <h4 className="np-diagnostics__capability-title">{t("capabilities.bufferbloat.title")}</h4>
+              <h3 className="np-diagnostics__capability-title">{t("capabilities.bufferbloat.title")}</h3>
               <span style={{ fontSize: "0.72rem", color: "var(--np-text-mute)" }}>{t("capabilities.bufferbloat.subtitle")}</span>
             </div>
           </div>

@@ -129,14 +129,16 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
       ? "elevated"
       : "normal";
 
+  const headingId = "deep-assessment-card-title";
+
   return (
-    <article className="np-diagnostics-assessment" aria-label={t("assessment.title")}>
+    <article className="np-diagnostics-assessment" aria-labelledby={headingId}>
       {/* 1. Header: Session & Stage Status */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.5rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          <h3 style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700, color: "var(--np-text)" }}>
+          <h2 id={headingId} style={{ margin: 0, fontSize: "1.15rem", fontWeight: 700, color: "var(--np-text)" }}>
             {t("assessment.title")}
-          </h3>
+          </h2>
           <span
             style={{
               padding: "0.2rem 0.5rem",
@@ -241,9 +243,9 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                 {t("assessment.status.analyzing")}
               </span>
             </div>
-            <h4 className="np-diagnostics-finding-title">
+            <h3 className="np-diagnostics-finding-title">
               {t("assessment.in_flight_title", "In-Flight Analysis")}
-            </h4>
+            </h3>
             <div style={{ display: "flex", flexDirection: "column", gap: "0.4rem", marginTop: "0.4rem" }}>
               <Skeleton variant="text" width="75%" height="16px" />
               <Skeleton variant="text" width="55%" height="14px" />
@@ -286,7 +288,7 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
                 {t("assessment.severity." + topDiagnosis.severity, topDiagnosis.severity)}
               </span>
             </div>
-            <h4 className="np-diagnostics-finding-title">{t(topDiagnosis.summary, topDiagnosis.summary)}</h4>
+            <h3 className="np-diagnostics-finding-title">{t(topDiagnosis.summary, topDiagnosis.summary)}</h3>
             <p className="np-diagnostics-finding-desc">{t(topDiagnosis.explanation, topDiagnosis.explanation)}</p>
           </div>
 
@@ -309,9 +311,9 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
         <div className="np-diagnostics-no-bottleneck">
           <Icon name="check" style={{ width: "20px", height: "20px", color: "var(--np-good)", flexShrink: 0 }} />
           <div>
-            <h4 style={{ margin: "0 0 0.2rem 0", fontSize: "0.95rem", fontWeight: 700, color: "var(--np-good)" }}>
+            <h3 style={{ margin: "0 0 0.2rem 0", fontSize: "0.95rem", fontWeight: 700, color: "var(--np-good)" }}>
               {t("assessment.no_bottleneck_title")}
-            </h4>
+            </h3>
             <p style={{ margin: 0, fontSize: "0.8rem", color: "var(--np-text-dim)" }}>
               {t("assessment.no_bottleneck_desc")}
             </p>
@@ -556,9 +558,9 @@ export function DeepDiagnosticCard({ session, activeStage }: DeepDiagnosticCardP
       {/* 5. Authoritative Recommendations */}
       {recommendations.length > 0 && (
         <div>
-          <h5 style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", fontWeight: 700, color: "var(--np-text)" }}>
+          <h4 style={{ margin: "0 0 0.5rem 0", fontSize: "0.85rem", fontWeight: 700, color: "var(--np-text)" }}>
             {t("assessment.remediations_title")}
-          </h5>
+          </h4>
           <div className="np-diagnostics-remediation-list">
             {recommendations.map((rec, i) => (
               <div key={i} className="np-diagnostics-remediation-item">

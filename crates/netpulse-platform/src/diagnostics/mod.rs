@@ -104,13 +104,86 @@ mod tests {
     #[test]
     fn test_traceroute_transports_cross_platform() {
         for transport in ["icmp", "udp", "tcp_syn"] {
-            let probe = TracerouteProbe::new("1.1.1.1".into(), transport.into(), 5);
+            let probe = TracerouteProbe::new("1.1.1.1".into(), transport.into(), 3);
             let cancel = AtomicBool::new(false);
             let out = probe.run(cancel).expect("traceroute probe run");
             assert!(!out.hops.is_empty());
-            assert!(out.hops.len() <= 5);
-            assert_eq!(out.source, "simulated");
+            assert!(out.hops.len() <= 3);
+            assert_eq!(out.source, "live");
+            // Check that first hop discovered has valid TTL and status
+            let first = &out.hops[0];
+            assert_eq!(first.ttl, 1);
+            assert!(first.status == "Reached" || first.status == "timeout");
         }
+    }
+
+    #[test]
+    fn test_traceroute_cancellation() {
+        let probe = TracerouteProbe::new("1.1.1.1".into(), "icmp".into(), 10);
+        let cancel = AtomicBool::new(true);
+        let out = probe.run(cancel).expect("traceroute probe run");
+        assert!(out.hops.is_empty());
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_traceroute_invalid_target() {
+        let probe = TracerouteProbe::new("invalid.nonexistent.domain.test".into(), "icmp".into(), 4);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("traceroute probe run");
+        assert!(out.hops.is_empty());
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_traceroute_unspecified_ip() {
+        let probe = TracerouteProbe::new("0.0.0.0".into(), "icmp".into(), 4);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("traceroute probe run");
+        assert!(out.hops.is_empty());
+        assert_eq!(out.source, "live");
+    }
+
+    #[test]
+    fn test_traceroute_localhost() {
+        let probe = TracerouteProbe::new("127.0.0.1".into(), "icmp".into(), 5);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("traceroute probe run");
+        assert_eq!(out.source, "live");
+        assert_eq!(out.hops.len(), 1);
+        assert_eq!(out.hops[0].ip, "127.0.0.1");
+        assert_eq!(out.hops[0].status, "Reached");
+        assert!(out.hops[0].rtt_ms > 0.0);
+    }
+
+    #[test]
+    fn test_traceroute_live_network_hops_detail() {
+        let probe = TracerouteProbe::new("1.1.1.1".into(), "icmp".into(), 12);
+        let cancel = AtomicBool::new(false);
+        let out = probe.run(cancel).expect("traceroute probe run");
+        assert_eq!(out.source, "live");
+        assert!(!out.hops.is_empty());
+        for hop in &out.hops {
+            println!("Hop {}: IP='{}' Hostname='{:?}' RTT={}ms Status='{}'", hop.ttl, hop.ip, hop.hostname, hop.rtt_ms, hop.status);
+            if hop.status == "timeout" {
+                assert_eq!(hop.ip, "*");
+                assert_eq!(hop.rtt_ms, 0.0);
+            } else {
+                assert_ne!(hop.ip, "*");
+                assert!(hop.rtt_ms >= 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_traceroute_reverse_dns() {
+        use std::net::Ipv4Addr;
+        let one_one: Ipv4Addr = "1.1.1.1".parse().unwrap();
+        let hostname = super::traceroute::reverse_resolve_with_timeout(one_one);
+        println!("Reverse DNS 1.1.1.1 => {:?}", hostname);
+        assert!(hostname.is_some());
+        let h = hostname.unwrap().to_lowercase();
+        assert!(h.contains("one.one.one.one") || h.contains("cloudflare"));
     }
 
     #[test]

@@ -22,7 +22,7 @@ impl PingProbe {
     }
 }
 
-fn resolve_target_ipv4(target: &str) -> Option<std::net::Ipv4Addr> {
+pub(crate) fn resolve_target_ipv4(target: &str) -> Option<std::net::Ipv4Addr> {
     let trimmed = target.trim();
     // Strip any URL scheme (e.g. "https://", "http://", "HTTP://")
     let without_scheme = if let Some(idx) = trimmed.find("://") {

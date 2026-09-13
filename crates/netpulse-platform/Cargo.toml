@@ -19,6 +19,8 @@ netpulse-core = { path = "../netpulse-core" }
 serde.workspace = true
 tracing.workspace = true
 httparse.workspace = true
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+webpki-roots = "1"
 # The libpcap/Npcap binding — only compiled when `live-capture` is enabled, which
 # we only do on Windows. Encapsulates all the FFI `unsafe`, so this crate keeps
 # `#![forbid(unsafe_code)]`. Requires the Npcap SDK at build and Npcap at runtime.

@@ -45,10 +45,6 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             to_mono_nanos,
             time_range,
         } => {
-            let depth = match state.depth.lock() {
-                Ok(g) => *g,
-                Err(p) => *p.into_inner(),
-            };
             let capture_running = state.capture.lock().map(|g| g.is_some()).unwrap_or(false);
             let active_stats = if capture_running {
                 stats
@@ -56,9 +52,11 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 netpulse_capture::CaptureStats::default()
             };
             let correlator = state.correlator.lock().ok();
-            let mut view = netpulse_engine::pipeline::present_window(
+            // Monitoring projects only the monitor: this query is polled every 1.5 s,
+            // and building the narrative/session view for it (then discarding it) was
+            // pure cost on the hot path.
+            let mut monitor = netpulse_engine::pipeline::monitor_window(
                 &store,
-                depth,
                 active_stats,
                 correlator.as_deref(),
                 state.sockets.as_deref(),
@@ -69,15 +67,13 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             // Capture lifecycle strictly dominates: if capture is not running,
             // telemetry_state is Standby, regardless of historical flows in store.
             if !capture_running {
-                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
+                monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
             } else if active_stats.received > 0 || !store.session_ids().is_empty() {
-                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Active;
+                monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Active;
             } else {
-                view.monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
+                monitor.telemetry_state = netpulse_api::dto::TelemetryStateDto::Standby;
             }
-            Ok(QueryResponse::MonitorSnapshot {
-                snapshot: view.monitor,
-            })
+            Ok(QueryResponse::MonitorSnapshot { snapshot: monitor })
         }
         Query::JourneyOfSession { session_id, depth } => {
             let view = present(&store, crate::to_depth(depth), stats);
@@ -221,8 +217,20 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 Ok(g) => *g,
                 Err(p) => *p.into_inner(),
             };
+            // Hand the detectors the same owners the monitoring projection shows.
+            // Passing an empty map here kept every attribution-dependent detector
+            // silent while the UI happily displayed a process for the same flow.
+            let correlator = state.correlator.lock().map_err(|_| "state poisoned")?;
+            let sockets = state.sockets.as_deref();
             Ok(QueryResponse::Findings {
-                findings: present_security(&store, from_mono_nanos, to_mono_nanos, depth),
+                findings: present_security(
+                    &store,
+                    from_mono_nanos,
+                    to_mono_nanos,
+                    depth,
+                    Some(&correlator),
+                    sockets,
+                ),
             })
         }
         Query::AskAssistant { question } => Ok(QueryResponse::AssistantAnswer {
@@ -324,20 +332,85 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
                 .is_some();
             let flow_count = store.flow_count();
             let session_count = store.session_count();
-            let check = netpulse_api::ComponentCheckDto {
-                component: "storage".into(),
-                status: "healthy".into(),
-                message: None,
+
+            // State what is actually true rather than a hard-coded "healthy": a store
+            // with no durable backing loses this session's capture, and a durable
+            // mirror that dropped writes has already lost data.
+            let durable = store.durable_health();
+            let (persistence_status, persistence_message) = match &durable {
+                Some(health) if health.is_healthy() => (
+                    "healthy",
+                    format!("durable write-behind store at {}", health.path),
+                ),
+                Some(health) => (
+                    "degraded",
+                    format!(
+                        "durable store dropped {} writes (last error: {})",
+                        health.failed,
+                        health.last_error.as_deref().unwrap_or("unreported")
+                    ),
+                ),
+                None => (
+                    "warning",
+                    "no durable store is attached: this session's capture data is not persisted"
+                        .to_string(),
+                ),
+            };
+
+            let checks = vec![
+                netpulse_api::ComponentCheckDto {
+                    component: "storage".into(),
+                    status: "healthy".into(),
+                    message: Some(format!(
+                        "{flow_count} flows, {session_count} sessions in memory"
+                    )),
+                },
+                netpulse_api::ComponentCheckDto {
+                    component: "persistence".into(),
+                    status: persistence_status.into(),
+                    message: Some(persistence_message),
+                },
+                netpulse_api::ComponentCheckDto {
+                    component: "diagnostics".into(),
+                    status: "healthy".into(),
+                    message: Some(format!(
+                        "{} of {} diagnostics probe slots in use",
+                        state.probe_gate.in_flight(),
+                        crate::ProbeGate::MAX_CONCURRENT
+                    )),
+                },
+                netpulse_api::ComponentCheckDto {
+                    component: "capture".into(),
+                    status: if capture_running {
+                        "healthy"
+                    } else {
+                        "warning"
+                    }
+                    .into(),
+                    message: Some(if capture_running {
+                        "live capture is running".into()
+                    } else {
+                        "no live capture is running".into()
+                    }),
+                },
+            ];
+            let overall = if checks
+                .iter()
+                .any(|c| c.status == "degraded" || c.status == "critical")
+            {
+                "degraded"
+            } else {
+                "healthy"
             };
             let status = netpulse_api::HealthStatusDto {
                 schema_version: 1,
-                status: "healthy".into(),
-                uptime_secs: 0,
+                status: overall.into(),
+                uptime_secs: state.started_at.elapsed().as_secs(),
                 capture_running,
                 active_flows: flow_count,
                 active_sessions: session_count,
                 store_records: (flow_count + session_count) as u64,
-                checks: vec![check],
+                checks,
                 version: "0.1.0".into(),
                 api_version: netpulse_api::API_VERSION,
             };
@@ -358,8 +431,10 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         Query::RunPing { target, count } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, PingProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            // A probe can block for seconds; never hold the store lock across it.
+            drop(store);
             let probe = PingProbe::new(target, count);
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::PingResult {
                 result: netpulse_api::PingResultDto {
@@ -381,8 +456,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             max_hops,
         } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, TracerouteProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
             let probe = TracerouteProbe::new(target, transport, max_hops);
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             let hops = out
                 .hops
@@ -403,8 +479,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         Query::RunBufferbloatTest { target } => {
             use netpulse_platform::diagnostics::{BufferbloatProbe, DiagnosticProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
             let probe = BufferbloatProbe::new(target);
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::BufferbloatResult {
                 result: netpulse_api::BufferbloatResultDto {
@@ -419,8 +496,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         Query::DiscoverGateway => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, GatewayProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
             let probe = GatewayProbe::new();
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::GatewayResult {
                 result: netpulse_api::GatewayResultDto {
@@ -433,8 +511,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         Query::RunDnsProbe { target } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, DnsProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
             let probe = DnsProbe::new(target);
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::DnsResult {
                 result: netpulse_api::DnsResultDto {
@@ -449,8 +528,9 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
         }
         Query::RunHttpProbe { url } => {
             use netpulse_platform::diagnostics::{DiagnosticProbe, HttpProbe};
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
             let probe = HttpProbe::new(url);
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let out = probe.run(cancel).map_err(|e| e.to_string())?;
             Ok(QueryResponse::HttpResult {
                 result: netpulse_api::HttpResultDto {
@@ -511,7 +591,8 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             };
             use netpulse_platform::diagnostics::DiagnosticProbe;
 
-            let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+            let (_probe_permit, cancel) = probe_cancel(state)?;
+            drop(store);
 
             let result = match stage {
                 DiagnosticChainStageKindDto::Device | DiagnosticChainStageKindDto::Interface => {
@@ -835,24 +916,40 @@ pub fn execute_query(state: &AppState, query: Query) -> Result<QueryResponse, St
             Ok(QueryResponse::StageProbeResult { result })
         }
         Query::ListFleetHosts => {
-            let agent = netpulse_capture_svc::agent::FleetAgent::new(
-                "server-east-01".into(),
-                "Linux".into(),
-            );
-            Ok(QueryResponse::FleetHosts {
-                hosts: vec![netpulse_api::HostIdentityDto {
-                    host_id: agent.identity.host_id,
-                    hostname: agent.identity.hostname,
-                    friendly_name: agent.identity.friendly_name,
-                    os: agent.identity.os,
-                    platform: agent.identity.platform,
-                    agent_version: agent.identity.agent_version,
-                    status: agent.health.status,
-                }],
-            })
+            // Honest empty fleet. The shell runs no capture agent and has discovered
+            // no peers, so an empty list is the truth; the previous implementation
+            // synthesized a "server-east-01" host with a fabricated health status,
+            // which made the Fleet surface look like it was monitoring something.
+            Ok(QueryResponse::FleetHosts { hosts: Vec::new() })
         }
         _ => Ok(QueryResponse::PayloadsUnavailable),
     }
+}
+
+/// Reserve a diagnostics-probe slot and hand back the shared cancel flag.
+///
+/// The permit must be held for the probe's whole duration (binding it in the caller's
+/// arm does that). Reserving refuses — rather than queues — once
+/// [`crate::ProbeGate::MAX_CONCURRENT`] probes are running, so a page that re-issues
+/// probe queries gets an immediate honest answer instead of an unbounded backlog of
+/// network probes, and shutdown can cancel the ones already in flight.
+#[allow(clippy::type_complexity)]
+fn probe_cancel(
+    state: &AppState,
+) -> Result<
+    (
+        crate::ProbePermit,
+        std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ),
+    String,
+> {
+    let permit = state.probe_gate.try_acquire().ok_or_else(|| {
+        format!(
+            "too many diagnostics probes are already running (limit {})",
+            crate::ProbeGate::MAX_CONCURRENT
+        )
+    })?;
+    Ok((permit, state.probe_gate.cancel_token()))
 }
 
 /// Validate that a probe target is a legitimate, non-malformed IP address or hostname.

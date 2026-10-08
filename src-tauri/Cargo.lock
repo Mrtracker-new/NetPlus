@@ -2200,18 +2200,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "netpulse-capture-svc"
-version = "0.1.0"
-dependencies = [
- "netpulse-capture",
- "netpulse-core",
- "netpulse-platform",
- "serde",
- "serde_json",
- "tracing",
-]
-
-[[package]]
 name = "netpulse-core"
 version = "0.1.0"
 dependencies = [
@@ -2325,7 +2313,6 @@ dependencies = [
  "httparse",
  "netpulse-api",
  "netpulse-capture",
- "netpulse-capture-svc",
  "netpulse-core",
  "netpulse-decode",
  "netpulse-engine",

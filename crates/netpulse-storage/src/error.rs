@@ -55,6 +55,12 @@ pub enum StorageError {
 
     #[error("Storage referential integrity violation: {reason}")]
     IntegrityViolation { reason: String },
+
+    #[error("Durable writer unavailable: {reason}")]
+    DurableWriterUnavailable { reason: String },
+
+    #[error("Storage I/O error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 pub type MigrationError = StorageError;

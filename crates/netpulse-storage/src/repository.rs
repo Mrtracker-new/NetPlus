@@ -48,48 +48,14 @@ pub trait CaptureRepository: std::fmt::Debug + Send + Sync {
     async fn all_proto_events(&self) -> Result<Vec<ProtoEvent>>;
     async fn all_hosts(&self) -> Result<Vec<(u64, Host)>>;
     async fn all_findings(&self) -> Result<Vec<StoredFinding>>;
-
-    fn insert_flow_sync(&self, _flow: Flow, _events: Vec<ProtoEvent>) -> Result<()> {
-        Ok(())
-    }
-    fn insert_session_sync(&self, _session: Session) -> Result<()> {
-        Ok(())
-    }
-    fn insert_host_sync(&self, _id: u64, _host: Host) -> Result<()> {
-        Ok(())
-    }
-    fn set_resolution_sync(&self, _ip: IpAddr, _names: Vec<HostName>) -> Result<()> {
-        Ok(())
-    }
-    fn merge_resolution_sync(&self, _ip: IpAddr, _names: Vec<HostName>) -> Result<()> {
-        Ok(())
-    }
-    fn insert_finding_sync(&self, _finding: Finding) -> Result<()> {
-        Ok(())
-    }
-    fn evict_oldest_flows_sync(&self, _target_max: usize) -> Result<usize> {
-        Ok(0)
-    }
-    fn evict_oldest_sessions_sync(&self, _target_max: usize) -> Result<usize> {
-        Ok(0)
-    }
-
-    fn all_flows_sync(&self) -> Result<Vec<Flow>> {
-        Ok(Vec::new())
-    }
-    fn all_sessions_sync(&self) -> Result<Vec<Session>> {
-        Ok(Vec::new())
-    }
-    fn all_proto_events_sync(&self) -> Result<Vec<ProtoEvent>> {
-        Ok(Vec::new())
-    }
-    fn all_hosts_sync(&self) -> Result<Vec<(u64, Host)>> {
-        Ok(Vec::new())
-    }
-    fn all_findings_sync(&self) -> Result<Vec<StoredFinding>> {
-        Ok(Vec::new())
-    }
 }
+// NOTE: this trait deliberately has **no** synchronous variants. A defaulted
+// `fn insert_flow_sync(&self, ..) -> Result<()> { Ok(()) }` used to exist here,
+// and because `CaptureStore<R>` can only see the trait bound, every synchronous
+// store write resolved to that no-op default and was silently dropped while the
+// caller observed `Ok(())`. Durability is now either the async surface (SQLite)
+// or the durable write-behind mirror in `crate::durable`, and a failed write is
+// reported rather than discarded.
 
 /// Encode L4Proto to a stable SQLite integer:
 /// TCP = 6 (IANA IP protocol 6), UDP = 17 (IANA IP protocol 17), Other(n) = 1000 + n.
@@ -392,16 +358,13 @@ impl MemoryCaptureStore {
 
     pub fn flows_in_window_sync(&self, from: u64, to: u64) -> Result<Vec<Flow>> {
         let inner = self.inner.read();
-        let mut v: Vec<Flow> = inner
-            .flows
-            .values()
-            .filter(|f| {
-                let t = f.first_ts.mono_nanos;
-                t >= from && t < to
-            })
-            .cloned()
+        // The maintained `flow_timeline` index answers this with a range scan in
+        // `(first_ts, id)` order, instead of scanning and re-sorting every flow.
+        let v: Vec<Flow> = inner
+            .flow_timeline
+            .range((from, 0)..(to, 0))
+            .filter_map(|(_, id)| inner.flows.get(id).cloned())
             .collect();
-        v.sort_by_key(|f| (f.first_ts.mono_nanos, f.id));
         Ok(v)
     }
 
@@ -699,6 +662,14 @@ impl SqliteCaptureRepository {
     /// Access the underlying SqlitePool connection handle.
     pub fn pool(&self) -> &SqlitePool {
         &self.pool
+    }
+
+    /// Full `PRAGMA integrity_check` on this database.
+    ///
+    /// O(database size), so it is an explicit maintenance/health operation and
+    /// deliberately *not* part of [`Self::connect`]: connecting must stay cheap.
+    pub async fn verify_integrity(&self) -> Result<()> {
+        MigrationManager::verify_integrity(&self.pool).await
     }
 }
 
@@ -1992,6 +1963,7 @@ mod tests {
             state: FlowState::Established,
         };
         repo.insert_flow(flow1, vec![]).await.unwrap();
+
         repo.insert_flow(flow2, vec![]).await.unwrap();
 
         // 2. Attempt to insert session with flow_ids [1, 2, 999] where 999 does not exist
@@ -2064,6 +2036,7 @@ mod tests {
             state: FlowState::Datagram,
         };
         repo.insert_flow(flow10, vec![]).await.unwrap();
+
         repo.insert_flow(flow11, vec![]).await.unwrap();
 
         let session = Session {

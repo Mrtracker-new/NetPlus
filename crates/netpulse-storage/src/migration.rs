@@ -76,7 +76,13 @@ impl MigrationManager {
         })
     }
 
-    /// Validate essential database tables, PRAGMA flags, and integrity.
+    /// Validate essential database tables and PRAGMA flags. Cheap: no table scan.
+    ///
+    /// This is the check every [`crate::SqliteCaptureRepository::connect`] runs.
+    /// `PRAGMA integrity_check` deliberately does *not* live here — it walks every
+    /// page in the database and belongs in [`Self::verify_integrity`], which the
+    /// startup path and the health report call explicitly rather than paying that
+    /// cost on every pool connect.
     pub async fn validate(pool: &SqlitePool) -> Result<()> {
         // 1. Verify foreign key enforcement is active
         let fk_enabled: i64 = sqlx::query_scalar("PRAGMA foreign_keys")
@@ -116,7 +122,13 @@ impl MigrationManager {
             }
         }
 
-        // 3. Execute PRAGMA integrity_check
+        Ok(())
+    }
+
+    /// Full `PRAGMA integrity_check`: walks the entire database to prove the pages
+    /// are consistent. O(database size), so it is an explicit maintenance/health
+    /// operation, never part of connecting.
+    pub async fn verify_integrity(pool: &SqlitePool) -> Result<()> {
         let integrity_result: String = sqlx::query_scalar("PRAGMA integrity_check")
             .fetch_one(pool)
             .await?;
@@ -125,7 +137,6 @@ impl MigrationManager {
                 reason: format!("PRAGMA integrity_check reported error: {integrity_result}"),
             });
         }
-
         Ok(())
     }
 }

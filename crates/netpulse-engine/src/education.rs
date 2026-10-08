@@ -424,14 +424,17 @@ mod tests {
                 kind: ProtoEventKind::TlsClientHello,
             },
         ];
-        store.insert_flow(flow, events);
-        store.insert_session(Session {
-            id: 1,
-            process_id: 0,
-            start_ts: Timestamp::new(1_000, 1_000),
-            trigger: "resolved and connected to example.com".into(),
-            flow_ids: vec![10],
-        });
+        store.insert_flow(flow, events).expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 1,
+                process_id: 0,
+                start_ts: Timestamp::new(1_000, 1_000),
+                trigger: "resolved and connected to example.com".into(),
+                flow_ids: vec![10],
+            })
+            .expect("store write");
         store
     }
 
@@ -550,37 +553,45 @@ mod tests {
             },
             state: FlowState::Established,
         };
-        store.insert_flow(flow1, vec![]);
-        store.insert_flow(flow2, vec![]);
-        store.insert_session(Session {
-            id: 42,
-            process_id: 0,
-            start_ts: Timestamp::new(1_000, 1_000),
-            trigger: "resolved and connected to multi-cdn site".into(),
-            flow_ids: vec![1, 2],
-        });
+        store.insert_flow(flow1, vec![]).expect("store write");
+
+        store.insert_flow(flow2, vec![]).expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 42,
+                process_id: 0,
+                start_ts: Timestamp::new(1_000, 1_000),
+                trigger: "resolved and connected to multi-cdn site".into(),
+                flow_ids: vec![1, 2],
+            })
+            .expect("store write");
 
         // Insert host enrichment with recognized organization names.
-        store.insert_host(
-            1,
-            Host {
-                ip: ip(1, 1, 1, 1),
-                names: vec!["one.one.one.one".into()],
-                geo: Some("US".into()),
-                asn: Some(13335),
-                org: Some("Cloudflare".into()),
-            },
-        );
-        store.insert_host(
-            2,
-            Host {
-                ip: ip(3, 5, 0, 1),
-                names: vec!["s3.amazonaws.com".into()],
-                geo: Some("US".into()),
-                asn: Some(16509),
-                org: Some("AWS".into()),
-            },
-        );
+        store
+            .insert_host(
+                1,
+                Host {
+                    ip: ip(1, 1, 1, 1),
+                    names: vec!["one.one.one.one".into()],
+                    geo: Some("US".into()),
+                    asn: Some(13335),
+                    org: Some("Cloudflare".into()),
+                },
+            )
+            .expect("store write");
+        store
+            .insert_host(
+                2,
+                Host {
+                    ip: ip(3, 5, 0, 1),
+                    names: vec!["s3.amazonaws.com".into()],
+                    geo: Some("US".into()),
+                    asn: Some(16509),
+                    org: Some("AWS".into()),
+                },
+            )
+            .expect("store write");
 
         // Verify single session projection
         let journey = present_journey_for_session(&store, 42, Depth::Beginner)

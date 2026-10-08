@@ -364,15 +364,23 @@ mod tests {
 
     fn seeded() -> CaptureStore {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(1, [198, 51, 100, 10], 100, 1000), vec![]);
-        store.insert_flow(flow(2, [203, 0, 113, 5], 200, 2000), vec![]);
-        store.insert_session(Session {
-            id: 1,
-            process_id: 0,
-            start_ts: Timestamp::new(100, 100),
-            trigger: "t".into(),
-            flow_ids: vec![1, 2],
-        });
+        store
+            .insert_flow(flow(1, [198, 51, 100, 10], 100, 1000), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(2, [203, 0, 113, 5], 200, 2000), vec![])
+            .expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 1,
+                process_id: 0,
+                start_ts: Timestamp::new(100, 100),
+                trigger: "t".into(),
+                flow_ids: vec![1, 2],
+            })
+            .expect("store write");
         store
     }
 

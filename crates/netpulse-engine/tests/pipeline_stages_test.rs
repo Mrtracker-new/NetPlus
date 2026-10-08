@@ -154,7 +154,7 @@ fn test_stage3_flow_engine_to_capture_store_in_memory() {
         ts: Timestamp::new(150, 150),
         kind: ProtoEventKind::TlsClientHello,
     };
-    store.insert_flow(flow, vec![event]);
+    store.insert_flow(flow, vec![event]).expect("store write");
 
     let session = Session {
         id: 7,
@@ -163,7 +163,7 @@ fn test_stage3_flow_engine_to_capture_store_in_memory() {
         trigger: "stage3_test".into(),
         flow_ids: vec![42],
     };
-    store.insert_session(session);
+    store.insert_session(session).expect("store write");
 
     assert_eq!(store.flow_count(), 1);
     assert_eq!(store.session_count(), 1);
@@ -394,10 +394,12 @@ fn test_high_throughput_zero_false_drops_and_healthy_diagnostics() {
     for batch_idx in 0..100 {
         pipeline.ingest_batch(&frames);
         if batch_idx % 10 == 0 {
-            pipeline.commit_to_store(&mut store, (batch_idx as u64 + 1) * 1_000_000_000);
+            pipeline
+                .commit_to_store(&mut store, (batch_idx as u64 + 1) * 1_000_000_000)
+                .expect("pipeline commit");
         }
     }
-    pipeline.finish(&mut store);
+    pipeline.finish(&mut store).expect("pipeline commit");
 
     let stats = CaptureStats {
         received: 100_000,

@@ -18,6 +18,7 @@
 //! converge immediately after this layer".
 
 use netpulse_api::dto::{MonitorSnapshotDto, NarrativeCardDto};
+
 use netpulse_capture::{CaptureStats, FileCapture, FrameFeed, Recording, ReplaySource};
 use netpulse_core::traits::RawFrame;
 use netpulse_core::{Depth, Session, Timestamp};
@@ -125,13 +126,13 @@ fn run_feed<S: FrameFeed, R: CaptureRepository>(
     let causal_links = sessions.iter().map(|s| s.flow_ids.len()).sum();
 
     for ff in flows {
-        store.insert_flow(ff.flow, ff.events);
+        store.insert_flow(ff.flow, ff.events)?;
     }
     for s in sessions {
-        store.insert_session(s);
+        store.insert_session(s)?;
     }
     for (ip, names) in engine.resolutions() {
-        store.set_resolution(ip, names);
+        store.set_resolution(ip, names)?;
     }
 
     let duration_ms = start_time.elapsed().as_millis() as u64;
@@ -270,36 +271,55 @@ impl LivePipeline {
     }
 
     /// Commit dirty flow, session, and resolution updates to `store`.
+    ///
+    /// The result reports durable-persistence failures: an `Err` means the
+    /// in-memory view is updated but at least one record is **not** durable, so
+    /// the caller must surface it rather than treat the tick as complete.
     pub fn commit_to_store<R: CaptureRepository>(
         &mut self,
         store: &mut CaptureStore<R>,
         now_mono: u64,
-    ) {
+    ) -> netpulse_core::Result<()> {
         let ts = Timestamp::new(now_mono, now_mono);
+        let mut first_error: Option<netpulse_core::NpError> = None;
+
         // 1. Tick engine to evict closed flows and get dirty sessions
         let (closed_flows, dirty_sessions) = self.engine.tick(ts);
         for ff in closed_flows {
-            store.insert_flow(ff.flow, ff.events);
+            if let Err(e) = store.insert_flow(ff.flow, ff.events) {
+                first_error.get_or_insert(e);
+            }
         }
 
         // 2. Snapshot and commit all dirty active flows
         let dirty_flows = self.engine.snapshot_dirty_flows();
         for ff in dirty_flows {
-            store.insert_flow(ff.flow, ff.events);
+            if let Err(e) = store.insert_flow(ff.flow, ff.events) {
+                first_error.get_or_insert(e);
+            }
         }
 
         // 3. Commit dirty sessions
         for s in dirty_sessions {
-            store.insert_session(s);
+            if let Err(e) = store.insert_session(s) {
+                first_error.get_or_insert(e);
+            }
         }
 
         // 4. Merge resolution table updates
         for (ip, names) in self.engine.resolutions() {
-            store.set_resolution(ip, names);
+            if let Err(e) = store.set_resolution(ip, names) {
+                first_error.get_or_insert(e);
+            }
         }
 
         // 5. Enforce storage bounds
         store.auto_evict_if_needed();
+
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     /// Commit dirty flow, session, and resolution updates asynchronously to `store` (and its backing repository).
@@ -336,18 +356,32 @@ impl LivePipeline {
     }
 
     /// Final flush on capture termination to commit all remaining flows and sessions.
-    pub fn finish<R: CaptureRepository>(&mut self, store: &mut CaptureStore<R>) {
+    pub fn finish<R: CaptureRepository>(
+        &mut self,
+        store: &mut CaptureStore<R>,
+    ) -> netpulse_core::Result<()> {
         let (flows, sessions) = self.engine.finish();
+        let mut first_error: Option<netpulse_core::NpError> = None;
         for ff in flows {
-            store.insert_flow(ff.flow, ff.events);
+            if let Err(e) = store.insert_flow(ff.flow, ff.events) {
+                first_error.get_or_insert(e);
+            }
         }
         for s in sessions {
-            store.insert_session(s);
+            if let Err(e) = store.insert_session(s) {
+                first_error.get_or_insert(e);
+            }
         }
         for (ip, names) in self.engine.resolutions() {
-            store.set_resolution(ip, names);
+            if let Err(e) = store.set_resolution(ip, names) {
+                first_error.get_or_insert(e);
+            }
         }
         store.auto_evict_if_needed();
+        match first_error {
+            Some(e) => Err(e),
+            None => Ok(()),
+        }
     }
 
     /// Final flush on capture termination to commit all remaining flows and sessions asynchronously.
@@ -377,26 +411,22 @@ pub struct PresentationView {
     pub monitor: MonitorSnapshotDto,
 }
 
-/// Build the presentation view from a committed store with explicit time-windowing and attribution sources.
-#[allow(clippy::too_many_arguments)]
-pub fn present_window<R: CaptureRepository>(
+/// Resolve the effective `[from, to)` window for a projection.
+///
+/// --- Monotonic Clock Authority ---
+/// Invariant: from_mono_nanos and to_mono_nanos must remain in the same
+/// monotonic-clock domain as CaptureStore timestamps.
+/// Semantics:
+/// 1. time_range = Some(...) -> Rust calculates the window against store.latest_mono_nanos().
+/// 2. explicit from/to -> Rust validates and uses them.
+/// 3. neither -> documented default window (FiveMinutes against store.latest_mono_nanos()).
+fn resolve_window<R: CaptureRepository>(
     store: &CaptureStore<R>,
-    depth: Depth,
-    capture_stats: CaptureStats,
-    correlator: Option<&crate::attribution::Correlator>,
-    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
     time_range: Option<netpulse_api::MonitorTimeRangeDto>,
     from_mono_nanos: Option<u64>,
     to_mono_nanos: Option<u64>,
-) -> PresentationView {
-    // --- Monotonic Clock Authority ---
-    // Invariant: from_mono_nanos and to_mono_nanos must remain in the same monotonic-clock domain
-    // as CaptureStore timestamps.
-    // Semantics:
-    // 1. time_range = Some(...) -> Rust calculates the window against store.latest_mono_nanos().
-    // 2. explicit from/to -> Rust validates and uses them.
-    // 3. neither -> documented default window (FiveMinutes against store.latest_mono_nanos()).
-    let (effective_from, effective_to) = match time_range {
+) -> (u64, u64) {
+    match time_range {
         Some(range) => {
             let d = match range {
                 netpulse_api::MonitorTimeRangeDto::FiveMinutes => 5 * 60 * 1_000_000_000,
@@ -435,8 +465,59 @@ pub fn present_window<R: CaptureRepository>(
                 )
             }
         },
-    };
+    }
+}
 
+/// Build only the monitoring snapshot for a window.
+///
+/// This is the projection the UI polls every 1.5 s (`Query::MonitorSnapshot`), so
+/// it deliberately does **not** materialize sessions, per-flow event vectors or
+/// narrative cards: those are narrative-feed concerns and used to be cloned for
+/// every snapshot request even though the result was discarded.
+#[allow(clippy::too_many_arguments)]
+pub fn monitor_window<R: CaptureRepository>(
+    store: &CaptureStore<R>,
+    capture_stats: CaptureStats,
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
+    time_range: Option<netpulse_api::MonitorTimeRangeDto>,
+    from_mono_nanos: Option<u64>,
+    to_mono_nanos: Option<u64>,
+) -> MonitorSnapshotDto {
+    let (effective_from, effective_to) =
+        resolve_window(store, time_range, from_mono_nanos, to_mono_nanos);
+    let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(effective_from, effective_to);
+    let network_loss: u32 = all_flows.iter().map(|f| f.stats.loss_indicators).sum();
+    let loss = LossAccounting {
+        network_loss_indicators: network_loss,
+        capture_drops: capture_stats.dropped,
+    };
+    let snap = monitor::snapshot_window(
+        &all_flows,
+        loss,
+        None,
+        store.resolutions(),
+        Some(capture_stats),
+        correlator,
+        sockets,
+        effective_from,
+        effective_to,
+    );
+    project::monitor_dto(&snap)
+}
+
+/// Build the presentation view from a committed store with explicit time-windowing and attribution sources.
+#[allow(clippy::too_many_arguments)]
+pub fn present_window<R: CaptureRepository>(
+    store: &CaptureStore<R>,
+    depth: Depth,
+    capture_stats: CaptureStats,
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
+    time_range: Option<netpulse_api::MonitorTimeRangeDto>,
+    from_mono_nanos: Option<u64>,
+    to_mono_nanos: Option<u64>,
+) -> PresentationView {
     let session_ids = store.session_ids();
     let mut owned: Vec<(
         Session,
@@ -467,27 +548,19 @@ pub fn present_window<R: CaptureRepository>(
         .collect();
 
     // --- Monitoring snapshot over the window ---
-    let all_flows: Vec<&netpulse_core::Flow> = store.flows_in_window(effective_from, effective_to);
-    let network_loss: u32 = all_flows.iter().map(|f| f.stats.loss_indicators).sum();
-    let loss = LossAccounting {
-        network_loss_indicators: network_loss,
-        capture_drops: capture_stats.dropped,
-    };
-    let snap = monitor::snapshot_window(
-        &all_flows,
-        loss,
-        None,
-        store.resolutions(),
-        Some(capture_stats),
+    let monitor = monitor_window(
+        store,
+        capture_stats,
         correlator,
         sockets,
-        effective_from,
-        effective_to,
+        time_range,
+        from_mono_nanos,
+        to_mono_nanos,
     );
 
     PresentationView {
         narratives,
-        monitor: project::monitor_dto(&snap),
+        monitor,
     }
 }
 
@@ -603,11 +676,15 @@ mod tests {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
 
         pipeline.ingest_batch(std::slice::from_ref(&f1));
-        pipeline.commit_to_store(&mut store, f1.mono_nanos);
+        pipeline
+            .commit_to_store(&mut store, f1.mono_nanos)
+            .expect("pipeline commit");
 
         pipeline.ingest_batch(std::slice::from_ref(&f2));
-        pipeline.commit_to_store(&mut store, f2.mono_nanos);
-        pipeline.finish(&mut store);
+        pipeline
+            .commit_to_store(&mut store, f2.mono_nanos)
+            .expect("pipeline commit");
+        pipeline.finish(&mut store).expect("pipeline commit");
 
         let (store_offline, _) = analyze_frames(1, &[f1, f2], 8).unwrap();
         assert_eq!(store.flow_count(), store_offline.flow_count());
@@ -637,7 +714,7 @@ mod tests {
             stats: FlowMetrics::default(),
             state: FlowState::Established,
         };
-        store.insert_flow(flow, Vec::new());
+        store.insert_flow(flow, Vec::new()).expect("store write");
 
         let view = present_window(
             &store,

@@ -324,17 +324,31 @@ mod tests {
 
     fn store_with_traffic() -> CaptureStore {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(1, ip(9), L7Proto::Tls, 5_000_000, 0), vec![]);
-        store.insert_flow(flow(2, ip(9), L7Proto::Tls, 1_000_000, 0), vec![]);
-        store.insert_flow(flow(3, ip(5), L7Proto::Dns, 500, 0), vec![]);
-        store.insert_flow(flow(4, ip(7), L7Proto::Tls, 2000, 4), vec![]);
-        store.insert_session(Session {
-            id: 1,
-            process_id: 0,
-            start_ts: Timestamp::new(1, 1),
-            trigger: "t".into(),
-            flow_ids: vec![1, 2, 3, 4],
-        });
+        store
+            .insert_flow(flow(1, ip(9), L7Proto::Tls, 5_000_000, 0), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(2, ip(9), L7Proto::Tls, 1_000_000, 0), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(3, ip(5), L7Proto::Dns, 500, 0), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(4, ip(7), L7Proto::Tls, 2000, 4), vec![])
+            .expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 1,
+                process_id: 0,
+                start_ts: Timestamp::new(1, 1),
+                trigger: "t".into(),
+                flow_ids: vec![1, 2, 3, 4],
+            })
+            .expect("store write");
         store
     }
 

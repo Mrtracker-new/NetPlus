@@ -157,8 +157,24 @@ fn test_query_health_check_invariants() {
         assert_eq!(status.schema_version, 1);
         assert_eq!(status.api_version, netpulse_api::API_VERSION);
         assert!(!status.capture_running);
-        assert_eq!(status.checks.len(), 1);
+        // Uptime is measured, not hard-coded to zero.
+        assert!(status.uptime_secs < 600);
+        // Storage, persistence, diagnostics and capture are each reported on.
+        assert_eq!(status.checks.len(), 4);
         assert_eq!(status.checks[0].component, "storage");
+        // This state has no durable store attached, and health says so instead of
+        // claiming persistence the session does not have.
+        let persistence = status
+            .checks
+            .iter()
+            .find(|c| c.component == "persistence")
+            .expect("persistence must be reported");
+        assert_eq!(persistence.status, "warning");
+        assert!(persistence
+            .message
+            .as_deref()
+            .unwrap_or_default()
+            .contains("not persisted"));
     } else {
         panic!("expected Health response");
     }
@@ -193,8 +209,12 @@ fn test_query_list_plugins_invariants() {
 
         assert_eq!(view_plugin.plugin_type, PluginTypeDto::View);
         assert_eq!(view_plugin.capabilities, vec![PluginCapabilityDto::ApiRead]);
-        assert_eq!(view_plugin.trust, PluginTrustDto::FirstParty);
-        assert!(view_plugin.enabled);
+        // Trust is derived, never self-declared: the in-tree references ship no
+        // signature and no hashed payload, so they are honestly Unreviewed and stay
+        // disabled until the user explicitly enables one.
+        assert_eq!(view_plugin.trust, PluginTrustDto::Unreviewed);
+        assert!(!view_plugin.enabled);
+        assert_eq!(view_plugin.disabled_reason.as_deref(), Some("not enabled"));
         assert!(view_plugin.compatible);
         assert_eq!(view_plugin.target_contract, netpulse_api::API_VERSION);
         assert!(view_plugin.config_schema.is_some());
@@ -212,7 +232,8 @@ fn test_query_list_plugins_invariants() {
 
         for p in &plugins {
             assert!(p.compatible);
-            assert!(p.enabled);
+            assert!(!p.enabled, "{} must not auto-enable unverified", p.name);
+            assert_eq!(p.trust, PluginTrustDto::Unreviewed);
         }
     } else {
         panic!("expected Plugins response");
@@ -345,14 +366,17 @@ fn test_query_journey_stages_of_session_and_latency() {
                     kind: netpulse_core::ProtoEventKind::TlsClientHello,
                 },
             ];
-            store.insert_flow(flow, events);
-            store.insert_session(netpulse_core::Session {
-                id: s_id,
-                process_id: 0,
-                start_ts: netpulse_core::Timestamp::new(1000 + s_id, 1000 + s_id),
-                trigger: format!("resolved and connected to site{s_id}.com"),
-                flow_ids: vec![f_id],
-            });
+            store.insert_flow(flow, events).expect("store write");
+
+            store
+                .insert_session(netpulse_core::Session {
+                    id: s_id,
+                    process_id: 0,
+                    start_ts: netpulse_core::Timestamp::new(1000 + s_id, 1000 + s_id),
+                    trigger: format!("resolved and connected to site{s_id}.com"),
+                    flow_ids: vec![f_id],
+                })
+                .expect("store write");
         }
     }
 
@@ -688,13 +712,21 @@ fn test_command_start_stop_recording_honest_refusal() {
     assert!(res_start.is_err());
     assert!(res_start
         .unwrap_err()
-        .contains("recording requires a live capture source"));
+        .contains("recording is not wired into the live capture loop"));
 
     let res_stop = execute_command(&state, Command::StopRecording);
     assert!(res_stop.is_err());
     assert!(res_stop
         .unwrap_err()
-        .contains("recording requires a live capture source"));
+        .contains("recording is not wired into the live capture loop"));
+
+    // Fail-closed means nothing was recorded either: the surface must not list a
+    // recording that never captured a frame.
+    let listed = execute_query(&state, Query::ListRecordings).unwrap();
+    match listed {
+        QueryResponse::Recordings { recordings } => assert!(recordings.is_empty()),
+        other => panic!("expected Recordings, got {other:?}"),
+    }
 }
 
 #[test]
@@ -715,7 +747,21 @@ fn test_command_replay_transport_refusal_when_unloaded() {
 }
 
 #[test]
-fn test_command_start_export() {
+fn test_command_start_export_writes_a_real_file_and_reports_it() {
+    let _guard = crate::export_env_lock()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!(
+        "netpulse_export_test_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::env::set_var("NETPULSE_EXPORT_DIR", &dir);
+
     let state = seeded_state();
     let res = execute_command(
         &state,
@@ -725,7 +771,171 @@ fn test_command_start_export() {
             level: netpulse_api::PayloadLevelDto::MetadataOnly,
         },
     );
-    assert!(res.is_ok());
+
+    // The command answers with the artifact it wrote, not a generic "ok": the UI
+    // needs the real path to display and open.
+    let artifact = match res.expect("export must succeed") {
+        netpulse_api::CommandResultDto::ArtifactWritten { artifact } => artifact,
+        other => panic!("expected an artifact result, got {other:?}"),
+    };
+    assert_eq!(artifact.format, ExportFormatDto::Json);
+    assert_eq!(artifact.level, netpulse_api::PayloadLevelDto::MetadataOnly);
+    assert!(artifact.id > 0);
+    assert!(
+        std::path::Path::new(&artifact.path).is_file(),
+        "the reported path must exist: {}",
+        artifact.path
+    );
+    assert!(
+        artifact.path.starts_with(dir.to_string_lossy().as_ref()),
+        "the artifact must live in the configured export directory: {}",
+        artifact.path
+    );
+    let body = std::fs::read_to_string(&artifact.path).unwrap();
+    assert!(body.contains("\"provenance\""));
+    assert_eq!(
+        artifact.bytes,
+        body.len() as u64,
+        "the reported size must be the bytes actually written"
+    );
+
+    // Ids are unique per write, so a second export cannot be confused with the first.
+    let second = match execute_command(
+        &state,
+        Command::StartExport {
+            selection: ExportSelectionDto::All,
+            format: ExportFormatDto::Csv,
+            level: netpulse_api::PayloadLevelDto::MetadataOnly,
+        },
+    )
+    .expect("second export must succeed")
+    {
+        netpulse_api::CommandResultDto::ArtifactWritten { artifact } => artifact,
+        other => panic!("expected an artifact result, got {other:?}"),
+    };
+    assert_ne!(second.id, artifact.id);
+
+    // Honest refusal where the store cannot satisfy the format: pcapng needs frames.
+    let pcapng = execute_command(
+        &state,
+        Command::StartExport {
+            selection: ExportSelectionDto::All,
+            format: ExportFormatDto::Pcapng,
+            level: netpulse_api::PayloadLevelDto::MetadataOnly,
+        },
+    );
+    assert!(
+        pcapng.is_err(),
+        "pcapng must refuse rather than write nothing"
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+    std::env::remove_var("NETPULSE_EXPORT_DIR");
+}
+
+#[test]
+fn test_command_open_export_only_resolves_recorded_artifacts() {
+    let _guard = crate::export_env_lock()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let dir = std::env::temp_dir().join(format!(
+        "netpulse_open_test_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::env::set_var("NETPULSE_EXPORT_DIR", &dir);
+
+    let state = seeded_state();
+
+    // 1. An id this session never wrote is refused.
+    let unknown = execute_command(&state, Command::OpenExport { id: 9999 });
+    assert!(unknown.is_err());
+    assert!(unknown
+        .unwrap_err()
+        .contains("no export with id 9999 was written"));
+
+    // 2. A real export resolves, and its canonical path stays inside the directory.
+    let artifact = match execute_command(
+        &state,
+        Command::StartExport {
+            selection: ExportSelectionDto::All,
+            format: ExportFormatDto::Json,
+            level: netpulse_api::PayloadLevelDto::MetadataOnly,
+        },
+    )
+    .expect("export must succeed")
+    {
+        netpulse_api::CommandResultDto::ArtifactWritten { artifact } => artifact,
+        other => panic!("expected an artifact result, got {other:?}"),
+    };
+    let (resolved, canonical) = crate::resolve_export_artifact(&state, artifact.id)
+        .expect("a recorded artifact must resolve");
+    assert_eq!(resolved.id, artifact.id);
+    assert!(canonical.starts_with(dir.canonicalize().unwrap()));
+
+    // 3. A recorded artifact whose file was removed is refused, not opened.
+    std::fs::remove_file(&artifact.path).unwrap();
+    let stale = crate::resolve_export_artifact(&state, artifact.id);
+    assert!(stale.is_err());
+    assert!(stale.unwrap_err().contains("no longer present on disk"));
+
+    // 4. Containment: a recorded artifact pointing outside the export directory is
+    //    refused even though it exists, so a poisoned record cannot escape it.
+    let outside = dir.parent().unwrap().join(format!(
+        "netpulse_outside_{}_{}.json",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::write(&outside, b"{}").unwrap();
+    let outside_id = 4242;
+    state
+        .exports
+        .lock()
+        .unwrap()
+        .push(netpulse_api::ExportArtifactDto {
+            id: outside_id,
+            path: outside.display().to_string(),
+            bytes: 2,
+            format: ExportFormatDto::Json,
+            level: netpulse_api::PayloadLevelDto::MetadataOnly,
+        });
+    let escaped = crate::resolve_export_artifact(&state, outside_id);
+    assert!(escaped.is_err());
+    assert!(escaped
+        .unwrap_err()
+        .contains("outside the export directory"));
+
+    // 5. Only the formats this shell writes are accepted.
+    let odd = dir.join("netpulse_odd.sh");
+    std::fs::write(&odd, b"echo hi").unwrap();
+    let odd_id = 4243;
+    state
+        .exports
+        .lock()
+        .unwrap()
+        .push(netpulse_api::ExportArtifactDto {
+            id: odd_id,
+            path: odd.display().to_string(),
+            bytes: 7,
+            format: ExportFormatDto::Json,
+            level: netpulse_api::PayloadLevelDto::MetadataOnly,
+        });
+    let odd_res = crate::resolve_export_artifact(&state, odd_id);
+    assert!(odd_res.is_err());
+    assert!(odd_res
+        .unwrap_err()
+        .contains("unexpected extension for an export"));
+
+    let _ = std::fs::remove_file(&outside);
+    let _ = std::fs::remove_dir_all(&dir);
+    std::env::remove_var("NETPULSE_EXPORT_DIR");
 }
 
 #[test]
@@ -1131,13 +1341,15 @@ fn test_query_list_sessions() {
     let state = seeded_state();
     {
         let mut store = state.store.lock().unwrap();
-        store.insert_session(netpulse_core::Session {
-            id: 42,
-            process_id: 0,
-            start_ts: netpulse_core::Timestamp::new(500_000, 0),
-            trigger: "resolved and connected to github.com".into(),
-            flow_ids: vec![10, 11, 12],
-        });
+        store
+            .insert_session(netpulse_core::Session {
+                id: 42,
+                process_id: 0,
+                start_ts: netpulse_core::Timestamp::new(500_000, 0),
+                trigger: "resolved and connected to github.com".into(),
+                flow_ids: vec![10, 11, 12],
+            })
+            .expect("store write");
     }
 
     let res = execute_query(&state, Query::ListSessions).unwrap();
@@ -1185,7 +1397,8 @@ fn make_dns_query_frame(domain: &str) -> Vec<u8> {
 }
 
 fn make_http_get_frame(host: &str, path: &str) -> Vec<u8> {
-    let payload = format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: NetPulse/1.0\r\n\r\n");
+    let payload =
+        format!("GET {path} HTTP/1.1\r\nHost: {host}\r\nUser-Agent: NetPulse/1.0\r\n\r\n");
     let payload_bytes = payload.as_bytes();
 
     let mut tcp = Vec::new();
@@ -1310,8 +1523,14 @@ fn test_full_slice_capture_to_presentation_lifecycle() {
 
     // Verify StartCapture command dispatch honors active capture state
     let dup_start = execute_command(&state, Command::StartCapture { iface_id: 0 });
-    assert!(dup_start.is_err(), "Duplicate start must be refused when capture is running");
-    assert!(state.capture.lock().unwrap().is_some(), "Capture handle must be active");
+    assert!(
+        dup_start.is_err(),
+        "Duplicate start must be refused when capture is running"
+    );
+    assert!(
+        state.capture.lock().unwrap().is_some(),
+        "Capture handle must be active"
+    );
 
     // 2. Generate network traffic (HTTP, DNS, TLS raw frames)
     let dns_frame = make_dns_query_frame("api.example.com");
@@ -1339,27 +1558,47 @@ fn test_full_slice_capture_to_presentation_lifecycle() {
     // 3. Observe raw frames decoded in netpulse-decode, flow-tracked in netpulse-flow, committed in netpulse-storage
     {
         // Decode directly and verify L7 protocol resolution
-        let d_dns = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[0].bytes);
+        let d_dns = netpulse_decode::decode_frame(
+            netpulse_decode::LinkType::Ethernet,
+            &raw_frames[0].bytes,
+        );
         assert_eq!(d_dns.l7, netpulse_core::net::L7Proto::Dns);
         assert_eq!(d_dns.events, vec![netpulse_core::ProtoEventKind::DnsQuery]);
 
-        let d_http = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[1].bytes);
+        let d_http = netpulse_decode::decode_frame(
+            netpulse_decode::LinkType::Ethernet,
+            &raw_frames[1].bytes,
+        );
         assert_eq!(d_http.l7, netpulse_core::net::L7Proto::Http1);
-        assert_eq!(d_http.events, vec![netpulse_core::ProtoEventKind::HttpRequest]);
+        assert_eq!(
+            d_http.events,
+            vec![netpulse_core::ProtoEventKind::HttpRequest]
+        );
 
-        let d_tls = netpulse_decode::decode_frame(netpulse_decode::LinkType::Ethernet, &raw_frames[2].bytes);
+        let d_tls = netpulse_decode::decode_frame(
+            netpulse_decode::LinkType::Ethernet,
+            &raw_frames[2].bytes,
+        );
         assert_eq!(d_tls.l7, netpulse_core::net::L7Proto::Tls);
-        assert_eq!(d_tls.events, vec![netpulse_core::ProtoEventKind::TlsClientHello]);
+        assert_eq!(
+            d_tls.events,
+            vec![netpulse_core::ProtoEventKind::TlsClientHello]
+        );
 
         // Ingest into LivePipeline and commit to store
         let mut pipeline = LivePipeline::new(1, 16); // 1 = Ethernet DLT
         pipeline.ingest_batch(&raw_frames);
 
         let mut store = state.store.lock().unwrap();
-        pipeline.commit_to_store(&mut store, 3_000_000);
-        pipeline.finish(&mut store);
+        pipeline
+            .commit_to_store(&mut store, 3_000_000)
+            .expect("pipeline commit");
+        pipeline.finish(&mut store).expect("pipeline commit");
 
-        assert!(store.flow_count() >= 3, "All 3 flows must be committed into CaptureStore");
+        assert!(
+            store.flow_count() >= 3,
+            "All 3 flows must be committed into CaptureStore"
+        );
     }
 
     // Update capture stats with the processed frames
@@ -1386,18 +1625,35 @@ fn test_full_slice_capture_to_presentation_lifecycle() {
             TelemetryStateDto::Active,
             "Active capture with flows must report telemetry_state: Active"
         );
-        assert!(!snapshot.by_protocol.rows.is_empty(), "Protocols breakdown must be populated");
-        assert!(!snapshot.by_host.rows.is_empty(), "Host breakdown must be populated");
-        assert!(snapshot.diagnostic_chain.is_some(), "Diagnostic chain must be present");
+        assert!(
+            !snapshot.by_protocol.rows.is_empty(),
+            "Protocols breakdown must be populated"
+        );
+        assert!(
+            !snapshot.by_host.rows.is_empty(),
+            "Host breakdown must be populated"
+        );
+        assert!(
+            snapshot.diagnostic_chain.is_some(),
+            "Diagnostic chain must be present"
+        );
         let chain = snapshot.diagnostic_chain.as_ref().unwrap();
-        assert_eq!(chain.stages.len(), 7, "Diagnostic chain must contain 7 grounded stages");
+        assert_eq!(
+            chain.stages.len(),
+            7,
+            "Diagnostic chain must contain 7 grounded stages"
+        );
     } else {
         panic!("expected MonitorSnapshot response");
     }
 
     // 5. Stop capture; verify telemetry_state immediately updates to Standby
-    execute_command(&state, Command::StopCapture { iface_id: 0 }).expect("StopCapture command must succeed");
-    assert!(state.capture.lock().unwrap().is_none(), "Capture handle must be None after stop");
+    execute_command(&state, Command::StopCapture { iface_id: 0 })
+        .expect("StopCapture command must succeed");
+    assert!(
+        state.capture.lock().unwrap().is_none(),
+        "Capture handle must be None after stop"
+    );
 
     let standby_res = execute_query(
         &state,
@@ -1438,4 +1694,3 @@ fn test_full_slice_capture_to_presentation_lifecycle() {
         panic!("expected StageProbeResult");
     }
 }
-

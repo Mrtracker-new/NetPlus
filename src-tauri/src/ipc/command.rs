@@ -1,9 +1,13 @@
 use crate::AppState;
-use netpulse_api::Command;
+use netpulse_api::{Command, CommandResultDto};
 
 /// Execute a control write command against the shell app state.
+///
+/// The result is a typed [`CommandResultDto`]: commands that touch a file report the
+/// artifact they wrote (or opened) so the UI can show the real path instead of an
+/// interchangeable success message; everything else answers `Completed`.
 #[tracing::instrument(level = "debug", skip(state))]
-pub fn execute_command(state: &AppState, command: Command) -> Result<(), String> {
+pub fn execute_command(state: &AppState, command: Command) -> Result<CommandResultDto, String> {
     match command {
         Command::SetDepth { depth } => {
             *state.depth.lock().map_err(|_| "state poisoned")? = crate::to_depth(depth);
@@ -22,13 +26,13 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
                 capture_running,
                 None,
             );
-            Ok(())
+            Ok(CommandResultDto::Completed)
         }
         Command::StartLesson { lesson_id } => {
             let mut progress_store = state.progress_store.lock().map_err(|_| "state poisoned")?;
             progress_store.mark_started(&lesson_id);
             state.save_progress(&progress_store);
-            Ok(())
+            Ok(CommandResultDto::Completed)
         }
         Command::SubmitExerciseChoice {
             lesson_id,
@@ -45,7 +49,7 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
             .is_some()
             {
                 state.save_progress(&progress_store);
-                Ok(())
+                Ok(CommandResultDto::Completed)
             } else {
                 Err(format!(
                     "invalid exercise '{exercise_id}' in lesson '{lesson_id}'"
@@ -56,12 +60,18 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
             let mut progress_store = state.progress_store.lock().map_err(|_| "state poisoned")?;
             progress_store.reset();
             state.save_progress(&progress_store);
-            Ok(())
+            Ok(CommandResultDto::Completed)
         }
-        Command::StartCapture { iface_id } => crate::start_capture(state, iface_id),
-        Command::StopCapture { .. } => crate::stop_capture(state),
-        Command::StartRecording => crate::start_recording(state),
-        Command::StopRecording => crate::stop_recording(state),
+        Command::StartCapture { iface_id } => {
+            crate::start_capture(state, iface_id).map(|_| CommandResultDto::Completed)
+        }
+        Command::StopCapture { .. } => {
+            crate::stop_capture(state).map(|_| CommandResultDto::Completed)
+        }
+        Command::StartRecording => {
+            crate::start_recording(state).map(|_| CommandResultDto::Completed)
+        }
+        Command::StopRecording => crate::stop_recording(state).map(|_| CommandResultDto::Completed),
         Command::ReplayPlay
         | Command::ReplayPause
         | Command::ReplayStep
@@ -79,13 +89,20 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
                 Command::ReplaySetSpeed { percent } => ctrl.set_speed(percent),
                 _ => unreachable!("outer match restricts to replay commands"),
             }
-            Ok(())
+            Ok(CommandResultDto::Completed)
         }
-        Command::StartExport { .. } => Ok(()),
+        Command::StartExport {
+            selection,
+            format,
+            level,
+        } => crate::run_export(state, selection, format, level)
+            .map(|artifact| CommandResultDto::ArtifactWritten { artifact }),
+        Command::OpenExport { id } => crate::open_export(state, id)
+            .map(|artifact| CommandResultDto::ArtifactOpened { artifact }),
         Command::EnablePlugin { name } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
             if registry.enable(&name) {
-                Ok(())
+                Ok(CommandResultDto::Completed)
             } else {
                 Err(format!("cannot enable plugin '{name}'"))
             }
@@ -93,14 +110,16 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
         Command::DisablePlugin { name } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
             if registry.disable(&name) {
-                Ok(())
+                Ok(CommandResultDto::Completed)
             } else {
                 Err(format!("unknown plugin '{name}'"))
             }
         }
         Command::ConfigurePlugin { name, config } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            registry.configure_plugin(&name, config)
+            registry
+                .configure_plugin(&name, config)
+                .map(|_| CommandResultDto::Completed)
         }
         Command::PatchPluginConfig {
             name,
@@ -110,11 +129,13 @@ pub fn execute_command(state: &AppState, command: Command) -> Result<(), String>
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
             registry
                 .patch_plugin(&name, expected_version, patch)
-                .map(|_| ())
+                .map(|_| CommandResultDto::Completed)
         }
         Command::ResetPluginConfig { name } => {
             let mut registry = state.registry.lock().map_err(|_| "state poisoned")?;
-            registry.reset_plugin(&name)
+            registry
+                .reset_plugin(&name)
+                .map(|_| CommandResultDto::Completed)
         }
         _ => Err("unknown command".into()),
     }

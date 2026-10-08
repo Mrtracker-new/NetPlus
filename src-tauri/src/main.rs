@@ -15,7 +15,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 #![forbid(unsafe_code)]
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use netpulse_api::dto::{ExportFormatDto, ExportSelectionDto};
@@ -24,7 +24,7 @@ use netpulse_capture::{CaptureStats, Recording, ReplayController, ReplayState, S
 use netpulse_core::traits::{CaptureSource, SocketTableSource};
 use netpulse_core::Depth;
 use netpulse_engine::attribution::Correlator;
-use netpulse_engine::export::{ExportFormat, Selection};
+use netpulse_engine::export::{ExportFormat, Sanitizer, Selection};
 use netpulse_plugin::{
     ContractVersion, PluginManifest, PluginRegistry, PluginType, TrustMetadata, TrustStatus,
 };
@@ -116,6 +116,21 @@ pub(crate) struct AppState {
     pub(crate) progress_path: Option<std::path::PathBuf>,
     /// Atomic once-guard guaranteeing shutdown sequence executes exactly once.
     pub(crate) shutting_down: Arc<AtomicBool>,
+    /// Process start instant, so health reporting states real uptime.
+    pub(crate) started_at: std::time::Instant,
+    /// Bounds and cancels the on-demand diagnostics probes (ping, traceroute,
+    /// DNS/HTTP probes). A probe can block for seconds, so a burst of UI requests
+    /// must not spawn unbounded work, and shutdown must be able to stop it.
+    pub(crate) probe_gate: Arc<ProbeGate>,
+    /// The local browser-transport capability token. `/api/query` and
+    /// `/api/command` on the loopback bridge require it; `/api/health` does not.
+    pub(crate) bridge_token: Arc<String>,
+    /// Export files this session actually wrote, keyed by the id handed to the UI.
+    /// `OpenExport` resolves strictly against this list, so a caller can never ask
+    /// the shell to open a path it did not itself write.
+    pub(crate) exports: Arc<Mutex<Vec<netpulse_api::ExportArtifactDto>>>,
+    /// Next export artifact id (session-scoped, monotonic).
+    pub(crate) next_export_id: Arc<std::sync::atomic::AtomicU32>,
 }
 
 impl AppState {
@@ -222,8 +237,117 @@ impl Default for AppState {
             progress_store: Arc::new(Mutex::new(load_progress_store(None))),
             progress_path: None,
             shutting_down: Arc::new(AtomicBool::new(false)),
+            started_at: std::time::Instant::now(),
+            probe_gate: Arc::new(ProbeGate::new()),
+            bridge_token: Arc::new(bridge_token()),
+            exports: Arc::new(Mutex::new(Vec::new())),
+            next_export_id: Arc::new(std::sync::atomic::AtomicU32::new(1)),
         }
     }
+}
+
+/// Bounds concurrent diagnostics probes and gives them one shared cancel flag.
+///
+/// Probes talk to the network and can block for seconds; without this, a page that
+/// re-issues probe queries spawns a thread per request and shutdown cannot stop
+/// them. `try_acquire` refuses rather than queues, so the UI gets an immediate
+/// honest "already running" answer instead of an unbounded backlog.
+pub(crate) struct ProbeGate {
+    in_flight: AtomicUsize,
+    cancel: Arc<AtomicBool>,
+}
+
+impl ProbeGate {
+    /// Maximum diagnostics probes running at once.
+    pub(crate) const MAX_CONCURRENT: usize = 4;
+
+    pub(crate) fn new() -> Self {
+        Self {
+            in_flight: AtomicUsize::new(0),
+            cancel: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    /// Reserve a probe slot, or `None` when [`Self::MAX_CONCURRENT`] are running.
+    pub(crate) fn try_acquire(self: &Arc<Self>) -> Option<ProbePermit> {
+        let mut current = self.in_flight.load(Ordering::Acquire);
+        loop {
+            if current >= Self::MAX_CONCURRENT {
+                return None;
+            }
+            match self.in_flight.compare_exchange_weak(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => {
+                    return Some(ProbePermit {
+                        gate: Arc::clone(self),
+                    })
+                }
+                Err(observed) => current = observed,
+            }
+        }
+    }
+
+    /// The shared cancel flag the probes poll; set once during shutdown.
+    pub(crate) fn cancel_token(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.cancel)
+    }
+
+    /// Cancel every in-flight probe (called once on shutdown).
+    pub(crate) fn cancel(&self) {
+        self.cancel.store(true, Ordering::Release);
+    }
+
+    pub(crate) fn in_flight(&self) -> usize {
+        self.in_flight.load(Ordering::Acquire)
+    }
+}
+
+/// Releases a probe slot when the probe finishes.
+pub(crate) struct ProbePermit {
+    gate: Arc<ProbeGate>,
+}
+
+impl Drop for ProbePermit {
+    fn drop(&mut self) {
+        self.gate.in_flight.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// The capability token for the loopback browser transport.
+///
+/// `NETPULSE_BRIDGE_TOKEN` sets it explicitly (share the same value with the UI dev
+/// server). Otherwise a per-process token is derived from process-local entropy and
+/// logged, and the browser bridge stays usable only for someone who can read the
+/// shell's output. This is a same-machine capability check, not a substitute for
+/// filesystem permissions: it stops blind cross-origin/other-local-process access,
+/// and the bridge additionally validates `Host` and the request `Origin`.
+pub(crate) fn bridge_token() -> String {
+    if let Ok(explicit) = std::env::var("NETPULSE_BRIDGE_TOKEN") {
+        let trimmed = explicit.trim().to_string();
+        if !trimmed.is_empty() {
+            return trimmed;
+        }
+    }
+    use std::sync::atomic::AtomicU64;
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    let stack_probe = 0u8;
+    let entropy = format!(
+        "netpulse-bridge-token|{}|{}|{:?}|{:?}|{}",
+        nanos,
+        std::process::id(),
+        &stack_probe as *const u8,
+        std::thread::current().id(),
+        COUNTER.fetch_add(1, Ordering::AcqRel)
+    );
+    netpulse_plugin::Sha256Digest::compute(entropy.as_bytes()).to_hex()
 }
 
 /// Start live capture on `iface_id` and spawn the background reconstruction loop
@@ -293,7 +417,83 @@ pub(crate) fn start_capture(state: &AppState, iface_id: u16) -> Result<(), Strin
     }
 }
 
+/// Resolve the SQLite file backing the durable write-behind mirror.
+///
+/// `NETPULSE_DB_PATH` overrides the standard per-user data directory; the
+/// explicit value `off` (or the empty string) opts out, which the shell then
+/// reports honestly instead of implying persistence it does not have.
+pub(crate) fn durable_db_path() -> Option<std::path::PathBuf> {
+    if let Ok(explicit) = std::env::var("NETPULSE_DB_PATH") {
+        if explicit.is_empty() || explicit.eq_ignore_ascii_case("off") {
+            return None;
+        }
+        return Some(std::path::PathBuf::from(explicit));
+    }
+    Some(netpulse_storage::default_db_path())
+}
+
 impl AppState {
+    /// The desktop shell's state: [`AppState::default`] plus a real durable
+    /// write-behind mirror, hydrated from the previous session so capture history
+    /// survives a restart.
+    ///
+    /// Tests and embedded uses keep `default()` (process-lifetime, isolated).
+    pub(crate) fn for_desktop() -> Self {
+        let state = Self::default();
+        let seeded_from_pcap = std::env::var_os("NETPULSE_PCAP").is_some();
+
+        let Some(path) = durable_db_path() else {
+            tracing::warn!(
+                event = "shell.persistence_disabled",
+                "NETPULSE_DB_PATH is off: this session will not persist to disk"
+            );
+            return state;
+        };
+
+        match netpulse_storage::DurableLog::open(&path) {
+            Ok((log, snapshot)) => {
+                let mut store = match state.store.lock() {
+                    Ok(guard) => guard,
+                    Err(poison) => poison.into_inner(),
+                };
+                let restored_flows = snapshot.flows.len();
+                if seeded_from_pcap {
+                    tracing::info!(
+                        event = "shell.persistence_seed_skipped",
+                        "NETPULSE_PCAP seed takes precedence over stored history for this run"
+                    );
+                } else if let Err(e) = store.apply_snapshot(snapshot) {
+                    tracing::error!(
+                        event = "shell.persistence_restore_failed",
+                        error = %e,
+                        "Stored capture history could not be restored; starting empty"
+                    );
+                } else {
+                    tracing::info!(
+                        event = "shell.persistence_restored",
+                        flows = restored_flows,
+                        "Restored capture history from the durable store"
+                    );
+                }
+                store.attach_durable_log(log);
+                tracing::info!(
+                    event = "shell.persistence_enabled",
+                    path = %path.display(),
+                    "Durable capture store attached"
+                );
+            }
+            Err(e) => {
+                tracing::error!(
+                    event = "shell.persistence_unavailable",
+                    path = %path.display(),
+                    error = %e,
+                    "Durable store unavailable: this session will not persist to disk"
+                );
+            }
+        }
+        state
+    }
+
     fn shutdown_health(&self) -> bool {
         tracing::info!(
             event = "health.stopping",
@@ -352,19 +552,55 @@ impl AppState {
         };
 
         use netpulse_storage::Store;
+
+        // 1. Drain every queued durable write and checkpoint the WAL. An error
+        // here means data is *not* durable, so it must fail the shutdown report.
         let res = store_guard.flush();
+
+        // 2. Stop and join the durable writer, capturing what was persisted so
+        // the report can state it instead of asserting success blindly.
+        let durable = store_guard.shutdown_durable();
         let elapsed = start.elapsed();
 
-        match res {
-            Ok(()) => {
+        if let Some(health) = &durable {
+            tracing::info!(
+                event = "storage.durable_report",
+                path = %health.path,
+                queued = health.queued,
+                applied = health.applied,
+                failed = health.failed,
+                "Durable store final state"
+            );
+            if health.has_loss() {
+                tracing::error!(
+                    event = "storage.durable_loss",
+                    failed = health.failed,
+                    last_error = ?health.last_error,
+                    "Durable store dropped writes during this session"
+                );
+            }
+        } else {
+            tracing::warn!(
+                event = "storage.memory_only",
+                "No durable store was attached: this session's capture data is not persisted"
+            );
+        }
+
+        match (res, &durable) {
+            (Ok(()), Some(health)) if health.has_loss() => Err(ShutdownError::Storage(format!(
+                "durable store reported {} failed writes (last error: {:?})",
+                health.failed, health.last_error
+            ))),
+            (Ok(()), _) => {
                 tracing::info!(
                     event = "store.flushed",
                     duration_ms = elapsed.as_millis(),
+                    durable = durable.is_some(),
                     "Storage flushed successfully"
                 );
                 Ok(elapsed)
             }
-            Err(e) => {
+            (Err(e), _) => {
                 tracing::error!(
                     event = "shell.store_flush_failed",
                     duration_ms = elapsed.as_millis(),
@@ -392,6 +628,10 @@ impl AppState {
         );
 
         let mut errors = Vec::new();
+
+        // 0. Cancel any in-flight diagnostics probes before anything waits on a
+        //    lock; a traceroute can otherwise hold its probe slot for seconds.
+        self.probe_gate.cancel();
 
         // 1. Health server stop flag (first, so health probe reports shutting down)
         let health_signaled = self.shutdown_health();
@@ -504,34 +744,287 @@ pub(crate) fn stop_capture(state: &AppState) -> Result<(), String> {
     }
 }
 
-pub(crate) fn start_recording(state: &AppState) -> Result<(), String> {
-    let is_running = match state.capture.lock() {
-        Ok(g) => g.is_some(),
-        Err(p) => p.into_inner().is_some(),
-    };
-    if !is_running {
-        return Err("recording requires a live capture source (platform backend is a stub)".into());
-    }
-    Ok(())
+/// Start a recording. Fail-closed and honest.
+///
+/// The live capture loop does not yet tee frames into a [`netpulse_capture::recording::Recorder`],
+/// so reporting success here would tell the user a recording exists while no bytes
+/// are captured (and the previous implementation did exactly that: it returned `Ok`
+/// and never started anything). The actionable reason is returned instead.
+pub(crate) fn start_recording(_state: &AppState) -> Result<(), String> {
+    Err(
+        "recording is not wired into the live capture loop in this build, so nothing was recorded"
+            .into(),
+    )
 }
 
-pub(crate) fn stop_recording(state: &AppState) -> Result<(), String> {
-    let is_running = match state.capture.lock() {
-        Ok(g) => g.is_some(),
-        Err(p) => p.into_inner().is_some(),
+/// Stop a recording. Honest for the same reason as [`start_recording`]: there is no
+/// recorder to finalize, and fabricating an empty [`Recording`] would make the
+/// Recordings surface list something that never captured a frame.
+pub(crate) fn stop_recording(_state: &AppState) -> Result<(), String> {
+    Err("no recording is in progress: recording is not wired into the live capture loop".into())
+}
+
+/// Resolve the directory exports are written to.
+///
+/// `NETPULSE_EXPORT_DIR` overrides the per-user data directory. Exports are the one
+/// artifact the user is expected to move/share, so the path is logged with every
+/// write rather than hidden behind the command's unit result.
+/// Serialises tests that redirect [`export_dir`] through `NETPULSE_EXPORT_DIR`:
+/// the variable is process-wide, so two such tests running in parallel would
+/// otherwise observe each other's directory.
+#[cfg(test)]
+pub(crate) fn export_env_lock() -> &'static Mutex<()> {
+    static LOCK: std::sync::OnceLock<Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| Mutex::new(()))
+}
+
+pub(crate) fn export_dir() -> std::path::PathBuf {
+    if let Ok(dir) = std::env::var("NETPULSE_EXPORT_DIR") {
+        if !dir.trim().is_empty() {
+            return std::path::PathBuf::from(dir);
+        }
+    }
+    match directories::ProjectDirs::from("com", "NetPulse", "NetPulse") {
+        Some(dirs) => dirs.data_local_dir().join("exports"),
+        None => std::path::PathBuf::from("exports"),
+    }
+}
+
+/// Map a wire payload level to the recording payload level.
+pub(crate) fn to_payload_level(
+    level: netpulse_api::PayloadLevelDto,
+) -> netpulse_capture::RecordingPayloadLevel {
+    match level {
+        netpulse_api::PayloadLevelDto::MetadataOnly => {
+            netpulse_capture::RecordingPayloadLevel::MetadataOnly
+        }
+        netpulse_api::PayloadLevelDto::Headers => netpulse_capture::RecordingPayloadLevel::Headers,
+        netpulse_api::PayloadLevelDto::FullPayload => {
+            netpulse_capture::RecordingPayloadLevel::FullPayload
+        }
+        // `PayloadLevelDto` is non-exhaustive across wire versions; an unknown
+        // level must not silently become a more revealing one.
+        _ => netpulse_capture::RecordingPayloadLevel::MetadataOnly,
+    }
+}
+
+/// Build the sanitizer that matches the payload level the user picked.
+///
+/// Metadata-only and headers exports keep every redaction on; only an explicit
+/// full-payload export relaxes them, and even then the level (not the format)
+/// governs whether payload bytes could be present at all.
+pub(crate) fn to_sanitizer(level: netpulse_api::PayloadLevelDto) -> Sanitizer {
+    let payload_level = to_payload_level(level);
+    let sanitize = !payload_level.allows_payloads();
+    Sanitizer {
+        level: payload_level,
+        coarsen_ips: sanitize,
+        redact_names: sanitize,
+        scrub_fields: sanitize,
+        pseudonymize: false,
+    }
+}
+
+/// Produce a real export to a local file.
+///
+/// Honest about what it cannot do: `pcapng` needs captured frames and the store
+/// holds reconstruction metadata only, so it returns an error rather than writing an
+/// empty file the user would believe was a capture. Every write is logged with its
+/// path and byte count so success is an observation, not an assumption.
+pub(crate) fn run_export(
+    state: &AppState,
+    selection: netpulse_api::ExportSelectionDto,
+    format: netpulse_api::ExportFormatDto,
+    level: netpulse_api::PayloadLevelDto,
+) -> Result<netpulse_api::ExportArtifactDto, String> {
+    let store = match state.store.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
     };
-    if !is_running {
-        return Err("recording requires a live capture source (platform backend is a stub)".into());
+
+    let selection = to_selection(selection);
+    let format = to_format(format);
+    let sanitizer = to_sanitizer(level);
+
+    use netpulse_engine::export::{export_csv, export_json, export_report};
+    let (body, extension) = match format {
+        ExportFormat::Json => (
+            export_json(&store, &selection, &sanitizer).map_err(|e| e.to_string())?,
+            "json",
+        ),
+        ExportFormat::Csv => (export_csv(&store, &selection, &sanitizer), "csv"),
+        ExportFormat::Report => (export_report(&store, &selection, &sanitizer), "html"),
+        ExportFormat::Pcapng => {
+            return Err(
+                "pcapng export requires captured frames; this store holds reconstruction \
+                 metadata only, so no file was written"
+                    .into(),
+            )
+        }
+    };
+    drop(store);
+
+    let dir = export_dir();
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("could not create export directory {}: {e}", dir.display()))?;
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("netpulse-export-{stamp}.{extension}"));
+    std::fs::write(&path, body.as_bytes())
+        .map_err(|e| format!("could not write export {}: {e}", path.display()))?;
+
+    // Register the artifact before answering: the id the UI receives must resolve to
+    // a file this session wrote, which is what makes `OpenExport` safe to expose.
+    let artifact = netpulse_api::ExportArtifactDto {
+        id: state.next_export_id.fetch_add(1, Ordering::AcqRel),
+        path: path.display().to_string(),
+        bytes: body.len() as u64,
+        format: match format {
+            ExportFormat::Pcapng => netpulse_api::ExportFormatDto::Pcapng,
+            ExportFormat::Json => netpulse_api::ExportFormatDto::Json,
+            ExportFormat::Csv => netpulse_api::ExportFormatDto::Csv,
+            ExportFormat::Report => netpulse_api::ExportFormatDto::Report,
+        },
+        level,
+    };
+    {
+        let mut exports = state.exports.lock().map_err(|_| "state poisoned")?;
+        exports.push(artifact.clone());
     }
 
-    let recorder = netpulse_capture::recording::Recorder::start(
-        netpulse_decode::LinkType::Ethernet,
-        netpulse_capture::recording::RecordingScope::default(),
+    tracing::info!(
+        event = "export.written",
+        artifact_id = artifact.id,
+        path = %artifact.path,
+        bytes = artifact.bytes,
+        format = ?format,
+        level = ?sanitizer.level,
+        "Export written to disk"
     );
-    let recording = recorder.finalize(1);
-    let mut recordings = state.recordings.lock().map_err(|_| "state poisoned")?;
-    recordings.push(recording);
-    Ok(())
+    Ok(artifact)
+}
+
+/// Hand a session-written export artifact to the operating system.
+///
+/// Security posture: the caller passes an **id**, never a path. The id must resolve
+/// to an artifact this session wrote, the path must still be a file inside
+/// [`export_dir`], and only the formats this shell produces are accepted. The OS
+/// handler is spawned directly with the path as a single argument (no shell, no
+/// string interpolation), so a crafted filename cannot become a command.
+pub(crate) fn open_export(
+    state: &AppState,
+    id: u32,
+) -> Result<netpulse_api::ExportArtifactDto, String> {
+    let (artifact, canonical_path) = resolve_export_artifact(state, id)?;
+
+    let mut command = open_handler_command(&canonical_path);
+    // Windows: CREATE_NO_WINDOW (0x0800_0000) keeps a console from flashing for a
+    // file-manager handoff. A no-op elsewhere; this is a flag, not a shell wrapper.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .map_err(|e| format!("the OS could not open {}: {e}", artifact.path))?;
+
+    tracing::info!(
+        event = "export.opened",
+        artifact_id = artifact.id,
+        path = %artifact.path,
+        "Export handed to the OS to open"
+    );
+    Ok(artifact)
+}
+
+/// Resolve an artifact id to a validated, canonical path.
+///
+/// This is the security-critical half of opening an export and is separated so it
+/// can be verified without launching a GUI handler: the id must be one this session
+/// recorded, the file must still exist, it must canonicalize to a location inside
+/// [`export_dir`] (so symlinks and `..` cannot escape), and its extension must be one
+/// of the formats this shell writes.
+fn resolve_export_artifact(
+    state: &AppState,
+    id: u32,
+) -> Result<(netpulse_api::ExportArtifactDto, std::path::PathBuf), String> {
+    let artifact = {
+        let exports = state.exports.lock().map_err(|_| "state poisoned")?;
+        exports
+            .iter()
+            .find(|a| a.id == id)
+            .cloned()
+            .ok_or_else(|| {
+                format!("no export with id {id} was written by this session; nothing was opened")
+            })?
+    };
+
+    let path = std::path::PathBuf::from(&artifact.path);
+    if !path.is_file() {
+        return Err(format!(
+            "the export at {} is no longer present on disk, so nothing was opened",
+            artifact.path
+        ));
+    }
+
+    let dir = export_dir();
+    let canonical_dir = dir
+        .canonicalize()
+        .map_err(|e| format!("could not resolve export directory {}: {e}", dir.display()))?;
+    let canonical_path = path
+        .canonicalize()
+        .map_err(|e| format!("could not resolve export {}: {e}", artifact.path))?;
+    if !canonical_path.starts_with(&canonical_dir) {
+        return Err(format!(
+            "{} is outside the export directory, so nothing was opened",
+            artifact.path
+        ));
+    }
+    match canonical_path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("json" | "csv" | "html") => {}
+        _ => {
+            return Err(format!(
+                "{} has an unexpected extension for an export, so nothing was opened",
+                artifact.path
+            ))
+        }
+    }
+
+    Ok((artifact, canonical_path))
+}
+
+/// The platform's file-opening handler, spawned with the path as one argument.
+fn open_handler_command(path: &std::path::Path) -> std::process::Command {
+    #[cfg(target_os = "windows")]
+    {
+        let mut c = std::process::Command::new("explorer.exe");
+        c.arg(path);
+        c
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let mut c = std::process::Command::new("open");
+        c.arg(path);
+        c
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let mut c = std::process::Command::new("xdg-open");
+        c.arg(path);
+        c
+    }
 }
 
 struct HintGuard(Arc<AtomicBool>);
@@ -647,12 +1140,29 @@ impl LiveLoopContext {
         }
     }
 
-    /// Commit pipeline updates & merge hint cache to store.
+    /// Commit pipeline updates & merge the hint cache into the store.
+    ///
+    /// A commit error means at least one record is not durable; it is logged with
+    /// the event name so the failure is visible in the log and in
+    /// `Query::HealthCheck`, never swallowed.
     fn commit_pipeline(&mut self, latest_mono: u64) {
         if let Ok(mut s) = self.store.lock() {
-            self.pipeline.commit_to_store(&mut s, latest_mono);
+            if let Err(e) = self.pipeline.commit_to_store(&mut s, latest_mono) {
+                tracing::error!(
+                    event = "shell.commit_failed",
+                    error = %e,
+                    "Failed to commit reconstruction to the store"
+                );
+            }
             for (ip, names) in self.hint_cache.iter() {
-                s.merge_resolution(*ip, names.clone());
+                if let Err(e) = s.merge_resolution(*ip, names.clone()) {
+                    tracing::error!(
+                        event = "shell.resolution_commit_failed",
+                        ip = %ip,
+                        error = %e,
+                        "Failed to persist a DNS resolution hint"
+                    );
+                }
             }
         }
     }
@@ -691,7 +1201,13 @@ impl LiveLoopContext {
     ) {
         self.rebuild_and_commit(latest_mono, metrics, buffer_len);
         if let Ok(mut s) = self.store.lock() {
-            self.pipeline.finish(&mut s);
+            if let Err(e) = self.pipeline.finish(&mut s) {
+                tracing::error!(
+                    event = "shell.final_commit_failed",
+                    error = %e,
+                    "Final pipeline flush could not persist every record"
+                );
+            }
         }
     }
 }
@@ -716,19 +1232,16 @@ pub(crate) fn emit_live_snapshot(
             Ok(g) => *g,
             Err(p) => *p.into_inner(),
         };
-        let depth_guard = match depth.lock() {
-            Ok(g) => *g,
-            Err(p) => *p.into_inner(),
-        };
         let corr_guard = correlator.lock().ok();
         let active_stats = if capture_running {
             stats_guard
         } else {
             netpulse_capture::CaptureStats::default()
         };
-        let view = netpulse_engine::pipeline::present_window(
+        // Monitor-only projection: this snapshot is emitted continuously while
+        // capture runs, and it never needed the narrative/session view.
+        let mut monitor = netpulse_engine::pipeline::monitor_window(
             &store_guard,
-            depth_guard,
             active_stats,
             corr_guard.as_deref(),
             sockets
@@ -738,15 +1251,58 @@ pub(crate) fn emit_live_snapshot(
             None,
             None,
         );
-        let mut monitor = view.monitor;
         monitor.telemetry_state = netpulse_engine::monitor::evaluate_telemetry_state(
             capture_running,
             last_non_empty_batch,
             std::time::Instant::now(),
         );
-        let _ = handle.emit("feed-delta", &view.narratives);
+
+        // `feed-delta` needs the narrative projection, which is the expensive half
+        // (it clones the window's sessions/flows and renders a card each). That is
+        // now built on a bounded cadence instead of on every one-second tick, plus
+        // once more for the final, capture-stopped snapshot so the feed ends on the
+        // truth rather than on whatever the last throttled refresh saw.
+        if !capture_running || feed_emit_due() {
+            let depth_guard = match depth.lock() {
+                Ok(g) => *g,
+                Err(p) => *p.into_inner(),
+            };
+            let view = netpulse_engine::pipeline::present_window(
+                &store_guard,
+                depth_guard,
+                active_stats,
+                corr_guard.as_deref(),
+                sockets
+                    .as_ref()
+                    .map(|s| s.as_ref() as &(dyn SocketTableSource + Send + Sync)),
+                None,
+                None,
+                None,
+            );
+            let _ = handle.emit("feed-delta", &view.narratives);
+        }
         let _ = handle.emit("monitor-snapshot", &monitor);
     }
+}
+
+/// Whether the narrative live feed is due for a refresh.
+///
+/// Refresh rate for the narrative feed emitted during live capture. The monitor
+/// snapshot keeps its per-tick cadence; only the narrative projection is throttled.
+fn feed_emit_due() -> bool {
+    const FEED_REFRESH: std::time::Duration = std::time::Duration::from_secs(3);
+    static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+    static LAST_EMIT_MS: AtomicU64 = AtomicU64::new(0);
+
+    let epoch = *EPOCH.get_or_init(std::time::Instant::now);
+    let now_ms = epoch.elapsed().as_millis() as u64;
+    let last = LAST_EMIT_MS.load(Ordering::Acquire);
+    if now_ms.saturating_sub(last) < FEED_REFRESH.as_millis() as u64 {
+        return false;
+    }
+    LAST_EMIT_MS
+        .compare_exchange(last, now_ms, Ordering::AcqRel, Ordering::Acquire)
+        .is_ok()
 }
 
 /// The background live-capture loop. Drains frames from the backend
@@ -800,6 +1356,11 @@ fn live_loop(
                 if let Ok(owners) = source.snapshot() {
                     if let Ok(mut c) = correlator.lock() {
                         c.ingest_snapshot(latest_mono, &owners);
+                        // Bound the mapping cache: mappings whose validity window
+                        // has ended can never satisfy a future attribution, so
+                        // retaining them would be an unbounded leak over a long
+                        // capture session.
+                        c.evict_expired(latest_mono);
                     }
                 }
             }
@@ -890,9 +1451,15 @@ fn seed_store_from_env() -> (CaptureStore, CaptureStats) {
     }
 }
 
-/// Register the first-party reference plugins so the Plugins surface
-/// lists real, capability-bounded seams. Their manifests mirror the in-tree
-/// examples under `plugins/`; the registry auto-enables first-party references.
+/// Register the in-tree reference plugins so the Plugins surface lists real,
+/// capability-bounded seams — honestly labelled.
+///
+/// The shell holds neither a plugin payload to hash nor a signing key, so these
+/// references genuinely cannot verify: the outcome recorded here is the real
+/// failure (no signature, no hashed payload), trust is reported `Unreviewed`, and
+/// each stays disabled until the user explicitly enables it. Seeding `FirstParty`
+/// trust with a fabricated "in-tree-key" signature is precisely the self-declared
+/// trust the verifier exists to prevent.
 fn seed_registry() -> PluginRegistry {
     let mut reg = PluginRegistry::new(netpulse_api::API_VERSION);
     let first_party = |name: &str,
@@ -917,8 +1484,12 @@ fn seed_registry() -> PluginRegistry {
                 trust: TrustMetadata {
                     source: format!("in-tree:plugins/{name}"),
                     signatures: Vec::new(),
-                    status: TrustStatus::FirstParty,
+                    // The manifest makes no trust claim; trust is derived at
+                    // verification time, never asserted here.
+                    status: TrustStatus::Unreviewed,
                 },
+                // No payload was hashed: the shell ships no plugin binary for these
+                // references, and the verifier treats the mismatch as failure.
                 payload_hash: netpulse_plugin::Sha256Digest([0u8; 32]),
                 signatures: Vec::new(),
                 fuzzed,
@@ -927,12 +1498,10 @@ fn seed_registry() -> PluginRegistry {
         };
         netpulse_plugin::VerificationOutcome {
             manifest: m,
-            claimed_trust: TrustStatus::FirstParty,
-            effective_trust: TrustStatus::FirstParty,
-            verification_result: Ok(netpulse_plugin::VerificationSuccess::FirstParty(
-                "in-tree-key".into(),
-            )),
-            payload_hash_valid: true,
+            claimed_trust: TrustStatus::Unreviewed,
+            effective_trust: TrustStatus::Unreviewed,
+            verification_result: Err(netpulse_plugin::VerificationError::SignatureMissing),
+            payload_hash_valid: false,
         }
     };
     reg.register(first_party(
@@ -1076,7 +1645,10 @@ async fn query(query: Query, state: tauri::State<'_, AppState>) -> Result<QueryR
 /// Observe-only: nothing here touches network traffic.
 #[tracing::instrument(level = "debug", skip(state))]
 #[tauri::command]
-async fn command(command: Command, state: tauri::State<'_, AppState>) -> Result<(), String> {
+async fn command(
+    command: Command,
+    state: tauri::State<'_, AppState>,
+) -> Result<netpulse_api::CommandResultDto, String> {
     ipc::execute_command(&state, command)
 }
 
@@ -1094,7 +1666,10 @@ fn main() {
 
     tracing::info!(event = "engine.start", "NetPulse desktop shell starting");
 
-    let app_state = AppState::default();
+    // The desktop shell attaches a real durable write-behind store (hydrated from
+    // the previous session). `AppState::default()` stays process-lifetime and
+    // isolated for tests and embedded uses.
+    let app_state = AppState::for_desktop();
     let health_config = netpulse_core::health::read_env_health_config();
     if health_config.enabled {
         let tracker = std::sync::Arc::new(netpulse_core::health::AtomicHealthTracker::default());
@@ -1116,6 +1691,13 @@ fn main() {
         http_bridge::DEFAULT_HTTP_BRIDGE_PORT,
         app_state.http_stop.clone(),
     );
+    if _http_bridge_thread.is_some() {
+        tracing::info!(
+            event = "http_bridge.token",
+            token = %app_state.bridge_token,
+            "Browser transport requires this token (X-NetPulse-Token); set NETPULSE_BRIDGE_TOKEN to fix it"
+        );
+    }
 
     let app = tauri::Builder::default()
         .setup(|app| {

@@ -3406,6 +3406,39 @@ button {
   gap: var(--np-3);
 }
 
+/* Written-artifact row: the real path of the file this session produced. */
+.np-export__artifact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--np-3);
+  padding: var(--np-2) var(--np-3);
+  background: var(--np-surface-1);
+  border-radius: var(--np-radius-sm);
+  box-shadow: var(--np-neu-inset);
+  min-width: 0;
+}
+
+.np-export__artifact-path {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--np-2);
+  margin: 0;
+  min-width: 0;
+  font-family: var(--np-font-mono);
+  font-size: var(--np-fs-xs);
+  color: var(--np-text-dim);
+}
+
+.np-export__artifact-path code {
+  font-family: var(--np-font-mono);
+  color: var(--np-text);
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 /* Reduced Motion & Responsive Rules */
 @media (prefers-reduced-motion: reduce) {
   .np-export__format-card,

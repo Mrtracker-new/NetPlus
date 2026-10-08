@@ -37,6 +37,7 @@ yarn-error.log*
 *.pem
 *.key
 docs_ignore/
+.freebuff/ 
 
 # ── Editor / IDE ──────────────────────────────────────────────────
 .vscode/*

@@ -9,7 +9,7 @@
 // - Mode C (Browser Standalone): Fails closed honestly with IpcError('BACKEND_UNAVAILABLE')
 
 import { invoke } from "@tauri-apps/api/core";
-import type { Command, Query, QueryResponse } from "@netpulse/contract";
+import type { Command, CommandResult, Query, QueryResponse } from "@netpulse/contract";
 
 export type IpcErrorCode =
   | "BACKEND_UNAVAILABLE"
@@ -19,6 +19,37 @@ export type IpcErrorCode =
   | "LENGTH_REQUIRED"
   | "PAYLOAD_TOO_LARGE"
   | "BACKEND_ERROR";
+
+/** In-process reads answer immediately; 5s is a generous ceiling for them. */
+const QUERY_TIMEOUT_MS = 5000;
+/**
+ * Diagnostics probes talk to the network, and the shell bounds each probe itself
+ * (ping counts, per-hop timeouts, HTTP/DNS budgets). The client only needs a
+ * ceiling above that budget: a flat 5s timeout used to abort requests the shell
+ * was still legitimately running, which reported a failure that had not happened.
+ */
+const PROBE_TIMEOUT_MS = 60_000;
+/**
+ * Commands can do real work (opening a capture backend, writing an export to disk).
+ * The shell reports its own errors, so the client ceiling only needs to be generous
+ * enough not to cut a legitimate write short and claim it failed.
+ */
+const COMMAND_TIMEOUT_MS = 30_000;
+
+const PROBE_QUERY_KINDS = new Set<string>([
+  "runPing",
+  "runTraceroute",
+  "runBufferbloatTest",
+  "discoverGateway",
+  "runDnsProbe",
+  "runHttpProbe",
+  "runStageProbe",
+]);
+
+function timeoutForQuery(q: Query): number {
+  const kind = (q as { kind?: string }).kind ?? "";
+  return PROBE_QUERY_KINDS.has(kind) ? PROBE_TIMEOUT_MS : QUERY_TIMEOUT_MS;
+}
 
 export class IpcError extends Error {
   readonly code: IpcErrorCode;
@@ -73,8 +104,9 @@ export async function query(q: Query): Promise<QueryResponse> {
     return invoke<QueryResponse>("query", { query: q });
   }
 
+  const timeoutMs = timeoutForQuery(q);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch("/api/query", {
       method: "POST",
@@ -116,7 +148,7 @@ export async function query(q: Query): Promise<QueryResponse> {
       throw err;
     }
     if (err?.name === "AbortError") {
-      throw new IpcError("Query request timed out after 5000ms", "TIMEOUT");
+      throw new IpcError(`Query request timed out after ${timeoutMs}ms`, "TIMEOUT");
     }
     if (err instanceof TypeError) {
       throw new IpcError(
@@ -131,15 +163,17 @@ export async function query(q: Query): Promise<QueryResponse> {
 }
 
 /** Send a control command — the only write path UI→engine.
- *  Nothing here modifies network traffic (observe-only). */
-export async function command(c: Command): Promise<void> {
+ *  Nothing here modifies network traffic (observe-only).
+ *
+ *  Returns what the command completed with, so callers can report the truth (the
+ *  path of a file that was written, for instance) instead of assuming success. */
+export async function command(c: Command): Promise<CommandResult> {
   if (inTauri()) {
-    await invoke("command", { command: c });
-    return;
+    return invoke<CommandResult>("command", { command: c });
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 5000);
+  const timeoutId = setTimeout(() => controller.abort(), COMMAND_TIMEOUT_MS);
   try {
     const res = await fetch("/api/command", {
       method: "POST",
@@ -174,12 +208,17 @@ export async function command(c: Command): Promise<void> {
         `HTTP ${res.status}: ${res.statusText}`;
       throw new IpcError(message, code, res.status);
     }
+
+    return (await res.json()) as CommandResult;
   } catch (err: any) {
     if (err instanceof IpcError) {
       throw err;
     }
     if (err?.name === "AbortError") {
-      throw new IpcError("Command request timed out after 5000ms", "TIMEOUT");
+      throw new IpcError(
+        `Command request timed out after ${COMMAND_TIMEOUT_MS}ms`,
+        "TIMEOUT"
+      );
     }
     if (err instanceof TypeError) {
       throw new IpcError(

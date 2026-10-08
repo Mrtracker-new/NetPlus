@@ -895,6 +895,27 @@ pub struct ExportPreviewDto {
     pub provenance: String,
 }
 
+/// A file an export command actually wrote to disk.
+///
+/// Command results carry this so the UI can show the real path — and offer to open
+/// it — instead of a generic "export completed" message: "an export happened" is
+/// not actionable, `…/netpulse-export-1730000000000.json` is. `id` is the
+/// session-scoped handle the shell assigns at write time, so opening an artifact
+/// never requires sending a filesystem path back over IPC.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExportArtifactDto {
+    /// Session-scoped identifier assigned by the shell when the file was written.
+    pub id: u32,
+    /// Absolute path of the file that was written.
+    pub path: String,
+    /// Bytes actually written (observed, not estimated).
+    pub bytes: u64,
+    /// The format that was written.
+    pub format: ExportFormatDto,
+    /// The payload level the artifact was produced at.
+    pub level: PayloadLevelDto,
+}
+
 /// A plugin extension seam. Mirrors `netpulse_plugin::PluginType`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

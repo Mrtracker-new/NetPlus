@@ -56,6 +56,7 @@ import type {
   PacketInspection,
   SessionDiff,
   FleetHost,
+  ExportArtifact,
   CurriculumModule,
   LessonDetail,
   LearningProgress,
@@ -177,5 +178,17 @@ export type Command =
   | { kind: "disablePlugin"; name: string }
   | { kind: "configurePlugin"; name: string; config: any }
   | { kind: "patchPluginConfig"; name: string; expected_version?: number; patch: any }
-  | { kind: "resetPluginConfig"; name: string };
+  | { kind: "resetPluginConfig"; name: string }
+  // Hand a recorded export artifact to the OS, by the session-scoped id the
+  // shell assigned when it wrote the file.
+  | { kind: "openExport"; id: number };
+
+/** What a Command completed with (mirrors `netpulse_api::CommandResultDto`).
+ *
+ *  Commands that write or open a file report the artifact so the UI can show the
+ *  real path instead of a generic success message. */
+export type CommandResult =
+  | { kind: "completed" }
+  | { kind: "artifactWritten"; artifact: ExportArtifact }
+  | { kind: "artifactOpened"; artifact: ExportArtifact };
 

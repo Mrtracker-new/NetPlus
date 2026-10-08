@@ -675,6 +675,16 @@ pub fn typescript_contract() -> String {
         ],
     ));
     s.push_str(&iface(
+        "ExportArtifact",
+        &[
+            ("id", "number"),
+            ("path", "string"),
+            ("bytes", "number"),
+            ("format", "ExportFormat"),
+            ("level", "PayloadLevel"),
+        ],
+    ));
+    s.push_str(&iface(
         "PluginDescriptor",
         &[
             ("name", "string"),
@@ -913,6 +923,7 @@ mod tests {
             "RecordingSummary",
             "ReplayState",
             "ExportPreview",
+            "ExportArtifact",
             "PluginDescriptor",
             "HandshakeResponse",
             "PingResult",

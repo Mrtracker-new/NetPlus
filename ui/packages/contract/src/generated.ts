@@ -439,6 +439,14 @@ export interface ExportPreview {
   provenance: string;
 }
 
+export interface ExportArtifact {
+  id: number;
+  path: string;
+  bytes: number;
+  format: ExportFormat;
+  level: PayloadLevel;
+}
+
 export interface PluginDescriptor {
   name: string;
   plugin_type: PluginType;

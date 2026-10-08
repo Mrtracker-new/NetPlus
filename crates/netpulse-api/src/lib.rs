@@ -30,12 +30,12 @@ pub use dto::{
     CaptureStatsDto, CauseDto, ComponentCheckDto, CurriculumLessonDto, CurriculumModuleDto,
     DiagnosisDto, DiagnosticChainStageKindDto, DimensionDto, DirectionDto,
     EndpointClassificationDto, EvidenceRefDto, ExerciseChoiceDto, ExerciseKindDto,
-    ExerciseValidationOutcomeDto, ExplorerEntryDto, ExportFormatDto, ExportPreviewDto,
-    ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto, FlowLineageDto,
-    GroundedExerciseDto, HandshakeResponseDto, HealthStatusDto, HostNameDto, InterfaceDto,
-    JourneyStageDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto, LessonOfferDto,
-    LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto, NarrativeCardDto,
-    NarrativeCategoryDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto,
+    ExerciseValidationOutcomeDto, ExplorerEntryDto, ExportArtifactDto, ExportFormatDto,
+    ExportPreviewDto, ExportSelectionDto, FanoutNodeDto, FindingCategoryDto, FindingKindDto,
+    FlowLineageDto, GroundedExerciseDto, HandshakeResponseDto, HealthStatusDto, HostNameDto,
+    InterfaceDto, JourneyStageDto, LearningProgressDto, LessonDetailDto, LessonExerciseDto,
+    LessonOfferDto, LessonStepDto, MonitorSnapshotDto, MonitorTimeRangeDto, NameSourceDto,
+    NarrativeCardDto, NarrativeCategoryDto, PageJourneyDto, PayloadLevelDto, PluginCapabilityDto,
     PluginDescriptorDto, PluginTrustDto, PluginTypeDto, PrivacyManifestDto, ProcessMetricDto,
     ProjectionDepth, RecordingSummaryDto, ReplayStateDto, SecurityFindingDto, SessionSummaryDto,
     SeverityDto, ShedStageDto, StageKindDto, StageProbeResultDto, StageProbeStatusDto,
@@ -611,6 +611,30 @@ pub enum Command {
     ResetPluginConfig {
         name: String,
     },
+    /// Hand a previously written export artifact to the operating system.
+    ///
+    /// Referenced by the session-scoped `id` the shell assigned at write time, so a
+    /// caller cannot ask the shell to open an arbitrary path.
+    OpenExport {
+        id: u32,
+    },
+}
+
+/// What a [`Command`] completed with.
+///
+/// Most commands have nothing to report and answer [`CommandResultDto::Completed`].
+/// The ones that touch a file say exactly what they did, so the UI can show the real
+/// path instead of an interchangeable "success" message.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum CommandResultDto {
+    /// The command completed with nothing further to report.
+    Completed,
+    /// An export file was written to disk.
+    ArtifactWritten { artifact: ExportArtifactDto },
+    /// A recorded export artifact was handed to the OS to open.
+    ArtifactOpened { artifact: ExportArtifactDto },
 }
 
 #[cfg(test)]

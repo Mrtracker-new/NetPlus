@@ -356,12 +356,22 @@ impl Default for HealthServerConfig {
 }
 
 /// Read health server configuration from environment variables (`NETPULSE_HEALTH_ENABLED`, `NETPULSE_HEALTH_HOST`, `NETPULSE_HEALTH_PORT`).
+///
+/// Setting a port implies enabling the server (documented in
+/// `docs/observability.md`), but an **explicit disable wins**:
+/// `NETPULSE_HEALTH_ENABLED=false` with a port set stays off. Previously the port
+/// branch re-enabled the server after an explicit `false`, so an operator could not
+/// actually turn it off while a port was configured.
 pub fn read_env_health_config() -> HealthServerConfig {
     let mut config = HealthServerConfig::default();
+    let mut explicitly_disabled = false;
 
     if let Ok(val) = std::env::var("NETPULSE_HEALTH_ENABLED") {
-        if val.eq_ignore_ascii_case("true") || val == "1" {
+        let normalized = val.trim();
+        if normalized.eq_ignore_ascii_case("true") || normalized == "1" {
             config.enabled = true;
+        } else if normalized.eq_ignore_ascii_case("false") || normalized == "0" {
+            explicitly_disabled = true;
         }
     }
 
@@ -374,8 +384,14 @@ pub fn read_env_health_config() -> HealthServerConfig {
     if let Ok(val) = std::env::var("NETPULSE_HEALTH_PORT") {
         if let Ok(port) = val.parse::<u16>() {
             config.port = port;
-            config.enabled = true;
+            if !explicitly_disabled {
+                config.enabled = true;
+            }
         }
+    }
+
+    if explicitly_disabled {
+        config.enabled = false;
     }
 
     config
@@ -501,6 +517,46 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The env-reading test owns these three variables and serialises against
+    /// itself, so a parallel test in this binary cannot observe a half-set env.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn test_health_env_port_implies_enabled_but_explicit_disable_wins() {
+        let _guard = ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        for key in [
+            "NETPULSE_HEALTH_ENABLED",
+            "NETPULSE_HEALTH_HOST",
+            "NETPULSE_HEALTH_PORT",
+        ] {
+            std::env::remove_var(key);
+        }
+
+        // Default: off.
+        assert!(!read_env_health_config().enabled);
+
+        // A configured port implies enabled (documented behaviour).
+        std::env::set_var("NETPULSE_HEALTH_PORT", "9977");
+        let cfg = read_env_health_config();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.port, 9977);
+
+        // An explicit disable must win over the port.
+        std::env::set_var("NETPULSE_HEALTH_ENABLED", "false");
+        assert!(!read_env_health_config().enabled);
+
+        std::env::set_var("NETPULSE_HEALTH_ENABLED", "true");
+        assert!(read_env_health_config().enabled);
+
+        for key in [
+            "NETPULSE_HEALTH_ENABLED",
+            "NETPULSE_HEALTH_HOST",
+            "NETPULSE_HEALTH_PORT",
+        ] {
+            std::env::remove_var(key);
+        }
+    }
 
     #[test]
     fn test_health_state_evaluation() {

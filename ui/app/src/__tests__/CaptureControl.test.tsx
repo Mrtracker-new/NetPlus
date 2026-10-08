@@ -23,7 +23,9 @@ describe("CaptureControl Component", () => {
   });
 
   it("toggles capture state and triggers command execution", async () => {
-    const commandSpy = vi.spyOn(ipc, "command").mockResolvedValue(undefined);
+    const commandSpy = vi
+      .spyOn(ipc, "command")
+      .mockResolvedValue({ kind: "completed" } as any);
 
     render(<App />);
 
@@ -72,9 +74,9 @@ describe("CaptureControl Component", () => {
     });
     const commandSpy = vi.spyOn(ipc, "command").mockImplementation(async (c) => {
       if (c.kind === "startCapture") {
-        return commandPromise;
+        return commandPromise as any;
       }
-      return Promise.resolve();
+      return { kind: "completed" } as any;
     });
 
     render(<App />);

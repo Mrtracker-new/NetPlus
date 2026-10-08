@@ -89,7 +89,9 @@ describe("Replay Screen & useReplayController", () => {
       },
     } as any);
 
-    const cmdSpy = vi.spyOn(ipcModule, "command").mockResolvedValue(undefined);
+    const cmdSpy = vi
+      .spyOn(ipcModule, "command")
+      .mockResolvedValue({ kind: "completed" } as any);
 
     render(<ReplayTestWrapper />);
 

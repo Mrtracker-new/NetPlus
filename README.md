@@ -31,7 +31,7 @@ NetPulse capabilities are specified, implemented, and executed across three dist
 | **Narrative & Presentation** | `netpulse-narrative`, `netpulse-api`, `@netpulse/contract`, `@netpulse/components`, `@netpulse/viz`, `@netpulse/design-system` | ✅ Complete | ✅ Complete | ✅ Complete | Session narrative card projection, v6 API DTO contract, real-time bandwidth/latency telemetry streaming, Windows process attribution (`GetExtendedTcpTable`), and progressive disclosure UI components fully operational. |
 | **Education & Exploration** | `netpulse-learn`, `@netpulse/app` | ✅ Complete | ✅ Complete | ✅ Complete | Interactive curriculum engine, Website Load Journey synthesizer, Protocol Explorer reference content, persistent local mastery engine, and interactive lesson player UI fully operational. |
 | **Intelligence & AI** | `netpulse-intel`, `netpulse-ai` | ✅ Complete | ✅ Complete | 🚧 In Progress | Threat detectors (DNS tunneling, port scans), statistical anomaly engine, grounded retrieval & `LocalTemplateBackend` complete. Local ONNX LLM backend planned. |
-| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `netpulse-capture-svc` | ✅ Complete | 🚧 In Progress | 🚧 In Progress | Session recording & deterministic replay, PCAPNG import/export, plugin seam traits & trust model complete. WASM runtime loader & privileged daemon loop in progress/planned. |
+| **Lifecycle & Plugins** | `netpulse-engine`, `netpulse-plugin`, `netpulse-capture-svc` | ✅ Complete | 🚧 In Progress | 🚧 In Progress | Deterministic replay controller, plugin seam traits, Ed25519 trust derivation, and durable write-behind persistence of the committed capture. Recording is **not yet wired** into the live capture loop and PCAPNG export needs captured frames, so both refuse with a reason instead of reporting a success that never happened. WASM runtime loader & privileged daemon loop in progress/planned. |
 
 ---
 
@@ -107,6 +107,32 @@ pnpm --filter @netpulse/app dev
 ### Desktop Application (Tauri Shell)
 ```sh
 cargo tauri dev
+```
+
+---
+
+## Runtime Configuration & Local Data
+
+Everything below is local-only; nothing here opens an outbound connection.
+
+| Variable | Effect |
+|---|---|
+| `NETPULSE_DB_PATH` | SQLite file backing the durable write-behind store (default: the per-user data directory). `off` disables persistence — the shell logs `shell.persistence_disabled` and health reports that this session is not persisted. |
+| `NETPULSE_PCAP` | Seed the store from a saved capture instead of stored history for this run. |
+| `NETPULSE_EXPORT_DIR` | Where `StartExport` writes JSON/CSV/HTML (default: `<data dir>/exports`). Every write is logged with its path and byte count, and the command returns the artifact (path, size, format, level) so the UI shows the real file instead of a generic success message. |
+| `NETPULSE_BRIDGE_TOKEN` | Capability token for the loopback browser transport. Required by `/api/query` and `/api/command` (sent as `X-NetPulse-Token`); `/api/health` stays open. Without it the shell generates one and logs it as `http_bridge.token`. |
+| `NETPULSE_SKIP_INTEGRITY_CHECK` | Skip the one-time `PRAGMA integrity_check` the durable writer runs at startup (useful for very large stores). |
+
+The durable writer verifies database integrity once per session and reports dropped writes through `Query::HealthCheck` and the shutdown report; a silent write loss is a bug, not a mode.
+
+The export screen can open the file it just wrote (`Command::OpenExport`): the UI passes back only the session-scoped artifact id the shell assigned, and the shell resolves that id to a file it wrote, inside the export directory, with an expected extension before handing it to the OS handler. A path is never accepted from the UI.
+
+### Browser (dev-server) transport
+
+The bridge refuses requests whose `Host` is not a loopback origin, so a page that resolves an attacker-controlled name to `127.0.0.1` cannot reach the engine. To use the browser transport, start the shell, copy the logged token, and export the same value for the UI dev server:
+
+```sh
+NETPULSE_BRIDGE_TOKEN=<token from the shell log> pnpm --filter @netpulse/app dev
 ```
 
 ---

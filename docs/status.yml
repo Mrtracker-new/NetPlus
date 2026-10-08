@@ -3,7 +3,7 @@
 # Synchronized with documentation via `python scripts/verify_docs_status.py`.
 
 version: 1
-last_updated: "2026-08-18"
+last_updated: "2026-10-08"
 
 status_legend:
   complete: "✅ Complete"
@@ -28,7 +28,7 @@ crates:
     design: complete
     code: complete
     runtime: complete
-    summary: "PCAP/PCAPNG file parsing, ring buffer, shedding policy, recording & replay complete."
+    summary: "PCAP/PCAPNG file parsing, ring buffer, shedding policy, and deterministic replay complete. Recording exists as a library (Recorder/Recording) but is not yet wired into the shell's live capture loop, which reports that honestly rather than fabricating a recording."
   netpulse-capture-svc:
     layer: Daemon
     design: complete
@@ -52,7 +52,7 @@ crates:
     design: complete
     code: complete
     runtime: complete
-    summary: "In-memory CaptureStore, WAL-mode durable SQLite repository, referential integrity hydration, atomic transactions, and snapshot equality."
+    summary: "In-memory CaptureStore plus a durable write-behind SQLite mirror: queued writes are drained and barriered, failures must be surfaced (never swallowed), and `PRAGMA integrity_check` runs once per session rather than on every repository connect."
   netpulse-narrative:
     layer: Presentation
     design: complete
@@ -88,13 +88,13 @@ crates:
     design: complete
     code: complete
     runtime: in_progress
-    summary: "Extension seam traits, capability model, Ed25519 verifier & registry complete; WASM host planned."
+    summary: "Extension seam traits, capability model, Ed25519 verifier & registry complete. Trust is derived from verification, never self-declared: the in-tree references ship no signature or hashed payload, so they register as Unreviewed and stay disabled until a user enables them; WASM host planned."
   netpulse-engine:
     layer: Orchestrator
     design: complete
     code: complete
     runtime: complete
-    summary: "Offline file analysis and incremental LivePipeline operational; verified against SQLite restart durability and presentation views."
+    summary: "Offline file analysis and incremental LivePipeline operational; verified against SQLite restart durability and presentation views. The monitoring snapshot projects only the monitor (no narrative/session clones), and attribution is resolved through one shared flow-to-process lookup so the monitoring and security projections cannot disagree."
 
 ui_workspace:
   contract:

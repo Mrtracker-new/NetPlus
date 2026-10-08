@@ -43,6 +43,11 @@ pub const MAPPING_VALIDITY_NANOS: u64 = 2_000_000_000; // 2s
 /// filled when the snapshot arrives. Nanoseconds.
 pub const RETRO_MATCH_NANOS: u64 = 1_000_000_000; // 1s
 
+/// Hard ceiling on retained 5-tuple mappings. A busy host can observe far more
+/// unique tuples than are ever attributed, so the cache is bounded explicitly
+/// rather than relying on callers to prune it.
+pub const MAX_CACHED_MAPPINGS: usize = 100_000;
+
 /// One cached mapping: who owned a 5-tuple, and the window in which that
 /// ownership is considered valid.
 #[derive(Debug, Clone)]
@@ -109,6 +114,25 @@ impl Correlator {
                     observed_at: at,
                 },
             );
+        }
+        // Hard ceiling. Expired mappings are useless (see `evict_expired`), so
+        // prune them first; if a single snapshot still exceeds the cap we drop
+        // the oldest observations, which are the least likely to match a future
+        // flow start.
+        if self.cache.len() > MAX_CACHED_MAPPINGS {
+            self.evict_expired(at);
+            if self.cache.len() > MAX_CACHED_MAPPINGS {
+                let mut by_age: Vec<(u64, FiveTuple)> = self
+                    .cache
+                    .iter()
+                    .map(|(tuple, m)| (m.observed_at, *tuple))
+                    .collect();
+                by_age.sort_by_key(|(observed_at, _)| *observed_at);
+                let excess = self.cache.len() - MAX_CACHED_MAPPINGS;
+                for (_, tuple) in by_age.into_iter().take(excess) {
+                    self.cache.remove(&tuple);
+                }
+            }
         }
     }
 

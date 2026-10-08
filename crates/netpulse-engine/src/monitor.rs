@@ -909,6 +909,50 @@ pub fn classify_endpoint(ip: &IpAddr) -> EndpointClassificationDto {
     }
 }
 
+/// The PID credited with a flow, or `None` when the correlator has no confident
+/// owner for it. The single shared attribution lookup: the monitoring, lineage and
+/// security projections all resolve owners through this, so they cannot disagree
+/// about who owns a flow.
+pub fn attributed_pid(
+    correlator: Option<&crate::attribution::Correlator>,
+    flow: &Flow,
+) -> Option<u64> {
+    correlator.and_then(|c| {
+        c.attribute(&flow.key, flow.first_ts.mono_nanos)
+            .pid
+            .or_else(|| c.attribute(&flow.key, flow.last_ts.mono_nanos).pid)
+    })
+}
+
+/// The process each flow in `flows` is attributed to, keyed by flow id.
+///
+/// Flows with no confident owner — and PIDs whose identity the socket table does
+/// not report — are simply absent rather than guessed, so a consumer that sees an
+/// entry can trust it names the real process.
+pub fn process_map(
+    flows: &[&Flow],
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Option<&(dyn netpulse_core::SocketTableSource + Send + Sync)>,
+) -> HashMap<u64, netpulse_core::Process> {
+    let mut map = HashMap::new();
+    if flows.is_empty() || correlator.is_none() {
+        return map;
+    }
+    let mut proc_cache: HashMap<u64, Option<netpulse_core::Process>> = HashMap::new();
+    for flow in flows {
+        let Some(pid) = attributed_pid(correlator, flow) else {
+            continue;
+        };
+        let info = proc_cache
+            .entry(pid)
+            .or_insert_with(|| sockets.and_then(|s| s.process_info(pid).ok().flatten()));
+        if let Some(process) = info {
+            map.insert(flow.id, process.clone());
+        }
+    }
+    map
+}
+
 /// Aggregate active flows in the window to their correlated OS processes.
 pub fn aggregate_processes(
     flows: &[&Flow],
@@ -935,11 +979,7 @@ pub fn aggregate_processes(
     let mut proc_cache: HashMap<u64, Option<netpulse_core::Process>> = HashMap::new();
 
     for flow in flows {
-        let pid_opt = correlator.and_then(|c| {
-            c.attribute(&flow.key, flow.first_ts.mono_nanos)
-                .pid
-                .or_else(|| c.attribute(&flow.key, flow.last_ts.mono_nanos).pid)
-        });
+        let pid_opt = attributed_pid(correlator, flow);
         let (pid, name, exe_path, cpu_percent, memory_bytes) = if let Some(pid) = pid_opt {
             let proc_info = proc_cache
                 .entry(pid)

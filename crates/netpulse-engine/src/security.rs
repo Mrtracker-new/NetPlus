@@ -7,12 +7,12 @@
 //! `netpulse-ai`) exactly the slices they need — capturing, parsing, and storing
 //! nothing.
 //!
-//! Attribution is honestly absent in this build: no live [`SocketTableSource`]
-//! is wired, so the process map handed to the detectors is
-//! empty and the attribution-dependent detector (unexpected unsigned egress,
-//!  stays silent rather than blaming the wrong app.
-//! When a live socket source lands, feeding a populated map here is the only
-//! change needed — the detectors already read it.
+//! Attribution is fed in by the caller, which owns the live socket table and the
+//! flow→process correlator. When no socket source is available the map is empty
+//! and the attribution-dependent detectors stay silent rather than blaming the
+//! wrong app — but when one *is* wired, the security projection sees exactly the
+//! same owners the monitoring projection shows. Handing the detectors an empty map
+//! while the UI displayed a process was the bug this shares one lookup to prevent.
 
 use std::collections::HashMap;
 
@@ -24,6 +24,10 @@ use netpulse_storage::CaptureStore;
 
 use crate::project;
 
+/// The live socket→PID source, borrowed so the projection can enrich an
+/// attributed PID with the process identity the detectors reason about.
+type Sockets<'a> = Option<&'a (dyn netpulse_core::SocketTableSource + Send + Sync)>;
+
 /// Assess a window of committed traffic and project the corroborated, ranked
 /// findings to their wire DTOs at `depth`. Most-confident first; an
 /// empty result is the honest "nothing looks unusual", never a
@@ -33,6 +37,8 @@ pub fn present_security(
     from_mono_nanos: u64,
     to_mono_nanos: u64,
     depth: Depth,
+    correlator: Option<&crate::attribution::Correlator>,
+    sockets: Sockets<'_>,
 ) -> Vec<SecurityFindingDto> {
     // Own the flow/event clones so the borrowed view can reference them while the
     // engine runs (same pattern as the other projections .
@@ -46,8 +52,9 @@ pub fn present_security(
         events.extend(store.events_for_flow(f.id).iter().cloned());
     }
 
-    // No live socket source in this build → no attribution.
-    let process_of: HashMap<u64, Process> = HashMap::new();
+    let flow_refs: Vec<&Flow> = flows.iter().collect();
+    let process_of: HashMap<u64, Process> =
+        crate::monitor::process_map(&flow_refs, correlator, sockets);
     let view = TrafficView {
         flows: &flows,
         events: &events,
@@ -105,22 +112,26 @@ mod tests {
     fn seeded_store() -> CaptureStore {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
         for i in 0..5 {
-            store.insert_flow(beacon_flow(i, i * 60_000_000_000), vec![]);
+            store
+                .insert_flow(beacon_flow(i, i * 60_000_000_000), vec![])
+                .expect("store write");
         }
-        store.insert_session(Session {
-            id: 1,
-            process_id: 0,
-            start_ts: Timestamp::new(0, 0),
-            trigger: "beacon".into(),
-            flow_ids: (0..5).collect(),
-        });
+        store
+            .insert_session(Session {
+                id: 1,
+                process_id: 0,
+                start_ts: Timestamp::new(0, 0),
+                trigger: "beacon".into(),
+                flow_ids: (0..5).collect(),
+            })
+            .expect("store write");
         store
     }
 
     #[test]
     fn present_security_surfaces_a_grounded_finding() {
         let store = seeded_store();
-        let findings = present_security(&store, 0, u64::MAX, Depth::Beginner);
+        let findings = present_security(&store, 0, u64::MAX, Depth::Beginner, None, None);
         assert_eq!(findings.len(), 1);
         let f = &findings[0];
         assert_eq!(
@@ -136,8 +147,11 @@ mod tests {
     fn quiet_capture_yields_no_findings() {
         // A single ordinary flow → nothing unusual, no fabrication.
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(beacon_flow(1, 0), vec![]);
-        assert!(present_security(&store, 0, u64::MAX, Depth::Beginner).is_empty());
+        store
+            .insert_flow(beacon_flow(1, 0), vec![])
+            .expect("store write");
+
+        assert!(present_security(&store, 0, u64::MAX, Depth::Beginner, None, None).is_empty());
     }
 
     #[test]

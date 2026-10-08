@@ -7,12 +7,14 @@
 
 use std::collections::HashMap;
 use std::net::IpAddr;
+use std::sync::Arc;
 
 use std::path::Path;
 
 use netpulse_core::{EvidenceRef, Finding, Flow, Host, HostName, NpError, ProtoEvent, Session};
 use serde::{Deserialize, Serialize};
 
+use crate::durable::{DurableHealth, DurableLog, DurableRecord};
 use crate::error::StorageError;
 use crate::repository::{CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository};
 use crate::{EvictionStats, PayloadPolicy, StorageConfig};
@@ -71,6 +73,13 @@ pub struct CaptureStore<R: CaptureRepository = MemoryCaptureStore> {
     events_by_flow: HashMap<u64, Vec<ProtoEvent>>,
     /// Count of packet payload records written — must stay 0 under MetadataOnly.
     payload_records: u64,
+    /// Optional durable write-behind mirror (SQLite). `None` means this store is
+    /// process-lifetime only, and `flush`/health say so rather than implying
+    /// durability that does not exist.
+    durable: Option<Arc<DurableLog>>,
+    /// Cached newest flow timestamp, kept so `latest_mono_nanos` is O(1) on the
+    /// query path instead of an O(n) scan of every retained flow.
+    latest_mono_cache: u64,
 }
 
 impl CaptureStore<MemoryCaptureStore> {
@@ -87,6 +96,8 @@ impl CaptureStore<MemoryCaptureStore> {
             findings: HashMap::new(),
             events_by_flow: HashMap::new(),
             payload_records: 0,
+            durable: None,
+            latest_mono_cache: 0,
         }
     }
 
@@ -103,6 +114,8 @@ impl CaptureStore<MemoryCaptureStore> {
             findings: HashMap::new(),
             events_by_flow: HashMap::new(),
             payload_records: 0,
+            durable: None,
+            latest_mono_cache: 0,
         }
     }
 }
@@ -121,6 +134,61 @@ impl<R: CaptureRepository> CaptureStore<R> {
             findings: HashMap::new(),
             events_by_flow: HashMap::new(),
             payload_records: 0,
+            durable: None,
+            latest_mono_cache: 0,
+        }
+    }
+
+    /// Attach a durable write-behind mirror. Every subsequent synchronous
+    /// mutation is also enqueued for durable persistence; the mirror is drained
+    /// and joined by [`CaptureStore::shutdown_durable`].
+    pub fn attach_durable_log(&mut self, log: DurableLog) {
+        self.durable = Some(Arc::new(log));
+    }
+
+    /// Health of the durable mirror, or `None` when the store has no durable
+    /// backing at all (a fact the caller must report, not hide).
+    pub fn durable_health(&self) -> Option<DurableHealth> {
+        self.durable.as_ref().map(|log| log.health())
+    }
+
+    /// The durable database file backing this store, if any.
+    pub fn durable_path(&self) -> Option<String> {
+        self.durable
+            .as_ref()
+            .map(|log| log.path().display().to_string())
+    }
+
+    /// True when this store persists beyond the process lifetime.
+    pub fn is_durable(&self) -> bool {
+        self.durable.is_some()
+    }
+
+    /// Wait for all queued durable writes to be attempted, then checkpoint the
+    /// WAL. Fails when the writes did not all succeed — callers must not report
+    /// success on `Err`.
+    pub fn flush_durable(&self, timeout: std::time::Duration) -> netpulse_core::Result<()> {
+        match &self.durable {
+            Some(log) => log
+                .flush(timeout)
+                .map_err(|e| NpError::Storage(format!("durable flush failed: {e}"))),
+            None => Ok(()),
+        }
+    }
+
+    /// Drain, stop and join the durable mirror, returning its final health so a
+    /// shutdown report can state exactly what was persisted.
+    pub fn shutdown_durable(&mut self) -> Option<DurableHealth> {
+        let log = self.durable.take()?;
+        Some(log.shutdown())
+    }
+
+    fn durable_write(&self, record: DurableRecord) -> netpulse_core::Result<()> {
+        match &self.durable {
+            Some(log) => log
+                .enqueue(record)
+                .map_err(|e| NpError::Storage(format!("durable persistence failed: {e}"))),
+            None => Ok(()),
         }
     }
 
@@ -229,16 +297,34 @@ impl<R: CaptureRepository> CaptureStore<R> {
     }
 
     /// The latest monotonic timestamp observed across all retained flows, or 0.
+    ///
+    /// Backed by an insert-time cache so it is O(1) on the query path; eviction
+    /// recomputes it only when the flow holding the maximum is removed.
     pub fn latest_mono_nanos(&self) -> u64 {
-        self.flows
+        self.latest_mono_cache
+    }
+
+    /// Recompute the cached newest timestamp from scratch (used after bulk loads
+    /// and after an eviction removed the newest flow).
+    fn recompute_latest_mono(&mut self) {
+        self.latest_mono_cache = self
+            .flows
             .values()
-            .map(|f| f.last_ts.mono_nanos)
+            .map(|f| f.last_ts.mono_nanos.max(f.first_ts.mono_nanos))
             .max()
-            .unwrap_or(0)
+            .unwrap_or(0);
     }
 
     /// Synchronous insert flow.
-    pub fn insert_flow(&mut self, flow: Flow, mut events: Vec<ProtoEvent>) {
+    ///
+    /// Errors mean the write is **not** durable (queue full or writer gone); the
+    /// in-memory model is still updated, so the caller must surface the error
+    /// rather than assume the flow will survive a restart.
+    pub fn insert_flow(
+        &mut self,
+        flow: Flow,
+        mut events: Vec<ProtoEvent>,
+    ) -> netpulse_core::Result<()> {
         if self.config.max_events_per_flow > 0 && events.len() > self.config.max_events_per_flow {
             events.truncate(self.config.max_events_per_flow);
         }
@@ -248,55 +334,67 @@ impl<R: CaptureRepository> CaptureStore<R> {
                 .or_default()
                 .extend(events.clone());
         }
+        self.latest_mono_cache = self
+            .latest_mono_cache
+            .max(flow.last_ts.mono_nanos)
+            .max(flow.first_ts.mono_nanos);
         self.flows.insert(flow.id, flow.clone());
-        let _ = self.repository.insert_flow_sync(flow, events);
+        let durable = self.durable_write(DurableRecord::Flow(flow, events));
         self.auto_evict_if_needed();
+        durable
     }
 
     /// Synchronous insert session.
-    pub fn insert_session(&mut self, session: Session) {
+    pub fn insert_session(&mut self, session: Session) -> netpulse_core::Result<()> {
         self.sessions.insert(session.id, session.clone());
-        let _ = self.repository.insert_session_sync(session);
+        self.durable_write(DurableRecord::Session(session))
     }
 
     /// Synchronous insert host.
-    pub fn insert_host(&mut self, id: u64, host: Host) {
+    pub fn insert_host(&mut self, id: u64, host: Host) -> netpulse_core::Result<()> {
         self.hosts.insert(id, host.clone());
-        let _ = self.repository.insert_host_sync(id, host);
+        self.durable_write(DurableRecord::Host(id, host))
     }
 
     /// Synchronous set resolution.
-    pub fn set_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
+    pub fn set_resolution(
+        &mut self,
+        ip: IpAddr,
+        names: Vec<HostName>,
+    ) -> netpulse_core::Result<()> {
         if names.is_empty() {
             self.resolutions.remove(&ip);
         } else {
             self.resolutions.insert(ip, names.clone());
         }
-        let _ = self.repository.set_resolution_sync(ip, names);
+        self.durable_write(DurableRecord::Resolution(ip, names))
     }
 
     /// Synchronous merge resolution.
-    pub fn merge_resolution(&mut self, ip: IpAddr, names: Vec<HostName>) {
-        if !names.is_empty() {
-            let existing = self.resolutions.entry(ip).or_default();
-            for n in &names {
-                if !existing
-                    .iter()
-                    .any(|h| h.name == n.name && h.source == n.source)
-                {
-                    existing.push(n.clone());
-                }
-            }
-            let _ = self.repository.merge_resolution_sync(ip, names);
+    pub fn merge_resolution(
+        &mut self,
+        ip: IpAddr,
+        names: Vec<HostName>,
+    ) -> netpulse_core::Result<()> {
+        if names.is_empty() {
+            return Ok(());
         }
+        let existing = self.resolutions.entry(ip).or_default();
+        for n in &names {
+            if !existing
+                .iter()
+                .any(|h| h.name == n.name && h.source == n.source)
+            {
+                existing.push(n.clone());
+            }
+        }
+        self.durable_write(DurableRecord::MergeResolution(ip, names))
     }
 
     /// Synchronous insert finding. Validates that all evidence references exist.
     pub fn insert_finding(&mut self, finding: Finding) -> netpulse_core::Result<()> {
         self.validate_evidence_refs(&finding)?;
-        self.repository
-            .insert_finding_sync(finding.clone())
-            .map_err(|e| NpError::Storage(e.to_string()))?;
+        let durable = self.durable_write(DurableRecord::Finding(finding.clone()));
         self.findings.insert(
             finding.id,
             StoredFinding {
@@ -304,7 +402,7 @@ impl<R: CaptureRepository> CaptureStore<R> {
                 evidence_expired: false,
             },
         );
-        Ok(())
+        durable
     }
 
     /// Trigger automatic eviction if flow or session counts exceed configured limits.
@@ -327,6 +425,10 @@ impl<R: CaptureRepository> CaptureStore<R> {
     }
 
     /// Evict oldest flows down to target count.
+    ///
+    /// Eviction is an in-memory retention decision only: the durable mirror
+    /// deliberately retains the full observed history, so dropping a flow from
+    /// the recent window does not delete it from the database.
     pub fn evict_oldest_flows(&mut self, target_max: usize) -> usize {
         if self.flows.len() <= target_max {
             return 0;
@@ -340,6 +442,8 @@ impl<R: CaptureRepository> CaptureStore<R> {
 
         let to_remove = self.flows.len() - target_max;
         let mut evicted = 0;
+        let mut removed_newest = false;
+        let newest = self.latest_mono_cache;
         for (_, flow_id) in order {
             if evicted >= to_remove {
                 break;
@@ -362,11 +466,17 @@ impl<R: CaptureRepository> CaptureStore<R> {
                     }
                 }
             }
-            self.flows.remove(&flow_id);
+            if let Some(removed) = self.flows.remove(&flow_id) {
+                if removed.last_ts.mono_nanos == newest || removed.first_ts.mono_nanos == newest {
+                    removed_newest = true;
+                }
+            }
             self.events_by_flow.remove(&flow_id);
             evicted += 1;
         }
-        let _ = self.repository.evict_oldest_flows_sync(target_max);
+        if removed_newest {
+            self.recompute_latest_mono();
+        }
         evicted
     }
 
@@ -409,7 +519,6 @@ impl<R: CaptureRepository> CaptureStore<R> {
             self.sessions.remove(&session_id);
             evicted += 1;
         }
-        let _ = self.repository.evict_oldest_sessions_sync(target_max);
         evicted
     }
 
@@ -433,90 +542,17 @@ impl<R: CaptureRepository> CaptureStore<R> {
     }
 
     /// Evict oldest flows down to target count asynchronously.
+    ///
+    /// Retention is an in-memory concern; the durable mirror keeps the full
+    /// observed history (see [`CaptureStore::evict_oldest_flows`]). This shares
+    /// one implementation with the synchronous path so the two can never drift.
     pub async fn evict_oldest_flows_async(&mut self, target_max: usize) -> usize {
-        if self.flows.len() <= target_max {
-            return 0;
-        }
-        let mut order: Vec<(u64, u64)> = self
-            .flows
-            .values()
-            .map(|f| (f.first_ts.mono_nanos, f.id))
-            .collect();
-        order.sort_unstable();
-
-        let to_remove = self.flows.len() - target_max;
-        let mut evicted = 0;
-        for (_, flow_id) in order {
-            if evicted >= to_remove {
-                break;
-            }
-            let is_ref = self.findings.values().any(|sf| {
-                sf.finding
-                    .evidence_refs
-                    .iter()
-                    .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
-            });
-            if is_ref {
-                for sf in self.findings.values_mut() {
-                    if sf
-                        .finding
-                        .evidence_refs
-                        .iter()
-                        .any(|r| matches!(r, EvidenceRef::Flow(id) if *id == flow_id))
-                    {
-                        sf.evidence_expired = true;
-                    }
-                }
-            }
-            self.flows.remove(&flow_id);
-            self.events_by_flow.remove(&flow_id);
-            evicted += 1;
-        }
-        let _ = self.repository.evict_oldest_flows(target_max).await;
-        evicted
+        self.evict_oldest_flows(target_max)
     }
 
     /// Evict oldest sessions down to target count asynchronously.
     pub async fn evict_oldest_sessions_async(&mut self, target_max: usize) -> usize {
-        if self.sessions.len() <= target_max {
-            return 0;
-        }
-        let mut order: Vec<(u64, u64)> = self
-            .sessions
-            .values()
-            .map(|s| (s.start_ts.mono_nanos, s.id))
-            .collect();
-        order.sort_unstable();
-
-        let to_remove = self.sessions.len() - target_max;
-        let mut evicted = 0;
-        for (_, session_id) in order {
-            if evicted >= to_remove {
-                break;
-            }
-            let is_ref = self.findings.values().any(|sf| {
-                sf.finding
-                    .evidence_refs
-                    .iter()
-                    .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
-            });
-            if is_ref {
-                for sf in self.findings.values_mut() {
-                    if sf
-                        .finding
-                        .evidence_refs
-                        .iter()
-                        .any(|r| matches!(r, EvidenceRef::Session(id) if *id == session_id))
-                    {
-                        sf.evidence_expired = true;
-                    }
-                }
-            }
-            self.sessions.remove(&session_id);
-            evicted += 1;
-        }
-        let _ = self.repository.evict_oldest_sessions(target_max).await;
-        evicted
+        self.evict_oldest_sessions(target_max)
     }
 
     /// Attempt to write packet payload bytes. Honors the payload policy
@@ -691,13 +727,14 @@ impl<R: CaptureRepository> CaptureStore<R> {
     /// Idempotently load and hydrate all 6 data entities from the underlying repository into memory.
     /// Replaces previous in-memory state and verifies referential integrity.
     pub async fn load_from_repository(&mut self) -> Result<(), StorageError> {
-        let raw_flows = self.repository.all_flows().await?;
-        let raw_sessions = self.repository.all_sessions().await?;
-        let raw_events = self.repository.all_proto_events().await?;
-        let raw_hosts = self.repository.all_hosts().await?;
-        let raw_resolutions = self.repository.resolutions().await?;
-        let raw_findings = self.repository.all_findings().await?;
+        let snapshot = read_repository_snapshot(&self.repository).await?;
+        self.apply_snapshot(snapshot)
+    }
 
+    /// Replace the in-memory state with `snapshot`, verifying referential
+    /// integrity. The durable counterpart of [`CaptureStore::snapshot`], used to
+    /// restore a previous session's reconstruction at startup.
+    pub fn apply_snapshot(&mut self, snapshot: CaptureStoreSnapshot) -> Result<(), StorageError> {
         // 1. Clear existing in-memory state for idempotent load
         self.flows.clear();
         self.sessions.clear();
@@ -707,12 +744,12 @@ impl<R: CaptureRepository> CaptureStore<R> {
         self.findings.clear();
 
         // 2. Populate flows
-        for flow in raw_flows {
+        for flow in snapshot.flows {
             self.flows.insert(flow.id, flow);
         }
 
         // 3. Populate proto events grouped by flow_id
-        for event in raw_events {
+        for event in snapshot.proto_events {
             self.events_by_flow
                 .entry(event.flow_id)
                 .or_default()
@@ -723,8 +760,7 @@ impl<R: CaptureRepository> CaptureStore<R> {
         }
 
         // 4. Populate sessions & verify referential integrity
-        for session in raw_sessions {
-            // Verify session.flow_ids ⊆ flows.keys()
+        for session in snapshot.sessions {
             for &flow_id in &session.flow_ids {
                 if !self.flows.contains_key(&flow_id) {
                     return Err(StorageError::IntegrityViolation {
@@ -739,20 +775,65 @@ impl<R: CaptureRepository> CaptureStore<R> {
         }
 
         // 5. Populate hosts
-        for (id, host) in raw_hosts {
+        for (id, host) in snapshot.hosts {
             self.hosts.insert(id, host);
         }
 
         // 6. Populate resolutions
-        self.resolutions = raw_resolutions;
+        self.resolutions = snapshot.resolutions.into_iter().collect();
 
         // 7. Populate findings
-        for finding in raw_findings {
+        for finding in snapshot.findings {
             self.findings.insert(finding.finding.id, finding);
         }
 
+        self.recompute_latest_mono();
         Ok(())
     }
+}
+
+/// Read every persisted entity from `repo` into a canonical
+/// [`CaptureStoreSnapshot`].
+///
+/// Free function (rather than a method) so callers that do not own a store —
+/// notably the durable writer thread at startup — can hydrate from a repository
+/// without materialising a second store just to read through it.
+pub async fn read_repository_snapshot<R: CaptureRepository>(
+    repo: &R,
+) -> Result<CaptureStoreSnapshot, StorageError> {
+    let mut flows = repo.all_flows().await?;
+    flows.sort_by_key(|f| (f.first_ts.mono_nanos, f.id));
+
+    let mut sessions = repo.all_sessions().await?;
+    for session in sessions.iter_mut() {
+        session.flow_ids.sort_unstable();
+    }
+    sessions.sort_by_key(|s| (s.start_ts.mono_nanos, s.id));
+
+    let mut proto_events = repo.all_proto_events().await?;
+    proto_events.sort_by_key(|e| (e.ts.mono_nanos, e.flow_id));
+
+    let mut hosts = repo.all_hosts().await?;
+    hosts.sort_by_key(|(id, _)| *id);
+
+    let resolutions = repo.resolutions().await?;
+    let mut resolutions: Vec<(IpAddr, Vec<HostName>)> = resolutions.into_iter().collect();
+    for (_, names) in resolutions.iter_mut() {
+        names.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+    resolutions.sort_by_key(|(ip, _)| *ip);
+
+    let mut findings = repo.all_findings().await?;
+    findings.sort_by_key(|f| f.finding.id);
+
+    Ok(CaptureStoreSnapshot {
+        flows,
+        sessions,
+        proto_events,
+        hosts,
+        resolutions,
+        findings,
+    })
 }
 
 impl CaptureStore<SqliteCaptureRepository> {
@@ -817,24 +898,41 @@ mod tests {
     #[test]
     fn flows_for_session_resolves_ids() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(10, 100), vec![]);
-        store.insert_flow(flow(11, 200), vec![]);
-        store.insert_session(Session {
-            id: 1,
-            process_id: 0,
-            start_ts: Timestamp::new(100, 100),
-            trigger: "t".into(),
-            flow_ids: vec![10, 11],
-        });
+        store
+            .insert_flow(flow(10, 100), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(11, 200), vec![])
+            .expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 1,
+                process_id: 0,
+                start_ts: Timestamp::new(100, 100),
+                trigger: "t".into(),
+                flow_ids: vec![10, 11],
+            })
+            .expect("store write");
         assert_eq!(store.flows_for_session(1).len(), 2);
     }
 
     #[test]
     fn window_query_is_time_bounded_and_sorted() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(1, 300), vec![]);
-        store.insert_flow(flow(2, 100), vec![]);
-        store.insert_flow(flow(3, 500), vec![]);
+        store
+            .insert_flow(flow(1, 300), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(2, 100), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(3, 500), vec![])
+            .expect("store write");
+
         let ids: Vec<u64> = store.flows_in_window(0, 400).iter().map(|f| f.id).collect();
         assert_eq!(ids, vec![2, 1]); // 500 excluded, sorted by time
     }
@@ -842,9 +940,17 @@ mod tests {
     #[test]
     fn retention_respects_evidence_invariant() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(1, 100), vec![]); // oldest
-        store.insert_flow(flow(2, 200), vec![]);
-        store.insert_flow(flow(3, 300), vec![]);
+        store
+            .insert_flow(flow(1, 100), vec![])
+            .expect("store write"); // oldest
+        store
+            .insert_flow(flow(2, 200), vec![])
+            .expect("store write");
+
+        store
+            .insert_flow(flow(3, 300), vec![])
+            .expect("store write");
+
         // A finding references the oldest flow (id 1).
         store
             .insert_finding(Finding {
@@ -872,7 +978,9 @@ mod tests {
         };
         let mut store = CaptureStore::with_config(PayloadPolicy::MetadataOnly, config);
         for i in 1..=20 {
-            store.insert_flow(flow(i, i * 10), vec![]);
+            store
+                .insert_flow(flow(i, i * 10), vec![])
+                .expect("store write");
         }
         // Exceeded 10 flows -> auto evicted down to 50% (5 flows) + inserted rest -> stays bounded below or at 10
         assert!(store.flow_count() <= 10);
@@ -882,13 +990,15 @@ mod tests {
     fn session_eviction_removes_oldest_sessions() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
         for i in 1..=5 {
-            store.insert_session(Session {
-                id: i,
-                process_id: 100 + i,
-                start_ts: Timestamp::new(i * 100, i * 100),
-                trigger: "test".into(),
-                flow_ids: vec![],
-            });
+            store
+                .insert_session(Session {
+                    id: i,
+                    process_id: 100 + i,
+                    start_ts: Timestamp::new(i * 100, i * 100),
+                    trigger: "test".into(),
+                    flow_ids: vec![],
+                })
+                .expect("store write");
         }
         assert_eq!(store.session_count(), 5);
         let evicted = store.evict_oldest_sessions(2);
@@ -966,7 +1076,10 @@ mod tests {
     #[test]
     fn insert_finding_rejects_partially_invalid_refs() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(101, 100), vec![]);
+        store
+            .insert_flow(flow(101, 100), vec![])
+            .expect("store write");
+
         let err = store
             .insert_finding(Finding {
                 id: 303,
@@ -984,14 +1097,19 @@ mod tests {
     #[test]
     fn insert_finding_accepts_multiple_valid_refs() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(101, 100), vec![]);
-        store.insert_session(Session {
-            id: 202,
-            process_id: 1,
-            start_ts: Timestamp::new(100, 100),
-            trigger: "test".into(),
-            flow_ids: vec![101],
-        });
+        store
+            .insert_flow(flow(101, 100), vec![])
+            .expect("store write");
+
+        store
+            .insert_session(Session {
+                id: 202,
+                process_id: 1,
+                start_ts: Timestamp::new(100, 100),
+                trigger: "test".into(),
+                flow_ids: vec![101],
+            })
+            .expect("store write");
         store
             .insert_finding(Finding {
                 id: 303,
@@ -1010,7 +1128,10 @@ mod tests {
     #[test]
     fn insert_finding_accepts_duplicate_valid_refs() {
         let mut store = CaptureStore::new(PayloadPolicy::MetadataOnly);
-        store.insert_flow(flow(101, 100), vec![]);
+        store
+            .insert_flow(flow(101, 100), vec![])
+            .expect("store write");
+
         store
             .insert_finding(Finding {
                 id: 303,

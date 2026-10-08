@@ -1,11 +1,10 @@
 //! # netpulse-storage — persistence
 //!
-//! The three stores from /, tiered by access pattern:
-//! - Tier 1 [`ring::RingBuffer`] — the in-memory ring of newest items (seconds),
-//! - Tier 2 [`timeseries::TimeSeriesStore`] — downsampled metrics (hours→days),
-//! - Tier 3 [`capture_store::CaptureStore`] — the durable flows/sessions/events
-//!   record (SQLite + columnar in the full build; an in-memory backing behind
-//!   the identical query surface for the Phase 1 slice .
+//! The readable model is the in-memory, bounded [`capture_store::CaptureStore`]:
+//! the flows/sessions/events/hosts/findings the engine answers queries from.
+//! Durability is a separate concern handled by [`durable::DurableLog`], a
+//! write-behind SQLite mirror drained by its own thread, so the capture loop and
+//! every query handler stay free of blocking SQL.
 //!
 //! Two privacy/honesty invariants are physical here, not conventional: the
 //! metadata-only **payload policy** default and the
@@ -13,23 +12,21 @@
 #![forbid(unsafe_code)]
 
 pub mod capture_store;
+pub mod durable;
 pub mod error;
-pub mod indexer;
 pub mod migration;
 pub mod models;
 pub mod repository;
-pub mod ring;
-pub mod timeseries;
 
-pub use capture_store::{CaptureStore, StoredFinding};
+pub use capture_store::{
+    read_repository_snapshot, CaptureStore, CaptureStoreSnapshot, StoredFinding,
+};
+pub use durable::{DurableHealth, DurableLog, DurableRecord};
 pub use error::{MigrationError, Result as StorageResult, StorageError};
-pub use indexer::{IncrementalSessionIndexer, SessionIndexMetrics};
 pub use migration::{MigrationManager, MigrationStatus};
 pub use repository::{
     default_db_path, CaptureRepository, MemoryCaptureStore, SqliteCaptureRepository,
 };
-pub use ring::RingBuffer;
-pub use timeseries::{Point, SeriesId, TimeSeriesStore};
 
 use netpulse_core::Result;
 
@@ -96,10 +93,16 @@ impl<R: CaptureRepository> Store for CaptureStore<R> {
         self.policy()
     }
 
+    /// Flush the durable write-behind mirror, waiting until every queued write
+    /// has been attempted and the WAL is checkpointed.
+    ///
+    /// * With a mirror attached, a failure here means data is **not** durable and
+    ///   must be reported (never swallowed).
+    /// * With no mirror attached the store is process-lifetime only; that is
+    ///   reported honestly by [`CaptureStore::is_durable`] / `durable_health`
+    ///   rather than by claiming a successful flush.
     fn flush(&mut self) -> Result<()> {
-        // In-memory backing is always durable-in-process; the SQLite backend
-        // commits the WAL here.
-        Ok(())
+        self.flush_durable(std::time::Duration::from_secs(15))
     }
 }
 

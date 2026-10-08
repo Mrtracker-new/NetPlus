@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ExportFormat, ExportPreview, PayloadLevel } from "@netpulse/contract";
+import type {
+  ExportArtifact,
+  ExportFormat,
+  ExportPreview,
+  PayloadLevel,
+} from "@netpulse/contract";
 import { query, command } from "../ipc";
 
 export type ExportStatus =
@@ -9,6 +14,12 @@ export type ExportStatus =
   | "exporting"
   | "completed"
   | "failed";
+
+function humanBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 function formatProvenance(rawProvenance: string, level: PayloadLevel): string {
   const formattedLevel =
@@ -48,6 +59,10 @@ export function useExportController() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  // The file this session actually wrote. "An export happened" is not actionable;
+  // the path is, so it is kept and shown (and can be opened).
+  const [artifact, setArtifact] = useState<ExportArtifact | null>(null);
+  const [opening, setOpening] = useState(false);
 
   const cacheRef = useRef<Map<string, ExportPreview>>(new Map());
 
@@ -120,10 +135,29 @@ export function useExportController() {
     setStatus("exporting");
     setAnnouncement(`Started export for ${format} format...`);
     try {
-      await command({ kind: "startExport", selection: { kind: "all" }, format, level });
+      const result = await command({
+        kind: "startExport",
+        selection: { kind: "all" },
+        format,
+        level,
+      });
       setStatus("completed");
-      setNotice("Export written locally to disk. Sharing is a separate, explicit action.");
-      setAnnouncement("Export completed successfully.");
+      if (result && result.kind === "artifactWritten") {
+        setArtifact(result.artifact);
+        setNotice(
+          `Export written to ${result.artifact.path} (${humanBytes(
+            result.artifact.bytes
+          )}). Sharing is a separate, explicit action.`
+        );
+        setAnnouncement("Export completed; the file is on disk.");
+      } else {
+        // No artifact reported: say only what is known rather than naming a file.
+        setArtifact(null);
+        setNotice(
+          "Export command completed, but no file path was reported. Sharing is a separate, explicit action."
+        );
+        setAnnouncement("Export completed without a reported file.");
+      }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : String(e);
       setStatus("failed");
@@ -133,6 +167,32 @@ export function useExportController() {
       setBusy(false);
     }
   }, [format, level]);
+
+  /**
+   * Ask the shell to hand the written file to the OS. The shell resolves the
+   * session-scoped artifact id against the files it wrote, so this action can
+   * never open an arbitrary path.
+   */
+  const openArtifact = useCallback(async () => {
+    if (!artifact) return;
+    setOpening(true);
+    setNotice(null);
+    try {
+      const result = await command({ kind: "openExport", id: artifact.id });
+      if (result && result.kind === "artifactOpened") {
+        setNotice(`Opened ${result.artifact.path} with your system's handler.`);
+        setAnnouncement("Export opened.");
+      } else {
+        setNotice("The open command completed without confirming the file was opened.");
+      }
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setNotice(errMsg);
+      setAnnouncement(`Could not open the export: ${errMsg}`);
+    } finally {
+      setOpening(false);
+    }
+  }, [artifact]);
 
   return {
     format,
@@ -145,6 +205,9 @@ export function useExportController() {
     notice,
     setNotice,
     startExport,
+    openArtifact,
+    artifact,
+    opening,
     announcement,
   };
 }

@@ -20,6 +20,9 @@ export function Export() {
     notice,
     setNotice,
     startExport,
+    openArtifact,
+    artifact,
+    opening,
     announcement,
   } = useExportController();
 
@@ -50,6 +53,23 @@ export function Export() {
       ) : preview ? (
         <ExportPreviewCard preview={preview} />
       ) : null}
+
+      {artifact && (
+        <div className="np-export__artifact" role="group" aria-label="Written export file">
+          <p className="np-export__artifact-path" title={artifact.path}>
+            <strong>{artifact.format.toUpperCase()}</strong> · <code>{artifact.path}</code>
+          </p>
+          <Button
+            variant="secondary"
+            disabled={opening}
+            busy={opening}
+            onClick={() => void openArtifact()}
+            style={{ display: "inline-flex", alignItems: "center", gap: "0.4rem" }}
+          >
+            {opening ? t("opening", "Opening…") : t("open_file", "Open File")}
+          </Button>
+        </div>
+      )}
 
       <div className="np-export__actions">
         <Button
